@@ -1,0 +1,2 @@
+# Firebase Admin Go SDK
+
