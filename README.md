@@ -1,2 +1,2 @@
-# firebase-admin-go
-Firebase Go SDK for admin actions
+# Firebase Admin Go SDK
+
