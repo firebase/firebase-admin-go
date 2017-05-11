@@ -87,7 +87,13 @@ func TestCertWithInvalidFile(t *testing.T) {
 }
 
 func TestRefreshToken(t *testing.T) {
-	cred, err := NewRefreshToken("testdata/refresh_token.json")
+	f, err := os.Open("testdata/refresh_token.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	cred, err := NewRefreshToken(f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +138,18 @@ func TestRefreshToken(t *testing.T) {
 func TestRefreshTokenWithInvalidFile(t *testing.T) {
 	invalidFiles := []string{
 		"testdata",
-		"testdata/non_existing.json",
 		"testdata/plain_text.txt",
 		"testdata/service_account.json",
 	}
 
 	for _, tc := range invalidFiles {
-		cred, err := NewRefreshToken(tc)
+		f, err := os.Open(tc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+
+		cred, err := NewRefreshToken(f)
 		if cred != nil {
 			t.Errorf("Expected nil, Got: %v", cred)
 		}
