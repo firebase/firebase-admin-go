@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,35 +25,35 @@ func TestCert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := jwt.Config{
+	want := jwt.Config{
 		Email:        "mock-email@mock-project.iam.gserviceaccount.com",
 		PrivateKeyID: "mock-key-id-1",
 		TokenURL:     "https://accounts.google.com/o/oauth2/token",
 	}
 	got := cred.(*certificate).Config
-	if expected.Email != got.Email {
-		t.Errorf("Expected: %s, Got: %s", expected.Email, got.Email)
+	if want.Email != got.Email {
+		t.Errorf("Email: %q; want: %q", got.Email, want.Email)
 	}
-	if expected.PrivateKeyID != got.PrivateKeyID {
-		t.Errorf("Expected: %s, Got: %s", expected.PrivateKeyID, got.PrivateKeyID)
+	if want.PrivateKeyID != got.PrivateKeyID {
+		t.Errorf("PrivateKeyID: %q; want: %q", got.PrivateKeyID, want.PrivateKeyID)
 	}
-	if expected.TokenURL != got.TokenURL {
-		t.Errorf("Expected: %s, Got: %s", expected.TokenURL, got.TokenURL)
+	if want.TokenURL != got.TokenURL {
+		t.Errorf("TokenURL: %q; want: %q", got.TokenURL, want.TokenURL)
 	}
 	if !reflect.DeepEqual(firebaseScopes, got.Scopes) {
-		t.Errorf("Expected: %v, Got: %v", firebaseScopes, got.Scopes)
+		t.Errorf("Scopes: %v; want: %v", got.Scopes, firebaseScopes)
 	}
 
 	ts := initMockServer()
 	defer ts.Close()
 	got.TokenURL = ts.URL
 
-	token, expiry, err := cred.AccessToken()
+	token, expiry, err := cred.AccessToken(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if token != "mock-token" {
-		t.Errorf("Expected: mock-token, Got: %s", token)
+		t.Errorf("Token: %q; want: %q", token, "mock-token")
 	}
 
 	expiresIn := int64(expiry.Sub(time.Now()) / time.Minute)
@@ -77,11 +78,8 @@ func TestCertWithInvalidFile(t *testing.T) {
 		defer f.Close()
 
 		cred, err := NewCert(f)
-		if cred != nil {
-			t.Errorf("Expected nil, Got: %v", cred)
-		}
-		if err == nil {
-			t.Error("Expected error, Got nil")
+		if cred != nil || err == nil {
+			t.Errorf("NewCert(%q) = (%v, %v); want: (nil, error)", tc, cred, err)
 		}
 	}
 }
@@ -99,34 +97,34 @@ func TestRefreshToken(t *testing.T) {
 	}
 
 	c := cred.(*refreshToken)
-	expected := oauth2.Config{
+	want := oauth2.Config{
 		ClientID:     "mock.apps.googleusercontent.com",
 		ClientSecret: "mock-secret",
 	}
 	got := c.Config
-	if expected.ClientID != got.ClientID {
-		t.Errorf("Expected: %s, Got: %s", expected.ClientID, got.ClientID)
+	if want.ClientID != got.ClientID {
+		t.Errorf("ClientID: %q; want: %q", got.ClientID, want.ClientID)
 	}
-	if expected.ClientSecret != got.ClientSecret {
-		t.Errorf("Expected: %s, Got: %s", expected.ClientSecret, got.ClientSecret)
+	if want.ClientSecret != got.ClientSecret {
+		t.Errorf("ClientSecret: %q; want: %q", got.ClientSecret, want.ClientSecret)
 	}
 	if !reflect.DeepEqual(firebaseScopes, got.Scopes) {
-		t.Errorf("Expected: %v, Got: %v", firebaseScopes, got.Scopes)
+		t.Errorf("Scopes: %v; want: %v", got.Scopes, firebaseScopes)
 	}
 	if c.Token.RefreshToken != "mock-refresh-token" {
-		t.Errorf("Expected: %s, Got: %s", "mock-refresh-token", c.Token.RefreshToken)
+		t.Errorf("RefreshToken: %q; want: %q", c.Token.RefreshToken, "mock-refresh-token")
 	}
 
 	ts := initMockServer()
 	defer ts.Close()
 	got.Endpoint.TokenURL = ts.URL
 
-	token, expiry, err := cred.AccessToken()
+	token, expiry, err := cred.AccessToken(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if token != "mock-token" {
-		t.Errorf("Expected: mock-token, Got: %s", token)
+		t.Errorf("Token: %q; want: %q", token, "mock-token")
 	}
 
 	expiresIn := int64(expiry.Sub(time.Now()) / time.Minute)
@@ -150,11 +148,8 @@ func TestRefreshTokenWithInvalidFile(t *testing.T) {
 		defer f.Close()
 
 		cred, err := NewRefreshToken(f)
-		if cred != nil {
-			t.Errorf("Expected nil, Got: %v", cred)
-		}
-		if err == nil {
-			t.Error("Expected error, Got nil")
+		if cred != nil || err == nil {
+			t.Errorf("NewRefreshToken(%q) = (%v, %v); want: (nil, error)", tc, cred, err)
 		}
 	}
 }
@@ -168,7 +163,8 @@ func TestAppDefault(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
-	cred, err := NewAppDefault()
+	ctx := context.Background()
+	cred, err := NewAppDefault(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,18 +172,18 @@ func TestAppDefault(t *testing.T) {
 	c := cred.(*appDefault)
 	ts := initMockServer()
 	defer ts.Close()
-	deadline := time.Now().Add(time.Hour)
-	c.Credential.TokenSource = &testTokenSource{"mock-token", deadline}
+	want := time.Now().Add(time.Hour)
+	c.Credential.TokenSource = &testTokenSource{"mock-token", want}
 
-	token, expiry, err := cred.AccessToken()
+	token, expiry, err := cred.AccessToken(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if token != "mock-token" {
-		t.Errorf("Expected: mock-token, Got: %s", token)
+		t.Errorf("Token: %q; want: %q", token, "mock-token")
 	}
-	if expiry != deadline {
-		t.Errorf("Expected %v, got %v", deadline, expiry)
+	if expiry != want {
+		t.Errorf("Expiry: %v; want %v", expiry, want)
 	}
 }
 
@@ -200,12 +196,9 @@ func TestAppDefaultWithInvalidFile(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
-	cred, err := NewAppDefault()
-	if cred != nil {
-		t.Errorf("Expected nil, Got: %v", cred)
-	}
-	if err == nil {
-		t.Error("Expected error, Got nil")
+	cred, err := NewAppDefault(context.Background())
+	if cred != nil || err == nil {
+		t.Errorf("NewAppDefault() = (%v, %v); want: (nil, error)", cred, err)
 	}
 }
 
@@ -221,6 +214,8 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
+// initMockServer starts a mock HTTP server that Credential implementations can invoke during tests to obtain OAuth2
+// access tokens.
 func initMockServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

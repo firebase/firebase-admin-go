@@ -1,3 +1,5 @@
+// Package credentials provides functions for creating authentication credentials, which can be used to initialize the
+// Firebase SDK.
 package credentials
 
 import (
@@ -36,7 +38,7 @@ type Credential interface {
 	// implement token caching. The returned token should be valid for authenticating against various Google and
 	// Firebase services that the SDK needs to interact with. Generally, user applications do not have to call
 	// AccessToken directly. The Admin SDK should manage calling AccessToken on behalf of user applications.
-	AccessToken() (string, time.Time, error)
+	AccessToken(ctx context.Context) (string, time.Time, error)
 }
 
 type certificate struct {
@@ -45,8 +47,8 @@ type certificate struct {
 	ProjID string
 }
 
-func (c *certificate) AccessToken() (string, time.Time, error) {
-	source := c.Config.TokenSource(context.Background())
+func (c *certificate) AccessToken(ctx context.Context) (string, time.Time, error) {
+	source := c.Config.TokenSource(ctx)
 	token, err := source.Token()
 	if err != nil {
 		return "", time.Time{}, err
@@ -97,10 +99,9 @@ func NewCert(r io.Reader) (Credential, error) {
 		return nil, errors.New("'private_key_id' field not available")
 	}
 
-	type serviceAcct struct {
+	s := &struct {
 		ProjectID string `json:"project_id"`
-	}
-	s := &serviceAcct{}
+	}{}
 	if err = json.Unmarshal(b, s); err != nil {
 		return nil, err
 	} else if s.ProjectID == "" {
@@ -119,8 +120,8 @@ type refreshToken struct {
 	Token  *oauth2.Token
 }
 
-func (c *refreshToken) AccessToken() (string, time.Time, error) {
-	source := c.Config.TokenSource(context.Background(), c.Token)
+func (c *refreshToken) AccessToken(ctx context.Context) (string, time.Time, error) {
+	source := c.Config.TokenSource(ctx, c.Token)
 	token, err := source.Token()
 	if err != nil {
 		return "", time.Time{}, err
@@ -138,14 +139,13 @@ func NewRefreshToken(r io.Reader) (Credential, error) {
 		return nil, err
 	}
 
-	type refreshTokenFile struct {
+	rt := &struct {
 		Type         string `json:"type"`
 		ClientSecret string `json:"client_secret"`
 		ClientID     string `json:"client_id"`
 		RefreshToken string `json:"refresh_token"`
-	}
-	var rt refreshTokenFile
-	if err := json.Unmarshal(b, &rt); err != nil {
+	}{}
+	if err := json.Unmarshal(b, rt); err != nil {
 		return nil, err
 	}
 	if rt.Type != "authorized_user" {
@@ -173,7 +173,7 @@ type appDefault struct {
 	Credential *google.DefaultCredentials
 }
 
-func (c *appDefault) AccessToken() (string, time.Time, error) {
+func (c *appDefault) AccessToken(ctx context.Context) (string, time.Time, error) {
 	source := c.Credential.TokenSource
 	token, err := source.Token()
 	if err != nil {
@@ -188,8 +188,8 @@ func (c *appDefault) AccessToken() (string, time.Time, error) {
 // particularly useful when deployed in a managed cloud environment such as Google App Engine or Google Compute Engine.
 // Refer https://developers.google.com/identity/protocols/application-default-credentials for more details on how
 // application default credentials work.
-func NewAppDefault() (Credential, error) {
-	cred, err := google.FindDefaultCredentials(context.Background(), firebaseScopes...)
+func NewAppDefault(ctx context.Context) (Credential, error) {
+	cred, err := google.FindDefaultCredentials(ctx, firebaseScopes...)
 	if err != nil {
 		return nil, err
 	}
