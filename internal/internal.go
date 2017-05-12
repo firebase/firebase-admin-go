@@ -10,8 +10,8 @@ import (
 // Each Firebase service exposed from the Admin SDK should implement this interface. This enables the parent Firebase
 // App to gracefully terminate Firebase services when they are no longer needed.
 type AppService interface {
-	// Del gracefully terminates this AppService service by cleaning up any internal state, and releasing
-	// any resources allocated.
+	// Del gracefully terminates this AppService by cleaning up any internal state, and releasing any resources
+	// allocated.
 	Del()
 }
 
