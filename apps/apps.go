@@ -15,18 +15,21 @@ import (
 
 const defaultName string = "[DEFAULT]"
 
+// apps holds all Firebase Apps initialized using this SDK.
 var apps = make(map[string]App)
+
+// mutex guards access to package-level state variables (apps in particular)
 var mutex = &sync.Mutex{}
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 //
 // Client code should initialize an App with a valid authentication credential, and then use it to access
-// the necessary Firebase services.
+// Firebase services.
 type App interface {
 	// Name returns the name of this App.
 	Name() string
 
-	// Credential returns the credential used tp initialize this App.
+	// Credential returns the credential used to initialize this App.
 	Credential() credentials.Credential
 
 	// Auth returns an instance of the auth.Auth service.
@@ -34,9 +37,10 @@ type App interface {
 	// Multiple calls to Auth may return the same value. Auth panics if the App is already deleted.
 	// Auth() auth.Auth
 
-	// Del gracefully terminates and deletes this App.
+	// Del gracefully terminates this App.
 	//
-	// Trying to obtain a Firebase service from the App after a call to Del will panic.
+	// Del stops any services associated with this App, and releases all allocated resources. Trying to obtain a
+	// Firebase service from the App after a call to Del will panic.
 	Del()
 }
 
@@ -47,18 +51,18 @@ type Conf struct {
 }
 
 type appImpl struct {
-	Ctx     *internal.Context
-	Mutex   *sync.Mutex
-	Serv    map[string]internal.AppService
-	Deleted bool
+	Conf     *internal.AppConf
+	Mutex    *sync.Mutex
+	Services map[string]internal.AppService
+	Deleted  bool
 }
 
 func (a *appImpl) Name() string {
-	return a.Ctx.Name
+	return a.Conf.Name
 }
 
 func (a *appImpl) Credential() credentials.Credential {
-	return a.Ctx.Cred
+	return a.Conf.Cred
 }
 
 func (a *appImpl) Del() {
@@ -74,14 +78,16 @@ func (a *appImpl) Del() {
 		delete(apps, a.Name())
 	}
 
-	for _, s := range a.Serv {
+	for _, s := range a.Services {
 		s.Del()
 	}
-	a.Serv = nil
+	a.Services = nil
 	a.Deleted = true
 }
 
-func (a *appImpl) service(id string, fn func() interface{}) interface{} {
+// service returns the AppService identified by the specified ID. If the AppService does not exist yet, the
+// provided function is invoked to initialize a new instance.
+func (a *appImpl) service(id string, fn func() internal.AppService) internal.AppService {
 	a.Mutex.Lock()
 	defer a.Mutex.Unlock()
 	if a.Deleted {
@@ -89,16 +95,16 @@ func (a *appImpl) service(id string, fn func() interface{}) interface{} {
 		if a.Name() == defaultName {
 			msg = "Default app is deleted."
 		} else {
-			msg = fmt.Sprintf("App '%s' is deleted.", a.Name())
+			msg = fmt.Sprintf("App %q is deleted.", a.Name())
 		}
 		panic(msg)
 	}
 
-	var s interface{}
+	var s internal.AppService
 	var ok bool
-	if s, ok = a.Serv[id]; !ok {
+	if s, ok = a.Services[id]; !ok {
 		s = fn()
-		a.Serv[id] = s.(internal.AppService)
+		a.Services[id] = s
 	}
 	return s
 }
@@ -130,21 +136,21 @@ func New(c *Conf) (App, error) {
 	if _, exists := apps[name]; exists {
 		var msg string
 		if name == defaultName {
-			msg = "The default Firebase app already exists. This means you called app.New() multiple " +
+			msg = "The default Firebase app already exists. This means you called apps.New() multiple " +
 				"times. If you want to initialize multiple apps, specify a unique name for each app " +
-				"instance via the app.Options argument passed into app.New()."
+				"instance via the apps.Conf argument passed into apps.New()."
 		} else {
-			msg = fmt.Sprintf("Firebase app named '%s' already exists. This means you called app.New() "+
-				"multiple times with the same name option. Make sure to provide a unique name in the "+
-				"app.Options each time you call app.New().", name)
+			msg = fmt.Sprintf("Firebase app named %q already exists. This means you called apps.New() "+
+				"multiple times with the same name argument. Make sure to provide a unique name in the "+
+				"apps.Conf each time you call apps.New().", name)
 		}
 		return nil, errors.New(msg)
 	}
 
 	a := &appImpl{
-		Ctx:   &internal.Context{Name: name, Cred: cred},
-		Mutex: &sync.Mutex{},
-		Serv:  make(map[string]internal.AppService),
+		Conf:     &internal.AppConf{Name: name, Cred: cred},
+		Mutex:    &sync.Mutex{},
+		Services: make(map[string]internal.AppService),
 	}
 	apps[name] = a
 	return a, nil

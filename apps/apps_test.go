@@ -12,6 +12,37 @@ var conf = &Conf{Cred: cred}
 
 const googAppCreds string = "GOOGLE_APPLICATION_CREDENTIALS"
 
+type testCredential struct{}
+
+func (t *testCredential) AccessToken(ctx context.Context) (string, time.Time, error) {
+	return "mock-token", time.Now().Add(time.Hour), nil
+}
+
+type testAppService struct {
+	Val    string
+	Delete bool
+}
+
+func (t *testAppService) Del() {
+	t.Delete = true
+}
+
+func setGoogleAppCredentials(t *testing.T, path string) string {
+	current := os.Getenv(googAppCreds)
+	if err := os.Setenv(googAppCreds, path); err != nil {
+		t.Fatal(err)
+	}
+	return current
+}
+
+func clearApps() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	for k := range apps {
+		delete(apps, k)
+	}
+}
+
 func TestNewApp(t *testing.T) {
 	defer clearApps()
 
@@ -209,43 +240,12 @@ func TestServiceDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &testAppService{Val: "test"}
-	app.(*appImpl).Serv["test"] = s
+	app.(*appImpl).Services["test"] = s
 	if s.Delete {
 		t.Error("Delete: true; want: false")
 	}
 	app.Del()
 	if !s.Delete {
 		t.Error("Delete: false; want: true")
-	}
-}
-
-type testCredential struct{}
-
-func (t *testCredential) AccessToken(ctx context.Context) (string, time.Time, error) {
-	return "mock-token", time.Now().Add(time.Hour), nil
-}
-
-type testAppService struct {
-	Val    string
-	Delete bool
-}
-
-func (t *testAppService) Del() {
-	t.Delete = true
-}
-
-func setGoogleAppCredentials(t *testing.T, path string) string {
-	current := os.Getenv(googAppCreds)
-	if err := os.Setenv(googAppCreds, path); err != nil {
-		t.Fatal(err)
-	}
-	return current
-}
-
-func clearApps() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	for k := range apps {
-		delete(apps, k)
 	}
 }
