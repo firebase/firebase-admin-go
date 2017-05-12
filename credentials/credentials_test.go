@@ -44,6 +44,8 @@ func TestCert(t *testing.T) {
 		t.Errorf("Scopes: %v; want: %v", got.Scopes, firebaseScopes)
 	}
 
+	// Start a mock token server, and point the Credential to that. AccessToken will contact the server to obtain
+	// OAuth2 tokens.
 	ts := initMockServer()
 	defer ts.Close()
 	got.TokenURL = ts.URL
@@ -115,6 +117,8 @@ func TestRefreshToken(t *testing.T) {
 		t.Errorf("RefreshToken: %q; want: %q", c.Token.RefreshToken, "mock-refresh-token")
 	}
 
+	// Start a mock token server, and point the Credential to that. AccessToken will contact the server to obtain
+	// OAuth2 tokens.
 	ts := initMockServer()
 	defer ts.Close()
 	got.Endpoint.TokenURL = ts.URL
@@ -169,10 +173,8 @@ func TestAppDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := cred.(*appDefault)
-	ts := initMockServer()
-	defer ts.Close()
 	want := time.Now().Add(time.Hour)
+	c := cred.(*appDefault)
 	c.Credential.TokenSource = &testTokenSource{"mock-token", want}
 
 	token, expiry, err := cred.AccessToken(ctx)
