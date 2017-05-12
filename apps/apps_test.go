@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/firebase/firebase-admin-go/internal"
 )
 
 var cred = &testCredential{}
@@ -232,19 +234,37 @@ func TestReinitApp(t *testing.T) {
 	}
 }
 
-func TestServiceDelete(t *testing.T) {
+func TestAppService(t *testing.T) {
 	defer clearApps()
 
 	app, err := New(&Conf{Cred: cred})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &testAppService{Val: "test"}
-	app.(*appImpl).Services["test"] = s
+
+	var c int32
+	fn := func() internal.AppService {
+		c++
+		return &testAppService{Val: "test"}
+	}
+
+	impl := app.(*appImpl)
+	s := impl.service("test", fn).(*testAppService)
+	if c != 1 {
+		t.Errorf("Count: %d; want 1", c)
+	}
 	if s.Delete {
 		t.Error("Delete: true; want: false")
 	}
-	app.Del()
+
+	if impl.service("test", fn) == nil {
+		t.Errorf("service() = nil; want value")
+	}
+	if c != 1 {
+		t.Errorf("Count: %d; want 1", c)
+	}
+
+	impl.Del()
 	if !s.Delete {
 		t.Error("Delete: false; want: true")
 	}
