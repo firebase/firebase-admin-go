@@ -70,7 +70,7 @@ func (a *appImpl) Del() {
 	a.Mutex.Lock()
 	defer a.Mutex.Unlock()
 
-	a.checkDeleted()
+	a.checkNotDeleted()
 	if _, exists := apps[a.Name()]; exists {
 		delete(apps, a.Name())
 	}
@@ -82,7 +82,7 @@ func (a *appImpl) Del() {
 	a.Deleted = true
 }
 
-func (a *appImpl) checkDeleted() {
+func (a *appImpl) checkNotDeleted() {
 	if !a.Deleted {
 		return
 	}
@@ -100,7 +100,7 @@ func (a *appImpl) checkDeleted() {
 func (a *appImpl) service(id string, fn func() internal.AppService) internal.AppService {
 	a.Mutex.Lock()
 	defer a.Mutex.Unlock()
-	a.checkDeleted()
+	a.checkNotDeleted()
 
 	var s internal.AppService
 	var ok bool
