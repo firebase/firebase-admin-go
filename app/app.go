@@ -4,7 +4,6 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -40,7 +39,7 @@ type App interface {
 	// Del gracefully terminates this App.
 	//
 	// Del stops any services associated with this App, and releases all allocated resources. Trying to obtain a
-	// Firebase service from the App after a call to Del will panic.
+	// Firebase service from the App after a call to Del, or calling Del multiple times on an App will panic.
 	Del()
 }
 
@@ -71,9 +70,7 @@ func (a *appImpl) Del() {
 	a.Mutex.Lock()
 	defer a.Mutex.Unlock()
 
-	if a.Deleted {
-		return
-	}
+	a.checkDeleted()
 	if _, exists := apps[a.Name()]; exists {
 		delete(apps, a.Name())
 	}
@@ -85,20 +82,25 @@ func (a *appImpl) Del() {
 	a.Deleted = true
 }
 
+func (a *appImpl) checkDeleted() {
+	if !a.Deleted {
+		return
+	}
+	var msg string
+	if a.Name() == defaultName {
+		msg = "Default app is deleted."
+	} else {
+		msg = fmt.Sprintf("App %q is deleted.", a.Name())
+	}
+	panic(msg)
+}
+
 // service returns the AppService identified by the specified ID. If the AppService does not exist yet, the
 // provided function is invoked to initialize a new instance.
 func (a *appImpl) service(id string, fn func() internal.AppService) internal.AppService {
 	a.Mutex.Lock()
 	defer a.Mutex.Unlock()
-	if a.Deleted {
-		var msg string
-		if a.Name() == defaultName {
-			msg = "Default app is deleted."
-		} else {
-			msg = fmt.Sprintf("App %q is deleted.", a.Name())
-		}
-		panic(msg)
-	}
+	a.checkDeleted()
 
 	var s internal.AppService
 	var ok bool
@@ -115,22 +117,17 @@ func New(c *Conf) (App, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	var name string
-	var cred credentials.Credential
+	if c == nil {
+		return nil, errors.New("configuration must not be nil")
+	} else if c.Cred == nil {
+		return nil, errors.New("configuration must contain a valid Credential")
+	}
 
-	if c == nil || c.Name == "" {
+	var name string
+	if c.Name == "" {
 		name = defaultName
 	} else {
 		name = c.Name
-	}
-
-	if c == nil || c.Cred == nil {
-		var err error
-		if cred, err = credentials.NewAppDefault(context.Background()); err != nil {
-			return nil, err
-		}
-	} else {
-		cred = c.Cred
 	}
 
 	if _, exists := apps[name]; exists {
@@ -148,7 +145,7 @@ func New(c *Conf) (App, error) {
 	}
 
 	a := &appImpl{
-		Conf:     &internal.AppConf{Name: name, Cred: cred},
+		Conf:     &internal.AppConf{Name: name, Cred: c.Cred},
 		Mutex:    &sync.Mutex{},
 		Services: make(map[string]internal.AppService),
 	}

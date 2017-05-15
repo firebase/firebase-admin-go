@@ -83,33 +83,21 @@ func TestNewAppWithName(t *testing.T) {
 	}
 }
 
-func TestNewAppWithDefaults(t *testing.T) {
+func TestNewAppWithNoCredential(t *testing.T) {
 	defer clearApps()
 
-	current := setGoogleAppCredentials(t, "../credentials/testdata/service_account.json")
-	defer setGoogleAppCredentials(t, current)
-
 	got, err := New(&Conf{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Name() != defaultName {
-		t.Errorf("Name: %q; want: %q", got.Name(), defaultName)
+	if got != nil || err == nil {
+		t.Errorf("New({}) = (%v, %v); want (nil, error)", got, err)
 	}
 }
 
 func TestNewAppWithNil(t *testing.T) {
 	defer clearApps()
 
-	current := setGoogleAppCredentials(t, "../credentials/testdata/service_account.json")
-	defer setGoogleAppCredentials(t, current)
-
 	got, err := New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Name() != defaultName {
-		t.Errorf("Name: %q; want: %q", got.Name(), defaultName)
+	if got != nil || err == nil {
+		t.Errorf("New(nil) = (%v, %v); want (nil, error)", got, err)
 	}
 }
 
@@ -199,6 +187,22 @@ func TestDelete(t *testing.T) {
 	if got, err := Get("myApp"); err == nil {
 		t.Errorf("Get('myApp') = (%v, %v); want: (nil, error)", got, err)
 	}
+}
+
+func TestMultipleDelete(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Del() did not panic; want panic")
+		}
+	}()
+
+	a, err := New(&Conf{Cred: cred})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a.Del()
+	a.Del()
 }
 
 func TestReinitApp(t *testing.T) {
