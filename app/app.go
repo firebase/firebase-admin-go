@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/firebase/firebase-admin-go/auth"
 	"github.com/firebase/firebase-admin-go/credentials"
 	"github.com/firebase/firebase-admin-go/internal"
 )
@@ -34,7 +35,7 @@ type App interface {
 	// Auth returns an instance of the auth.Auth service.
 	//
 	// Multiple calls to Auth may return the same value. Auth panics if the App is already deleted.
-	// Auth() auth.Auth
+	Auth() auth.Auth
 
 	// Del gracefully terminates this App.
 	//
@@ -62,6 +63,13 @@ func (a *appImpl) Name() string {
 
 func (a *appImpl) Credential() credentials.Credential {
 	return a.Conf.Cred
+}
+
+func (a *appImpl) Auth() auth.Auth {
+	fn := func() internal.AppService {
+		return auth.New(a.Conf).(internal.AppService)
+	}
+	return a.service("auth", fn).(auth.Auth)
 }
 
 func (a *appImpl) Del() {
