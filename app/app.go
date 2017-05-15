@@ -1,7 +1,7 @@
-// Package apps is the entry point to the Firebase Admin SDK. It provides functionality for initializing and managing
+// Package app is the entry point to the Firebase Admin SDK. It provides functionality for initializing and managing
 // App instances, which serve as central entities that provide access to various other Firebase services exposed from
 // the SDK.
-package apps
+package app
 
 import (
 	"context"
