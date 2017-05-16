@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/firebase/firebase-admin-go/credentials"
 	"github.com/firebase/firebase-admin-go/internal"
 )
 
-const firebaseAudience string = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-const googleCertURL string = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const issuerPrefix string = "https://securetoken.google.com/"
-const gcloudProject string = "GCLOUD_PROJECT"
-const tokenExpSeconds int64 = 3600
+const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+const issuerPrefix = "https://securetoken.google.com/"
+const gcloudProject = "GCLOUD_PROJECT"
+const tokenExpSeconds = 3600
 
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
@@ -23,6 +22,8 @@ var reservedClaims = []string{
 }
 
 var keys keySource = newHTTPKeySource(googleCertURL)
+
+var clk clock = &systemClock{}
 
 // Token represents a decoded Firebase ID token.
 //
@@ -52,9 +53,9 @@ type Auth interface {
 	// all the key-value pairs in the provided map as claims in the resulting JWT.
 	CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error)
 
-	// VerifyIDToken verifies the signature	and payload of the provided JWT.
+	// VerifyIDToken verifies the signature	and payload of the provided ID token.
 
-	// VerifyIDToken accepts a signed token string, and verifies that it is current, issued for the
+	// VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
 	// correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
 	// a Token containing the decoded claims in the input JWT.
 	VerifyIDToken(idToken string) (*Token, error)
@@ -99,7 +100,7 @@ func (a *authImpl) CustomTokenWithClaims(uid string, devClaims map[string]interf
 		return "", errors.New("parent Firebase app instance has been deleted")
 	}
 	if len(uid) == 0 || len(uid) > 128 {
-		return "", errors.New("uid must be non-empty, and less than 128 characters")
+		return "", errors.New("uid must be non-empty, and not longer than 128 characters")
 	}
 
 	var disallowed []string
@@ -119,7 +120,7 @@ func (a *authImpl) CustomTokenWithClaims(uid string, devClaims map[string]interf
 		return "", errors.New("must initialize Firebase App with a credential that supports token signing")
 	}
 
-	now := time.Now().Unix()
+	now := clk.Now().Unix()
 	payload := &customToken{
 		Iss:    signer.ServiceAcctEmail(),
 		Sub:    signer.ServiceAcctEmail(),
@@ -173,17 +174,17 @@ func (a *authImpl) VerifyIDToken(idToken string) (*Token, error) {
 			err = fmt.Errorf("ID token has no 'kid' header")
 		}
 	} else if h.Algorithm != "RS256" {
-		err = fmt.Errorf("ID token has invalid incorrect algorithm. Expected 'RS256' but got '%s'. %s",
+		err = fmt.Errorf("ID token has invalid incorrect algorithm. Expected 'RS256' but got %q. %s",
 			h.Algorithm, verifyTokenMsg)
 	} else if p.Audience != projectID {
-		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected '%s' but got '%s'. %s %s",
+		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected %q but got %q. %s %s",
 			projectID, p.Audience, projectIDMsg, verifyTokenMsg)
 	} else if p.Issuer != issuer {
-		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected '%s' but got '%s'. %s %s",
+		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if p.IssuedAt > time.Now().Unix() {
+	} else if p.IssuedAt > clk.Now().Unix() {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
-	} else if p.Expires < time.Now().Unix() {
+	} else if p.Expires < clk.Now().Unix() {
 		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)
 	} else if p.Subject == "" {
 		err = fmt.Errorf("ID token has empty 'sub' (subject) claim. %s", verifyTokenMsg)

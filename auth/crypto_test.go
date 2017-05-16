@@ -40,14 +40,6 @@ func (r *mockReadCloser) Close() error {
 	return nil
 }
 
-type mockClock struct {
-	now time.Time
-}
-
-func (m *mockClock) Now() time.Time {
-	return m.now
-}
-
 func TestHTTPKeySource(t *testing.T) {
 	data, err := ioutil.ReadFile("../credentials/testdata/public_certs.json")
 	if err != nil {

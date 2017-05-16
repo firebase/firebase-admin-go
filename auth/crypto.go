@@ -26,6 +26,20 @@ type clock interface {
 	Now() time.Time
 }
 
+type systemClock struct{}
+
+func (s systemClock) Now() time.Time {
+	return time.Now()
+}
+
+type mockClock struct {
+	now time.Time
+}
+
+func (m *mockClock) Now() time.Time {
+	return m.now
+}
+
 type keySource interface {
 	Keys() ([]*publicKey, error)
 }
@@ -39,17 +53,6 @@ type httpKeySource struct {
 	CachedKeys []*publicKey
 	ExpiryTime time.Time
 	Clock      clock
-}
-
-type fileKeySource struct {
-	FilePath   string
-	CachedKeys []*publicKey
-}
-
-type systemClock struct{}
-
-func (s systemClock) Now() time.Time {
-	return time.Now()
 }
 
 func newHTTPKeySource(uri string) *httpKeySource {
@@ -69,20 +72,6 @@ func (k *httpKeySource) Keys() ([]*publicKey, error) {
 		}
 	}
 	return k.CachedKeys, nil
-}
-
-func (f *fileKeySource) Keys() ([]*publicKey, error) {
-	if f.CachedKeys == nil {
-		certs, err := ioutil.ReadFile(f.FilePath)
-		if err != nil {
-			return nil, err
-		}
-		f.CachedKeys, err = parsePublicKeys(certs)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return f.CachedKeys, nil
 }
 
 // hasExpired indicates whether the cache has expired.
@@ -118,6 +107,25 @@ func (k *httpKeySource) refreshKeys() error {
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil
+}
+
+type fileKeySource struct {
+	FilePath   string
+	CachedKeys []*publicKey
+}
+
+func (f *fileKeySource) Keys() ([]*publicKey, error) {
+	if f.CachedKeys == nil {
+		certs, err := ioutil.ReadFile(f.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		f.CachedKeys, err = parsePublicKeys(certs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return f.CachedKeys, nil
 }
 
 func findMaxAge(resp *http.Response) (*time.Duration, error) {

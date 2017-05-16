@@ -143,7 +143,7 @@ func TestCustomTokenError(t *testing.T) {
 	for _, tc := range cases {
 		token, err := impl.CustomTokenWithClaims(tc.uid, tc.claims)
 		if token != "" || err == nil {
-			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want: ('', error)", tc.name, token, err)
+			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want: (\"\", error)", tc.name, token, err)
 		}
 	}
 }
@@ -154,12 +154,12 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 
 	token, err := s.CustomToken("user1")
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: ('', error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
 	}
 
 	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: ('', error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
 	}
 }
 
@@ -179,6 +179,7 @@ func TestVerifyIDToken(t *testing.T) {
 
 func TestVerifyIDTokenError(t *testing.T) {
 	keys = testKeys
+	var now int64 = 1000
 	cases := []struct {
 		name  string
 		token string
@@ -190,15 +191,19 @@ func TestVerifyIDTokenError(t *testing.T) {
 		{"EmptySubject", getIDToken(mockIDTokenPayload{"sub": ""})},
 		{"IntSubject", getIDToken(mockIDTokenPayload{"sub": 10})},
 		{"LongSubject", getIDToken(mockIDTokenPayload{"sub": strings.Repeat("a", 129)})},
-		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": time.Now().Unix() + 1000})},
+		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": time.Unix(now+1, 0)})},
 		{"ExpiredToken", getIDToken(mockIDTokenPayload{
-			"iat": time.Now().Unix() - 10000,
-			"exp": time.Now().Unix() - 3600,
+			"iat": time.Unix(now-10, 0),
+			"exp": time.Unix(now-1, 0),
 		})},
 		{"EmptyToken", ""},
 		{"BadFormatToken", "foobar"},
 	}
 
+	clk = &mockClock{now: time.Unix(now, 0)}
+	defer func() {
+		clk = &systemClock{}
+	}()
 	for _, tc := range cases {
 		if _, err := impl.VerifyIDToken(tc.token); err == nil {
 			t.Errorf("VerifyyIDToken(%q) = nil; want error", tc.name)
