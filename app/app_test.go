@@ -273,3 +273,39 @@ func TestAppService(t *testing.T) {
 		t.Error("Delete: false; want: true")
 	}
 }
+
+func TestAuth(t *testing.T) {
+	defer clearApps()
+
+	app1, err := New(&Conf{Cred: cred})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app2, err := New(&Conf{Cred: cred, Name: "myApp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s := app1.Auth(); s == nil {
+		t.Error("Auth() = nil; want auth.Auth")
+	}
+	if s := app2.Auth(); s == nil {
+		t.Error("Auth() = nil; want auth.Auth")
+	}
+}
+
+func TestAuthAfterDeleteApp(t *testing.T) {
+	defer clearApps()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Auth() did not panic; want panic")
+		}
+	}()
+
+	app, err := New(&Conf{Cred: cred})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Del()
+	app.Auth()
+}
