@@ -9,11 +9,11 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -53,18 +53,22 @@ type httpKeySource struct {
 	CachedKeys []*publicKey
 	ExpiryTime time.Time
 	Clock      clock
+	Mutex      *sync.Mutex
 }
 
 func newHTTPKeySource(uri string) *httpKeySource {
 	return &httpKeySource{
 		KeyURI: uri,
 		Clock:  systemClock{},
+		Mutex:  &sync.Mutex{},
 	}
 }
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
 // the cache is stale.
 func (k *httpKeySource) Keys() ([]*publicKey, error) {
+	k.Mutex.Lock()
+	defer k.Mutex.Unlock()
 	if len(k.CachedKeys) == 0 || k.hasExpired() {
 		err := k.refreshKeys()
 		if err != nil && len(k.CachedKeys) == 0 {
@@ -80,7 +84,7 @@ func (k *httpKeySource) hasExpired() bool {
 }
 
 func (k *httpKeySource) refreshKeys() error {
-	fmt.Println("Refreshing")
+	k.CachedKeys = nil
 	if k.HTTPClient == nil {
 		k.HTTPClient = http.DefaultClient
 	}

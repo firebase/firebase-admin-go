@@ -18,9 +18,9 @@ func (m *mockHTTPResponse) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 type mockReadCloser struct {
-	data    string
-	index   int64
-	counter int
+	data       string
+	index      int64
+	closeCount int
 }
 
 func (r *mockReadCloser) Read(p []byte) (n int, err error) {
@@ -36,7 +36,8 @@ func (r *mockReadCloser) Read(p []byte) (n int, err error) {
 }
 
 func (r *mockReadCloser) Close() error {
-	r.counter++
+	r.closeCount++
+	r.index = 0
 	return nil
 }
 
@@ -48,25 +49,24 @@ func TestHTTPKeySource(t *testing.T) {
 
 	mc := &mockClock{now: time.Unix(0, 0)}
 	rc := &mockReadCloser{
-		data:    string(data),
-		counter: 0,
+		data:       string(data),
+		closeCount: 0,
 	}
-	ks := &httpKeySource{
-		HTTPClient: &http.Client{
-			Transport: &mockHTTPResponse{
-				Response: http.Response{
-					Status:     "200 OK",
-					StatusCode: 200,
-					Header: http.Header{
-						"Cache-Control": {"public, max-age=100"},
-					},
-					Body: rc,
+	ks := newHTTPKeySource("http://mock.url")
+	ks.HTTPClient = &http.Client{
+		Transport: &mockHTTPResponse{
+			Response: http.Response{
+				Status:     "200 OK",
+				StatusCode: 200,
+				Header: http.Header{
+					"Cache-Control": {"public, max-age=100"},
 				},
-				Err: nil,
+				Body: rc,
 			},
+			Err: nil,
 		},
-		Clock: mc,
 	}
+	ks.Clock = mc
 
 	exp := time.Unix(100, 0)
 	for i := 0; i <= 100; i++ {
@@ -76,8 +76,8 @@ func TestHTTPKeySource(t *testing.T) {
 		}
 		if len(keys) != 3 {
 			t.Errorf("Keys: %d; want: 3", len(keys))
-		} else if rc.counter != 1 {
-			t.Errorf("Counter: %d; want: 1", rc.counter)
+		} else if rc.closeCount != 1 {
+			t.Errorf("HTTP calls: %d; want: 1", rc.closeCount)
 		} else if ks.ExpiryTime != exp {
 			t.Errorf("Expiry: %v; want: %v", ks.ExpiryTime, exp)
 		}
@@ -91,7 +91,7 @@ func TestHTTPKeySource(t *testing.T) {
 	}
 	if len(keys) != 3 {
 		t.Errorf("Keys: %d; want: 3", len(keys))
-	} else if rc.counter != 2 {
-		t.Errorf("Counter: %d; want: 2", rc.counter)
+	} else if rc.closeCount != 2 {
+		t.Errorf("HTTP calls: %d; want: 2", rc.closeCount)
 	}
 }
