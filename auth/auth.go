@@ -54,7 +54,7 @@ type Auth interface {
 	CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error)
 
 	// VerifyIDToken verifies the signature	and payload of the provided ID token.
-
+	//
 	// VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
 	// correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
 	// a Token containing the decoded claims in the input JWT.
