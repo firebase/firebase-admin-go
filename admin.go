@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/firebase/firebase-admin-go/auth"
 	"github.com/firebase/firebase-admin-go/database"
 	"github.com/firebase/firebase-admin-go/internal"
 	"golang.org/x/net/context"
@@ -89,9 +90,9 @@ func DefaultConfig() (*Config, error) {
 	return config, nil
 }
 
-// Client returns an http.Client for accessing Google APIs.
-func (a *App) Client() *http.Client {
-	return a.hc
+// Auth returns a new Auth client.
+func (a *App) Auth() *auth.Auth {
+	return auth.New(&internal.AuthConfig{Client: a.hc})
 }
 
 // Database returns a new Database client for the default db.
