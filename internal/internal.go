@@ -2,6 +2,9 @@
 package internal
 
 import (
+	"net/http"
+	"net/url"
+
 	"github.com/firebase/firebase-admin-go/credentials"
 )
 
@@ -19,4 +22,11 @@ type AppService interface {
 type AppConf struct {
 	Name string
 	Cred credentials.Credential
+}
+
+// DatabaseConfig contains all the configuration needed to initialize a database
+// client.
+type DatabaseConfig struct {
+	Client *http.Client
+	URL    *url.URL
 }
