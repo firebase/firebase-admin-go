@@ -30,7 +30,7 @@ type keyCache struct {
 	hc   *http.Client
 }
 
-func (k *keyCache) Get(kid string) (*rsa.PublicKey, error) {
+func (k *keyCache) get(kid string) (*rsa.PublicKey, error) {
 	k.Lock()
 	defer k.Unlock()
 
@@ -41,6 +41,10 @@ func (k *keyCache) Get(kid string) (*rsa.PublicKey, error) {
 			return key, nil
 		}
 		return nil, ErrKeyNotFound
+	}
+
+	if k.hc == nil {
+		return nil, fmt.Errorf("no http client defined on key cache")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, googleCertURL, nil)
@@ -70,14 +74,14 @@ func (k *keyCache) Get(kid string) (*rsa.PublicKey, error) {
 		}
 	}
 
-	ks := map[string][]byte{}
+	ks := map[string]string{}
 	if err = json.NewDecoder(resp.Body).Decode(&ks); err != nil {
 		return nil, fmt.Errorf("parsing keys response: %v", err)
 	}
 
 	keys := map[string]*rsa.PublicKey{}
 	for kid, pk := range ks {
-		b, _ := pem.Decode(pk)
+		b, _ := pem.Decode([]byte(pk))
 		if b == nil {
 			return nil, fmt.Errorf("parsing keys: not a pem public key")
 		}

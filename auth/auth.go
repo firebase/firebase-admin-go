@@ -24,22 +24,6 @@ type Auth struct {
 	pid string
 }
 
-// Token represents a decoded Firebase ID token.
-//
-// Token provides typed accessors to the common JWT fields such as Audience
-// (aud) and Expiry (exp). Additionally it provides a UID field, which indicates
-// the user ID of the account to which this token belongs. Any additional JWT
-// claims can be accessed via the Claims map of Token.
-type Token struct {
-	Issuer   string                 `json:"iss"`
-	Audience string                 `json:"aud"`
-	Expires  int64                  `json:"exp"`
-	IssuedAt int64                  `json:"iat"`
-	Subject  string                 `json:"sub,omitempty"`
-	UID      string                 `json:"uid,omitempty"`
-	Claims   map[string]interface{} `json:"-"`
-}
-
 // New creates a new Firebase Auth client.
 func New(c *internal.AuthConfig) *Auth {
 	return &Auth{
