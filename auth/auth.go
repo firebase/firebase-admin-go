@@ -2,14 +2,26 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/firebase/firebase-admin-go/internal"
 )
 
+const (
+	issuerPrefix = "https://securetoken.google.com/"
+)
+
+var (
+	timeNow = time.Now
+)
+
 // Auth provides methods for creating and validating Firebase Auth tokens.
 type Auth struct {
-	hc *http.Client
+	hc  *http.Client
+	kc  *keyCache
+	pid string
 }
 
 // Token represents a decoded Firebase ID token.
@@ -32,6 +44,10 @@ type Token struct {
 func New(c *internal.AuthConfig) *Auth {
 	return &Auth{
 		hc: c.Client,
+		kc: &keyCache{
+			hc: c.Client,
+		},
+		pid: c.ProjectID,
 	}
 }
 
@@ -54,5 +70,42 @@ func (a *Auth) CustomTokenWithClaims(uid string, claims map[string]interface{}) 
 // correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
 // a Token containing the decoded claims in the input JWT.
 func (a *Auth) VerifyIDToken(idToken string) (*Token, error) {
-	return nil, errors.New("Not yet implemented")
+	if idToken == "" {
+		return nil, fmt.Errorf("ID token must be a non-empty string")
+	}
+	if a.pid == "" {
+		return nil, fmt.Errorf("unkown project ID")
+	}
+
+	issuer := issuerPrefix + a.pid
+
+	t, err := a.decodeToken(idToken)
+	if err != nil {
+		return nil, err
+	}
+
+	projectIDMsg := "Make sure the ID token comes from the same Firebase project as the credential used to" +
+		" authenticate this SDK."
+	verifyTokenMsg := "See https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
+		"retrieve a valid ID token."
+
+	switch {
+	case t.Audience != a.pid:
+		return nil, fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected %q but got %q. %s %s",
+			a.pid, t.Audience, projectIDMsg, verifyTokenMsg)
+	case t.Issuer != issuer:
+		return nil, fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
+			issuer, t.Issuer, projectIDMsg, verifyTokenMsg)
+	case t.IssuedAt > timeNow().Unix():
+		return nil, fmt.Errorf("ID token issued at future timestamp: %d", t.IssuedAt)
+	case t.Expires < timeNow().Unix():
+		return nil, fmt.Errorf("ID token has expired. Expired at: %d", t.Expires)
+	case t.Subject == "":
+		return nil, fmt.Errorf("ID token has empty 'sub' (subject) claim. %s", verifyTokenMsg)
+	case len(t.Subject) > 128:
+		return nil, fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters. %s", verifyTokenMsg)
+	}
+
+	t.UID = t.Subject
+	return t, nil
 }

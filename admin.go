@@ -54,6 +54,9 @@ func NewApp(ctx context.Context, opts ...option.ClientOption) (*App, error) {
 
 // NewAppWithConfig creates a new Firebase App with the provided config.
 func NewAppWithConfig(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
+	if config == nil {
+		return nil, fmt.Errorf("invalid config: config must not be nil")
+	}
 	o := []option.ClientOption{
 		option.WithScopes(ScopeReadWrite, "https://www.googleapis.com/auth/userinfo.email" /* we should get rid of this requirement soon */),
 		option.WithUserAgent(userAgent),
@@ -79,12 +82,14 @@ func DefaultConfig() (*Config, error) {
 	c := os.Getenv("FIREBASE_PROJECT")
 	config := &Config{}
 
-	if c == "" {
-		return config, nil
+	if c != "" {
+		if err := json.NewDecoder(strings.NewReader(c)).Decode(config); err != nil {
+			return nil, fmt.Errorf("decoding config: %v", err)
+		}
 	}
 
-	if err := json.NewDecoder(strings.NewReader(c)).Decode(config); err != nil {
-		return nil, fmt.Errorf("decoding config: %v", err)
+	if config.ProjectID == "" {
+		config.ProjectID = os.Getenv("GCLOUD_PROJECT")
 	}
 
 	return config, nil
@@ -92,7 +97,7 @@ func DefaultConfig() (*Config, error) {
 
 // Auth returns a new Auth client.
 func (a *App) Auth() *auth.Auth {
-	return auth.New(&internal.AuthConfig{Client: a.hc})
+	return auth.New(&internal.AuthConfig{Client: a.hc, ProjectID: a.c.ProjectID})
 }
 
 // Database returns a new Database client for the default db.
