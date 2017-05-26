@@ -40,7 +40,11 @@ func (c *Client) decodeToken(tokenString string) (*Token, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("parsing token: invalid signing method: %v", token.Header["alg"])
 		}
-		return c.kc.get(token.Header["kid"].(string))
+		kid, ok := token.Header["kid"].(string)
+		if !ok {
+			return nil, fmt.Errorf("parsing token: missing kid")
+		}
+		return c.kc.get(kid)
 	})
 
 	if err != nil {
