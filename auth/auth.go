@@ -80,14 +80,6 @@ func (a *Auth) VerifyIDToken(idToken string) (*Token, error) {
 	case t.Issuer != issuer:
 		return nil, fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, t.Issuer, projectIDMsg, verifyTokenMsg)
-	case t.IssuedAt > timeNow().Unix():
-		return nil, fmt.Errorf("ID token issued at future timestamp: %d", t.IssuedAt)
-	case t.Expires < timeNow().Unix():
-		return nil, fmt.Errorf("ID token has expired. Expired at: %d", t.Expires)
-	case t.Subject == "":
-		return nil, fmt.Errorf("ID token has empty 'sub' (subject) claim. %s", verifyTokenMsg)
-	case len(t.Subject) > 128:
-		return nil, fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters. %s", verifyTokenMsg)
 	}
 
 	t.UID = t.Subject
