@@ -102,17 +102,17 @@ func DefaultConfig() (*Config, error) {
 }
 
 // Auth returns a new Auth client.
-func (a *App) Auth() *auth.Auth {
-	return auth.New(&internal.AuthConfig{Client: a.hc, ProjectID: a.c.ProjectID})
+func (a *App) Auth() *auth.Client {
+	return auth.NewClient(&internal.AuthConfig{Client: a.hc, ProjectID: a.c.ProjectID})
 }
 
 // Database returns a new Database client for the default db.
-func (a *App) Database() *database.Database {
+func (a *App) Database() *database.Client {
 	return a.databaseWithURL(a.dbURL)
 }
 
 // DatabaseWithURL returns a new Database client for the specified URL.
-func (a *App) DatabaseWithURL(databaseURL string) (*database.Database, error) {
+func (a *App) DatabaseWithURL(databaseURL string) (*database.Client, error) {
 	u, err := url.Parse(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %v", err)
@@ -120,8 +120,8 @@ func (a *App) DatabaseWithURL(databaseURL string) (*database.Database, error) {
 	return a.databaseWithURL(u), nil
 }
 
-func (a *App) databaseWithURL(u *url.URL) *database.Database {
-	return database.New(&internal.DatabaseConfig{Client: a.hc, URL: u})
+func (a *App) databaseWithURL(u *url.URL) *database.Client {
+	return database.NewClient(&internal.DatabaseConfig{Client: a.hc, URL: u})
 }
 
 // Storage returns a Cloud storage client.

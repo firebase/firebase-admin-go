@@ -17,59 +17,59 @@ import (
 	"github.com/firebase/firebase-admin-go/internal"
 )
 
-// Database provides methods for accessing the Firebase Realtime Database.
-type Database struct {
+// Client provides methods for accessing the Firebase Realtime Database.
+type Client struct {
 	hc  *http.Client
 	url *url.URL
 }
 
-// New creates a new Firebase Realtime Database client.
-func New(config *internal.DatabaseConfig) *Database {
-	return &Database{
+// NewClient creates a new Firebase Realtime Database client.
+func NewClient(config *internal.DatabaseConfig) *Client {
+	return &Client{
 		hc:  config.Client,
 		url: config.URL,
 	}
 }
 
 // Get fetches a value from the realtime database at the specified path.
-func (d *Database) Get(ctx context.Context, path string, response interface{}) error {
-	return d.request(ctx, path, http.MethodGet, nil, response)
+func (c *Client) Get(ctx context.Context, path string, response interface{}) error {
+	return c.request(ctx, path, http.MethodGet, nil, response)
 }
 
 // Set PUTs the contents of value at the specified path.
-func (d *Database) Set(ctx context.Context, path string, value, response interface{}) error {
+func (c *Client) Set(ctx context.Context, path string, value, response interface{}) error {
 	b := &bytes.Buffer{}
 	if err := json.NewEncoder(b).Encode(value); err != nil {
 		return fmt.Errorf("encoding value: %v", err)
 	}
-	return d.request(ctx, path, http.MethodPut, b, response)
+	return c.request(ctx, path, http.MethodPut, b, response)
 }
 
 // Update performs a PATCH with the value at the specified path.
-func (d *Database) Update(ctx context.Context, path string, value, response interface{}) error {
+func (c *Client) Update(ctx context.Context, path string, value, response interface{}) error {
 	b := &bytes.Buffer{}
 	if err := json.NewEncoder(b).Encode(value); err != nil {
 		return fmt.Errorf("encoding value: %v", err)
 	}
-	return d.request(ctx, path, http.MethodPatch, b, response)
+	return c.request(ctx, path, http.MethodPatch, b, response)
 }
 
 // Push performs a POST with the value at the specified path.
-func (d *Database) Push(ctx context.Context, path string, value, response interface{}) error {
+func (c *Client) Push(ctx context.Context, path string, value, response interface{}) error {
 	b := &bytes.Buffer{}
 	if err := json.NewEncoder(b).Encode(value); err != nil {
 		return fmt.Errorf("encoding value: %v", err)
 	}
-	return d.request(ctx, path, http.MethodPost, b, response)
+	return c.request(ctx, path, http.MethodPost, b, response)
 }
 
 // Delete removes the data at the specified path.
-func (d *Database) Delete(ctx context.Context, path string) error {
-	return d.request(ctx, path, http.MethodDelete, nil, nil)
+func (c *Client) Delete(ctx context.Context, path string) error {
+	return c.request(ctx, path, http.MethodDelete, nil, nil)
 }
 
-func (d *Database) request(ctx context.Context, path, method string, value io.Reader, response interface{}) error {
-	url, err := d.fullURL(path)
+func (c *Client) request(ctx context.Context, path, method string, value io.Reader, response interface{}) error {
+	url, err := c.fullURL(path)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (d *Database) request(ctx context.Context, path, method string, value io.Re
 		return fmt.Errorf("generating request: %v", err)
 	}
 
-	resp, err := d.hc.Do(req.WithContext(ctx))
+	resp, err := c.hc.Do(req.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("performing request: %v", err)
 	}
@@ -99,19 +99,19 @@ func (d *Database) request(ctx context.Context, path, method string, value io.Re
 	return fmt.Errorf("making request: response body: %q, status code: %d", resp.StatusCode, body)
 }
 
-func (d *Database) fullURL(path string) (string, error) {
+func (c *Client) fullURL(path string) (string, error) {
 	if !strings.HasPrefix(path, "/") {
 		return "", fmt.Errorf(`database path must start with a "/"`)
 	}
-	if d.url.Scheme == "" || d.url.Host == "" {
-		return "", fmt.Errorf("invalid database URL: %q", d.url.String())
+	if c.url.Scheme == "" || c.url.Host == "" {
+		return "", fmt.Errorf("invalid database URL: %q", c.url.String())
 	}
 	if !strings.HasSuffix(path, ".json") {
 		path += ".json"
 	}
 	u := url.URL{
-		Scheme: d.url.Scheme,
-		Host:   d.url.Host,
+		Scheme: c.url.Scheme,
+		Host:   c.url.Host,
 		Path:   path,
 	}
 	return u.String(), nil

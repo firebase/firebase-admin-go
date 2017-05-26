@@ -78,13 +78,13 @@ type Token struct {
 
 // decodeToken decodes a token and verifies the signature. Requires that the
 // token is signed using the RS256 algorithm.
-func (a *Auth) decodeToken(tokenString string) (*Token, error) {
+func (c *Client) decodeToken(tokenString string) (*Token, error) {
 	rc := rawClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, &rc, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("parsing token: invalid signing method: %v", token.Header["alg"])
 		}
-		return a.kc.get(token.Header["kid"].(string))
+		return c.kc.get(token.Header["kid"].(string))
 	})
 
 	if err != nil {
@@ -111,22 +111,22 @@ func (a *Auth) decodeToken(tokenString string) (*Token, error) {
 	if nbf, ok := rc["nbf"].(float64); ok {
 		t.NotBefore = int64(nbf)
 	}
-	for _, c := range reservedClaims {
-		delete(rc, c)
+	for _, k := range reservedClaims {
+		delete(rc, k)
 	}
 	return t, nil
 }
 
-func (a *Auth) encodeToken(rc rawClaims) (string, error) {
-	c, ok := rc["claims"].(map[string]interface{})
+func (c *Client) encodeToken(rc rawClaims) (string, error) {
+	claims, ok := rc["claims"].(map[string]interface{})
 	if !ok {
 		return "", fmt.Errorf("encoding token: invalid claims: %v", rc["claims"])
 	}
-	if len(c) == 0 {
+	if len(claims) == 0 {
 		delete(rc, "claims")
 	}
 	for _, k := range reservedClaims {
-		delete(c, k)
+		delete(claims, k)
 	}
 	email := "some@email.com"
 	rc["iss"] = email

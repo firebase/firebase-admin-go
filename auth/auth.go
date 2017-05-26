@@ -18,16 +18,16 @@ var (
 	timeNow = time.Now
 )
 
-// Auth provides methods for creating and validating Firebase Auth tokens.
-type Auth struct {
+// Client provides methods for creating and validating Firebase Auth tokens.
+type Client struct {
 	hc  *http.Client
 	kc  *keyCache
 	pid string
 }
 
-// New creates a new Firebase Auth client.
-func New(c *internal.AuthConfig) *Auth {
-	return &Auth{
+// NewClient creates a new Firebase Auth client.
+func NewClient(c *internal.AuthConfig) *Client {
+	return &Client{
 		hc: c.Client,
 		kc: &keyCache{
 			hc: c.Client,
@@ -39,18 +39,18 @@ func New(c *internal.AuthConfig) *Auth {
 // CustomToken creates a signed custom authentication token with the specified
 // user ID. The resulting JWT can be used in a Firebase client SDK to trigger an
 // authentication flow.
-func (a *Auth) CustomToken(uid string) (string, error) {
-	return a.CustomTokenWithClaims(uid, nil)
+func (c *Client) CustomToken(uid string) (string, error) {
+	return c.CustomTokenWithClaims(uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
-func (a *Auth) CustomTokenWithClaims(uid string, claims map[string]interface{}) (string, error) {
+func (c *Client) CustomTokenWithClaims(uid string, claims map[string]interface{}) (string, error) {
 	if n := len(uid); n == 0 || n > 128 {
 		return "", fmt.Errorf("creating token: invalid UID: %q", uid)
 	}
 	now := timeNow()
-	return a.encodeToken(rawClaims{
+	return c.encodeToken(rawClaims{
 		"aud":    firebaseAudience,
 		"claims": claims,
 		"exp":    now.Add(customTokenDuration).Unix(),
@@ -64,17 +64,17 @@ func (a *Auth) CustomTokenWithClaims(uid string, claims map[string]interface{}) 
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
 // correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
 // a Token containing the decoded claims in the input JWT.
-func (a *Auth) VerifyIDToken(idToken string) (*Token, error) {
+func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if idToken == "" {
 		return nil, fmt.Errorf("ID token must be a non-empty string")
 	}
-	if a.pid == "" {
+	if c.pid == "" {
 		return nil, fmt.Errorf("unkown project ID")
 	}
 
-	issuer := issuerPrefix + a.pid
+	issuer := issuerPrefix + c.pid
 
-	t, err := a.decodeToken(idToken)
+	t, err := c.decodeToken(idToken)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +85,9 @@ func (a *Auth) VerifyIDToken(idToken string) (*Token, error) {
 		"retrieve a valid ID token."
 
 	switch {
-	case t.Audience != a.pid:
+	case t.Audience != c.pid:
 		return nil, fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected %q but got %q. %s %s",
-			a.pid, t.Audience, projectIDMsg, verifyTokenMsg)
+			c.pid, t.Audience, projectIDMsg, verifyTokenMsg)
 	case t.Issuer != issuer:
 		return nil, fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, t.Issuer, projectIDMsg, verifyTokenMsg)
