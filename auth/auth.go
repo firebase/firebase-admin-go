@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"time"
@@ -20,20 +21,29 @@ var (
 
 // Client provides methods for creating and validating Firebase Auth tokens.
 type Client struct {
-	hc  *http.Client
-	kc  *keyCache
-	pid string
+	hc     *http.Client
+	kc     *keyCache
+	pid, e string
+	pk     *rsa.PrivateKey
 }
 
 // NewClient creates a new Firebase Auth client.
 func NewClient(c *internal.AuthConfig) *Client {
-	return &Client{
+	client := &Client{
 		hc: c.Client,
 		kc: &keyCache{
 			hc: c.Client,
 		},
 		pid: c.ProjectID,
 	}
+	if c.Creds != nil && c.Creds.JWTConfig != nil {
+		client.e = c.Creds.JWTConfig.Email
+		pk, err := internal.ParseKey(c.Creds.JWTConfig.PrivateKey)
+		if err == nil {
+			client.pk = pk
+		}
+	}
+	return client
 }
 
 // CustomToken creates a signed custom authentication token with the specified

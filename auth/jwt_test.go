@@ -2,14 +2,14 @@ package auth
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
+
+	"github.com/firebase/firebase-admin-go/internal"
 )
 
 var (
 	fakePrivateKey = func() *rsa.PrivateKey {
 		// Unused private key used solely for testing jwt functionality.
-		block, _ := pem.Decode([]byte(`
+		key, err := internal.ParseKey([]byte(`
 -----BEGIN RSA PRIVATE KEY-----
 MIIEogIBAAKCAQEAx89EGCCop2dbbjiZOUoyc0IuczSbG5HYl0F2HsZVDqkNya4D
 Lh2+rE3Z+VkQkjLqjz83tkjASBWXl/m0kueKId26T1/R8zj5a566a2WH4CBuP0DF
@@ -38,10 +38,8 @@ lSJx7yKq+KvNh+1VXfUSc66n4/7D+1ZzBEqDoWbWReEw9eXqzPJaM+PGUgk/dDUa
 X+QEGdpIhe1Ga/WO063ujDMW+Nx2I1AJ4icUjiX56mVl0X8Eb40=
 -----END RSA PRIVATE KEY-----
 `))
-
-		key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			panic("Failed to parse private key: " + err.Error())
+			panic(err)
 		}
 		return key
 	}()

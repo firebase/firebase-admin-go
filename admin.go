@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/creds"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 
@@ -46,6 +48,7 @@ type App struct {
 	c     *Config
 	dbURL *url.URL
 	opts  []option.ClientOption
+	creds *google.DefaultCredentials
 }
 
 // NewApp creates a new Firebase App with the default config.
@@ -75,11 +78,19 @@ func NewAppWithConfig(ctx context.Context, config *Config, opts ...option.Client
 	if err != nil {
 		return nil, fmt.Errorf("parsing database URL: %v", err)
 	}
+	c, err := creds.Get(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("fetching credentials: %v", err)
+	}
+	if c != nil && c.ProjectID != "" {
+		config.ProjectID = c.ProjectID
+	}
 	return &App{
 		hc:    hc,
 		c:     config,
 		dbURL: u,
 		opts:  opts,
+		creds: c,
 	}, nil
 }
 
@@ -103,7 +114,11 @@ func DefaultConfig() (*Config, error) {
 
 // Auth returns a new Auth client.
 func (a *App) Auth() *auth.Client {
-	return auth.NewClient(&internal.AuthConfig{Client: a.hc, ProjectID: a.c.ProjectID})
+	return auth.NewClient(&internal.AuthConfig{
+		Client:    a.hc,
+		ProjectID: a.c.ProjectID,
+		Creds:     a.creds,
+	})
 }
 
 // Database returns a new Database client for the default db.
