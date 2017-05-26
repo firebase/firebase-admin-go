@@ -8,7 +8,7 @@ import (
 
 var (
 	fakePrivateKey = func() *rsa.PrivateKey {
-		// Unused private key used solely for testing crypto functionality.
+		// Unused private key used solely for testing jwt functionality.
 		block, _ := pem.Decode([]byte(`
 -----BEGIN RSA PRIVATE KEY-----
 MIIEogIBAAKCAQEAx89EGCCop2dbbjiZOUoyc0IuczSbG5HYl0F2HsZVDqkNya4D
