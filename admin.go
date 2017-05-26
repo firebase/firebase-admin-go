@@ -1,5 +1,5 @@
-// Package admin provides an admin SDK for accessing Firebase features.
-package admin
+// Package firebase provides an admin SDK for accessing Firebase features.
+package firebase
 
 import (
 	"encoding/json"
@@ -51,17 +51,17 @@ type App struct {
 	creds *google.DefaultCredentials
 }
 
-// NewApp creates a new Firebase App with the default config.
-func NewApp(ctx context.Context, opts ...option.ClientOption) (*App, error) {
+// DefaultApp creates a new Firebase App with the default config.
+func DefaultApp(ctx context.Context, opts ...option.ClientOption) (*App, error) {
 	config, err := DefaultConfig()
 	if err != nil {
 		return nil, err
 	}
-	return NewAppWithConfig(ctx, config, opts...)
+	return New(ctx, config, opts...)
 }
 
-// NewAppWithConfig creates a new Firebase App with the provided config.
-func NewAppWithConfig(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
+// New creates a new Firebase App with the provided config.
+func New(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	if config == nil {
 		return nil, fmt.Errorf("invalid config: config must not be nil")
 	}
