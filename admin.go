@@ -13,6 +13,8 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 
+	"cloud.google.com/go/storage"
+
 	"github.com/firebase/firebase-admin-go/auth"
 	"github.com/firebase/firebase-admin-go/database"
 	"github.com/firebase/firebase-admin-go/internal"
@@ -39,9 +41,11 @@ type Config struct {
 
 // App represents a Firebase App.
 type App struct {
+	ctx   context.Context
 	hc    *http.Client
 	c     *Config
 	dbURL *url.URL
+	opts  []option.ClientOption
 }
 
 // NewApp creates a new Firebase App with the default config.
@@ -62,8 +66,8 @@ func NewAppWithConfig(ctx context.Context, config *Config, opts ...option.Client
 		option.WithScopes(ScopeReadWrite, "https://www.googleapis.com/auth/userinfo.email" /* we should get rid of this requirement soon */),
 		option.WithUserAgent(userAgent),
 	}
-	opts = append(o, opts...)
-	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	o = append(o, opts...)
+	hc, _, err := transport.NewHTTPClient(ctx, o...)
 	if err != nil {
 		return nil, fmt.Errorf("dialing: %v", err)
 	}
@@ -75,6 +79,7 @@ func NewAppWithConfig(ctx context.Context, config *Config, opts ...option.Client
 		hc:    hc,
 		c:     config,
 		dbURL: u,
+		opts:  opts,
 	}, nil
 }
 
@@ -117,4 +122,9 @@ func (a *App) DatabaseWithURL(databaseURL string) (*database.Database, error) {
 
 func (a *App) databaseWithURL(u *url.URL) *database.Database {
 	return database.New(&internal.DatabaseConfig{Client: a.hc, URL: u})
+}
+
+// Storage returns a Cloud storage client.
+func (a *App) Storage() (*storage.Client, error) {
+	return storage.NewClient(a.ctx, a.opts...)
 }
