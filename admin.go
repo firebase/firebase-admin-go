@@ -9,12 +9,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/firebase/firebase-admin-go/auth"
-	"github.com/firebase/firebase-admin-go/database"
-	"github.com/firebase/firebase-admin-go/internal"
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
+
+	"github.com/firebase/firebase-admin-go/auth"
+	"github.com/firebase/firebase-admin-go/database"
+	"github.com/firebase/firebase-admin-go/internal"
 )
 
 const (

@@ -12,8 +12,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/firebase/firebase-admin-go/internal"
 	"golang.org/x/net/context"
+
+	"github.com/firebase/firebase-admin-go/internal"
 )
 
 // Database provides methods for accessing the Firebase Realtime Database.

@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,7 +9,9 @@ import (
 )
 
 const (
-	issuerPrefix = "https://securetoken.google.com/"
+	firebaseAudience    = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	issuerPrefix        = "https://securetoken.google.com/"
+	customTokenDuration = 1 * time.Hour
 )
 
 var (
@@ -39,13 +40,23 @@ func New(c *internal.AuthConfig) *Auth {
 // user ID. The resulting JWT can be used in a Firebase client SDK to trigger an
 // authentication flow.
 func (a *Auth) CustomToken(uid string) (string, error) {
-	return "", errors.New("Not yet implemented")
+	return a.CustomTokenWithClaims(uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
 func (a *Auth) CustomTokenWithClaims(uid string, claims map[string]interface{}) (string, error) {
-	return "", errors.New("Not yet implemented")
+	if n := len(uid); n == 0 || n > 128 {
+		return "", fmt.Errorf("creating token: invalid UID: %q", uid)
+	}
+	now := timeNow()
+	return a.encodeToken(rawClaims{
+		"aud":    firebaseAudience,
+		"claims": claims,
+		"exp":    now.Add(customTokenDuration).Unix(),
+		"iat":    now.Unix(),
+		"uid":    uid,
+	})
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
