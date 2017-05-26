@@ -37,8 +37,8 @@ const (
 // This is serializable from the config JSON provided by the UI, and
 // specifically does not contain auth credentials.
 type Config struct {
-	DatabaseURL string `json:"databaseURL"`
-	ProjectID   string `json:"projectId"`
+	DefaultDatabaseURL string `json:"databaseURL"`
+	ProjectID          string `json:"projectId"`
 }
 
 // App represents a Firebase App.
@@ -74,7 +74,7 @@ func New(ctx context.Context, config *Config, opts ...option.ClientOption) (*App
 	if err != nil {
 		return nil, fmt.Errorf("dialing: %v", err)
 	}
-	u, err := url.Parse(config.DatabaseURL)
+	u, err := url.Parse(config.DefaultDatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing database URL: %v", err)
 	}
