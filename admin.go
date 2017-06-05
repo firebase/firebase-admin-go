@@ -140,7 +140,7 @@ func AppFromRefreshToken(ctx context.Context, config *Config, bytes []byte) (*Ap
 		return nil, err
 	}
 	if rt.Type != "authorized_user" {
-		return nil, fmt.Errorf("'type' field is '%s' (expected 'authorized_user')", rt.Type)
+		return nil, fmt.Errorf("'type' field is %q (expected %q)", rt.Type, "authorized_user")
 	} else if rt.ClientID == "" {
 		return nil, fmt.Errorf("'client_id' field not available")
 	} else if rt.ClientSecret == "" {
@@ -179,25 +179,28 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if config == nil {
 		config = &Config{}
 	}
+
+	// TODO: Use creds.Get() when it's available.
 	cred, err := google.FindDefaultCredentials(ctx, firebaseScopes...)
 	if err != nil {
 		return nil, err
 	}
 
-	var jc *jwt.Config
-	// Needs changes from Chris to make the following work.
-	// jc := cred.JWTConfig
-
 	pid := config.ProjectID
-	if pid == "" {
-		pid = projectID(cred.ProjectID)
-	}
+	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
+	if cred != nil {
+		if pid == "" {
+			pid = projectID(cred.ProjectID)
+		}
 
-	o := []option.ClientOption{
-		option.WithScopes(firebaseScopes...),
-		option.WithTokenSource(cred.TokenSource),
+		o = append(o, option.WithTokenSource(cred.TokenSource))
 	}
 	o = append(o, opts...)
+
+	var jc *jwt.Config
+	// TODO: Needs changes from Chris to make the following work.
+	// jc := cred.JWTConfig
+
 	return &App{
 		ctx:       ctx,
 		jwtConf:   jc,
