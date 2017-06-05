@@ -17,12 +17,11 @@ import (
 var jwtConfig *jwt.Config
 var client *Client
 var testIDToken string
-var testKeys keySource
 
 func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
 	h := &jwtHeader{}
 	p := &customToken{}
-	if err := decodeToken(token, testKeys, h, p); err != nil {
+	if err := decodeToken(token, client.ks, h, p); err != nil {
 		t.Fatal(err)
 	}
 
@@ -96,8 +95,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		os.Exit(1)
 	}
+	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	testIDToken = getIDToken(nil)
-	testKeys = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	os.Exit(m.Run())
 }
 
@@ -167,7 +166,6 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	keys = testKeys
 	ft, err := client.VerifyIDToken(testIDToken)
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +179,6 @@ func TestVerifyIDToken(t *testing.T) {
 }
 
 func TestVerifyIDTokenError(t *testing.T) {
-	keys = testKeys
 	var now int64 = 1000
 	cases := []struct {
 		name  string
@@ -215,24 +212,23 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	keys = testKeys
 	projectID := os.Getenv(gcloudProject)
 	defer os.Setenv(gcloudProject, projectID)
 
 	if err := os.Setenv(gcloudProject, ""); err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
+	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.VerifyIDToken(testIDToken); err == nil {
+	c.ks = client.ks
+	if _, err := c.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCustomTokenVerification(t *testing.T) {
-	keys = testKeys
 	token, err := client.CustomToken("user1")
 	if err != nil {
 		t.Fatal(err)
@@ -244,8 +240,12 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	keys = &mockKeySource{nil, errors.New("mock error")}
-	if _, err := client.VerifyIDToken(testIDToken); err == nil {
+	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ks = &mockKeySource{nil, errors.New("mock error")}
+	if _, err := c.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }

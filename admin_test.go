@@ -2,12 +2,17 @@ package admin
 
 import (
 	"context"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	"google.golang.org/api/transport"
+
+	"encoding/json"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/jwt"
@@ -48,6 +53,55 @@ func TestAppFromServiceAcctFile(t *testing.T) {
 	}
 }
 
+func mockServiceAcct(tokenURL string) ([]byte, error) {
+	b, err := ioutil.ReadFile("testdata/service_account.json")
+	if err != nil {
+		return nil, err
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		return nil, err
+	}
+	parsed["token_uri"] = tokenURL
+	return json.Marshal(parsed)
+}
+
+func TestClientOptions(t *testing.T) {
+	ts := initMockServer()
+	defer ts.Close()
+	b, err := mockServiceAcct(ts.URL)
+
+	ctx := context.Background()
+	app, err := AppFromServiceAcct(ctx, nil, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, _, err := transport.NewHTTPClient(ctx, app.opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var bearer string
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bearer = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"output": "test"}`))
+	}))
+	defer service.Close()
+
+	resp, err := client.Get(service.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("Status: %d; want: 200", resp.StatusCode)
+	}
+	if bearer != "Bearer mock-token" {
+		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer mock-token")
+	}
+}
+
 func TestAppFromInvalidServiceAcctFile(t *testing.T) {
 	invalidFiles := []string{
 		"testdata",
@@ -81,6 +135,30 @@ func TestAppFromRefreshTokenFile(t *testing.T) {
 func TestAppFromRefreshTokenFileWithConfig(t *testing.T) {
 	config := &Config{ProjectID: "mock-project-id"}
 	app, err := AppFromRefreshTokenFile(context.Background(), config, "testdata/refresh_token.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.projectID != "mock-project-id" {
+		t.Errorf("Project ID: %q; want: mock-project-id", app.projectID)
+	}
+	if len(app.opts) != 2 {
+		t.Errorf("Client opts: %d; want: 2", len(app.opts))
+	}
+	if app.ctx == nil {
+		t.Error("Context: nil; want: ctx")
+	}
+}
+
+func TestAppFromRefreshTokenWithEnvVar(t *testing.T) {
+	varName := "GCLOUD_PROJECT"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "mock-project-id"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
+	app, err := AppFromRefreshTokenFile(context.Background(), nil, "testdata/refresh_token.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +250,7 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-// initMockServer starts a mock HTTP server that Credential implementations can invoke during tests to obtain OAuth2
+// initMockServer starts a mock HTTP server that Apps can invoke during tests to obtain OAuth2
 // access tokens.
 func initMockServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

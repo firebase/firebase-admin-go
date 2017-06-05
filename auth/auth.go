@@ -23,8 +23,6 @@ var reservedClaims = []string{
 	"exp", "firebase", "iat", "iss", "jti", "nbf", "nonce", "sub",
 }
 
-var keys keySource = newHTTPKeySource(googleCertURL)
-
 var clk clock = &systemClock{}
 
 // Token represents a decoded Firebase ID token.
@@ -58,7 +56,7 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through admin.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
-	client := &Client{ks: keys, projectID: c.ProjectID}
+	client := &Client{ks: newHTTPKeySource(googleCertURL), projectID: c.ProjectID}
 	if c.Config != nil {
 		client.email = c.Config.Email
 		pk, err := parseKey(c.Config.PrivateKey)
@@ -130,7 +128,7 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 
 	h := &jwtHeader{}
 	p := &Token{}
-	if err := decodeToken(idToken, keys, h, p); err != nil {
+	if err := decodeToken(idToken, c.ks, h, p); err != nil {
 		return nil, err
 	}
 
