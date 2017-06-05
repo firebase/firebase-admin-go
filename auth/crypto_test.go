@@ -42,7 +42,7 @@ func (r *mockReadCloser) Close() error {
 }
 
 func TestHTTPKeySource(t *testing.T) {
-	data, err := ioutil.ReadFile("../credentials/testdata/public_certs.json")
+	data, err := ioutil.ReadFile("../testdata/public_certs.json")
 	if err != nil {
 		t.Fatal(err)
 	}
