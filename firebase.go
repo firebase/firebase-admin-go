@@ -57,7 +57,7 @@ func DefaultApp(ctx context.Context, opts ...option.ClientOption) (*App, error) 
 	if err != nil {
 		return nil, err
 	}
-	return New(ctx, config, opts...)
+	return NewApp(ctx, config, opts...)
 }
 
 // NewApp creates a new Firebase App with the provided config.
