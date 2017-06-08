@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,11 +37,18 @@ func NewClient(c *internal.AuthConfig) *Client {
 		},
 		pid: c.ProjectID,
 	}
-	if c.Creds != nil && c.Creds.JWTConfig != nil {
-		client.e = c.Creds.JWTConfig.Email
-		pk, err := internal.ParseKey(c.Creds.JWTConfig.PrivateKey)
-		if err == nil {
-			client.pk = pk
+	if c.Creds != nil && len(c.Creds.JSONKey) > 0 {
+		var f struct {
+			ClientEmail string `json:"client_email"`
+			PrivateKey  string `json:"private_key"`
+		}
+		err := json.Unmarshal(c.Creds.JSONKey, &f)
+		if err == nil && f.ClientEmail != "" && f.PrivateKey != "" {
+			pk, err := internal.ParseKey(f.PrivateKey)
+			if err == nil {
+				client.e = f.ClientEmail
+				client.pk = pk
+			}
 		}
 	}
 	return client

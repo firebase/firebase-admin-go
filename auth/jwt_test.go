@@ -9,7 +9,7 @@ import (
 var (
 	fakePrivateKey = func() *rsa.PrivateKey {
 		// Unused private key used solely for testing jwt functionality.
-		key, err := internal.ParseKey([]byte(`
+		key, err := internal.ParseKey(`
 -----BEGIN RSA PRIVATE KEY-----
 MIIEogIBAAKCAQEAx89EGCCop2dbbjiZOUoyc0IuczSbG5HYl0F2HsZVDqkNya4D
 Lh2+rE3Z+VkQkjLqjz83tkjASBWXl/m0kueKId26T1/R8zj5a566a2WH4CBuP0DF
@@ -37,7 +37,7 @@ gPdPAoGAH1inO+h4HngwIH2jASSI3n0bW+ygjEPj8VmwZbmoe7Ga3KQE0Deemkqe
 lSJx7yKq+KvNh+1VXfUSc66n4/7D+1ZzBEqDoWbWReEw9eXqzPJaM+PGUgk/dDUa
 X+QEGdpIhe1Ga/WO063ujDMW+Nx2I1AJ4icUjiX56mVl0X8Eb40=
 -----END RSA PRIVATE KEY-----
-`))
+`)
 		if err != nil {
 			panic(err)
 		}

@@ -78,6 +78,12 @@ func (c *Client) decodeToken(tokenString string) (*Token, error) {
 }
 
 func (c *Client) encodeToken(rc rawClaims) (string, error) {
+	if c.pk == nil {
+		return "", fmt.Errorf("missing private key")
+	}
+	if c.e == "" {
+		return "", fmt.Errorf("invalid credential")
+	}
 	claims, ok := rc["claims"].(map[string]interface{})
 	if !ok {
 		return "", fmt.Errorf("encoding token: invalid claims: %v", rc["claims"])
@@ -87,12 +93,6 @@ func (c *Client) encodeToken(rc rawClaims) (string, error) {
 	}
 	for _, k := range reservedClaims {
 		delete(claims, k)
-	}
-	if c.pk == nil {
-		return "", fmt.Errorf("missing private key")
-	}
-	if c.e == "" {
-		return "", fmt.Errorf("invalid credential")
 	}
 	rc["iss"] = c.e
 	rc["sub"] = c.e
