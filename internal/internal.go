@@ -2,21 +2,49 @@
 package internal
 
 import (
-	"github.com/firebase/firebase-admin-go/credentials"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+
+	"golang.org/x/oauth2/google"
 )
 
-// AppService represents a service initialized and managed by a Firebase App.
-//
-// Each Firebase service exposed from the Admin SDK should implement this interface. This enables the parent Firebase
-// App to gracefully terminate Firebase services when they are no longer needed.
-type AppService interface {
-	// Del gracefully terminates this AppService by cleaning up any internal state, and releasing any resources
-	// allocated.
-	Del()
+// AuthConfig contains all the configuration needed to initialize an auth
+// client.
+type AuthConfig struct {
+	Client    *http.Client
+	Creds     *google.DefaultCredentials
+	ProjectID string
 }
 
-// AppConf represents the internal state of a Firebase App that is shared across all Firebase services.
-type AppConf struct {
-	Name string
-	Cred credentials.Credential
+// DatabaseConfig contains all the configuration needed to initialize a database
+// client.
+type DatabaseConfig struct {
+	Client *http.Client
+	URL    *url.URL
+}
+
+// ParseKey converts the contents of a private key file to an *rsa.PrivateKey.
+func ParseKey(key string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, fmt.Errorf("no private key data found in: %v", key)
+	}
+	k := block.Bytes
+	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
+	if err != nil {
+		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
+		if err != nil {
+			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
+		}
+	}
+	parsed, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("private key is invalid")
+	}
+	return parsed, nil
 }
