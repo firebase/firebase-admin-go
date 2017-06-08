@@ -60,8 +60,8 @@ func DefaultApp(ctx context.Context, opts ...option.ClientOption) (*App, error) 
 	return New(ctx, config, opts...)
 }
 
-// New creates a new Firebase App with the provided config.
-func New(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
+// NewApp creates a new Firebase App with the provided config.
+func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	if config == nil {
 		return nil, fmt.Errorf("invalid config: config must not be nil")
 	}
