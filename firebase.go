@@ -88,6 +88,9 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if c != nil && c.ProjectID != "" {
 		config.ProjectID = c.ProjectID
 	}
+	if _, err := c.TokenSource.Token(); err != nil {
+		return nil, fmt.Errorf("generating access token: %v", err)
+	}
 	return &App{
 		hc:    hc,
 		c:     config,
