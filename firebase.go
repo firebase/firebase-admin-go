@@ -31,6 +31,9 @@ const (
 
 	// ScopeReadOnly allows read-only access to the realtime database.
 	ScopeReadOnly = "https://www.googleapis.com/auth/firebase.readonly"
+
+	// Version is the version of this SDK.
+	Version = "0.0.1"
 )
 
 // Config defines the Firebase admin configuration options.
