@@ -1,26 +1,27 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/firebase/firebase-admin-go/credentials"
+	"io/ioutil"
+
 	"github.com/firebase/firebase-admin-go/internal"
+	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/jwt"
 )
 
-var cred credentials.Credential
-var impl Auth
+var jwtConfig *jwt.Config
+var client *Client
 var testIDToken string
-var testKeys keySource
 
 func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
 	h := &jwtHeader{}
 	p := &customToken{}
-	if err := decodeToken(token, testKeys, h, p); err != nil {
+	if err := decodeToken(token, client.ks, h, p); err != nil {
 		t.Fatal(err)
 	}
 
@@ -44,11 +45,9 @@ func getIDToken(p mockIDTokenPayload) string {
 }
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
-	signer := cred.(Signer)
-	pid := cred.(ProjectMember).ProjectID()
 	pCopy := mockIDTokenPayload{
-		"aud":   pid,
-		"iss":   "https://securetoken.google.com/" + pid,
+		"aud":   client.projectID,
+		"iss":   "https://securetoken.google.com/" + client.projectID,
 		"iat":   time.Now().Unix() - 100,
 		"exp":   time.Now().Unix() + 3600,
 		"sub":   "1234567890",
@@ -59,7 +58,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	}
 	h := defaultHeader()
 	h.KeyID = kid
-	token, _ := encodeToken(h, pCopy, signer)
+	token, _ := encodeToken(h, pCopy, client.pk)
 	return token
 }
 
@@ -67,12 +66,6 @@ type mockIDTokenPayload map[string]interface{}
 
 func (p mockIDTokenPayload) decode(s string) error {
 	return decode(s, &p)
-}
-
-type mockCredential struct{}
-
-func (c *mockCredential) AccessToken(ctx context.Context) (string, time.Time, error) {
-	return "mock-token", time.Now().Add(time.Hour), nil
 }
 
 type mockKeySource struct {
@@ -85,23 +78,30 @@ func (t *mockKeySource) Keys() ([]*publicKey, error) {
 }
 
 func TestMain(m *testing.M) {
-	file, err := os.Open("../credentials/testdata/service_account.json")
+	data, err := ioutil.ReadFile("../testdata/service_account.json")
 	if err != nil {
 		os.Exit(1)
 	}
-	defer file.Close()
 
-	if cred, err = credentials.NewCert(file); err != nil {
+	jwtConfig, err = google.JWTConfigFromJSON(data)
+	if err != nil {
 		os.Exit(1)
 	}
-	impl = New(&internal.AppConf{Cred: cred})
+
+	client, err = NewClient(&internal.AuthConfig{
+		Config:    jwtConfig,
+		ProjectID: "mock-project-id",
+	})
+	if err != nil {
+		os.Exit(1)
+	}
+	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	testIDToken = getIDToken(nil)
-	testKeys = &fileKeySource{FilePath: "../credentials/testdata/public_certs.json"}
 	os.Exit(m.Run())
 }
 
 func TestCustomToken(t *testing.T) {
-	token, err := impl.CustomToken("user1")
+	token, err := client.CustomToken("user1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		"premium": true,
 		"count":   float64(123),
 	}
-	token, err := impl.CustomTokenWithClaims("user1", claims)
+	token, err := client.CustomTokenWithClaims("user1", claims)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
-	token, err := impl.CustomTokenWithClaims("user1", nil)
+	token, err := client.CustomTokenWithClaims("user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestCustomTokenError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		token, err := impl.CustomTokenWithClaims(tc.uid, tc.claims)
+		token, err := client.CustomTokenWithClaims(tc.uid, tc.claims)
 		if token != "" || err == nil {
 			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want: (\"\", error)", tc.name, token, err)
 		}
@@ -149,8 +149,10 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	c := &mockCredential{}
-	s := New(&internal.AppConf{Cred: c})
+	s, err := NewClient(&internal.AuthConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	token, err := s.CustomToken("user1")
 	if token != "" || err == nil {
@@ -164,8 +166,7 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	keys = testKeys
-	ft, err := impl.VerifyIDToken(testIDToken)
+	ft, err := client.VerifyIDToken(testIDToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +179,6 @@ func TestVerifyIDToken(t *testing.T) {
 }
 
 func TestVerifyIDTokenError(t *testing.T) {
-	keys = testKeys
 	var now int64 = 1000
 	cases := []struct {
 		name  string
@@ -205,64 +205,47 @@ func TestVerifyIDTokenError(t *testing.T) {
 		clk = &systemClock{}
 	}()
 	for _, tc := range cases {
-		if _, err := impl.VerifyIDToken(tc.token); err == nil {
+		if _, err := client.VerifyIDToken(tc.token); err == nil {
 			t.Errorf("VerifyyIDToken(%q) = nil; want error", tc.name)
 		}
 	}
 }
 
-func TestProjectIDEnvVariable(t *testing.T) {
-	keys = testKeys
-	projectID := os.Getenv(gcloudProject)
-	defer os.Setenv(gcloudProject, projectID)
-
-	if err := os.Setenv(gcloudProject, cred.(ProjectMember).ProjectID()); err != nil {
-		t.Fatal(err)
-	}
-	c := &mockCredential{}
-	a := New(&internal.AppConf{Cred: c})
-	ft, err := a.VerifyIDToken(testIDToken)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want: true", ft.Claims["admin"])
-	}
-	if ft.UID != ft.Subject {
-		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
 func TestNoProjectID(t *testing.T) {
-	keys = testKeys
 	projectID := os.Getenv(gcloudProject)
 	defer os.Setenv(gcloudProject, projectID)
 
 	if err := os.Setenv(gcloudProject, ""); err != nil {
 		t.Fatal(err)
 	}
-	c := &mockCredential{}
-	s := New(&internal.AppConf{Cred: c})
-	if _, err := s.VerifyIDToken(testIDToken); err == nil {
+	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ks = client.ks
+	if _, err := c.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCustomTokenVerification(t *testing.T) {
-	keys = testKeys
-	token, err := impl.CustomToken("user1")
+	token, err := client.CustomToken("user1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := impl.VerifyIDToken(token); err == nil {
+	if _, err := client.VerifyIDToken(token); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	keys = &mockKeySource{nil, errors.New("mock error")}
-	if _, err := impl.VerifyIDToken(testIDToken); err == nil {
+	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ks = &mockKeySource{nil, errors.New("mock error")}
+	if _, err := c.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
