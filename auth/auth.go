@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -57,13 +58,24 @@ type Client struct {
 // the Auth service through admin.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
 	client := &Client{ks: newHTTPKeySource(googleCertURL), projectID: c.ProjectID}
-	if c.Config != nil {
-		client.email = c.Config.Email
-		pk, err := parseKey(c.Config.PrivateKey)
-		if err != nil {
-			return nil, err
+	if c.Creds != nil {
+		// TODO: Get JSON from Creds
+		var jsonKey []byte
+		var svcAcct struct {
+			ClientEmail string `json:"client_email"`
+			PrivateKey  string `json:"private_key"`
 		}
-		client.pk = pk
+		err := json.Unmarshal(jsonKey, &svcAcct)
+		if err == nil && svcAcct.ClientEmail != "" && svcAcct.PrivateKey != "" {
+			pk, err := parseKey(svcAcct.PrivateKey)
+			if err != nil {
+				// A private_key field is available, but cannot be parsed. This error should be
+				// presented to the user.
+				return nil, err
+			}
+			client.email = svcAcct.ClientEmail
+			client.pk = pk
+		}
 	}
 	return client, nil
 }
@@ -171,14 +183,15 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	return p, nil
 }
 
-func parseKey(key []byte) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode(key)
-	if block != nil {
-		key = block.Bytes
+func parseKey(key string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, fmt.Errorf("no private key data found in: %v", key)
 	}
-	parsedKey, err := x509.ParsePKCS8PrivateKey(key)
+	k := block.Bytes
+	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
 	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(key)
+		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
 		if err != nil {
 			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
 		}

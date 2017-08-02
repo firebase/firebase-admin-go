@@ -2,11 +2,11 @@
 package internal
 
 import (
-	"golang.org/x/oauth2/jwt"
+	"golang.org/x/oauth2/google"
 )
 
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
-	Config    *jwt.Config
+	Creds     *google.DefaultCredentials
 	ProjectID string
 }

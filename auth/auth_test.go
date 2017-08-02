@@ -1,20 +1,24 @@
 package auth
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"io/ioutil"
+	"golang.org/x/oauth2/google"
+
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 
 	"github.com/firebase/firebase-admin-go/internal"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/jwt"
 )
 
-var jwtConfig *jwt.Config
+var creds *google.DefaultCredentials
 var client *Client
 var testIDToken string
 
@@ -78,24 +82,32 @@ func (t *mockKeySource) Keys() ([]*publicKey, error) {
 }
 
 func TestMain(m *testing.M) {
-	data, err := ioutil.ReadFile("../testdata/service_account.json")
-	if err != nil {
-		os.Exit(1)
-	}
-
-	jwtConfig, err = google.JWTConfigFromJSON(data)
+	var err error
+	opt := option.WithCredentialsFile("../testdata/service_account.json")
+	creds, err = transport.Creds(context.Background(), opt)
 	if err != nil {
 		os.Exit(1)
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
-		Config:    jwtConfig,
+		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
 		os.Exit(1)
 	}
 	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+
+	// TODO: temp hack (remove when the creds expose JSON key)
+	b, err := ioutil.ReadFile("../testdata/service_account.json")
+	var svcAcct struct {
+		PrivateKey  string `json:"private_key"`
+		ClientEmail string `json:"client_email"`
+	}
+	json.Unmarshal(b, &svcAcct)
+	client.pk, _ = parseKey(svcAcct.PrivateKey)
+	client.email = svcAcct.ClientEmail
+
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
 }
@@ -218,7 +230,7 @@ func TestNoProjectID(t *testing.T) {
 	if err := os.Setenv(gcloudProject, ""); err != nil {
 		t.Fatal(err)
 	}
-	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
+	c, err := NewClient(&internal.AuthConfig{Creds: creds})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,12 +252,12 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Config: jwtConfig})
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.ks = &mockKeySource{nil, errors.New("mock error")}
-	if _, err := c.VerifyIDToken(testIDToken); err == nil {
+	ks := client.ks
+	client.ks = &mockKeySource{nil, errors.New("mock error")}
+	defer func() {
+		client.ks = ks
+	}()
+	if _, err := client.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
