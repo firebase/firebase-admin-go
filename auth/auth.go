@@ -81,9 +81,11 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
-// JWT can be used in a Firebase client SDK to trigger an authentication flow.
+// JWT can be used in a Firebase client SDK to trigger an authentication flow. See
+// https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
+// for more details on how to use a custom tokens for client authentication.
 func (c *Client) CustomToken(uid string) (string, error) {
-	return c.CustomTokenWithClaims(uid, make(map[string]interface{}))
+	return c.CustomTokenWithClaims(uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
@@ -129,7 +131,9 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
 // correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
-// a Token containing the decoded claims in the input JWT.
+// a Token containing the decoded claims in the input JWT. See
+// https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
+// more details on how to obtain an ID token in a client app.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")

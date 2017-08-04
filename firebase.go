@@ -1,7 +1,7 @@
-// Package admin is the entry point to the Firebase Admin SDK. It provides functionality for initializing and managing
-// App instances, which serve as central entities that provide access to various other Firebase services exposed from
-// the SDK.
-package admin
+// Package firebase is the entry point to the Firebase Admin SDK. It provides functionality for initializing App
+// instances, which serve as the central entities that provide access to various other Firebase services exposed
+// from the SDK.
+package firebase
 
 import (
 	"context"
@@ -43,11 +43,11 @@ func (a *App) Auth() (*auth.Client, error) {
 	return auth.NewClient(conf)
 }
 
-// NewApp creates a new App from the provided config and options.
+// NewApp creates a new App from the provided config and client options.
 //
-// If the client options contain a credential file (a service account file or a refresh token
-// file), the App will be authenticated using that credential. Otherwise, NewApp inspects the
-// runtime environment to fetch Google application default credentials.
+// If the client options contain a valid credential (a service account file, a refresh token file or an
+// oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
+// authenticate the App with Google application default credentials.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
