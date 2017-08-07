@@ -57,26 +57,31 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through admin.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
-	client := &Client{ks: newHTTPKeySource(googleCertURL), projectID: c.ProjectID}
-	if c.Creds != nil {
-		// TODO: Get JSON from Creds
-		var jsonKey []byte
-		var svcAcct struct {
-			ClientEmail string `json:"client_email"`
-			PrivateKey  string `json:"private_key"`
-		}
-		err := json.Unmarshal(jsonKey, &svcAcct)
-		if err == nil && svcAcct.ClientEmail != "" && svcAcct.PrivateKey != "" {
-			pk, err := parseKey(svcAcct.PrivateKey)
-			if err != nil {
-				// A private_key field is available, but cannot be parsed. This error should be
-				// presented to the user.
-				return nil, err
-			}
-			client.email = svcAcct.ClientEmail
-			client.pk = pk
-		}
+	client := &Client{
+		ks:        newHTTPKeySource(googleCertURL),
+		projectID: c.ProjectID,
 	}
+	if c.Creds == nil || len(c.Creds.JSON) == 0 {
+		return client, nil
+	}
+
+	var svcAcct struct {
+		ClientEmail string `json:"client_email"`
+		PrivateKey  string `json:"private_key"`
+	}
+	err := json.Unmarshal(c.Creds.JSON, &svcAcct)
+	if err != nil {
+		return nil, err
+	}
+
+	if svcAcct.PrivateKey != "" {
+		pk, err := parseKey(svcAcct.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+		client.pk = pk
+	}
+	client.email = svcAcct.ClientEmail
 	return client, nil
 }
 
