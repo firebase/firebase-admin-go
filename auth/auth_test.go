@@ -2,9 +2,7 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -97,16 +95,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
-
-	// TODO: temp hack (remove when the creds expose JSON key)
-	b, err := ioutil.ReadFile("../testdata/service_account.json")
-	var svcAcct struct {
-		PrivateKey  string `json:"private_key"`
-		ClientEmail string `json:"client_email"`
-	}
-	json.Unmarshal(b, &svcAcct)
-	client.pk, _ = parseKey(svcAcct.PrivateKey)
-	client.email = svcAcct.ClientEmail
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
@@ -224,12 +212,6 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	projectID := os.Getenv(gcloudProject)
-	defer os.Setenv(gcloudProject, projectID)
-
-	if err := os.Setenv(gcloudProject, ""); err != nil {
-		t.Fatal(err)
-	}
 	c, err := NewClient(&internal.AuthConfig{Creds: creds})
 	if err != nil {
 		t.Fatal(err)
