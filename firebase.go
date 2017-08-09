@@ -4,13 +4,12 @@
 package firebase
 
 import (
-	"context"
-
 	"github.com/firebase/firebase-admin-go/auth"
 	"github.com/firebase/firebase-admin-go/internal"
 
 	"os"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"

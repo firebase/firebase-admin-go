@@ -1,7 +1,6 @@
 package firebase
 
 import (
-	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 
 	"encoding/json"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )

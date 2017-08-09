@@ -1,13 +1,13 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 
 	"google.golang.org/api/option"

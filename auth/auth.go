@@ -1,3 +1,4 @@
+// Package auth contains functions for minting custom authentication tokens, and verifying Firebase ID tokens.
 package auth
 
 import (

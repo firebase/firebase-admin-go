@@ -1,22 +1,33 @@
+// Package integration contains utilities for running integration tests.
 package integration
 
 import (
-	"context"
 	"io/ioutil"
+
+	"golang.org/x/net/context"
 
 	firebase "github.com/firebase/firebase-admin-go"
 	"google.golang.org/api/option"
 )
 
-// NewAppForTest creates a new App instance that can be used in integration tests.
-func NewAppForTest() (*firebase.App, error) {
-	opt := option.WithCredentialsFile("../testdata/integration_cert.json")
-	return firebase.NewApp(context.Background(), nil, opt)
+const certPath = "../testdata/integration_cert.json"
+const apiKeyPath = "../testdata/integration_apikey.txt"
+
+// NewAppForTest creates a new App instance for integration tests.
+//
+// NewAppForTest looks for a service account JSON file named integration_cert.json
+// in the testdata directory. This file is used to initialize the newly created
+// App instance.
+func NewAppForTest(ctx context.Context) (*firebase.App, error) {
+	return firebase.NewApp(ctx, nil, option.WithCredentialsFile(certPath))
 }
 
-// APIKey fetches a Firebase API key that can be used in integration tests.
+// APIKey fetches a Firebase API key for integration tests.
+//
+// APIKey reads the API key string from a file named integration_apikey.txt
+// in the testdata directory.
 func APIKey() (string, error) {
-	b, err := ioutil.ReadFile("../testdata/integration_apikey.txt")
+	b, err := ioutil.ReadFile(apiKeyPath)
 	if err != nil {
 		return "", err
 	}

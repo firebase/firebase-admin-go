@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/firebase/firebase-admin-go/auth"
+
+	"golang.org/x/net/context"
 )
 
 const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
@@ -24,7 +26,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	app, err := NewAppForTest()
+	app, err := NewAppForTest(context.Background())
 	if err != nil {
 		os.Exit(1)
 	}
