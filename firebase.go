@@ -20,6 +20,9 @@ var firebaseScopes = []string{
 	"https://www.googleapis.com/auth/userinfo.email",
 }
 
+// Version of the Firebase Go Admin SDK.
+const Version = "0.0.1"
+
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
 	ctx       context.Context
@@ -59,8 +62,10 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	var pid string
 	if config != nil && config.ProjectID != "" {
 		pid = config.ProjectID
+	} else if creds.ProjectID != "" {
+		pid = creds.ProjectID
 	} else {
-		pid = projectID(creds.ProjectID)
+		pid = os.Getenv("GCLOUD_PROJECT")
 	}
 
 	return &App{
@@ -69,11 +74,4 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		projectID: pid,
 		opts:      o,
 	}, nil
-}
-
-func projectID(def string) string {
-	if def == "" {
-		return os.Getenv("GCLOUD_PROJECT")
-	}
-	return def
 }
