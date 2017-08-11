@@ -23,11 +23,11 @@ var client *auth.Client
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping tests in short mode.")
+		fmt.Println("skipping auth integration tests in short mode.")
 		os.Exit(0)
 	}
 
-	app, err := internal.NewAppForTest(context.Background())
+	app, err := internal.NewTestApp(context.Background())
 	if err != nil {
 		os.Exit(1)
 	}

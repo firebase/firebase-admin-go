@@ -14,12 +14,12 @@ import (
 const certPath = "../testdata/integration_cert.json"
 const apiKeyPath = "../testdata/integration_apikey.txt"
 
-// NewAppForTest creates a new App instance for integration tests.
+// NewTestApp creates a new App instance for integration tests.
 //
-// NewAppForTest looks for a service account JSON file named integration_cert.json
+// NewTestApp looks for a service account JSON file named integration_cert.json
 // in the testdata directory. This file is used to initialize the newly created
 // App instance.
-func NewAppForTest(ctx context.Context) (*firebase.App, error) {
+func NewTestApp(ctx context.Context) (*firebase.App, error) {
 	return firebase.NewApp(ctx, nil, option.WithCredentialsFile(certPath))
 }
 
