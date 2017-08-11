@@ -1,8 +1,9 @@
-// Package integration contains utilities for running integration tests.
-package integration
+// Package internal contains utilities for running integration tests.
+package internal
 
 import (
 	"io/ioutil"
+	"strings"
 
 	"golang.org/x/net/context"
 
@@ -31,5 +32,5 @@ func APIKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return strings.TrimSpace(string(b)), nil
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/firebase/firebase-admin-go/auth"
+	"github.com/firebase/firebase-admin-go/integration/internal"
 
 	"golang.org/x/net/context"
 )
@@ -26,7 +27,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	app, err := NewAppForTest(context.Background())
+	app, err := internal.NewAppForTest(context.Background())
 	if err != nil {
 		os.Exit(1)
 	}
@@ -97,7 +98,7 @@ func signInWithCustomToken(token string) (string, error) {
 		return "", err
 	}
 
-	apiKey, err := APIKey()
+	apiKey, err := internal.APIKey()
 	if err != nil {
 		return "", err
 	}
