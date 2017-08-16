@@ -1,6 +1,8 @@
+// Package auth contains functions for minting custom authentication tokens, and verifying Firebase ID tokens.
 package auth
 
 import (
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -15,7 +17,6 @@ import (
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
 const issuerPrefix = "https://securetoken.google.com/"
-const gcloudProject = "GCLOUD_PROJECT"
 const tokenExpSeconds = 3600
 
 var reservedClaims = []string{
@@ -54,24 +55,42 @@ type Client struct {
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
-// the Auth service through admin.App.
+// the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
-	client := &Client{ks: newHTTPKeySource(googleCertURL), projectID: c.ProjectID}
-	if c.Config != nil {
-		client.email = c.Config.Email
-		pk, err := parseKey(c.Config.PrivateKey)
+	client := &Client{
+		ks:        newHTTPKeySource(googleCertURL),
+		projectID: c.ProjectID,
+	}
+	if c.Creds == nil || len(c.Creds.JSON) == 0 {
+		return client, nil
+	}
+
+	var svcAcct struct {
+		ClientEmail string `json:"client_email"`
+		PrivateKey  string `json:"private_key"`
+	}
+	err := json.Unmarshal(c.Creds.JSON, &svcAcct)
+	if err != nil {
+		return nil, err
+	}
+
+	if svcAcct.PrivateKey != "" {
+		pk, err := parseKey(svcAcct.PrivateKey)
 		if err != nil {
 			return nil, err
 		}
 		client.pk = pk
 	}
+	client.email = svcAcct.ClientEmail
 	return client, nil
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
-// JWT can be used in a Firebase client SDK to trigger an authentication flow.
+// JWT can be used in a Firebase client SDK to trigger an authentication flow. See
+// https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
+// for more details on how to use custom tokens for client authentication.
 func (c *Client) CustomToken(uid string) (string, error) {
-	return c.CustomTokenWithClaims(uid, make(map[string]interface{}))
+	return c.CustomTokenWithClaims(uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
@@ -117,7 +136,9 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
 // correct Firebase project, and signed by the Google Firebase services in the cloud. It returns
-// a Token containing the decoded claims in the input JWT.
+// a Token containing the decoded claims in the input JWT. See
+// https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
+// more details on how to obtain an ID token in a client app.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -171,14 +192,15 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	return p, nil
 }
 
-func parseKey(key []byte) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode(key)
-	if block != nil {
-		key = block.Bytes
+func parseKey(key string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, fmt.Errorf("no private key data found in: %v", key)
 	}
-	parsedKey, err := x509.ParsePKCS8PrivateKey(key)
+	k := block.Bytes
+	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
 	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(key)
+		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
 		if err != nil {
 			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
 		}

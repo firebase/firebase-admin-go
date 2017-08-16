@@ -1,38 +1,26 @@
-package admin
+package firebase
 
 import (
-	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"reflect"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2/google"
 
 	"google.golang.org/api/transport"
 
 	"encoding/json"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/jwt"
 	"google.golang.org/api/option"
 )
 
-func TestAppFromServiceAcctFile(t *testing.T) {
-	app, err := AppFromServiceAcctFile(context.Background(), nil, "testdata/service_account.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	verifyServiceAcct(t, app)
-}
-
-func TestAppFromServiceAcct(t *testing.T) {
-	b, err := ioutil.ReadFile("testdata/service_account.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	app, err := AppFromServiceAcct(context.Background(), nil, b)
+func TestServiceAcctFile(t *testing.T) {
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,16 +28,16 @@ func TestAppFromServiceAcct(t *testing.T) {
 }
 
 func TestClientOptions(t *testing.T) {
-	ts := initMockServer()
+	ts := initMockTokenServer()
 	defer ts.Close()
-	b, err := mockServiceAcct(ts.URL)
 
-	ctx := context.Background()
-	app, err := AppFromServiceAcct(ctx, nil, b)
+	b, err := mockServiceAcct(ts.URL)
+	config, err := google.JWTConfigFromJSON(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, _, err := transport.NewHTTPClient(ctx, app.opts...)
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithTokenSource(config.TokenSource(ctx)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +50,10 @@ func TestClientOptions(t *testing.T) {
 	}))
 	defer service.Close()
 
+	client, _, err := transport.NewHTTPClient(ctx, app.opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	resp, err := client.Get(service.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -74,25 +66,8 @@ func TestClientOptions(t *testing.T) {
 	}
 }
 
-func TestAppFromInvalidServiceAcctFile(t *testing.T) {
-	invalidFiles := []string{
-		"testdata",
-		"testdata/plain_text.txt",
-		"testdata/refresh_token.json",
-		"testdata/invalid_service_account.json",
-	}
-
-	ctx := context.Background()
-	for _, tc := range invalidFiles {
-		app, err := AppFromServiceAcctFile(ctx, nil, tc)
-		if app != nil || err == nil {
-			t.Errorf("AppFromServiceAcctFile(%q) = (%v, %v); want: (nil, error)", tc, app, err)
-		}
-	}
-}
-
-func TestAppFromRefreshTokenFile(t *testing.T) {
-	app, err := AppFromRefreshTokenFile(context.Background(), nil, "testdata/refresh_token.json")
+func TestRefreshTokenFile(t *testing.T) {
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/refresh_token.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,26 +79,9 @@ func TestAppFromRefreshTokenFile(t *testing.T) {
 	}
 }
 
-func TestAppFromRefreshToken(t *testing.T) {
-	b, err := ioutil.ReadFile("testdata/refresh_token.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	app, err := AppFromRefreshToken(context.Background(), nil, b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(app.opts) != 2 {
-		t.Errorf("Client opts: %d; want: 2", len(app.opts))
-	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
-	}
-}
-
-func TestAppFromRefreshTokenFileWithConfig(t *testing.T) {
+func TestRefreshTokenFileWithConfig(t *testing.T) {
 	config := &Config{ProjectID: "mock-project-id"}
-	app, err := AppFromRefreshTokenFile(context.Background(), config, "testdata/refresh_token.json")
+	app, err := NewApp(context.Background(), config, option.WithCredentialsFile("testdata/refresh_token.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +96,7 @@ func TestAppFromRefreshTokenFileWithConfig(t *testing.T) {
 	}
 }
 
-func TestAppFromRefreshTokenWithEnvVar(t *testing.T) {
+func TestRefreshTokenWithEnvVar(t *testing.T) {
 	varName := "GCLOUD_PROJECT"
 	current := os.Getenv(varName)
 
@@ -147,7 +105,7 @@ func TestAppFromRefreshTokenWithEnvVar(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
-	app, err := AppFromRefreshTokenFile(context.Background(), nil, "testdata/refresh_token.json")
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/refresh_token.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,22 +117,6 @@ func TestAppFromRefreshTokenWithEnvVar(t *testing.T) {
 	}
 	if app.ctx == nil {
 		t.Error("Context: nil; want: ctx")
-	}
-}
-
-func TestAppFromInvalidRefreshTokenFile(t *testing.T) {
-	invalidFiles := []string{
-		"testdata",
-		"testdata/plain_text.txt",
-		"testdata/service_account.json",
-	}
-
-	ctx := context.Background()
-	for _, tc := range invalidFiles {
-		app, err := AppFromRefreshTokenFile(ctx, nil, tc)
-		if app != nil || err == nil {
-			t.Errorf("AppFromRefreshTokenFile(%q) = (%v, %v); want: (nil, error)", tc, app, err)
-		}
 	}
 }
 
@@ -193,8 +135,8 @@ func TestAppDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(app.opts) != 2 {
-		t.Errorf("Client opts: %d; want: 2", len(app.opts))
+	if len(app.opts) != 1 {
+		t.Errorf("Client opts: %d; want: 1", len(app.opts))
 	}
 	if app.ctx == nil {
 		t.Error("Context: nil; want: ctx")
@@ -216,6 +158,21 @@ func TestAppDefaultWithInvalidFile(t *testing.T) {
 	}
 }
 
+func TestInvalidCredentialFile(t *testing.T) {
+	invalidFiles := []string{
+		"testdata",
+		"testdata/plain_text.txt",
+	}
+
+	ctx := context.Background()
+	for _, tc := range invalidFiles {
+		app, err := NewApp(ctx, nil, option.WithCredentialsFile(tc))
+		if app != nil || err == nil {
+			t.Errorf("NewApp(%q) = (%v, %v); want: (nil, error)", tc, app, err)
+		}
+	}
+}
+
 func TestAuth(t *testing.T) {
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
@@ -228,14 +185,6 @@ func TestAuth(t *testing.T) {
 }
 
 func TestCustomTokenSource(t *testing.T) {
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
-
 	ctx := context.Background()
 	ts := &testTokenSource{AccessToken: "mock-token-from-custom"}
 	app, err := NewApp(ctx, nil, option.WithTokenSource(ts))
@@ -281,24 +230,7 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func verifyServiceAcct(t *testing.T, app *App) {
-	want := jwt.Config{
-		Email:        "mock-email@mock-project.iam.gserviceaccount.com",
-		PrivateKeyID: "mock-key-id-1",
-		TokenURL:     "https://accounts.google.com/o/oauth2/token",
-	}
-	got := app.jwtConf
-	if want.Email != got.Email {
-		t.Errorf("Email: %q; want: %q", got.Email, want.Email)
-	}
-	if want.PrivateKeyID != got.PrivateKeyID {
-		t.Errorf("PrivateKeyID: %q; want: %q", got.PrivateKeyID, want.PrivateKeyID)
-	}
-	if want.TokenURL != got.TokenURL {
-		t.Errorf("TokenURL: %q; want: %q", got.TokenURL, want.TokenURL)
-	}
-	if !reflect.DeepEqual(firebaseScopes, got.Scopes) {
-		t.Errorf("Scopes: %v; want: %v", got.Scopes, firebaseScopes)
-	}
+	// TODO: Compare creds JSON
 	if app.projectID != "mock-project-id" {
 		t.Errorf("Project ID: %q; want: %q", app.projectID, "mock-project-id")
 	}
@@ -310,6 +242,8 @@ func verifyServiceAcct(t *testing.T, app *App) {
 	}
 }
 
+// mockServiceAcct generates a service account configuration with the provided URL as the
+// token_url value.
 func mockServiceAcct(tokenURL string) ([]byte, error) {
 	b, err := ioutil.ReadFile("testdata/service_account.json")
 	if err != nil {
@@ -324,9 +258,9 @@ func mockServiceAcct(tokenURL string) ([]byte, error) {
 	return json.Marshal(parsed)
 }
 
-// initMockServer starts a mock HTTP server that Apps can invoke during tests to obtain OAuth2
-// access tokens.
-func initMockServer() *httptest.Server {
+// initMockTokenServer starts a mock HTTP server that Apps can invoke during tests to obtain
+// OAuth2 access tokens.
+func initMockTokenServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{
