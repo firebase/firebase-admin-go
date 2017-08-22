@@ -84,15 +84,15 @@ information on using pull requests.
 
 ### Initial Setup
 
-Use the standard Github and [Go development tools](https://golang.org/doc/cmd)
+Use the standard GitHub and [Go development tools](https://golang.org/doc/cmd)
 to build and test the Firebase Admin SDK. Follow the instructions given in
 the [golang documentation](https://golang.org/doc/code.html) to get your
-`GOPATH` configured correctly. Then execute the following of commands
+`GOPATH` configured correctly. Then execute the following series of commands
 to checkout the sources of Firebase Admin SDK, and its dependencies:
 
 ```bash
 $ cd $GOPATH
-$ git clone https://github.com/firebase/firebase-admin-go.git src/github.com/firebase/firebase-admin-go
+$ git clone https://github.com/firebase/firebase-admin-go.git src/firebase.google.com/go
 $ go get -d gihub.com/firebase/firebase-admin-go/... # Install dependencies
 ```
 
@@ -101,7 +101,7 @@ $ go get -d gihub.com/firebase/firebase-admin-go/... # Install dependencies
 Invoke the `go test` command as follows to build and run the unit tests:
 
 ```bash
-go test -test.short github.com/firebase/firebase-admin-go/...
+go test -test.short firebase.google.com/go/...
 ```
 
 Note the `-test.short` flag passed into the `go test` command. This will skip
@@ -112,18 +112,20 @@ the integration tests, and only execute the unit tests.
 A suite of integration tests are available in the Admin SDK source code.
 These tests are designed to run against an actual Firebase project. Create a new
 project in the [Firebase Console](https://console.firebase.google.com), if you
-do not already have one suitable for running the tests aginst. Then obtain the
+do not already have one suitable for running the tests against. Then obtain the
 following credentials from the project:
 
 1. *Service account certificate*: This can be downloaded as a JSON file from
    the "Settings > Service Accounts" tab of the Firebase console. Copy the
-   file into your workspace as `testdata/integration_cert.json`.
+   file into your workspace as
+   `src/firebase.google.com/go/testdata/integration_cert.json`.
 2. *Web API key*: This is displayed in the "Settings > General" tab of the
    console. Copy it and save to a new text file. Copy this text file into
-   your workspace as `testdata/integration_apikey.txt`.
+   your workspace as
+   `src/firebase.google.com/go/testdata/integration_apikey.txt`.
 
 Now you can invoke the integration test suite as follows:
 
 ```
-go test github.com/firebase/firebase-admin-go/...
+go test firebase.google.com/go/...
 ```

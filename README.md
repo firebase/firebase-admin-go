@@ -13,7 +13,7 @@
 [Firebase](https://firebase.google.com) provides the tools and infrastructure
 you need to develop apps, grow your user base, and earn money. The Firebase
 Admin Go SDK enables access to Firebase services from privileged environments
-(such as servers or cloud) in Golang. Currently this SDK provides
+(such as servers or cloud) in Go. Currently this SDK provides
 Firebase custom authentication support.
 
 For more information, visit the
