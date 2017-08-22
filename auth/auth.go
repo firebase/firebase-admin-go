@@ -25,7 +25,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 
-	"github.com/firebase/firebase-admin-go/internal"
+	"firebase.google.com/go/internal"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"

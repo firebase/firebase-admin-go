@@ -24,8 +24,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/firebase/firebase-admin-go/auth"
-	"github.com/firebase/firebase-admin-go/integration/internal"
+	"firebase.google.com/go/auth"
+	"firebase.google.com/go/integration/internal"
 
 	"golang.org/x/net/context"
 )

@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	firebase "github.com/firebase/firebase-admin-go"
+	firebase "firebase.google.com/go"
 	"google.golang.org/api/option"
 )
 

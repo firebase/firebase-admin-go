@@ -27,7 +27,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 
-	"github.com/firebase/firebase-admin-go/internal"
+	"firebase.google.com/go/internal"
 )
 
 var creds *google.DefaultCredentials
