@@ -18,8 +18,8 @@
 package firebase
 
 import (
-	"github.com/firebase/firebase-admin-go/auth"
-	"github.com/firebase/firebase-admin-go/internal"
+	"firebase.google.com/go/auth"
+	"firebase.google.com/go/internal"
 
 	"os"
 
