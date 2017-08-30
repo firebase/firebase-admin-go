@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/firebase/firebase-admin-go.svg?branch=master)](https://travis-ci.org/firebase/firebase-admin-go)
+
 # Firebase Admin Go SDK
 
 ## Table of Contents
