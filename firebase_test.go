@@ -190,7 +190,7 @@ func TestInvalidCredentialFile(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
-	app, err := NewApp(context.Background(), nil)
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
