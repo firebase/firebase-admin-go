@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -228,6 +230,18 @@ func TestCustomTokenSource(t *testing.T) {
 	}
 	if bearer != "Bearer "+ts.AccessToken {
 		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer "+ts.AccessToken)
+	}
+}
+
+func TestVersion(t *testing.T) {
+	segments := strings.Split(Version, ".")
+	if len(segments) != 3 {
+		t.Errorf("Incorrect number of segments: %d; want: 3", len(segments))
+	}
+	for _, segment := range segments {
+		if _, err := strconv.Atoi(segment); err != nil {
+			t.Errorf("Invalid segment in version number: %q; want integer", segment)
+		}
 	}
 }
 
