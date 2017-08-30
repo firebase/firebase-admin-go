@@ -1,0 +1,4 @@
+language: go
+go_import_path: firebase.google.com/go
+gobuild_args: -v -test.short
+
