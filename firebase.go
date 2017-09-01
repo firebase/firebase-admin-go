@@ -18,8 +18,12 @@
 package firebase
 
 import (
+	"errors"
+	"gocloud-exp/firestore"
+
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/internal"
+	"firebase.google.com/go/storage"
 
 	"os"
 
@@ -39,15 +43,17 @@ const Version = "1.0.0"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
-	ctx       context.Context
-	creds     *google.DefaultCredentials
-	projectID string
-	opts      []option.ClientOption
+	ctx           context.Context
+	creds         *google.DefaultCredentials
+	projectID     string
+	storageBucket string
+	opts          []option.ClientOption
 }
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	ProjectID string
+	ProjectID     string
+	StorageBucket string
 }
 
 // Auth returns an instance of auth.Client.
@@ -57,6 +63,24 @@ func (a *App) Auth() (*auth.Client, error) {
 		ProjectID: a.projectID,
 	}
 	return auth.NewClient(conf)
+}
+
+// Storage returns a new instance of storage.Client.
+func (a *App) storage() (*storage.Client, error) {
+	conf := &internal.StorageConfig{
+		Ctx:    a.ctx,
+		Opts:   a.opts,
+		Bucket: a.storageBucket,
+	}
+	return storage.NewClient(conf)
+}
+
+// Firestore returns a new Firestore client instance.
+func (a *App) Firestore() (*firestore.Client, error) {
+	if a.projectID == "" {
+		return nil, errors.New("project id is required to access Firestore")
+	}
+	return firestore.NewClient(a.ctx, a.projectID, a.opts...)
 }
 
 // NewApp creates a new App from the provided config and client options.
@@ -73,8 +97,12 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		return nil, err
 	}
 
+	if config == nil {
+		config = &Config{}
+	}
+
 	var pid string
-	if config != nil && config.ProjectID != "" {
+	if config.ProjectID != "" {
 		pid = config.ProjectID
 	} else if creds.ProjectID != "" {
 		pid = creds.ProjectID
@@ -83,9 +111,10 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}
 
 	return &App{
-		ctx:       ctx,
-		creds:     creds,
-		projectID: pid,
-		opts:      o,
+		ctx:           ctx,
+		creds:         creds,
+		projectID:     pid,
+		storageBucket: config.StorageBucket,
+		opts:          o,
 	}, nil
 }

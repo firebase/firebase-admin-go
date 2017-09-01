@@ -16,6 +16,9 @@
 package internal
 
 import (
+	"google.golang.org/api/option"
+
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 )
 
@@ -23,4 +26,10 @@ import (
 type AuthConfig struct {
 	Creds     *google.DefaultCredentials
 	ProjectID string
+}
+
+type StorageConfig struct {
+	Ctx    context.Context
+	Opts   []option.ClientOption
+	Bucket string
 }
