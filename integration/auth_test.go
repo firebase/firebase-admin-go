@@ -17,44 +17,22 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
 
-	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
 
-var client *auth.Client
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	if testing.Short() {
-		fmt.Println("skipping auth integration tests in short mode.")
-		os.Exit(0)
-	}
-
-	app, err := internal.NewTestApp(context.Background())
-	if err != nil {
-		os.Exit(1)
-	}
-
-	client, err = app.Auth()
-	if err != nil {
-		os.Exit(1)
-	}
-
-	os.Exit(m.Run())
-}
-
 func TestCustomToken(t *testing.T) {
+	client, err := app.Auth()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ct, err := client.CustomToken("user1")
 	if err != nil {
 		t.Fatal(err)
@@ -75,6 +53,11 @@ func TestCustomToken(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
+	client, err := app.Auth()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ct, err := client.CustomTokenWithClaims("user1", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
@@ -137,5 +120,8 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
+	}
 	return ioutil.ReadAll(resp.Body)
 }

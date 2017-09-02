@@ -34,6 +34,9 @@ import (
 )
 
 var firebaseScopes = []string{
+	"https://www.googleapis.com/auth/cloud-platform",
+	"https://www.googleapis.com/auth/datastore",
+	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
@@ -66,7 +69,7 @@ func (a *App) Auth() (*auth.Client, error) {
 }
 
 // Storage returns a new instance of storage.Client.
-func (a *App) storage() (*storage.Client, error) {
+func (a *App) Storage() (*storage.Client, error) {
 	conf := &internal.StorageConfig{
 		Ctx:    a.ctx,
 		Opts:   a.opts,
@@ -75,7 +78,7 @@ func (a *App) storage() (*storage.Client, error) {
 	return storage.NewClient(conf)
 }
 
-// Firestore returns a new Firestore client instance.
+// Firestore returns a new instance of firestore.Client.
 func (a *App) Firestore() (*firestore.Client, error) {
 	if a.projectID == "" {
 		return nil, errors.New("project id is required to access Firestore")
