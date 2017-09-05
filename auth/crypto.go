@@ -29,6 +29,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 type publicKey struct {
@@ -70,12 +75,17 @@ type httpKeySource struct {
 	Mutex      *sync.Mutex
 }
 
-func newHTTPKeySource(uri string) *httpKeySource {
-	return &httpKeySource{
-		KeyURI: uri,
-		Clock:  systemClock{},
-		Mutex:  &sync.Mutex{},
+func newHTTPKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (*httpKeySource, error) {
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	if err != nil {
+		return nil, err
 	}
+	return &httpKeySource{
+		KeyURI:     uri,
+		HTTPClient: hc,
+		Clock:      systemClock{},
+		Mutex:      &sync.Mutex{},
+	}, nil
 }
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
@@ -99,9 +109,6 @@ func (k *httpKeySource) hasExpired() bool {
 
 func (k *httpKeySource) refreshKeys() error {
 	k.CachedKeys = nil
-	if k.HTTPClient == nil {
-		k.HTTPClient = http.DefaultClient
-	}
 	resp, err := k.HTTPClient.Get(k.KeyURI)
 	if err != nil {
 		return err
