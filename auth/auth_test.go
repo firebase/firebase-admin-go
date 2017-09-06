@@ -103,6 +103,7 @@ func TestMain(m *testing.M) {
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
+		Ctx:       context.Background(),
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
@@ -164,7 +165,7 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(&internal.AuthConfig{})
+	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +228,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Creds: creds})
+	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
 	if err != nil {
 		t.Fatal(err)
 	}
