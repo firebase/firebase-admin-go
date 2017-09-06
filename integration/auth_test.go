@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"testing"
@@ -37,18 +38,18 @@ var client *auth.Client
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping auth integration tests in short mode.")
+		log.Println("skipping auth integration tests in short mode.")
 		os.Exit(0)
 	}
 
 	app, err := internal.NewTestApp(context.Background())
 	if err != nil {
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 
 	client, err = app.Auth()
 	if err != nil {
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 
 	os.Exit(m.Run())
