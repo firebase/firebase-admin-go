@@ -16,6 +16,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -98,14 +99,17 @@ func TestMain(m *testing.M) {
 	opt := option.WithCredentialsFile("../testdata/service_account.json")
 	creds, err = transport.Creds(context.Background(), opt)
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
+		Ctx:       context.Background(),
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
