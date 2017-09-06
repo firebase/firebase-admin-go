@@ -71,8 +71,13 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
+	ks, err := newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
-		ks:        newHTTPKeySource(googleCertURL),
+		ks:        ks,
 		projectID: c.ProjectID,
 	}
 	if c.Creds == nil || len(c.Creds.JSON) == 0 {
@@ -83,8 +88,7 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 		ClientEmail string `json:"client_email"`
 		PrivateKey  string `json:"private_key"`
 	}
-	err := json.Unmarshal(c.Creds.JSON, &svcAcct)
-	if err != nil {
+	if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
 		return nil, err
 	}
 

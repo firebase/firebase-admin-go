@@ -53,8 +53,10 @@ type Config struct {
 // Auth returns an instance of auth.Client.
 func (a *App) Auth() (*auth.Client, error) {
 	conf := &internal.AuthConfig{
+		Ctx:       a.ctx,
 		Creds:     a.creds,
 		ProjectID: a.projectID,
+		Opts:      a.opts,
 	}
 	return auth.NewClient(conf)
 }
