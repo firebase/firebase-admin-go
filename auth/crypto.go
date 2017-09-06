@@ -76,10 +76,17 @@ type httpKeySource struct {
 }
 
 func newHTTPKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (*httpKeySource, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, opts...)
-	if err != nil {
-		return nil, err
+	var hc *http.Client
+	if ctx != nil && len(opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, opts...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hc = http.DefaultClient
 	}
+
 	return &httpKeySource{
 		KeyURI:     uri,
 		HTTPClient: hc,
