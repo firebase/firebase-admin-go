@@ -16,6 +16,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -98,15 +99,16 @@ func TestMain(m *testing.M) {
 	opt := option.WithCredentialsFile("../testdata/service_account.json")
 	creds, err = transport.Creds(context.Background(), opt)
 	if err != nil {
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
+		Ctx:       context.Background(),
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 
@@ -163,7 +165,7 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(&internal.AuthConfig{})
+	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +228,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Creds: creds})
+	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
 	if err != nil {
 		t.Fatal(err)
 	}
