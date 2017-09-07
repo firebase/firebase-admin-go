@@ -35,7 +35,7 @@ var firebaseScopes = []string{
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "1.0.0"
+const Version = "1.0.1"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
