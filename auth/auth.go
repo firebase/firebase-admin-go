@@ -22,8 +22,6 @@ import (
 	"os"
 	"strings"
 
-	"google.golang.org/appengine/log"
-
 	"firebase.google.com/go/internal"
 )
 
@@ -97,7 +95,6 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 	if gdcExist || (len(c.Opts) > 1) {
 		snr, err = newStdSigner(c)
 	} else {
-		log.Debugf(c.Ctx, "? %t", gdcExist)
 		snr, err = newSigner(c)
 	}
 	if err != nil {
