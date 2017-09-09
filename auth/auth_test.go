@@ -27,6 +27,8 @@ import (
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/aetest"
 
 	"firebase.google.com/go/internal"
 )
@@ -75,7 +77,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	}
 	h := defaultHeader()
 	h.KeyID = kid
-	token, _ := encodeToken(h, pCopy, client.pk)
+	token, _ := encodeToken(client.snr, h, pCopy)
 	return token
 }
 
@@ -101,9 +103,19 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	ctx := context.Background()
+	gae := appengine.IsDevAppServer()
+	if gae {
+		aectx, aedone, err := aetest.NewContext()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		ctx = aectx
+		defer aedone()
+	}
 
 	client, err = NewClient(&internal.AuthConfig{
-		Ctx:       context.Background(),
+		Ctx:       ctx,
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
@@ -111,6 +123,12 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	if gae {
+		client.ks, err = newKeySource(ctx, "")
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
@@ -164,36 +182,6 @@ func TestCustomTokenError(t *testing.T) {
 	}
 }
 
-func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	token, err := s.CustomToken("user1")
-	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
-	}
-
-	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
-	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
-	}
-}
-
-func TestVerifyIDToken(t *testing.T) {
-	ft, err := client.VerifyIDToken(testIDToken)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want: true", ft.Claims["admin"])
-	}
-	if ft.UID != ft.Subject {
-		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
 func TestVerifyIDTokenError(t *testing.T) {
 	var now int64 = 1000
 	cases := []struct {
@@ -224,17 +212,6 @@ func TestVerifyIDTokenError(t *testing.T) {
 		if _, err := client.VerifyIDToken(tc.token); err == nil {
 			t.Errorf("VerifyyIDToken(%q) = nil; want error", tc.name)
 		}
-	}
-}
-
-func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.ks = client.ks
-	if _, err := c.VerifyIDToken(testIDToken); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 

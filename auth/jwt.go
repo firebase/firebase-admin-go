@@ -16,10 +16,6 @@ package auth
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -90,7 +86,7 @@ func decode(s string, i interface{}) error {
 	return nil
 }
 
-func encodeToken(h jwtHeader, p jwtPayload, pk *rsa.PrivateKey) (string, error) {
+func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {
 	header, err := encode(h)
 	if err != nil {
 		return "", err
@@ -101,9 +97,7 @@ func encodeToken(h jwtHeader, p jwtPayload, pk *rsa.PrivateKey) (string, error) 
 	}
 
 	ss := fmt.Sprintf("%s.%s", header, payload)
-	hash := sha256.New()
-	hash.Write([]byte(ss))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, pk, crypto.SHA256, hash.Sum(nil))
+	sig, err := s.Sign([]byte(ss))
 	if err != nil {
 		return "", err
 	}

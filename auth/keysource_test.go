@@ -1,3 +1,5 @@
+// +build !appengine
+
 // Copyright 2017 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +27,7 @@ import (
 	"golang.org/x/net/context"
 
 	"google.golang.org/api/option"
+	"google.golang.org/appengine"
 )
 
 type mockHTTPResponse struct {
@@ -82,6 +85,9 @@ func (r *mockReadCloser) Close() error {
 }
 
 func TestHTTPKeySource(t *testing.T) {
+	if appengine.IsDevAppServer() {
+
+	}
 	data, err := ioutil.ReadFile("../testdata/public_certs.json")
 	if err != nil {
 		t.Fatal(err)

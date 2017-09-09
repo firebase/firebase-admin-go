@@ -16,14 +16,10 @@
 package auth
 
 import (
-	"encoding/json"
-	"encoding/pem"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"strings"
-
-	"crypto/rsa"
-	"crypto/x509"
 
 	"firebase.google.com/go/internal"
 )
@@ -62,8 +58,21 @@ type Token struct {
 type Client struct {
 	ks        keySource
 	projectID string
-	email     string
-	pk        *rsa.PrivateKey
+	snr       signer
+}
+
+type signer interface {
+	Email() (string, error)
+	Sign(b []byte) ([]byte, error)
+}
+
+type keySource interface {
+	Keys() ([]*publicKey, error)
+}
+
+type publicKey struct {
+	Kid string
+	Key *rsa.PublicKey
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -71,7 +80,12 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
-	ks, err := newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
+	ks, err := newKeySource(c.Ctx, googleCertURL, c.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	snr, err := newSigner(c)
 	if err != nil {
 		return nil, err
 	}
@@ -79,27 +93,8 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 	client := &Client{
 		ks:        ks,
 		projectID: c.ProjectID,
+		snr:       snr,
 	}
-	if c.Creds == nil || len(c.Creds.JSON) == 0 {
-		return client, nil
-	}
-
-	var svcAcct struct {
-		ClientEmail string `json:"client_email"`
-		PrivateKey  string `json:"private_key"`
-	}
-	if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
-		return nil, err
-	}
-
-	if svcAcct.PrivateKey != "" {
-		pk, err := parseKey(svcAcct.PrivateKey)
-		if err != nil {
-			return nil, err
-		}
-		client.pk = pk
-	}
-	client.email = svcAcct.ClientEmail
 	return client, nil
 }
 
@@ -114,11 +109,9 @@ func (c *Client) CustomToken(uid string) (string, error) {
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
 func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
-	if c.email == "" {
+	iss, err := c.snr.Email()
+	if err != nil {
 		return "", errors.New("service account email not available")
-	}
-	if c.pk == nil {
-		return "", errors.New("private key not available")
 	}
 
 	if len(uid) == 0 || len(uid) > 128 {
@@ -139,15 +132,15 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 
 	now := clk.Now().Unix()
 	payload := &customToken{
-		Iss:    c.email,
-		Sub:    c.email,
+		Iss:    iss,
+		Sub:    iss,
 		Aud:    firebaseAudience,
 		UID:    uid,
 		Iat:    now,
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-	return encodeToken(defaultHeader(), payload, c.pk)
+	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
@@ -208,24 +201,4 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	}
 	p.UID = p.Subject
 	return p, nil
-}
-
-func parseKey(key string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(key))
-	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %v", key)
-	}
-	k := block.Bytes
-	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
-		}
-	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private key is not an RSA key")
-	}
-	return parsed, nil
 }
