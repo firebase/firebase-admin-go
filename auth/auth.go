@@ -19,7 +19,10 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+
+	"google.golang.org/appengine"
 
 	"firebase.google.com/go/internal"
 )
@@ -85,7 +88,18 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 		return nil, err
 	}
 
-	snr, err := newSigner(c)
+	var snr signer
+	// normally the build tags will give us what we want: GAE signer for GAE, Std signer
+	// for  everything else.
+	// BUT when running GAE locally and proper credentials are provided,
+	// users will want the std signer so they can access Firebase remotely.
+	_, gdcExist := os.LookupEnv("GOOGLE_DEFAULT_CREDENTIALS")
+	if appengine.IsDevAppServer() && (gdcExist || (len(c.Opts) > 0)) {
+		snr, err = newStdSigner(c)
+	} else {
+		snr, err = newSigner(c)
+	}
+
 	if err != nil {
 		return nil, err
 	}

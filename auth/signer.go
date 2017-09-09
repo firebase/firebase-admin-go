@@ -1,5 +1,3 @@
-// +build !appengine
-
 // Copyright 2017 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +33,7 @@ type stdSigner struct {
 	pk    *rsa.PrivateKey
 }
 
-func newSigner(c *internal.AuthConfig) (signer, error) {
+func newStdSigner(c *internal.AuthConfig) (signer, error) {
 	var s stdSigner
 	if c.Creds == nil || len(c.Creds.JSON) == 0 {
 		return s, nil
