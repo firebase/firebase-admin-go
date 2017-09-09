@@ -81,18 +81,20 @@ type publicKey struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
-	ks, err := newKeySource(c.Ctx, googleCertURL, c.Opts...)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		err error
+		snr signer
+		ks  keySource
+	)
 
-	var snr signer
-	// normally the build tags will give us what we want: GAE signer for GAE, Std signer
-	// for everything else.
+	// normally the build tags will give us what we want: GAE signer/key source for GAE,
+	// Std signer/key source for everything else.
 	// BUT if any options are provided or the default credentials exist,
 	// users will want the std signer so we use it explicitly.
 	_, gdcExist := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	if gdcExist || (len(c.Opts) > 1) {
+	useStd := gdcExist || (len(c.Opts) > 1)
+
+	if useStd {
 		snr, err = newStdSigner(c)
 	} else {
 		snr, err = newSigner(c)
@@ -101,12 +103,20 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 		return nil, err
 	}
 
-	client := &Client{
+	if useStd {
+		ks, err = newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
+	} else {
+		ks, err = newKeySource(c.Ctx, googleCertURL, c.Opts...)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
 		ks:        ks,
 		projectID: c.ProjectID,
 		snr:       snr,
-	}
-	return client, nil
+	}, nil
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting

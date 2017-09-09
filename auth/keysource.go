@@ -1,5 +1,3 @@
-// +build !appengine
-
 // Copyright 2017 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,10 +39,6 @@ type httpKeySource struct {
 	ExpiryTime time.Time
 	Clock      clock
 	Mutex      *sync.Mutex
-}
-
-func newKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (keySource, error) {
-	return newHTTPKeySource(ctx, uri, opts...)
 }
 
 func newHTTPKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (*httpKeySource, error) {
