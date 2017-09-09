@@ -22,6 +22,8 @@ import (
 	"os"
 	"strings"
 
+	"google.golang.org/appengine/log"
+
 	"firebase.google.com/go/internal"
 )
 
@@ -91,10 +93,11 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 	// for everything else.
 	// BUT if any options are provided or the default credentials exist,
 	// users will want the std signer so we use it explicitly.
-	_, gdcExist := os.LookupEnv("GOOGLE_DEFAULT_CREDENTIALS")
+	_, gdcExist := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if gdcExist || (len(c.Opts) > 1) {
 		snr, err = newStdSigner(c)
 	} else {
+		log.Debugf(c.Ctx, "? %t", gdcExist)
 		snr, err = newSigner(c)
 	}
 	if err != nil {
