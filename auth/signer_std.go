@@ -16,8 +16,8 @@
 
 package auth
 
-import "firebase.google.com/go/internal"
+import "context"
 
-func newSigner(c *internal.AuthConfig) (signer, error) {
-	return newStdSigner(c)
+func newSigner(ctx context.Context) (signer, error) {
+	return serviceAcctSigner{}, nil
 }

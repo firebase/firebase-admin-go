@@ -119,6 +119,7 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		creds = nil
 	}
 
 	client, err = NewClient(&internal.AuthConfig{

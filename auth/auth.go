@@ -16,9 +16,10 @@
 package auth
 
 import (
+	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"firebase.google.com/go/internal"
@@ -72,28 +73,37 @@ type signer interface {
 // the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
 	var (
-		err error
-		snr signer
-		ks  keySource
+		err   error
+		email string
+		pk    *rsa.PrivateKey
 	)
-
-	// normally the build tags will give us what we want: GAE signer/key source for GAE,
-	// Std signer/key source for everything else.
-	// BUT if any options are provided or the default credentials exist,
-	// users will want the std signer so we use it explicitly.
-	_, gdcExist := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	useStd := gdcExist || (len(c.Opts) > 1)
-
-	if useStd {
-		snr, err = newStdSigner(c)
+	if c.Creds != nil && len(c.Creds.JSON) > 0 {
+		var svcAcct struct {
+			ClientEmail string `json:"client_email"`
+			PrivateKey  string `json:"private_key"`
+		}
+		if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
+			return nil, err
+		}
+		if svcAcct.PrivateKey != "" {
+			pk, err = parseKey(svcAcct.PrivateKey)
+			if err != nil {
+				return nil, err
+			}
+		}
+		email = svcAcct.ClientEmail
+	}
+	var snr signer
+	if email != "" && pk != nil {
+		snr = serviceAcctSigner{email: email, pk: pk}
 	} else {
-		snr, err = newSigner(c)
-	}
-	if err != nil {
-		return nil, err
+		snr, err = newSigner(c.Ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	ks, err = newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
+	ks, err := newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -20,52 +20,24 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
-
-	"firebase.google.com/go/internal"
 )
 
-type stdSigner struct {
+type serviceAcctSigner struct {
 	email string
 	pk    *rsa.PrivateKey
 }
 
-func newStdSigner(c *internal.AuthConfig) (signer, error) {
-	var s stdSigner
-	if c.Creds == nil || len(c.Creds.JSON) == 0 {
-		return s, nil
-	}
-
-	var svcAcct struct {
-		ClientEmail string `json:"client_email"`
-		PrivateKey  string `json:"private_key"`
-	}
-	if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
-		return s, err
-	}
-
-	if svcAcct.PrivateKey != "" {
-		pk, err := parseKey(svcAcct.PrivateKey)
-		if err != nil {
-			return nil, err
-		}
-		s.pk = pk
-	}
-	s.email = svcAcct.ClientEmail
-	return s, nil
-}
-
-func (s stdSigner) Email() (string, error) {
+func (s serviceAcctSigner) Email() (string, error) {
 	if s.email == "" {
 		return "", errors.New("service account email not available")
 	}
 	return s.email, nil
 }
 
-func (s stdSigner) Sign(ss []byte) ([]byte, error) {
+func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
 	if s.pk == nil {
 		return nil, errors.New("private key not available")
 	}

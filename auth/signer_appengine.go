@@ -20,16 +20,14 @@ import (
 	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
-
-	"firebase.google.com/go/internal"
 )
 
 type aeSigner struct {
 	ctx context.Context
 }
 
-func newSigner(c *internal.AuthConfig) (signer, error) {
-	return aeSigner{c.Ctx}, nil
+func newSigner(ctx context.Context) (signer, error) {
+	return aeSigner{ctx}, nil
 }
 
 func (s aeSigner) Email() (string, error) {
