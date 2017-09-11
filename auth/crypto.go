@@ -16,6 +16,7 @@ package auth
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -221,4 +222,25 @@ func verifySignature(parts []string, k *publicKey) error {
 	h := sha256.New()
 	h.Write([]byte(content))
 	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
+}
+
+type serviceAcctSigner struct {
+	email string
+	pk    *rsa.PrivateKey
+}
+
+func (s serviceAcctSigner) Email() (string, error) {
+	if s.email == "" {
+		return "", errors.New("service account email not available")
+	}
+	return s.email, nil
+}
+
+func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
+	if s.pk == nil {
+		return nil, errors.New("private key not available")
+	}
+	hash := sha256.New()
+	hash.Write([]byte(ss))
+	return rsa.SignPKCS1v15(rand.Reader, s.pk, crypto.SHA256, hash.Sum(nil))
 }

@@ -130,7 +130,7 @@ func (c *Client) CustomToken(uid string) (string, error) {
 func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
 	iss, err := c.snr.Email()
 	if err != nil {
-		return "", errors.New("service account email not available")
+		return "", err
 	}
 
 	if len(uid) == 0 || len(uid) > 128 {

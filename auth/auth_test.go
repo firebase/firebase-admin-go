@@ -77,7 +77,10 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	}
 	h := defaultHeader()
 	h.KeyID = kid
-	token, _ := encodeToken(client.snr, h, pCopy)
+	token, err := encodeToken(client.snr, h, pCopy)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	return token
 }
 
@@ -97,16 +100,13 @@ func (t *mockKeySource) Keys() ([]*publicKey, error) {
 }
 
 func TestMain(m *testing.M) {
-	var err error
-	opt := option.WithCredentialsFile("../testdata/service_account.json")
-	creds, err = transport.Creds(context.Background(), opt)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	var (
+		err   error
+		ks    keySource
+		ctx   context.Context
+		creds *google.DefaultCredentials
+	)
 
-	ctx := context.Background()
-	var ks keySource
-	ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {
@@ -119,7 +119,14 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		creds = nil
+	} else {
+		opt := option.WithCredentialsFile("../testdata/service_account.json")
+		creds, err = transport.Creds(context.Background(), opt)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
@@ -202,9 +209,6 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	if appengine.IsDevAppServer() {
-		return
-	}
 	ft, err := client.VerifyIDToken(testIDToken)
 	if err != nil {
 		t.Fatal(err)
@@ -294,14 +298,13 @@ func newAEKeySource(ctx context.Context) (keySource, error) {
 	}
 	keys := make([]*publicKey, len(certs))
 	for i, cert := range certs {
-		pk, err := parsePublicKey(cert.KeyName, cert.Data)
+		pk, err := parsePublicKey("mock-key-id-1", cert.Data)
 		if err != nil {
 			return nil, err
 		}
 		keys[i] = pk
 	}
 	return aeKeySource{keys}, nil
-
 }
 
 // Keys returns the RSA Public Keys managed by App Engine.
