@@ -16,6 +16,7 @@ package auth
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -189,18 +190,26 @@ func parsePublicKeys(keys []byte) ([]*publicKey, error) {
 
 	var result []*publicKey
 	for kid, key := range m {
-		block, _ := pem.Decode([]byte(key))
-		cert, err := x509.ParseCertificate(block.Bytes)
+		pubKey, err := parsePublicKey(kid, []byte(key))
 		if err != nil {
 			return nil, err
 		}
-		pk, ok := cert.PublicKey.(*rsa.PublicKey)
-		if !ok {
-			return nil, errors.New("Certificate is not a RSA key")
-		}
-		result = append(result, &publicKey{kid, pk})
+		result = append(result, pubKey)
 	}
 	return result, nil
+}
+
+func parsePublicKey(kid string, key []byte) (*publicKey, error) {
+	block, _ := pem.Decode(key)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	pk, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("Certificate is not a RSA key")
+	}
+	return &publicKey{kid, pk}, nil
 }
 
 func verifySignature(parts []string, k *publicKey) error {
@@ -213,4 +222,25 @@ func verifySignature(parts []string, k *publicKey) error {
 	h := sha256.New()
 	h.Write([]byte(content))
 	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
+}
+
+type serviceAcctSigner struct {
+	email string
+	pk    *rsa.PrivateKey
+}
+
+func (s serviceAcctSigner) Email() (string, error) {
+	if s.email == "" {
+		return "", errors.New("service account email not available")
+	}
+	return s.email, nil
+}
+
+func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
+	if s.pk == nil {
+		return nil, errors.New("private key not available")
+	}
+	hash := sha256.New()
+	hash.Write([]byte(ss))
+	return rsa.SignPKCS1v15(rand.Reader, s.pk, crypto.SHA256, hash.Sum(nil))
 }
