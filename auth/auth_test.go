@@ -103,15 +103,22 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	ctx := context.Background()
-	gae := appengine.IsDevAppServer()
-	if gae {
+	var ks keySource
+	ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {
 			log.Fatalln(err)
 		}
 		ctx = aectx
 		defer aedone()
+
+		ks, err = newAEKeySource(ctx)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
@@ -122,13 +129,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
-	if gae {
-		client.ks, err = newKeySource(ctx, "")
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
+	client.ks = ks
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
@@ -182,6 +183,39 @@ func TestCustomTokenError(t *testing.T) {
 	}
 }
 
+func TestCustomTokenInvalidCredential(t *testing.T) {
+	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := s.CustomToken("user1")
+	if token != "" || err == nil {
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+	}
+
+	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
+	if token != "" || err == nil {
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+	}
+}
+
+func TestVerifyIDToken(t *testing.T) {
+	if appengine.IsDevAppServer() {
+		return
+	}
+	ft, err := client.VerifyIDToken(testIDToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want: true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
 func TestVerifyIDTokenError(t *testing.T) {
 	var now int64 = 1000
 	cases := []struct {
@@ -215,6 +249,17 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 }
 
+func TestNoProjectID(t *testing.T) {
+	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ks = client.ks
+	if _, err := c.VerifyIDToken(testIDToken); err == nil {
+		t.Error("VeridyIDToken() = nil; want error")
+	}
+}
+
 func TestCustomTokenVerification(t *testing.T) {
 	token, err := client.CustomToken("user1")
 	if err != nil {
@@ -235,4 +280,30 @@ func TestCertificateRequestError(t *testing.T) {
 	if _, err := client.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
+}
+
+type aeKeySource struct {
+	keys []*publicKey
+}
+
+func newAEKeySource(ctx context.Context) (keySource, error) {
+	certs, err := appengine.PublicCertificates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]*publicKey, len(certs))
+	for i, cert := range certs {
+		pk, err := parsePublicKey(cert.KeyName, cert.Data)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = pk
+	}
+	return aeKeySource{keys}, nil
+
+}
+
+// Keys returns the RSA Public Keys managed by App Engine.
+func (k aeKeySource) Keys() ([]*publicKey, error) {
+	return k.keys, nil
 }

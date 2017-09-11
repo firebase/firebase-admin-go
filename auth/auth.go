@@ -16,7 +16,6 @@
 package auth
 
 import (
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"os"
@@ -67,15 +66,6 @@ type signer interface {
 	Sign(b []byte) ([]byte, error)
 }
 
-type keySource interface {
-	Keys() ([]*publicKey, error)
-}
-
-type publicKey struct {
-	Kid string
-	Key *rsa.PublicKey
-}
-
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
@@ -103,11 +93,7 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 		return nil, err
 	}
 
-	if useStd {
-		ks, err = newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
-	} else {
-		ks, err = newKeySource(c.Ctx, googleCertURL, c.Opts...)
-	}
+	ks, err = newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
