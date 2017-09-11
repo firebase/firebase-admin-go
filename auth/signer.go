@@ -19,10 +19,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
-	"fmt"
 )
 
 type serviceAcctSigner struct {
@@ -44,24 +41,4 @@ func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
 	hash := sha256.New()
 	hash.Write([]byte(ss))
 	return rsa.SignPKCS1v15(rand.Reader, s.pk, crypto.SHA256, hash.Sum(nil))
-}
-
-func parseKey(key string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(key))
-	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %v", key)
-	}
-	k := block.Bytes
-	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
-		}
-	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private key is not an RSA key")
-	}
-	return parsed, nil
 }

@@ -17,7 +17,9 @@ package auth
 
 import (
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -218,4 +220,24 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	}
 	p.UID = p.Subject
 	return p, nil
+}
+
+func parseKey(key string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, fmt.Errorf("no private key data found in: %v", key)
+	}
+	k := block.Bytes
+	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
+	if err != nil {
+		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
+		if err != nil {
+			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
+		}
+	}
+	parsed, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("private key is not an RSA key")
+	}
+	return parsed, nil
 }
