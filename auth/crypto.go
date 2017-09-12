@@ -37,11 +37,13 @@ import (
 	"google.golang.org/api/transport"
 )
 
+// publicKey represents a parsed RSA public key along with its unique key ID.
 type publicKey struct {
 	Kid string
 	Key *rsa.PublicKey
 }
 
+// clock is used to query the current local time.
 type clock interface {
 	Now() time.Time
 }
@@ -60,6 +62,8 @@ func (m *mockClock) Now() time.Time {
 	return m.now
 }
 
+// keySource is used to obtain a set of public keys, which can be used to verify cryptographic
+// signatures.
 type keySource interface {
 	Keys() ([]*publicKey, error)
 }
