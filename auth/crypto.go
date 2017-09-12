@@ -146,25 +146,6 @@ func (k *httpKeySource) refreshKeys() error {
 	return nil
 }
 
-type fileKeySource struct {
-	FilePath   string
-	CachedKeys []*publicKey
-}
-
-func (f *fileKeySource) Keys() ([]*publicKey, error) {
-	if f.CachedKeys == nil {
-		certs, err := ioutil.ReadFile(f.FilePath)
-		if err != nil {
-			return nil, err
-		}
-		f.CachedKeys, err = parsePublicKeys(certs)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return f.CachedKeys, nil
-}
-
 func findMaxAge(resp *http.Response) (*time.Duration, error) {
 	cc := resp.Header.Get("cache-control")
 	for _, value := range strings.Split(cc, ", ") {

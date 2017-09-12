@@ -16,6 +16,7 @@ package auth
 
 import (
 	"errors"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -35,68 +36,6 @@ import (
 
 var client *Client
 var testIDToken string
-
-func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
-	h := &jwtHeader{}
-	p := &customToken{}
-	if err := decodeToken(token, client.ks, h, p); err != nil {
-		t.Fatal(err)
-	}
-
-	if h.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
-	} else if h.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", h.Type)
-	} else if p.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
-	}
-
-	for k, v := range expected {
-		if p.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
-		}
-	}
-}
-
-func getIDToken(p mockIDTokenPayload) string {
-	return getIDTokenWithKid("mock-key-id-1", p)
-}
-
-func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
-	pCopy := mockIDTokenPayload{
-		"aud":   client.projectID,
-		"iss":   "https://securetoken.google.com/" + client.projectID,
-		"iat":   time.Now().Unix() - 100,
-		"exp":   time.Now().Unix() + 3600,
-		"sub":   "1234567890",
-		"admin": true,
-	}
-	for k, v := range p {
-		pCopy[k] = v
-	}
-	h := defaultHeader()
-	h.KeyID = kid
-	token, err := encodeToken(client.snr, h, pCopy)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return token
-}
-
-type mockIDTokenPayload map[string]interface{}
-
-func (p mockIDTokenPayload) decode(s string) error {
-	return decode(s, &p)
-}
-
-type mockKeySource struct {
-	keys []*publicKey
-	err  error
-}
-
-func (t *mockKeySource) Keys() ([]*publicKey, error) {
-	return t.keys, t.err
-}
 
 func TestMain(m *testing.M) {
 	var (
@@ -284,6 +223,98 @@ func TestCertificateRequestError(t *testing.T) {
 	if _, err := client.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
+}
+
+func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
+	h := &jwtHeader{}
+	p := &customToken{}
+	if err := decodeToken(token, client.ks, h, p); err != nil {
+		t.Fatal(err)
+	}
+
+	email, err := client.snr.Email()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if h.Algorithm != "RS256" {
+		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
+	} else if h.Type != "JWT" {
+		t.Errorf("Type: %q; want: 'JWT'", h.Type)
+	} else if p.Aud != firebaseAudience {
+		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
+	} else if p.Iss != email {
+		t.Errorf("Issuer: %q; want: %q", p.Iss, email)
+	} else if p.Sub != email {
+		t.Errorf("Subject: %q; want: %q", p.Sub, email)
+	}
+
+	for k, v := range expected {
+		if p.Claims[k] != v {
+			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
+		}
+	}
+}
+
+func getIDToken(p mockIDTokenPayload) string {
+	return getIDTokenWithKid("mock-key-id-1", p)
+}
+
+func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
+	pCopy := mockIDTokenPayload{
+		"aud":   client.projectID,
+		"iss":   "https://securetoken.google.com/" + client.projectID,
+		"iat":   time.Now().Unix() - 100,
+		"exp":   time.Now().Unix() + 3600,
+		"sub":   "1234567890",
+		"admin": true,
+	}
+	for k, v := range p {
+		pCopy[k] = v
+	}
+	h := defaultHeader()
+	h.KeyID = kid
+	token, err := encodeToken(client.snr, h, pCopy)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return token
+}
+
+type mockIDTokenPayload map[string]interface{}
+
+func (p mockIDTokenPayload) decode(s string) error {
+	return decode(s, &p)
+}
+
+// mockKeySource provides access to a set of in-memory public keys.
+type mockKeySource struct {
+	keys []*publicKey
+	err  error
+}
+
+func (t *mockKeySource) Keys() ([]*publicKey, error) {
+	return t.keys, t.err
+}
+
+// fileKeySource loads a set of public keys from the local file system.
+type fileKeySource struct {
+	FilePath   string
+	CachedKeys []*publicKey
+}
+
+func (f *fileKeySource) Keys() ([]*publicKey, error) {
+	if f.CachedKeys == nil {
+		certs, err := ioutil.ReadFile(f.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		f.CachedKeys, err = parsePublicKeys(certs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return f.CachedKeys, nil
 }
 
 // aeKeySource provides access to the public keys associated with App Engine apps. This
