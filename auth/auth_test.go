@@ -232,12 +232,21 @@ func verifyCustomToken(t *testing.T, token string, expected map[string]interface
 		t.Fatal(err)
 	}
 
+	email, err := client.snr.Email()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if h.Algorithm != "RS256" {
 		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
 	} else if h.Type != "JWT" {
 		t.Errorf("Type: %q; want: 'JWT'", h.Type)
 	} else if p.Aud != firebaseAudience {
 		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
+	} else if p.Iss != email {
+		t.Errorf("Issuer: %q; want: %q", p.Iss, email)
+	} else if p.Sub != email {
+		t.Errorf("Subject: %q; want: %q", p.Sub, email)
 	}
 
 	for k, v := range expected {
