@@ -33,7 +33,6 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-var creds *google.DefaultCredentials
 var client *Client
 var testIDToken string
 
@@ -255,7 +254,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
+	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,6 +286,9 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
+// aeKeySource provides access to the public keys associated with App Engine apps. This
+// is used in tests to verify custom tokens and mock ID tokens when they are signed with
+// App Engine private keys.
 type aeKeySource struct {
 	keys []*publicKey
 }
