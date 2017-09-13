@@ -16,6 +16,7 @@ package auth
 
 import (
 	"errors"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -27,90 +28,54 @@ import (
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/aetest"
 
 	"firebase.google.com/go/internal"
 )
 
-var creds *google.DefaultCredentials
 var client *Client
 var testIDToken string
 
-func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
-	h := &jwtHeader{}
-	p := &customToken{}
-	if err := decodeToken(token, client.ks, h, p); err != nil {
-		t.Fatal(err)
-	}
-
-	if h.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
-	} else if h.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", h.Type)
-	} else if p.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
-	}
-
-	for k, v := range expected {
-		if p.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
-		}
-	}
-}
-
-func getIDToken(p mockIDTokenPayload) string {
-	return getIDTokenWithKid("mock-key-id-1", p)
-}
-
-func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
-	pCopy := mockIDTokenPayload{
-		"aud":   client.projectID,
-		"iss":   "https://securetoken.google.com/" + client.projectID,
-		"iat":   time.Now().Unix() - 100,
-		"exp":   time.Now().Unix() + 3600,
-		"sub":   "1234567890",
-		"admin": true,
-	}
-	for k, v := range p {
-		pCopy[k] = v
-	}
-	h := defaultHeader()
-	h.KeyID = kid
-	token, _ := encodeToken(h, pCopy, client.pk)
-	return token
-}
-
-type mockIDTokenPayload map[string]interface{}
-
-func (p mockIDTokenPayload) decode(s string) error {
-	return decode(s, &p)
-}
-
-type mockKeySource struct {
-	keys []*publicKey
-	err  error
-}
-
-func (t *mockKeySource) Keys() ([]*publicKey, error) {
-	return t.keys, t.err
-}
-
 func TestMain(m *testing.M) {
-	var err error
-	opt := option.WithCredentialsFile("../testdata/service_account.json")
-	creds, err = transport.Creds(context.Background(), opt)
-	if err != nil {
-		log.Fatalln(err)
+	var (
+		err   error
+		ks    keySource
+		ctx   context.Context
+		creds *google.DefaultCredentials
+	)
+
+	if appengine.IsDevAppServer() {
+		aectx, aedone, err := aetest.NewContext()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		ctx = aectx
+		defer aedone()
+
+		ks, err = newAEKeySource(ctx)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	} else {
+		opt := option.WithCredentialsFile("../testdata/service_account.json")
+		creds, err = transport.Creds(context.Background(), opt)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
 
 	client, err = NewClient(&internal.AuthConfig{
-		Ctx:       context.Background(),
+		Ctx:       ctx,
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	client.ks = ks
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
@@ -228,7 +193,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background(), Creds: creds})
+	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,4 +223,124 @@ func TestCertificateRequestError(t *testing.T) {
 	if _, err := client.VerifyIDToken(testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
+}
+
+func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
+	h := &jwtHeader{}
+	p := &customToken{}
+	if err := decodeToken(token, client.ks, h, p); err != nil {
+		t.Fatal(err)
+	}
+
+	email, err := client.snr.Email()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if h.Algorithm != "RS256" {
+		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
+	} else if h.Type != "JWT" {
+		t.Errorf("Type: %q; want: 'JWT'", h.Type)
+	} else if p.Aud != firebaseAudience {
+		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
+	} else if p.Iss != email {
+		t.Errorf("Issuer: %q; want: %q", p.Iss, email)
+	} else if p.Sub != email {
+		t.Errorf("Subject: %q; want: %q", p.Sub, email)
+	}
+
+	for k, v := range expected {
+		if p.Claims[k] != v {
+			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
+		}
+	}
+}
+
+func getIDToken(p mockIDTokenPayload) string {
+	return getIDTokenWithKid("mock-key-id-1", p)
+}
+
+func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
+	pCopy := mockIDTokenPayload{
+		"aud":   client.projectID,
+		"iss":   "https://securetoken.google.com/" + client.projectID,
+		"iat":   time.Now().Unix() - 100,
+		"exp":   time.Now().Unix() + 3600,
+		"sub":   "1234567890",
+		"admin": true,
+	}
+	for k, v := range p {
+		pCopy[k] = v
+	}
+	h := defaultHeader()
+	h.KeyID = kid
+	token, err := encodeToken(client.snr, h, pCopy)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return token
+}
+
+type mockIDTokenPayload map[string]interface{}
+
+func (p mockIDTokenPayload) decode(s string) error {
+	return decode(s, &p)
+}
+
+// mockKeySource provides access to a set of in-memory public keys.
+type mockKeySource struct {
+	keys []*publicKey
+	err  error
+}
+
+func (t *mockKeySource) Keys() ([]*publicKey, error) {
+	return t.keys, t.err
+}
+
+// fileKeySource loads a set of public keys from the local file system.
+type fileKeySource struct {
+	FilePath   string
+	CachedKeys []*publicKey
+}
+
+func (f *fileKeySource) Keys() ([]*publicKey, error) {
+	if f.CachedKeys == nil {
+		certs, err := ioutil.ReadFile(f.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		f.CachedKeys, err = parsePublicKeys(certs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return f.CachedKeys, nil
+}
+
+// aeKeySource provides access to the public keys associated with App Engine apps. This
+// is used in tests to verify custom tokens and mock ID tokens when they are signed with
+// App Engine private keys.
+type aeKeySource struct {
+	keys []*publicKey
+}
+
+func newAEKeySource(ctx context.Context) (keySource, error) {
+	certs, err := appengine.PublicCertificates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]*publicKey, len(certs))
+	for i, cert := range certs {
+		pk, err := parsePublicKey("mock-key-id-1", cert.Data)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = pk
+	}
+	return aeKeySource{keys}, nil
+}
+
+// Keys returns the RSA Public Keys managed by App Engine.
+func (k aeKeySource) Keys() ([]*publicKey, error) {
+	return k.keys, nil
 }
