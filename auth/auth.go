@@ -16,14 +16,13 @@
 package auth
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
-
-	"crypto/rsa"
-	"crypto/x509"
 
 	"firebase.google.com/go/internal"
 )
@@ -62,8 +61,12 @@ type Token struct {
 type Client struct {
 	ks        keySource
 	projectID string
-	email     string
-	pk        *rsa.PrivateKey
+	snr       signer
+}
+
+type signer interface {
+	Email() (string, error)
+	Sign(b []byte) ([]byte, error)
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -71,36 +74,47 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through firebase.App.
 func NewClient(c *internal.AuthConfig) (*Client, error) {
+	var (
+		err   error
+		email string
+		pk    *rsa.PrivateKey
+	)
+	if c.Creds != nil && len(c.Creds.JSON) > 0 {
+		var svcAcct struct {
+			ClientEmail string `json:"client_email"`
+			PrivateKey  string `json:"private_key"`
+		}
+		if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
+			return nil, err
+		}
+		if svcAcct.PrivateKey != "" {
+			pk, err = parseKey(svcAcct.PrivateKey)
+			if err != nil {
+				return nil, err
+			}
+		}
+		email = svcAcct.ClientEmail
+	}
+	var snr signer
+	if email != "" && pk != nil {
+		snr = serviceAcctSigner{email: email, pk: pk}
+	} else {
+		snr, err = newSigner(c.Ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ks, err := newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	client := &Client{
+	return &Client{
 		ks:        ks,
 		projectID: c.ProjectID,
-	}
-	if c.Creds == nil || len(c.Creds.JSON) == 0 {
-		return client, nil
-	}
-
-	var svcAcct struct {
-		ClientEmail string `json:"client_email"`
-		PrivateKey  string `json:"private_key"`
-	}
-	if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
-		return nil, err
-	}
-
-	if svcAcct.PrivateKey != "" {
-		pk, err := parseKey(svcAcct.PrivateKey)
-		if err != nil {
-			return nil, err
-		}
-		client.pk = pk
-	}
-	client.email = svcAcct.ClientEmail
-	return client, nil
+		snr:       snr,
+	}, nil
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
@@ -114,11 +128,9 @@ func (c *Client) CustomToken(uid string) (string, error) {
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
 func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
-	if c.email == "" {
-		return "", errors.New("service account email not available")
-	}
-	if c.pk == nil {
-		return "", errors.New("private key not available")
+	iss, err := c.snr.Email()
+	if err != nil {
+		return "", err
 	}
 
 	if len(uid) == 0 || len(uid) > 128 {
@@ -139,15 +151,15 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 
 	now := clk.Now().Unix()
 	payload := &customToken{
-		Iss:    c.email,
-		Sub:    c.email,
+		Iss:    iss,
+		Sub:    iss,
 		Aud:    firebaseAudience,
 		UID:    uid,
 		Iat:    now,
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-	return encodeToken(defaultHeader(), payload, c.pk)
+	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
