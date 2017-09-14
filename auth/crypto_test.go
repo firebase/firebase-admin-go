@@ -15,11 +15,16 @@
 package auth
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"google.golang.org/api/option"
 )
 
 type mockHTTPResponse struct {
@@ -35,6 +40,27 @@ type mockReadCloser struct {
 	data       string
 	index      int64
 	closeCount int
+}
+
+func newHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
+	rc := &mockReadCloser{
+		data:       string(data),
+		closeCount: 0,
+	}
+	client := &http.Client{
+		Transport: &mockHTTPResponse{
+			Response: http.Response{
+				Status:     "200 OK",
+				StatusCode: 200,
+				Header: http.Header{
+					"Cache-Control": {"public, max-age=100"},
+				},
+				Body: rc,
+			},
+			Err: nil,
+		},
+	}
+	return client, rc
 }
 
 func (r *mockReadCloser) Read(p []byte) (n int, err error) {
@@ -61,39 +87,57 @@ func TestHTTPKeySource(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ks.HTTPClient == nil {
+		t.Errorf("HTTPClient = nil; want non-nil")
+	}
+	hc, rc := newHTTPClient(data)
+	ks.HTTPClient = hc
+	if err := verifyHTTPKeySource(ks, rc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHTTPKeySourceWithClient(t *testing.T) {
+	data, err := ioutil.ReadFile("../testdata/public_certs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hc, rc := newHTTPClient(data)
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ks.HTTPClient != hc {
+		t.Errorf("HTTPClient = %v; want %v", ks.HTTPClient, hc)
+	}
+	if err := verifyHTTPKeySource(ks, rc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
 	mc := &mockClock{now: time.Unix(0, 0)}
-	rc := &mockReadCloser{
-		data:       string(data),
-		closeCount: 0,
-	}
-	ks := newHTTPKeySource("http://mock.url")
-	ks.HTTPClient = &http.Client{
-		Transport: &mockHTTPResponse{
-			Response: http.Response{
-				Status:     "200 OK",
-				StatusCode: 200,
-				Header: http.Header{
-					"Cache-Control": {"public, max-age=100"},
-				},
-				Body: rc,
-			},
-			Err: nil,
-		},
-	}
 	ks.Clock = mc
 
 	exp := time.Unix(100, 0)
 	for i := 0; i <= 100; i++ {
 		keys, err := ks.Keys()
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		if len(keys) != 3 {
-			t.Errorf("Keys: %d; want: 3", len(keys))
+			return fmt.Errorf("Keys: %d; want: 3", len(keys))
 		} else if rc.closeCount != 1 {
-			t.Errorf("HTTP calls: %d; want: 1", rc.closeCount)
+			return fmt.Errorf("HTTP calls: %d; want: 1", rc.closeCount)
 		} else if ks.ExpiryTime != exp {
-			t.Errorf("Expiry: %v; want: %v", ks.ExpiryTime, exp)
+			return fmt.Errorf("Expiry: %v; want: %v", ks.ExpiryTime, exp)
 		}
 		mc.now = mc.now.Add(time.Second)
 	}
@@ -101,11 +145,12 @@ func TestHTTPKeySource(t *testing.T) {
 	mc.now = time.Unix(101, 0)
 	keys, err := ks.Keys()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	if len(keys) != 3 {
-		t.Errorf("Keys: %d; want: 3", len(keys))
+		return fmt.Errorf("Keys: %d; want: 3", len(keys))
 	} else if rc.closeCount != 2 {
-		t.Errorf("HTTP calls: %d; want: 2", rc.closeCount)
+		return fmt.Errorf("HTTP calls: %d; want: 2", rc.closeCount)
 	}
+	return nil
 }

@@ -17,7 +17,9 @@ package internal
 
 import (
 	"encoding/json"
+	"go/build"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/net/context"
@@ -26,8 +28,14 @@ import (
 	"google.golang.org/api/option"
 )
 
-const certPath = "../testdata/integration_cert.json"
-const apiKeyPath = "../testdata/integration_apikey.txt"
+const certPath = "integration_cert.json"
+const apiKeyPath = "integration_apikey.txt"
+
+// Resource returns the absolute path to the specified test resource file.
+func Resource(name string) string {
+	p := []string{build.Default.GOPATH, "src", "firebase.google.com", "go", "testdata", name}
+	return filepath.Join(p...)
+}
 
 // NewTestApp creates a new App instance for integration tests.
 //
@@ -42,7 +50,7 @@ func NewTestApp(ctx context.Context) (*firebase.App, error) {
 	config := &firebase.Config{
 		StorageBucket: pid + ".appspot.com",
 	}
-	return firebase.NewApp(ctx, config, option.WithCredentialsFile(certPath))
+	return firebase.NewApp(ctx, config, option.WithCredentialsFile(Resource(certPath)))
 }
 
 // APIKey fetches a Firebase API key for integration tests.
@@ -50,7 +58,7 @@ func NewTestApp(ctx context.Context) (*firebase.App, error) {
 // APIKey reads the API key string from a file named integration_apikey.txt
 // in the testdata directory.
 func APIKey() (string, error) {
-	b, err := ioutil.ReadFile(apiKeyPath)
+	b, err := ioutil.ReadFile(Resource(apiKeyPath))
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +67,7 @@ func APIKey() (string, error) {
 
 // ProjectID fetches a Google Cloud project ID for integration tests.
 func ProjectID() (string, error) {
-	b, err := ioutil.ReadFile(certPath)
+	b, err := ioutil.ReadFile(Resource(certPath))
 	if err != nil {
 		return "", err
 	}

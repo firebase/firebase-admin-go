@@ -12,27 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration
+// Package auth contains integration tests for the firebase.google.com/go/auth package.
+package auth
 
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"testing"
 
+	"golang.org/x/net/context"
+
+	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
 )
 
 const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
 
-func TestCustomToken(t *testing.T) {
-	client, err := app.Auth()
-	if err != nil {
-		t.Fatal(err)
+var client *auth.Client
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		log.Println("skipping auth integration tests in short mode.")
+		os.Exit(0)
 	}
 
+	app, err := internal.NewTestApp(context.Background())
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	client, err = app.Auth()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	os.Exit(m.Run())
+}
+
+func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken("user1")
 	if err != nil {
 		t.Fatal(err)
@@ -53,11 +77,6 @@ func TestCustomToken(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	client, err := app.Auth()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ct, err := client.CustomTokenWithClaims("user1", map[string]interface{}{
 		"premium": true,
 		"package": "gold",

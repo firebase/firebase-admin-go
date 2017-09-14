@@ -1,3 +1,5 @@
+// +build !appengine
+
 // Copyright 2017 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,25 +14,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package internal contains functionality that is only accessible from within the Admin SDK.
-package internal
+package auth
 
-import (
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
-)
+import "context"
 
-// AuthConfig represents the configuration of Firebase Auth service.
-type AuthConfig struct {
-	Ctx       context.Context
-	Opts      []option.ClientOption
-	Creds     *google.DefaultCredentials
-	ProjectID string
-}
-
-type StorageConfig struct {
-	Ctx    context.Context
-	Opts   []option.ClientOption
-	Bucket string
+func newSigner(ctx context.Context) (signer, error) {
+	return serviceAcctSigner{}, nil
 }

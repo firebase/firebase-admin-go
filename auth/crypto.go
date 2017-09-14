@@ -16,6 +16,7 @@ package auth
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -29,13 +30,20 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
+// publicKey represents a parsed RSA public key along with its unique key ID.
 type publicKey struct {
 	Kid string
 	Key *rsa.PublicKey
 }
 
+// clock is used to query the current local time.
 type clock interface {
 	Now() time.Time
 }
@@ -54,6 +62,8 @@ func (m *mockClock) Now() time.Time {
 	return m.now
 }
 
+// keySource is used to obtain a set of public keys, which can be used to verify cryptographic
+// signatures.
 type keySource interface {
 	Keys() ([]*publicKey, error)
 }
@@ -70,12 +80,24 @@ type httpKeySource struct {
 	Mutex      *sync.Mutex
 }
 
-func newHTTPKeySource(uri string) *httpKeySource {
-	return &httpKeySource{
-		KeyURI: uri,
-		Clock:  systemClock{},
-		Mutex:  &sync.Mutex{},
+func newHTTPKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (*httpKeySource, error) {
+	var hc *http.Client
+	if ctx != nil && len(opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, opts...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hc = http.DefaultClient
 	}
+
+	return &httpKeySource{
+		KeyURI:     uri,
+		HTTPClient: hc,
+		Clock:      systemClock{},
+		Mutex:      &sync.Mutex{},
+	}, nil
 }
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
@@ -99,9 +121,6 @@ func (k *httpKeySource) hasExpired() bool {
 
 func (k *httpKeySource) refreshKeys() error {
 	k.CachedKeys = nil
-	if k.HTTPClient == nil {
-		k.HTTPClient = http.DefaultClient
-	}
 	resp, err := k.HTTPClient.Get(k.KeyURI)
 	if err != nil {
 		return err
@@ -125,25 +144,6 @@ func (k *httpKeySource) refreshKeys() error {
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil
-}
-
-type fileKeySource struct {
-	FilePath   string
-	CachedKeys []*publicKey
-}
-
-func (f *fileKeySource) Keys() ([]*publicKey, error) {
-	if f.CachedKeys == nil {
-		certs, err := ioutil.ReadFile(f.FilePath)
-		if err != nil {
-			return nil, err
-		}
-		f.CachedKeys, err = parsePublicKeys(certs)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return f.CachedKeys, nil
 }
 
 func findMaxAge(resp *http.Response) (*time.Duration, error) {
@@ -175,18 +175,26 @@ func parsePublicKeys(keys []byte) ([]*publicKey, error) {
 
 	var result []*publicKey
 	for kid, key := range m {
-		block, _ := pem.Decode([]byte(key))
-		cert, err := x509.ParseCertificate(block.Bytes)
+		pubKey, err := parsePublicKey(kid, []byte(key))
 		if err != nil {
 			return nil, err
 		}
-		pk, ok := cert.PublicKey.(*rsa.PublicKey)
-		if !ok {
-			return nil, errors.New("Certificate is not a RSA key")
-		}
-		result = append(result, &publicKey{kid, pk})
+		result = append(result, pubKey)
 	}
 	return result, nil
+}
+
+func parsePublicKey(kid string, key []byte) (*publicKey, error) {
+	block, _ := pem.Decode(key)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	pk, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("Certificate is not a RSA key")
+	}
+	return &publicKey{kid, pk}, nil
 }
 
 func verifySignature(parts []string, k *publicKey) error {
@@ -199,4 +207,25 @@ func verifySignature(parts []string, k *publicKey) error {
 	h := sha256.New()
 	h.Write([]byte(content))
 	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
+}
+
+type serviceAcctSigner struct {
+	email string
+	pk    *rsa.PrivateKey
+}
+
+func (s serviceAcctSigner) Email() (string, error) {
+	if s.email == "" {
+		return "", errors.New("service account email not available")
+	}
+	return s.email, nil
+}
+
+func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
+	if s.pk == nil {
+		return nil, errors.New("private key not available")
+	}
+	hash := sha256.New()
+	hash.Write([]byte(ss))
+	return rsa.SignPKCS1v15(rand.Reader, s.pk, crypto.SHA256, hash.Sum(nil))
 }
