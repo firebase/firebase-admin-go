@@ -43,12 +43,13 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	app, err := internal.NewTestApp(context.Background())
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.Auth()
+	client, err = app.Auth(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}

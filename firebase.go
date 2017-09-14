@@ -46,7 +46,6 @@ const Version = "1.0.2"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
-	ctx           context.Context
 	creds         *google.DefaultCredentials
 	projectID     string
 	storageBucket string
@@ -59,10 +58,10 @@ type Config struct {
 	StorageBucket string
 }
 
-// Auth returns an instance of auth.Client.
-func (a *App) Auth() (*auth.Client, error) {
+// Auth returns a new instance of auth.Client.
+func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	conf := &internal.AuthConfig{
-		Ctx:       a.ctx,
+		Ctx:       ctx,
 		Creds:     a.creds,
 		ProjectID: a.projectID,
 		Opts:      a.opts,
@@ -71,21 +70,21 @@ func (a *App) Auth() (*auth.Client, error) {
 }
 
 // Storage returns a new instance of storage.Client.
-func (a *App) Storage() (*storage.Client, error) {
+func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 	conf := &internal.StorageConfig{
-		Ctx:    a.ctx,
+		Ctx:    ctx,
 		Opts:   a.opts,
 		Bucket: a.storageBucket,
 	}
 	return storage.NewClient(conf)
 }
 
-// Firestore returns a new instance of firestore.Client.
-func (a *App) Firestore() (*firestore.Client, error) {
+// Firestore returns a new instance of firestore.Client from the cloud.google.com/go package.
+func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
 	if a.projectID == "" {
 		return nil, errors.New("project id is required to access Firestore")
 	}
-	return firestore.NewClient(a.ctx, a.projectID, a.opts...)
+	return firestore.NewClient(ctx, a.projectID, a.opts...)
 }
 
 // NewApp creates a new App from the provided config and client options.
@@ -116,7 +115,6 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}
 
 	return &App{
-		ctx:           ctx,
 		creds:         creds,
 		projectID:     pid,
 		storageBucket: config.StorageBucket,

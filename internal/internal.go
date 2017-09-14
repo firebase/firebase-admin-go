@@ -29,6 +29,7 @@ type AuthConfig struct {
 	ProjectID string
 }
 
+// StorageConfig represents the configuration of Google Cloud Storage service.
 type StorageConfig struct {
 	Ctx    context.Context
 	Opts   []option.ClientOption

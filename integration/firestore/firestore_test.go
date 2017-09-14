@@ -12,15 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration
+package firestore
 
 import (
+	"context"
 	"reflect"
 	"testing"
+
+	"firebase.google.com/go/integration/internal"
 )
 
 func TestFirestore(t *testing.T) {
-	client, err := app.Firestore()
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := app.Firestore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

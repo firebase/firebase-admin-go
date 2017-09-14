@@ -12,24 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration
+package storage
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
 	"testing"
 
-	"cloud.google.com/go/storage"
+	gcs "cloud.google.com/go/storage"
 	"firebase.google.com/go/integration/internal"
+	"firebase.google.com/go/storage"
 	"golang.org/x/net/context"
 )
 
-func TestDefaultBucket(t *testing.T) {
-	client, err := app.Storage()
-	if err != nil {
-		t.Fatal(err)
+var ctx context.Context
+var client *storage.Client
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		log.Println("skipping storage integration tests in short mode.")
+		os.Exit(0)
 	}
 
+	ctx = context.Background()
+	app, err := internal.NewTestApp(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	client, err = app.Storage(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	os.Exit(m.Run())
+}
+
+func TestDefaultBucket(t *testing.T) {
 	bucket, err := client.DefaultBucket()
 	if bucket == nil || err != nil {
 		t.Errorf("DefaultBucket() = (%v, %v); want (bucket, nil)", bucket, err)
@@ -40,11 +63,6 @@ func TestDefaultBucket(t *testing.T) {
 }
 
 func TestCustomBucket(t *testing.T) {
-	client, err := app.Storage()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	pid, err := internal.ProjectID()
 	if err != nil {
 		t.Fatal(err)
@@ -60,10 +78,6 @@ func TestCustomBucket(t *testing.T) {
 }
 
 func TestNonExistingBucket(t *testing.T) {
-	client, err := app.Storage()
-	if err != nil {
-		t.Fatal(err)
-	}
 	bucket, err := client.Bucket("non-existing")
 	if bucket == nil || err != nil {
 		t.Errorf("Bucket() = (%v, %v); want (bucket, nil)", bucket, err)
@@ -73,7 +87,7 @@ func TestNonExistingBucket(t *testing.T) {
 	}
 }
 
-func verifyBucket(bucket *storage.BucketHandle) error {
+func verifyBucket(bucket *gcs.BucketHandle) error {
 	const expected = "Hello World"
 
 	// Create new object

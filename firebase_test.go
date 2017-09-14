@@ -40,7 +40,18 @@ func TestServiceAcctFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyServiceAcct(t, app)
+
+	if app.projectID != "mock-project-id" {
+		t.Errorf("Project ID: %q; want: %q", app.projectID, "mock-project-id")
+	}
+	if len(app.opts) != 2 {
+		t.Errorf("Client opts: %d; want: 2", len(app.opts))
+	}
+	if app.creds == nil {
+		t.Error("Credentials: nil; want creds")
+	} else if len(app.creds.JSON) == 0 {
+		t.Error("JSON: empty; want; non-empty")
+	}
 }
 
 func TestClientOptions(t *testing.T) {
@@ -90,8 +101,10 @@ func TestRefreshTokenFile(t *testing.T) {
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
 	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
+	if app.creds == nil {
+		t.Error("Credentials: nil; want creds")
+	} else if len(app.creds.JSON) == 0 {
+		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -107,8 +120,10 @@ func TestRefreshTokenFileWithConfig(t *testing.T) {
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
 	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
+	if app.creds == nil {
+		t.Error("Credentials: nil; want creds")
+	} else if len(app.creds.JSON) == 0 {
+		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -131,8 +146,10 @@ func TestRefreshTokenWithEnvVar(t *testing.T) {
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
 	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
+	if app.creds == nil {
+		t.Error("Credentials: nil; want creds")
+	} else if len(app.creds.JSON) == 0 {
+		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -145,8 +162,7 @@ func TestAppDefault(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
-	ctx := context.Background()
-	app, err := NewApp(ctx, nil)
+	app, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,8 +170,10 @@ func TestAppDefault(t *testing.T) {
 	if len(app.opts) != 1 {
 		t.Errorf("Client opts: %d; want: 1", len(app.opts))
 	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
+	if app.creds == nil {
+		t.Error("Credentials: nil; want creds")
+	} else if len(app.creds.JSON) == 0 {
+		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -190,34 +208,37 @@ func TestInvalidCredentialFile(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Auth(); c == nil || err != nil {
+	if c, err := app.Auth(ctx); c == nil || err != nil {
 		t.Errorf("Auth() = (%v, %v); want (auth, nil)", c, err)
 	}
 }
 
 func TestStorage(t *testing.T) {
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Storage(); c == nil || err != nil {
+	if c, err := app.Storage(ctx); c == nil || err != nil {
 		t.Errorf("Storage() = (%v, %v); want (auth, nil)", c, err)
 	}
 }
 
 func TestFirestore(t *testing.T) {
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Firestore(); c == nil || err != nil {
+	if c, err := app.Firestore(ctx); c == nil || err != nil {
 		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
 	}
 }
@@ -231,13 +252,14 @@ func TestFirestoreWithProjectID(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
+	ctx := context.Background()
 	config := &Config{ProjectID: "project-id"}
-	app, err := NewApp(context.Background(), config, option.WithCredentialsFile("testdata/refresh_token.json"))
+	app, err := NewApp(ctx, config, option.WithCredentialsFile("testdata/refresh_token.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Firestore(); c == nil || err != nil {
+	if c, err := app.Firestore(ctx); c == nil || err != nil {
 		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
 	}
 }
@@ -251,12 +273,13 @@ func TestFirestoreWithNoProjectID(t *testing.T) {
 	}
 	defer os.Setenv(varName, current)
 
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/refresh_token.json"))
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/refresh_token.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Firestore(); c != nil || err == nil {
+	if c, err := app.Firestore(ctx); c != nil || err == nil {
 		t.Errorf("Firestore() = (%v, %v); want (nil, error)", c, err)
 	}
 }
@@ -316,19 +339,6 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 		AccessToken: t.AccessToken,
 		Expiry:      t.Expiry,
 	}, nil
-}
-
-func verifyServiceAcct(t *testing.T, app *App) {
-	// TODO: Compare creds JSON
-	if app.projectID != "mock-project-id" {
-		t.Errorf("Project ID: %q; want: %q", app.projectID, "mock-project-id")
-	}
-	if len(app.opts) != 2 {
-		t.Errorf("Client opts: %d; want: 2", len(app.opts))
-	}
-	if app.ctx == nil {
-		t.Error("Context: nil; want: ctx")
-	}
 }
 
 // mockServiceAcct generates a service account configuration with the provided URL as the
