@@ -61,22 +61,20 @@ type Config struct {
 // Auth returns a new instance of auth.Client.
 func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	conf := &internal.AuthConfig{
-		Ctx:       ctx,
 		Creds:     a.creds,
 		ProjectID: a.projectID,
 		Opts:      a.opts,
 	}
-	return auth.NewClient(conf)
+	return auth.NewClient(ctx, conf)
 }
 
 // Storage returns a new instance of storage.Client.
 func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 	conf := &internal.StorageConfig{
-		Ctx:    ctx,
 		Opts:   a.opts,
 		Bucket: a.storageBucket,
 	}
-	return storage.NewClient(conf)
+	return storage.NewClient(ctx, conf)
 }
 
 // Firestore returns a new instance of firestore.Client from the cloud.google.com/go package.

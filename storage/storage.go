@@ -16,6 +16,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 
 	"cloud.google.com/go/storage"
@@ -32,8 +33,8 @@ type Client struct {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Storage service through firebase.App.
-func NewClient(c *internal.StorageConfig) (*Client, error) {
-	client, err := storage.NewClient(c.Ctx, c.Opts...)
+func NewClient(ctx context.Context, c *internal.StorageConfig) (*Client, error) {
+	client, err := storage.NewClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}

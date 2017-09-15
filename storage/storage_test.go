@@ -8,9 +8,7 @@ import (
 )
 
 func TestNoBucketName(t *testing.T) {
-	client, err := NewClient(&internal.StorageConfig{
-		Ctx: context.Background(),
-	})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,9 +18,7 @@ func TestNoBucketName(t *testing.T) {
 }
 
 func TestEmptyBucketName(t *testing.T) {
-	client, err := NewClient(&internal.StorageConfig{
-		Ctx: context.Background(),
-	})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,8 +28,7 @@ func TestEmptyBucketName(t *testing.T) {
 }
 
 func TestDefaultBucket(t *testing.T) {
-	client, err := NewClient(&internal.StorageConfig{
-		Ctx:    context.Background(),
+	client, err := NewClient(context.Background(), &internal.StorageConfig{
 		Bucket: "bucket.name",
 	})
 	if err != nil {
@@ -47,9 +42,7 @@ func TestDefaultBucket(t *testing.T) {
 }
 
 func TestBucket(t *testing.T) {
-	client, err := NewClient(&internal.StorageConfig{
-		Ctx: context.Background(),
-	})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
