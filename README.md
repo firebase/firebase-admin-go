@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/firebase/firebase-admin-go.svg?branch=master)](https://travis-ci.org/firebase/firebase-admin-go)
-[![GoDoc](https://godoc.org/github.com/firebase/firebase-admin-go?status.svg)](http://godoc.org/github.com/firebase/firebase-admin-go)
+[![GoDoc](https://godoc.org/firebase.google.com/go?status.svg)](https://godoc.org/firebase.google.com/go)
 
 # Firebase Admin Go SDK
 
@@ -42,7 +42,7 @@ requests, code review feedback, and also pull requests.
 ## Documentation
 
 * [Setup Guide](https://firebase.google.com/docs/admin/setup/)
-* [API Reference](http://godoc.org/github.com/firebase/firebase-admin-go)
+* [API Reference](https://godoc.org/firebase.google.com/go)
 
 
 ## License and Terms
