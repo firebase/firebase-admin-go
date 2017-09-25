@@ -43,12 +43,13 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	app, err := internal.NewTestApp(context.Background())
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.Auth()
+	client, err = app.Auth(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -139,5 +140,8 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
+	}
 	return ioutil.ReadAll(resp.Body)
 }

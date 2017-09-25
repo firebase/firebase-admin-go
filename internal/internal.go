@@ -16,7 +16,6 @@
 package internal
 
 import (
-	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 
 	"golang.org/x/oauth2/google"
@@ -24,7 +23,6 @@ import (
 
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
-	Ctx       context.Context
 	Opts      []option.ClientOption
 	Creds     *google.DefaultCredentials
 	ProjectID string
