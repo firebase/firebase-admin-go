@@ -67,7 +67,9 @@ func TestDefaultBucket(t *testing.T) {
 }
 
 func TestBucket(t *testing.T) {
-	client, err := NewClient(context.Background(), &internal.StorageConfig{})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{
+		Opts: opts,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
