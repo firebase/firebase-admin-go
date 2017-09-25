@@ -17,12 +17,20 @@ package storage
 import (
 	"testing"
 
+	"google.golang.org/api/option"
+
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
 )
 
+var opts = []option.ClientOption{
+	option.WithCredentialsFile("../testdata/service_account.json"),
+}
+
 func TestNoBucketName(t *testing.T) {
-	client, err := NewClient(context.Background(), &internal.StorageConfig{})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{
+		Opts: opts,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +40,9 @@ func TestNoBucketName(t *testing.T) {
 }
 
 func TestEmptyBucketName(t *testing.T) {
-	client, err := NewClient(context.Background(), &internal.StorageConfig{})
+	client, err := NewClient(context.Background(), &internal.StorageConfig{
+		Opts: opts,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,6 +54,7 @@ func TestEmptyBucketName(t *testing.T) {
 func TestDefaultBucket(t *testing.T) {
 	client, err := NewClient(context.Background(), &internal.StorageConfig{
 		Bucket: "bucket.name",
+		Opts:   opts,
 	})
 	if err != nil {
 		t.Fatal(err)
