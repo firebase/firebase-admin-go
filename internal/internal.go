@@ -27,3 +27,9 @@ type AuthConfig struct {
 	Creds     *google.DefaultCredentials
 	ProjectID string
 }
+
+// StorageConfig represents the configuration of Google Cloud Storage service.
+type StorageConfig struct {
+	Opts   []option.ClientOption
+	Bucket string
+}

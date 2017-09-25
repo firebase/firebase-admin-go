@@ -216,6 +216,18 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+func TestStorage(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Storage(ctx); c == nil || err != nil {
+		t.Errorf("Storage() = (%v, %v); want (auth, nil)", c, err)
+	}
+}
+
 func TestCustomTokenSource(t *testing.T) {
 	ctx := context.Background()
 	ts := &testTokenSource{AccessToken: "mock-token-from-custom"}
