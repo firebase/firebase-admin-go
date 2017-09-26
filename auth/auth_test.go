@@ -159,7 +159,7 @@ func TestCustomTokenError(t *testing.T) {
 	for _, tc := range cases {
 		token, err := client.CustomTokenWithClaims(tc.uid, tc.claims)
 		if token != "" || err == nil {
-			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want: (\"\", error)", tc.name, token, err)
+			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
 		}
 	}
 }
@@ -172,12 +172,12 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 
 	token, err := s.CustomToken("user1")
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
 
 	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
 }
 
@@ -187,7 +187,7 @@ func TestVerifyIDToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want: true", ft.Claims["admin"])
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
 	}
 	if ft.UID != ft.Subject {
 		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
@@ -198,7 +198,7 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
 	if ft, err := client.VerifyIDToken(token); ft != nil || err == nil {
-		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want: (nil, error)", ft, err)
+		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
 	}
 }
 
