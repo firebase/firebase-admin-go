@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -122,6 +123,46 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 	}
 }
 
+func TestHTTPKeySourceEmptyResponse(t *testing.T) {
+	hc, _ := newHTTPClient([]byte(""))
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
+	hc, _ := newHTTPClient([]byte("{\"foo\": 1}"))
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestHTTPKeySourceTransportError(t *testing.T) {
+	hc := &http.Client{
+		Transport: &mockHTTPResponse{
+			Err: errors.New("transport error"),
+		},
+	}
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
 func TestFindMaxAge(t *testing.T) {
 	cases := []struct {
 		cc   string
@@ -133,7 +174,7 @@ func TestFindMaxAge(t *testing.T) {
 	}
 	for _, tc := range cases {
 		resp := &http.Response{
-			Header: http.Header{"Cache-Control": []string{tc.cc}},
+			Header: http.Header{"Cache-Control": {tc.cc}},
 		}
 		age, err := findMaxAge(resp)
 		if err != nil {
@@ -185,6 +226,16 @@ func TestParsePublicKeysError(t *testing.T) {
 		if keys, err := parsePublicKeys([]byte(tc)); keys != nil || err == nil {
 			t.Errorf("parsePublicKeys(%q) = (%v, %v); want: (nil, err)", tc, keys, err)
 		}
+	}
+}
+
+func TestDefaultServiceAcctSigner(t *testing.T) {
+	signer := &serviceAcctSigner{}
+	if email, err := signer.Email(); email != "" || err == nil {
+		t.Errorf("Email() = (%v, %v); want = ('', error)", email, err)
+	}
+	if sig, err := signer.Sign([]byte("")); sig != nil || err == nil {
+		t.Errorf("Sign() = (%v, %v); want = ('', error)", sig, err)
 	}
 }
 
