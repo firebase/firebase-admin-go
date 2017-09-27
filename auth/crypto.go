@@ -148,13 +148,10 @@ func (k *httpKeySource) refreshKeys() error {
 
 func findMaxAge(resp *http.Response) (*time.Duration, error) {
 	cc := resp.Header.Get("cache-control")
-	for _, value := range strings.Split(cc, ", ") {
+	for _, value := range strings.Split(cc, ",") {
 		value = strings.TrimSpace(value)
-		if strings.HasPrefix(value, "max-age") {
+		if strings.HasPrefix(value, "max-age=") {
 			sep := strings.Index(value, "=")
-			if sep == -1 {
-				return nil, errors.New("Malformed cache-control header")
-			}
 			seconds, err := strconv.ParseInt(value[sep+1:], 10, 64)
 			if err != nil {
 				return nil, err
