@@ -226,7 +226,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 
 	for _, tc := range cases {
 		if _, err := client.VerifyIDToken(tc.token); err == nil {
-			t.Errorf("VerifyyIDToken(%q) = nil; want error", tc.name)
+			t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
 		}
 	}
 }
