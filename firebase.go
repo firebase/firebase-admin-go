@@ -20,6 +20,7 @@ package firebase
 import (
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/internal"
+	"firebase.google.com/go/storage"
 
 	"os"
 
@@ -30,6 +31,7 @@ import (
 )
 
 var firebaseScopes = []string{
+	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
@@ -39,26 +41,35 @@ const Version = "1.0.2"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
-	ctx       context.Context
-	creds     *google.DefaultCredentials
-	projectID string
-	opts      []option.ClientOption
+	creds         *google.DefaultCredentials
+	projectID     string
+	storageBucket string
+	opts          []option.ClientOption
 }
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	ProjectID string
+	ProjectID     string
+	StorageBucket string
 }
 
 // Auth returns an instance of auth.Client.
-func (a *App) Auth() (*auth.Client, error) {
+func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	conf := &internal.AuthConfig{
-		Ctx:       a.ctx,
 		Creds:     a.creds,
 		ProjectID: a.projectID,
 		Opts:      a.opts,
 	}
-	return auth.NewClient(conf)
+	return auth.NewClient(ctx, conf)
+}
+
+// Storage returns a new instance of storage.Client.
+func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
+	conf := &internal.StorageConfig{
+		Opts:   a.opts,
+		Bucket: a.storageBucket,
+	}
+	return storage.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
@@ -75,8 +86,12 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		return nil, err
 	}
 
+	if config == nil {
+		config = &Config{}
+	}
+
 	var pid string
-	if config != nil && config.ProjectID != "" {
+	if config.ProjectID != "" {
 		pid = config.ProjectID
 	} else if creds.ProjectID != "" {
 		pid = creds.ProjectID
@@ -85,9 +100,9 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}
 
 	return &App{
-		ctx:       ctx,
-		creds:     creds,
-		projectID: pid,
-		opts:      o,
+		creds:         creds,
+		projectID:     pid,
+		storageBucket: config.StorageBucket,
+		opts:          o,
 	}, nil
 }

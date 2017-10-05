@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
+	"golang.org/x/net/context"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
@@ -73,7 +74,7 @@ type signer interface {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Auth service through firebase.App.
-func NewClient(c *internal.AuthConfig) (*Client, error) {
+func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	var (
 		err   error
 		email string
@@ -99,13 +100,13 @@ func NewClient(c *internal.AuthConfig) (*Client, error) {
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}
 	} else {
-		snr, err = newSigner(c.Ctx)
+		snr, err = newSigner(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	ks, err := newHTTPKeySource(c.Ctx, googleCertURL, c.Opts...)
+	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
 	if err != nil {
 		return nil, err
 	}

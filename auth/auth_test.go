@@ -60,8 +60,8 @@ func TestMain(m *testing.M) {
 			log.Fatalln(err)
 		}
 	} else {
-		opt := option.WithCredentialsFile("../testdata/service_account.json")
-		creds, err = transport.Creds(context.Background(), opt)
+		ctx = context.Background()
+		creds, err = transport.Creds(ctx, option.WithCredentialsFile("../testdata/service_account.json"))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -69,8 +69,7 @@ func TestMain(m *testing.M) {
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
 
-	client, err = NewClient(&internal.AuthConfig{
-		Ctx:       ctx,
+	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
@@ -87,11 +86,8 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("foo"),
 	}
-	conf := &internal.AuthConfig{
-		Ctx:   context.Background(),
-		Creds: creds,
-	}
-	if c, err := NewClient(conf); c != nil || err == nil {
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
@@ -106,11 +102,8 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	creds := &google.DefaultCredentials{JSON: b}
-	conf := &internal.AuthConfig{
-		Ctx:   context.Background(),
-		Creds: creds,
-	}
-	if c, err := NewClient(conf); c != nil || err == nil {
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
@@ -165,7 +158,7 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
+	s, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +225,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
+	c, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}

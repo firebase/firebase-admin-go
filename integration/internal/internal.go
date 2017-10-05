@@ -16,6 +16,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"go/build"
 	"io/ioutil"
 	"path/filepath"
@@ -42,7 +43,14 @@ func Resource(name string) string {
 // in the testdata directory. This file is used to initialize the newly created
 // App instance.
 func NewTestApp(ctx context.Context) (*firebase.App, error) {
-	return firebase.NewApp(ctx, nil, option.WithCredentialsFile(Resource(certPath)))
+	pid, err := ProjectID()
+	if err != nil {
+		return nil, err
+	}
+	config := &firebase.Config{
+		StorageBucket: pid + ".appspot.com",
+	}
+	return firebase.NewApp(ctx, config, option.WithCredentialsFile(Resource(certPath)))
 }
 
 // APIKey fetches a Firebase API key for integration tests.
@@ -55,4 +63,19 @@ func APIKey() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(b)), nil
+}
+
+// ProjectID fetches a Google Cloud project ID for integration tests.
+func ProjectID() (string, error) {
+	b, err := ioutil.ReadFile(Resource(certPath))
+	if err != nil {
+		return "", err
+	}
+	var serviceAccount struct {
+		ProjectID string `json:"project_id"`
+	}
+	if err := json.Unmarshal(b, &serviceAccount); err != nil {
+		return "", err
+	}
+	return serviceAccount.ProjectID, nil
 }
