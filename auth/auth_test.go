@@ -86,11 +86,8 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("foo"),
 	}
-	conf := &internal.AuthConfig{
-		Ctx:   context.Background(),
-		Creds: creds,
-	}
-	if c, err := NewClient(conf); c != nil || err == nil {
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
@@ -105,11 +102,8 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	creds := &google.DefaultCredentials{JSON: b}
-	conf := &internal.AuthConfig{
-		Ctx:   context.Background(),
-		Creds: creds,
-	}
-	if c, err := NewClient(conf); c != nil || err == nil {
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
