@@ -27,6 +27,18 @@ var opts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
 
+func TestNewClientError(t *testing.T) {
+	invalid := []option.ClientOption{
+		option.WithCredentialsFile("../testdata/non_existing.json"),
+	}
+	client, err := NewClient(context.Background(), &internal.StorageConfig{
+		Opts: invalid,
+	})
+	if client != nil || err == nil {
+		t.Errorf("NewClient() = (%v, %v); want (nil, error)", client, err)
+	}
+}
+
 func TestNoBucketName(t *testing.T) {
 	client, err := NewClient(context.Background(), &internal.StorageConfig{
 		Opts: opts,
