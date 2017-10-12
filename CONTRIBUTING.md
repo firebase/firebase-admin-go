@@ -99,7 +99,7 @@ to checkout the sources of Firebase Admin SDK, and its dependencies:
 ```bash
 $ cd $GOPATH
 $ git clone https://github.com/firebase/firebase-admin-go.git src/firebase.google.com/go
-$ go get -d gihub.com/firebase/firebase-admin-go/... # Install dependencies
+$ go get -d -t firebase.google.com/go/... # Install dependencies
 ```
 
 ### Unit Testing
