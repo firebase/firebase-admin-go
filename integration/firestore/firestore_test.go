@@ -16,6 +16,7 @@ package firestore
 
 import (
 	"context"
+	"log"
 	"reflect"
 	"testing"
 
@@ -23,6 +24,10 @@ import (
 )
 
 func TestFirestore(t *testing.T) {
+	if testing.Short() {
+		log.Println("skipping Firestore integration tests in short mode.")
+		return
+	}
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx)
 	if err != nil {
