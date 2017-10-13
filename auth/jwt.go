@@ -80,10 +80,7 @@ func decode(s string, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	if err := json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i); err != nil {
-		return err
-	}
-	return nil
+	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
 }
 
 func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {

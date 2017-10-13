@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -119,6 +120,122 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 	}
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHTTPKeySourceEmptyResponse(t *testing.T) {
+	hc, _ := newHTTPClient([]byte(""))
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
+	hc, _ := newHTTPClient([]byte("{\"foo\": 1}"))
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestHTTPKeySourceTransportError(t *testing.T) {
+	hc := &http.Client{
+		Transport: &mockHTTPResponse{
+			Err: errors.New("transport error"),
+		},
+	}
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if keys, err := ks.Keys(); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestFindMaxAge(t *testing.T) {
+	cases := []struct {
+		cc   string
+		want int64
+	}{
+		{"max-age=100", 100},
+		{"public, max-age=100", 100},
+		{"public,max-age=100", 100},
+	}
+	for _, tc := range cases {
+		resp := &http.Response{
+			Header: http.Header{"Cache-Control": {tc.cc}},
+		}
+		age, err := findMaxAge(resp)
+		if err != nil {
+			t.Errorf("findMaxAge(%q) = %v", tc.cc, err)
+		} else if *age != (time.Duration(tc.want) * time.Second) {
+			t.Errorf("findMaxAge(%q) = %v; want %v", tc.cc, *age, tc.want)
+		}
+	}
+}
+
+func TestFindMaxAgeError(t *testing.T) {
+	cases := []string{
+		"",
+		"max-age 100",
+		"max-age: 100",
+		"max-age2=100",
+		"max-age=foo",
+	}
+	for _, tc := range cases {
+		resp := &http.Response{
+			Header: http.Header{"Cache-Control": []string{tc}},
+		}
+		if age, err := findMaxAge(resp); age != nil || err == nil {
+			t.Errorf("findMaxAge(%q) = (%v, %v); want = (nil, err)", tc, age, err)
+		}
+	}
+}
+
+func TestParsePublicKeys(t *testing.T) {
+	b, err := ioutil.ReadFile("../testdata/public_certs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := parsePublicKeys(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 3 {
+		t.Errorf("parsePublicKeys() = %d; want: %d", len(keys), 3)
+	}
+}
+
+func TestParsePublicKeysError(t *testing.T) {
+	cases := []string{
+		"",
+		"not-json",
+	}
+	for _, tc := range cases {
+		if keys, err := parsePublicKeys([]byte(tc)); keys != nil || err == nil {
+			t.Errorf("parsePublicKeys(%q) = (%v, %v); want: (nil, err)", tc, keys, err)
+		}
+	}
+}
+
+func TestDefaultServiceAcctSigner(t *testing.T) {
+	signer := &serviceAcctSigner{}
+	if email, err := signer.Email(); email != "" || err == nil {
+		t.Errorf("Email() = (%v, %v); want = ('', error)", email, err)
+	}
+	if sig, err := signer.Sign([]byte("")); sig != nil || err == nil {
+		t.Errorf("Sign() = (%v, %v); want = ('', error)", sig, err)
 	}
 }
 

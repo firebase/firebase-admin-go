@@ -15,7 +15,9 @@
 package auth
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -58,8 +60,8 @@ func TestMain(m *testing.M) {
 			log.Fatalln(err)
 		}
 	} else {
-		opt := option.WithCredentialsFile("../testdata/service_account.json")
-		creds, err = transport.Creds(context.Background(), opt)
+		ctx = context.Background()
+		creds, err = transport.Creds(ctx, option.WithCredentialsFile("../testdata/service_account.json"))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -67,8 +69,7 @@ func TestMain(m *testing.M) {
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
 
-	client, err = NewClient(&internal.AuthConfig{
-		Ctx:       ctx,
+	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
@@ -79,6 +80,32 @@ func TestMain(m *testing.M) {
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
+}
+
+func TestNewClientInvalidCredentials(t *testing.T) {
+	creds := &google.DefaultCredentials{
+		JSON: []byte("foo"),
+	}
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
+	}
+}
+
+func TestNewClientInvalidPrivateKey(t *testing.T) {
+	sa := map[string]interface{}{
+		"private_key":  "foo",
+		"client_email": "bar@test.com",
+	}
+	b, err := json.Marshal(sa)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creds := &google.DefaultCredentials{JSON: b}
+	conf := &internal.AuthConfig{Creds: creds}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
+	}
 }
 
 func TestCustomToken(t *testing.T) {
@@ -118,31 +145,32 @@ func TestCustomTokenError(t *testing.T) {
 	}{
 		{"EmptyName", "", nil},
 		{"LongUid", strings.Repeat("a", 129), nil},
-		{"ReservedClaims", "uid", map[string]interface{}{"sub": "1234"}},
+		{"ReservedClaim", "uid", map[string]interface{}{"sub": "1234"}},
+		{"ReservedClaims", "uid", map[string]interface{}{"sub": "1234", "aud": "foo"}},
 	}
 
 	for _, tc := range cases {
 		token, err := client.CustomTokenWithClaims(tc.uid, tc.claims)
 		if token != "" || err == nil {
-			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want: (\"\", error)", tc.name, token, err)
+			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
 		}
 	}
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
+	s, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	token, err := s.CustomToken("user1")
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
 
 	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want: (\"\", error)", token, err)
+		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
 }
 
@@ -152,15 +180,23 @@ func TestVerifyIDToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want: true", ft.Claims["admin"])
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
 	}
 	if ft.UID != ft.Subject {
 		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
 	}
 }
 
+func TestVerifyIDTokenInvalidSignature(t *testing.T) {
+	parts := strings.Split(testIDToken, ".")
+	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
+	if ft, err := client.VerifyIDToken(token); ft != nil || err == nil {
+		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
+	}
+}
+
 func TestVerifyIDTokenError(t *testing.T) {
-	var now int64 = 1000
+	now := time.Now().Unix()
 	cases := []struct {
 		name  string
 		token string
@@ -172,28 +208,24 @@ func TestVerifyIDTokenError(t *testing.T) {
 		{"EmptySubject", getIDToken(mockIDTokenPayload{"sub": ""})},
 		{"IntSubject", getIDToken(mockIDTokenPayload{"sub": 10})},
 		{"LongSubject", getIDToken(mockIDTokenPayload{"sub": strings.Repeat("a", 129)})},
-		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": time.Unix(now+1, 0)})},
+		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": now + 1000})},
 		{"ExpiredToken", getIDToken(mockIDTokenPayload{
-			"iat": time.Unix(now-10, 0),
-			"exp": time.Unix(now-1, 0),
+			"iat": now - 1000,
+			"exp": now - 100,
 		})},
 		{"EmptyToken", ""},
 		{"BadFormatToken", "foobar"},
 	}
 
-	clk = &mockClock{now: time.Unix(now, 0)}
-	defer func() {
-		clk = &systemClock{}
-	}()
 	for _, tc := range cases {
 		if _, err := client.VerifyIDToken(tc.token); err == nil {
-			t.Errorf("VerifyyIDToken(%q) = nil; want error", tc.name)
+			t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
 		}
 	}
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(&internal.AuthConfig{Ctx: context.Background()})
+	c, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
