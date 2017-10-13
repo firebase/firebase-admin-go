@@ -19,7 +19,8 @@ package firebase
 
 import (
 	"errors"
-	"gocloud-exp/firestore"
+
+	"cloud.google.com/go/firestore"
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/internal"
@@ -42,7 +43,7 @@ var firebaseScopes = []string{
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "1.0.2"
+const Version = "2.0.0"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
@@ -58,7 +59,7 @@ type Config struct {
 	StorageBucket string
 }
 
-// Auth returns a new instance of auth.Client.
+// Auth returns an instance of auth.Client.
 func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	conf := &internal.AuthConfig{
 		Creds:     a.creds,

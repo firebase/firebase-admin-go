@@ -143,9 +143,6 @@ func TestRefreshTokenWithEnvVar(t *testing.T) {
 	if app.projectID != "mock-project-id" {
 		t.Errorf("Project ID: %q; want: mock-project-id", app.projectID)
 	}
-	if len(app.opts) != 2 {
-		t.Errorf("Client opts: %d; want: 2", len(app.opts))
-	}
 	if app.creds == nil {
 		t.Error("Credentials: nil; want creds")
 	} else if len(app.creds.JSON) == 0 {
