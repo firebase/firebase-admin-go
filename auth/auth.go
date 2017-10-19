@@ -69,6 +69,39 @@ type signer interface {
 	Sign(b []byte) ([]byte, error)
 }
 
+// UserInfo A collection of standard profile information for a user.
+//
+// Used to expose profile information returned by an identity provider.
+type UserInfo struct {
+	DisplayName string
+	Email       string
+	PhoneNumber string
+	PhotoUrl    string
+	// This can be short domain name (e.g. google.com),
+	// or the identity of an OpenID identity provider.
+	ProviderId string
+	Uid        string
+}
+
+//UserMetadata contains additional metadata associated with a user account.
+type UserMetadata struct {
+	CreationTimestamp   int64
+	LastSignInTimestamp int64
+}
+
+// UserRecord contains metadata associated with a Firebase user account.
+type UserRecord struct {
+	*UserInfo
+	Disabled      bool
+	Emailverified bool
+	Providerdata  []UserInfo
+	Usermetadata  UserMetadata
+}
+
+func (c *Client) CreateUser(uid) UserRecord {
+	return UserRecord{}
+}
+
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the

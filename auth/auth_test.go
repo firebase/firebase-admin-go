@@ -31,6 +31,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"
 )
 
@@ -344,3 +345,37 @@ func newAEKeySource(ctx context.Context) (keySource, error) {
 func (k aeKeySource) Keys() ([]*publicKey, error) {
 	return k.keys, nil
 }
+
+func TestAppCreation(t *testing.T) {
+	config := &firebase.Config{ProjectID: "mock-project-id"}
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithTokenSource(config.TokenSource(ctx)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+// Adding tests for user management
+/*
+func TestUserRecordMetadata(t *testing.T) {
+	metadata := client.UserMetadata(map[string]interface{}{
+		"createdAt":   10,
+		"lastLoginAt": 20})
+	if created, err := metadata.CreationTimestamp(); err != nil || created != 10 {
+		t.Errorf("metadata createdAt not propagated (%v %v)", created, err)
+	}
+	if last, err := metadata.LastSignInTimestamp(); err != nil || last != 20 {
+		t.Errorf("metadata last sign in not propagated  (%v %v)", last, err)
+	}
+	metadata = client.UserMetadata(map[string]interface{}{})
+
+	if _, err := metadata.CreationTimestamp(); err == nil {
+		t.Errorf("not expecting metadata createdAt")
+	}
+	if _, err := metadata.LastSignInTimestamp(); err == nil {
+		t.Errorf("not expecting metadata last sign in ")
+	}
+
+}
+*/
