@@ -28,6 +28,11 @@ type AuthConfig struct {
 	ProjectID string
 }
 
+type DatabaseConfig struct {
+	Opts    []option.ClientOption
+	BaseURL string
+}
+
 // StorageConfig represents the configuration of Google Cloud Storage service.
 type StorageConfig struct {
 	Opts   []option.ClientOption
