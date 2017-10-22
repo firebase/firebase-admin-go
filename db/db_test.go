@@ -98,9 +98,11 @@ func TestNewRef(t *testing.T) {
 		}
 		if r.client == nil {
 			t.Errorf("Client = nil; want = %v", client)
-		} else if r.Path != tc.WantPath {
+		}
+		if r.Path != tc.WantPath {
 			t.Errorf("Path = %q; want = %q", r.Path, tc.WantPath)
-		} else if r.Key != tc.WantKey {
+		}
+		if r.Key != tc.WantKey {
 			t.Errorf("Key = %q; want = %q", r.Key, tc.WantKey)
 		}
 	}
@@ -130,9 +132,11 @@ func TestParent(t *testing.T) {
 		if tc.HasParent {
 			if r == nil {
 				t.Fatalf("Parent = nil; want = %q", tc.Want)
-			} else if r.client == nil {
+			}
+			if r.client == nil {
 				t.Errorf("Client = nil; want = %v", client)
-			} else if r.Key != tc.Want {
+			}
+			if r.Key != tc.Want {
 				t.Errorf("Key = %q; want = %q", r.Key, tc.Want)
 			}
 		} else if r != nil {
@@ -150,7 +154,8 @@ func TestGet(t *testing.T) {
 	var got map[string]interface{}
 	if err := ref.Get(&got); err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(want, got) {
+	}
+	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
@@ -165,10 +170,38 @@ func TestGetWithStruct(t *testing.T) {
 	var got person
 	if err := ref.Get(&got); err != nil {
 		t.Fatal(err)
-	} else if want != got {
+	}
+	if want != got {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+}
+
+func TestGetWithETag(t *testing.T) {
+	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
+	mock := &mockServer{
+		Resp:   want,
+		Header: map[string]string{"ETag": "mock-etag"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got map[string]interface{}
+	etag, err := ref.GetWithETag(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	if etag != "mock-etag" {
+		t.Errorf("ETag = %q; want = %q", etag, "mock-etag")
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+	})
 }
 
 func TestWerlformedHttpError(t *testing.T) {
@@ -228,6 +261,51 @@ func TestSetWithStruct(t *testing.T) {
 		Method: "PUT",
 		Path:   "/peter.json?print=silent",
 		Body:   serialize(want),
+	})
+}
+
+func TestSetIfUnchanged(t *testing.T) {
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	want := &person{"Peter Parker", 17}
+	ok, err := ref.SetIfUnchanged("mock-etag", &want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("SetIfUnchanged() = %v; want = %v", ok, true)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "PUT",
+		Path:   "/peter.json",
+		Body:   serialize(want),
+		Header: http.Header{"If-Match": []string{"mock-etag"}},
+	})
+}
+
+func TestSetIfUnchangedError(t *testing.T) {
+	mock := &mockServer{
+		Status: http.StatusPreconditionFailed,
+		Resp:   &person{"Tony Stark", 39},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	want := &person{"Peter Parker", 17}
+	ok, err := ref.SetIfUnchanged("mock-etag", &want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Errorf("SetIfUnchanged() = %v; want = %v", ok, false)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "PUT",
+		Path:   "/peter.json",
+		Body:   serialize(want),
+		Header: http.Header{"If-Match": []string{"mock-etag"}},
 	})
 }
 
@@ -298,6 +376,92 @@ func TestInvalidUpdate(t *testing.T) {
 	}
 }
 
+func TestTransaction(t *testing.T) {
+	mock := &mockServer{
+		Resp:   &person{"Peter Parker", 17},
+		Header: map[string]string{"ETag": "mock-etag"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+		p := i.(map[string]interface{})
+		p["age"] = p["age"].(float64) + 1.0
+		return p, nil
+	}
+	if err := ref.Transaction(fn); err != nil {
+		t.Fatal(err)
+	}
+	checkAllRequests(t, mock.Reqs, []*testReq{
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+		},
+		&testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body: serialize(map[string]interface{}{
+				"name": "Peter Parker",
+				"age":  18,
+			}),
+			Header: http.Header{"If-Match": []string{"mock-etag"}},
+		},
+	})
+}
+
+func TestTransactionRetry(t *testing.T) {
+	mock := &mockServer{
+		Resp:   &person{"Peter Parker", 17},
+		Header: map[string]string{"ETag": "mock-etag1"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cnt := 0
+	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+		if cnt == 0 {
+			mock.Status = http.StatusPreconditionFailed
+			mock.Header = map[string]string{"ETag": "mock-etag2"}
+			mock.Resp = &person{"Peter Parker", 19}
+		} else if cnt == 1 {
+			mock.Status = http.StatusOK
+		}
+		cnt++
+		p := i.(map[string]interface{})
+		p["age"] = p["age"].(float64) + 1.0
+		return p, nil
+	}
+	if err := ref.Transaction(fn); err != nil {
+		t.Fatal(err)
+	}
+	checkAllRequests(t, mock.Reqs, []*testReq{
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+		},
+		&testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body: serialize(map[string]interface{}{
+				"name": "Peter Parker",
+				"age":  18,
+			}),
+			Header: http.Header{"If-Match": []string{"mock-etag1"}},
+		},
+		&testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body: serialize(map[string]interface{}{
+				"name": "Peter Parker",
+				"age":  20,
+			}),
+			Header: http.Header{"If-Match": []string{"mock-etag2"}},
+		},
+	})
+}
+
 func TestRemove(t *testing.T) {
 	mock := &mockServer{Resp: "null"}
 	srv := mock.Start(client)
@@ -321,32 +485,48 @@ func checkAllRequests(t *testing.T, got []*testReq, want []*testReq) {
 		t.Errorf("Request Count = %d; want = %d", len(got), len(want))
 	}
 	for i, r := range got {
-		if h := r.Header.Get("Authorization"); h != "Bearer mock-token" {
-			t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
-		}
-		if h := r.Header.Get("User-Agent"); h != userAgent {
-			t.Errorf("User-Agent = %q; want = %q", h, userAgent)
-		}
+		checkRequest(t, r, want[i])
+	}
+}
 
-		w := want[i]
-		if r.Method != w.Method {
-			t.Errorf("Method = %q; want = %q", r.Method, w.Method)
+func checkRequest(t *testing.T, got *testReq, want *testReq) {
+	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" {
+		t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
+	}
+	if h := got.Header.Get("User-Agent"); h != userAgent {
+		t.Errorf("User-Agent = %q; want = %q", h, userAgent)
+	}
+
+	if got.Method != want.Method {
+		t.Errorf("Method = %q; want = %q", got.Method, want.Method)
+	}
+	if got.Path != want.Path {
+		t.Errorf("URL = %q; want = %q", got.Path, want.Path)
+	}
+	for k, v := range want.Header {
+		if got.Header.Get(k) != v[0] {
+			t.Errorf("Header(%q) = %q; want = %q", k, got.Header.Get(k), v[0])
 		}
-		if r.Path != w.Path {
-			t.Errorf("URL = %q; want = %q", r.Path, w.Path)
+	}
+	if want.Body != nil {
+		var wi, gi interface{}
+		if err := json.Unmarshal(want.Body, &wi); err != nil {
+			t.Fatal(err)
 		}
-		if w.Body != nil {
-			if !reflect.DeepEqual(r.Body, w.Body) {
-				t.Errorf("Body = %v; want = %v", string(r.Body), string(w.Body))
-			}
-		} else if len(r.Body) != 0 {
-			t.Errorf("Body = %v; want empty", r.Body)
+		if err := json.Unmarshal(got.Body, &gi); err != nil {
+			t.Fatal(err)
 		}
+		if !reflect.DeepEqual(gi, wi) {
+			t.Errorf("Body = %v; want = %v", gi, wi)
+		}
+	} else if len(got.Body) != 0 {
+		t.Errorf("Body = %v; want empty", got.Body)
 	}
 }
 
 type mockServer struct {
 	Resp   interface{}
+	Header map[string]string
 	Status int
 	Reqs   []*testReq
 	srv    *httptest.Server
@@ -379,25 +559,30 @@ func newTestReq(r *http.Request) (*testReq, error) {
 }
 
 func (s *mockServer) Start(c *Client) *httptest.Server {
-	if s.srv == nil {
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tr, _ := newTestReq(r)
-			s.Reqs = append(s.Reqs, tr)
-
-			print := r.URL.Query().Get("print")
-			if s.Status != 0 {
-				w.WriteHeader(s.Status)
-			} else if print == "silent" {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			b, _ := json.Marshal(s.Resp)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(b)
-		})
-		s.srv = httptest.NewServer(handler)
-		c.baseURL = s.srv.URL
+	if s.srv != nil {
+		return s.srv
 	}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr, _ := newTestReq(r)
+		s.Reqs = append(s.Reqs, tr)
+
+		for k, v := range s.Header {
+			w.Header().Set(k, v)
+		}
+
+		print := r.URL.Query().Get("print")
+		if s.Status != 0 {
+			w.WriteHeader(s.Status)
+		} else if print == "silent" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		b, _ := json.Marshal(s.Resp)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	})
+	s.srv = httptest.NewServer(handler)
+	c.baseURL = s.srv.URL
 	return s.srv
 }
 
