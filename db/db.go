@@ -109,14 +109,19 @@ func (c *Client) send(r *request) (*response, error) {
 		}
 		data = bytes.NewBuffer(b)
 	}
-
 	req, err := http.NewRequest(r.Method, url, data)
 	if err != nil {
 		return nil, err
-	}
-	if data != nil {
+	} else if data != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
+
+	q := req.URL.Query()
+	for k, v := range r.Query {
+		q.Add(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return nil, err
@@ -128,33 +133,6 @@ func (c *Client) send(r *request) (*response, error) {
 		return nil, err
 	}
 	return &response{Status: resp.StatusCode, Body: b}, nil
-}
-
-type request struct {
-	Method string
-	Path   string
-	Body   interface{}
-}
-
-type response struct {
-	Status int
-	Body   []byte
-}
-
-func (r *response) CheckStatus(want int) error {
-	if r.Status != want {
-		return fmt.Errorf("http error: %d; body: %s", r.Status, string(r.Body))
-	}
-	return nil
-}
-
-func (r *response) CheckAndParse(want int, v interface{}) error {
-	if err := r.CheckStatus(want); err != nil {
-		return err
-	} else if err := json.Unmarshal(r.Body, v); err != nil {
-		return err
-	}
-	return nil
 }
 
 type Ref struct {
@@ -175,6 +153,14 @@ func (r *Ref) Parent() *Ref {
 	return nil
 }
 
+func (r *Ref) Child(path string) (*Ref, error) {
+	if strings.HasPrefix(path, "/") {
+		return nil, fmt.Errorf("child path must not start with %q", "/")
+	}
+	fp := fmt.Sprintf("%s/%s", r.Path, path)
+	return r.client.NewRef(fp)
+}
+
 func (r *Ref) Get(v interface{}) error {
 	resp, err := r.client.send(&request{Method: "GET", Path: r.Path})
 	if err != nil {
@@ -186,10 +172,95 @@ func (r *Ref) Get(v interface{}) error {
 }
 
 func (r *Ref) Set(v interface{}) error {
-	resp, err := r.client.send(&request{Method: "PUT", Path: r.Path, Body: v})
+	resp, err := r.client.send(&request{
+		Method: "PUT",
+		Path:   r.Path,
+		Body:   v,
+		Query:  map[string]string{"print": "silent"},
+	})
+	if err != nil {
+		return err
+	} else if err := resp.CheckStatus(http.StatusNoContent); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Ref) Push(v interface{}) (*Ref, error) {
+	resp, err := r.client.send(&request{Method: "POST", Path: r.Path, Body: v})
+	if err != nil {
+		return nil, err
+	}
+	var d struct {
+		Name string `json:"name"`
+	}
+	if err := resp.CheckAndParse(http.StatusOK, &d); err != nil {
+		return nil, err
+	}
+	return r.Child(d.Name)
+}
+
+func (r *Ref) Update(v map[string]interface{}) error {
+	if len(v) == 0 {
+		return fmt.Errorf("value argument must be a non-empty map")
+	}
+	resp, err := r.client.send(&request{
+		Method: "PATCH",
+		Path:   r.Path,
+		Body:   v,
+		Query:  map[string]string{"print": "silent"},
+	})
+	if err != nil {
+		return err
+	} else if err := resp.CheckStatus(http.StatusNoContent); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Ref) Remove() error {
+	resp, err := r.client.send(&request{Method: "DELETE", Path: r.Path})
 	if err != nil {
 		return err
 	} else if err := resp.CheckStatus(http.StatusOK); err != nil {
+		return err
+	}
+	return nil
+}
+
+type request struct {
+	Method string
+	Path   string
+	Body   interface{}
+	Query  map[string]string
+}
+
+type response struct {
+	Status int
+	Body   []byte
+}
+
+func (r *response) CheckStatus(want int) error {
+	if r.Status == want {
+		return nil
+	}
+	var b struct {
+		Error string `json:"error"`
+	}
+	json.Unmarshal(r.Body, &b)
+	var msg string
+	if b.Error != "" {
+		msg = fmt.Sprintf("http error status: %d; reason: %s", r.Status, b.Error)
+	} else {
+		msg = fmt.Sprintf("http error status: %d; message: %s", r.Status, string(r.Body))
+	}
+	return fmt.Errorf(msg)
+}
+
+func (r *response) CheckAndParse(want int, v interface{}) error {
+	if err := r.CheckStatus(want); err != nil {
+		return err
+	} else if err := json.Unmarshal(r.Body, v); err != nil {
 		return err
 	}
 	return nil
