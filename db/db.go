@@ -17,7 +17,6 @@ package db
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -26,13 +25,7 @@ import (
 
 	"net/url"
 
-	"io/ioutil"
-
-	"encoding/json"
-
 	"runtime"
-
-	"bytes"
 
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
@@ -96,90 +89,4 @@ func (c *Client) NewRef(path string) (*Ref, error) {
 		client: c,
 		segs:   segs,
 	}, nil
-}
-
-func (c *Client) send(r *request) (*response, error) {
-	url := fmt.Sprintf("%s%s%s", c.baseURL, r.Path, ".json")
-
-	var body io.Reader
-	if r.Body != nil {
-		b, err := json.Marshal(r.Body)
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewBuffer(b)
-	}
-
-	req, err := http.NewRequest(r.Method, url, body)
-	if err != nil {
-		return nil, err
-	} else if body != nil {
-		req.Header.Add("Content-Type", "application/json")
-	}
-
-	for k, v := range r.Header {
-		req.Header.Add(k, v)
-	}
-
-	q := req.URL.Query()
-	for k, v := range r.Query {
-		q.Add(k, v)
-	}
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := c.hc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return &response{
-		Status: resp.StatusCode,
-		Body:   b,
-		Header: resp.Header,
-	}, nil
-}
-
-type request struct {
-	Method string
-	Path   string
-	Body   interface{}
-	Query  map[string]string
-	Header map[string]string
-}
-
-type response struct {
-	Status int
-	Header http.Header
-	Body   []byte
-}
-
-func (r *response) CheckStatus(want int) error {
-	if r.Status == want {
-		return nil
-	}
-	var b struct {
-		Error string `json:"error"`
-	}
-	json.Unmarshal(r.Body, &b)
-	var msg string
-	if b.Error != "" {
-		msg = fmt.Sprintf("http error status: %d; reason: %s", r.Status, b.Error)
-	} else {
-		msg = fmt.Sprintf("http error status: %d; message: %s", r.Status, string(r.Body))
-	}
-	return fmt.Errorf(msg)
-}
-
-func (r *response) CheckAndParse(want int, v interface{}) error {
-	if err := r.CheckStatus(want); err != nil {
-		return err
-	} else if err := json.Unmarshal(r.Body, v); err != nil {
-		return err
-	}
-	return nil
 }

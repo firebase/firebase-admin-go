@@ -556,6 +556,9 @@ func checkRequest(t *testing.T, got *testReq, want *testReq) {
 		}
 	}
 	if want.Body != nil {
+		if h := got.Header.Get("Content-Type"); h != "application/json" {
+			t.Errorf("User-Agent = %q; want = %q", h, "application/json")
+		}
 		var wi, gi interface{}
 		if err := json.Unmarshal(want.Body, &wi); err != nil {
 			t.Fatal(err)
@@ -571,24 +574,11 @@ func checkRequest(t *testing.T, got *testReq, want *testReq) {
 	}
 }
 
-type mockServer struct {
-	Resp   interface{}
-	Header map[string]string
-	Status int
-	Reqs   []*testReq
-	srv    *httptest.Server
-}
-
 type testReq struct {
 	Method string
 	Path   string
 	Header http.Header
 	Body   []byte
-}
-
-func serialize(v interface{}) []byte {
-	b, _ := json.Marshal(v)
-	return b
 }
 
 func newTestReq(r *http.Request) (*testReq, error) {
@@ -603,6 +593,14 @@ func newTestReq(r *http.Request) (*testReq, error) {
 		Header: r.Header,
 		Body:   b,
 	}, nil
+}
+
+type mockServer struct {
+	Resp   interface{}
+	Header map[string]string
+	Status int
+	Reqs   []*testReq
+	srv    *httptest.Server
 }
 
 func (s *mockServer) Start(c *Client) *httptest.Server {
@@ -644,4 +642,9 @@ func (ts *mockTokenSource) Token() (*oauth2.Token, error) {
 type person struct {
 	Name string `json:"name"`
 	Age  int32  `json:"age"`
+}
+
+func serialize(v interface{}) []byte {
+	b, _ := json.Marshal(v)
+	return b
 }

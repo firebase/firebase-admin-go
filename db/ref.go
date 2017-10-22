@@ -47,7 +47,7 @@ func (r *Ref) Child(path string) (*Ref, error) {
 }
 
 func (r *Ref) Get(v interface{}) error {
-	resp, err := r.client.send(&request{Method: "GET", Path: r.Path})
+	resp, err := r.send("GET", nil)
 	if err != nil {
 		return err
 	}
@@ -55,11 +55,7 @@ func (r *Ref) Get(v interface{}) error {
 }
 
 func (r *Ref) GetWithETag(v interface{}) (string, error) {
-	resp, err := r.client.send(&request{
-		Method: "GET",
-		Path:   r.Path,
-		Header: map[string]string{"X-Firebase-ETag": "true"},
-	})
+	resp, err := r.send("GET", nil, withHeader("X-Firebase-ETag", "true"))
 	if err != nil {
 		return "", err
 	} else if err := resp.CheckAndParse(http.StatusOK, v); err != nil {
@@ -69,12 +65,7 @@ func (r *Ref) GetWithETag(v interface{}) (string, error) {
 }
 
 func (r *Ref) Set(v interface{}) error {
-	resp, err := r.client.send(&request{
-		Method: "PUT",
-		Path:   r.Path,
-		Body:   v,
-		Query:  map[string]string{"print": "silent"},
-	})
+	resp, err := r.send("PUT", v, withQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
@@ -82,12 +73,7 @@ func (r *Ref) Set(v interface{}) error {
 }
 
 func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
-	resp, err := r.client.send(&request{
-		Method: "PUT",
-		Path:   r.Path,
-		Body:   v,
-		Header: map[string]string{"If-Match": etag},
-	})
+	resp, err := r.send("PUT", v, withHeader("If-Match", etag))
 	if err != nil {
 		return false, err
 	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
@@ -99,11 +85,7 @@ func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
 }
 
 func (r *Ref) Push(v interface{}) (*Ref, error) {
-	resp, err := r.client.send(&request{
-		Method: "POST",
-		Path:   r.Path,
-		Body:   v,
-	})
+	resp, err := r.send("POST", v)
 	if err != nil {
 		return nil, err
 	}
@@ -120,12 +102,7 @@ func (r *Ref) Update(v map[string]interface{}) error {
 	if len(v) == 0 {
 		return fmt.Errorf("value argument must be a non-empty map")
 	}
-	resp, err := r.client.send(&request{
-		Method: "PATCH",
-		Path:   r.Path,
-		Body:   v,
-		Query:  map[string]string{"print": "silent"},
-	})
+	resp, err := r.send("PATCH", v, withQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
@@ -146,13 +123,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 		if err != nil {
 			return err
 		}
-
-		resp, err := r.client.send(&request{
-			Method: "PUT",
-			Path:   r.Path,
-			Body:   new,
-			Header: map[string]string{"If-Match": etag},
-		})
+		resp, err := r.send("PUT", new, withHeader("If-Match", etag))
 		if err := resp.CheckStatus(http.StatusOK); err == nil {
 			return nil
 		} else if err := resp.CheckAndParse(http.StatusPreconditionFailed, &curr); err != nil {
@@ -164,10 +135,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 }
 
 func (r *Ref) Remove() error {
-	resp, err := r.client.send(&request{
-		Method: "DELETE",
-		Path:   r.Path,
-	})
+	resp, err := r.send("DELETE", nil)
 	if err != nil {
 		return err
 	}
