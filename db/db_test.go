@@ -16,6 +16,8 @@ import (
 
 	"io/ioutil"
 
+	"net/url"
+
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
 )
@@ -536,7 +538,7 @@ func checkAllRequests(t *testing.T, got []*testReq, want []*testReq) {
 	}
 }
 
-func checkRequest(t *testing.T, got *testReq, want *testReq) {
+func checkRequest(t *testing.T, got, want *testReq) {
 	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
 	}
@@ -547,9 +549,8 @@ func checkRequest(t *testing.T, got *testReq, want *testReq) {
 	if got.Method != want.Method {
 		t.Errorf("Method = %q; want = %q", got.Method, want.Method)
 	}
-	if got.Path != want.Path {
-		t.Errorf("URL = %q; want = %q", got.Path, want.Path)
-	}
+
+	checkURL(t, got.Path, want.Path)
 	for k, v := range want.Header {
 		if got.Header.Get(k) != v[0] {
 			t.Errorf("Header(%q) = %q; want = %q", k, got.Header.Get(k), v[0])
@@ -571,6 +572,28 @@ func checkRequest(t *testing.T, got *testReq, want *testReq) {
 		}
 	} else if len(got.Body) != 0 {
 		t.Errorf("Body = %v; want empty", got.Body)
+	}
+}
+
+func checkURL(t *testing.T, ug, uw string) {
+	got, err := url.ParseRequestURI(ug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := url.ParseRequestURI(uw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Path != want.Path {
+		t.Errorf("Path = %q; want = %q", got, want)
+	}
+	if len(got.Query()) != len(want.Query()) {
+		t.Errorf("QueryParams = %v; want = %v", got.Query(), want.Query())
+	}
+	for k, v := range want.Query() {
+		if !reflect.DeepEqual(v, got.Query()[k]) {
+			t.Errorf("QueryParam(%v) = %v; want = %v", k, got.Query()[k], v)
+		}
 	}
 }
 

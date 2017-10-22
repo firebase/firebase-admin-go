@@ -93,3 +93,13 @@ func withQueryParam(key, value string) httpOption {
 		r.URL.RawQuery = q.Encode()
 	}
 }
+
+func withQueryParams(qp queryParams) httpOption {
+	return func(r *http.Request) {
+		q := r.URL.Query()
+		for k, v := range qp {
+			q.Add(k, v)
+		}
+		r.URL.RawQuery = q.Encode()
+	}
+}

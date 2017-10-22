@@ -68,14 +68,9 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 }
 
 func (c *Client) NewRef(path string) (*Ref, error) {
-	if strings.ContainsAny(path, invalidChars) {
-		return nil, fmt.Errorf("path %q contains one or more invalid characters", path)
-	}
-	var segs []string
-	for _, s := range strings.Split(path, "/") {
-		if s != "" {
-			segs = append(segs, s)
-		}
+	segs, err := parsePath(path)
+	if err != nil {
+		return nil, err
 	}
 
 	key := ""
@@ -89,4 +84,17 @@ func (c *Client) NewRef(path string) (*Ref, error) {
 		client: c,
 		segs:   segs,
 	}, nil
+}
+
+func parsePath(path string) ([]string, error) {
+	if strings.ContainsAny(path, invalidChars) {
+		return nil, fmt.Errorf("path %q contains one or more invalid characters", path)
+	}
+	var segs []string
+	for _, s := range strings.Split(path, "/") {
+		if s != "" {
+			segs = append(segs, s)
+		}
+	}
+	return segs, nil
 }
