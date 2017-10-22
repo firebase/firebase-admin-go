@@ -15,7 +15,6 @@
 package db
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -83,8 +82,20 @@ func (r *Ref) Set(v interface{}) error {
 }
 
 func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
-	ok, _, err := r.compareAndSet(etag, v)
-	return ok, err
+	resp, err := r.client.send(&request{
+		Method: "PUT",
+		Path:   r.Path,
+		Body:   v,
+		Header: map[string]string{"If-Match": etag},
+	})
+	if err != nil {
+		return false, err
+	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
+		return true, nil
+	} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 func (r *Ref) Push(v interface{}) (*Ref, error) {
@@ -136,16 +147,20 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 			return err
 		}
 
-		ok, b, err := r.compareAndSet(etag, new)
-		if err != nil {
-			return err
-		} else if ok {
-			break
-		} else if err := json.Unmarshal(b, &curr); err != nil {
+		resp, err := r.client.send(&request{
+			Method: "PUT",
+			Path:   r.Path,
+			Body:   new,
+			Header: map[string]string{"If-Match": etag},
+		})
+		if err := resp.CheckStatus(http.StatusOK); err == nil {
+			return nil
+		} else if err := resp.CheckAndParse(http.StatusPreconditionFailed, &curr); err != nil {
 			return err
 		}
+		etag = resp.Header.Get("ETag")
 	}
-	return nil
+	return fmt.Errorf("transaction aborted after failed retries")
 }
 
 func (r *Ref) Remove() error {
@@ -157,22 +172,4 @@ func (r *Ref) Remove() error {
 		return err
 	}
 	return resp.CheckStatus(http.StatusOK)
-}
-
-func (r *Ref) compareAndSet(etag string, new interface{}) (bool, []byte, error) {
-	resp, err := r.client.send(&request{
-		Method: "PUT",
-		Path:   r.Path,
-		Body:   new,
-		Header: map[string]string{"If-Match": etag},
-	})
-	if err != nil {
-		return false, nil, err
-	}
-	if resp.Status == http.StatusPreconditionFailed {
-		return false, resp.Body, nil
-	} else if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return false, nil, err
-	}
-	return true, nil, nil
 }

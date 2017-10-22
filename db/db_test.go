@@ -435,6 +435,9 @@ func TestTransactionRetry(t *testing.T) {
 	if err := ref.Transaction(fn); err != nil {
 		t.Fatal(err)
 	}
+	if cnt != 2 {
+		t.Errorf("Retry Count = %d; want = %d", cnt, 2)
+	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
 		&testReq{
 			Method: "GET",
@@ -460,6 +463,50 @@ func TestTransactionRetry(t *testing.T) {
 			Header: http.Header{"If-Match": []string{"mock-etag2"}},
 		},
 	})
+}
+
+func TestTransactionAbort(t *testing.T) {
+	mock := &mockServer{
+		Resp:   &person{"Peter Parker", 17},
+		Header: map[string]string{"ETag": "mock-etag1"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cnt := 0
+	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+		if cnt == 0 {
+			mock.Status = http.StatusPreconditionFailed
+			mock.Header = map[string]string{"ETag": "mock-etag1"}
+		}
+		cnt++
+		p := i.(map[string]interface{})
+		p["age"] = p["age"].(float64) + 1.0
+		return p, nil
+	}
+	err := ref.Transaction(fn)
+	if err == nil {
+		t.Errorf("Transaction() = nil; want error")
+	}
+	wanted := []*testReq{
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+		},
+	}
+	for i := 0; i < 20; i++ {
+		wanted = append(wanted, &testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body: serialize(map[string]interface{}{
+				"name": "Peter Parker",
+				"age":  18,
+			}),
+			Header: http.Header{"If-Match": []string{"mock-etag1"}},
+		})
+	}
+	checkAllRequests(t, mock.Reqs, wanted)
 }
 
 func TestRemove(t *testing.T) {
