@@ -97,6 +97,9 @@ func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
 }
 
 func (r *Ref) Push(v interface{}) (*Ref, error) {
+	if v == nil {
+		v = ""
+	}
 	resp, err := r.send("POST", v)
 	if err != nil {
 		return nil, err

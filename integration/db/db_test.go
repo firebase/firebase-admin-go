@@ -19,6 +19,7 @@ import (
 
 var client *db.Client
 var ref *db.Ref
+var users *db.Ref
 var testData map[string]interface{}
 var parsedTestData map[string]Dinosaur
 
@@ -41,6 +42,11 @@ func TestMain(m *testing.M) {
 	}
 
 	ref, err = client.NewRef("_adminsdk/go/dinodb")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	users, err = ref.Parent().Child("users")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -199,6 +205,79 @@ func TestGetNonExistingChild(t *testing.T) {
 	}
 }
 
+func TestPush(t *testing.T) {
+	u, err := users.Push(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Path != "/_adminsdk/go/users/"+u.Key {
+		t.Errorf("Push() = %q; want = %q", u.Path, "/_adminsdk/go/users/"+u.Key)
+	}
+
+	var i interface{}
+	if err := u.Get(&i); err != nil {
+		t.Fatal(err)
+	}
+	if i != "" {
+		t.Errorf("Get() = %v; want empty string", i)
+	}
+}
+
+func TestPushWithValue(t *testing.T) {
+	want := User{"Luis Alvarez", 1911}
+	u, err := users.Push(&want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Path != "/_adminsdk/go/users/"+u.Key {
+		t.Errorf("Push() = %q; want = %q", u.Path, "/_adminsdk/go/users/"+u.Key)
+	}
+
+	var got User
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if want != got {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestPrimitiveValue(t *testing.T) {
+	u, err := users.Push(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("value"); err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != "value" {
+		t.Errorf("Get() = %q; want = %q", got, "value")
+	}
+}
+
+func TestComplexValue(t *testing.T) {
+	u, err := users.Push(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := User{"Mary Anning", 1799}
+	if err := u.Set(&want); err != nil {
+		t.Fatal(err)
+	}
+	var got User
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
 type Dinosaur struct {
 	Appeared int     `json:"appeared"`
 	Height   float64 `json:"height"`
@@ -211,4 +290,9 @@ type Dinosaur struct {
 
 type Ratings struct {
 	Pos int `json:"pos"`
+}
+
+type User struct {
+	Name  string `json:"name"`
+	Since int    `json:"sine"`
 }
