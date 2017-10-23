@@ -387,6 +387,7 @@ func TestPush(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "POST",
 		Path:   "/peter.json",
+		Body:   serialize(""),
 	})
 }
 
