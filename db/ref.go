@@ -149,7 +149,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 	return fmt.Errorf("transaction aborted after failed retries")
 }
 
-func (r *Ref) Remove() error {
+func (r *Ref) Delete() error {
 	resp, err := r.send("DELETE", nil)
 	if err != nil {
 		return err

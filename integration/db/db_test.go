@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -242,7 +243,7 @@ func TestPushWithValue(t *testing.T) {
 	}
 }
 
-func TestPrimitiveValue(t *testing.T) {
+func TestSetPrimitiveValue(t *testing.T) {
 	u, err := users.Push(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -259,7 +260,7 @@ func TestPrimitiveValue(t *testing.T) {
 	}
 }
 
-func TestComplexValue(t *testing.T) {
+func TestSetComplexValue(t *testing.T) {
 	u, err := users.Push(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -275,6 +276,197 @@ func TestComplexValue(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestUpdateChildren(t *testing.T) {
+	u, err := users.Push(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]interface{}{
+		"name":  "Robert Bakker",
+		"since": float64(1945),
+	}
+	if err := u.Update(want); err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]interface{}
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestUpdateChildrenWithExistingValue(t *testing.T) {
+	u, err := users.Push(map[string]interface{}{
+		"name":  "Edwin Colbert",
+		"since": float64(1900),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	update := map[string]interface{}{"since": float64(1905)}
+	if err := u.Update(update); err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]interface{}
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]interface{}{
+		"name":  "Edwin Colbert",
+		"since": float64(1905),
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestUpdateNestedChildren(t *testing.T) {
+	edward, err := users.Push(map[string]interface{}{"name": "Edward Cope", "since": float64(1800)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jack, err := users.Push(map[string]interface{}{"name": "Jack Horner", "since": float64(1940)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delta := map[string]interface{}{
+		fmt.Sprintf("%s/since", edward.Key): 1840,
+		fmt.Sprintf("%s/since", jack.Key):   1946,
+	}
+	if err := users.Update(delta); err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]interface{}
+	if err := edward.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]interface{}{"name": "Edward Cope", "since": float64(1840)}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+
+	if err := jack.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	want = map[string]interface{}{"name": "Jack Horner", "since": float64(1946)}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestSetIfChanged(t *testing.T) {
+	edward, err := users.Push(&User{"Edward Cope", 1800})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	update := User{"Jack Horner", 1940}
+	ok, err := edward.SetIfUnchanged("invalid-etag", &update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Errorf("SetIfUnchanged() = %v; want = %v", ok, false)
+	}
+
+	var u User
+	etag, err := edward.GetWithETag(&u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, err = edward.SetIfUnchanged(etag, &update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("SetIfUnchanged() = %v; want = %v", ok, true)
+	}
+
+	if err := edward.Get(&u); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(update, u) {
+		t.Errorf("Get() = %v; want = %v", u, update)
+	}
+}
+
+func TestTransaction(t *testing.T) {
+	u, err := users.Push(&User{Name: "Richard"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn := func(curr interface{}) (interface{}, error) {
+		snap := curr.(map[string]interface{})
+		snap["name"] = "Richard Owen"
+		snap["since"] = 1804
+		return snap, nil
+	}
+	if err := u.Transaction(fn); err != nil {
+		t.Fatal(err)
+	}
+	var got User
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	want := User{"Richard Owen", 1804}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+}
+
+func TestTransactionScalar(t *testing.T) {
+	cnt, err := users.Child("count")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cnt.Set(42); err != nil {
+		t.Fatal(err)
+	}
+	fn := func(curr interface{}) (interface{}, error) {
+		snap := curr.(float64)
+		return snap + 1, nil
+	}
+	if err := cnt.Transaction(fn); err != nil {
+		t.Fatal(err)
+	}
+	var got float64
+	if err := cnt.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != 43.0 {
+		t.Errorf("Get() = %v; want = %v", got, 43.0)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	u, err := users.Push("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := u.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != "foo" {
+		t.Errorf("Get() = %q; want = %q", got, "foo")
+	}
+	if err := u.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	var got2 string
+	if err := u.Get(&got2); err != nil {
+		t.Fatal(err)
+	}
+	if got2 != "" {
+		t.Errorf("Get() = %q; want = %q", got2, "")
 	}
 }
 
@@ -294,5 +486,5 @@ type Ratings struct {
 
 type User struct {
 	Name  string `json:"name"`
-	Since int    `json:"sine"`
+	Since int    `json:"since"`
 }

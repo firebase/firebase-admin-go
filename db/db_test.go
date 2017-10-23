@@ -572,12 +572,12 @@ func TestTransactionAbort(t *testing.T) {
 	checkAllRequests(t, mock.Reqs, wanted)
 }
 
-func TestRemove(t *testing.T) {
+func TestDelete(t *testing.T) {
 	mock := &mockServer{Resp: "null"}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	if err := ref.Remove(); err != nil {
+	if err := ref.Delete(); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
