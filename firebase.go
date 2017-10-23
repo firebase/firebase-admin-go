@@ -31,12 +31,6 @@ import (
 	"google.golang.org/api/transport"
 )
 
-var firebaseScopes = []string{
-	"https://www.googleapis.com/auth/devstorage.full_control",
-	"https://www.googleapis.com/auth/firebase",
-	"https://www.googleapis.com/auth/userinfo.email",
-}
-
 // Version of the Firebase Go Admin SDK.
 const Version = "2.0.0"
 
@@ -91,7 +85,7 @@ func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 // oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
 // authenticate the App with Google application default credentials.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
-	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
+	o := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
 	o = append(o, opts...)
 
 	creds, err := transport.Creds(ctx, o...)

@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"go/build"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -27,7 +28,9 @@ import (
 	"fmt"
 
 	firebase "firebase.google.com/go"
+	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 const certPath = "integration_cert.json"
@@ -81,4 +84,14 @@ func ProjectID() (string, error) {
 		return "", err
 	}
 	return serviceAccount.ProjectID, nil
+}
+
+func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
+	opts = append(
+		opts,
+		option.WithCredentialsFile(Resource(certPath)),
+		option.WithScopes(internal.FirebaseScopes...),
+	)
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	return hc, err
 }

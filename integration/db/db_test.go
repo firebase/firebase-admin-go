@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"testing"
 
@@ -14,6 +15,8 @@ import (
 
 	"reflect"
 
+	"bytes"
+
 	"firebase.google.com/go/db"
 	"firebase.google.com/go/integration/internal"
 )
@@ -21,6 +24,7 @@ import (
 var client *db.Client
 var ref *db.Ref
 var users *db.Ref
+var dinos *db.Ref
 var testData map[string]interface{}
 var parsedTestData map[string]Dinosaur
 
@@ -42,7 +46,21 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
+	initRefs()
+	initRules()
+	initData()
+
+	os.Exit(m.Run())
+}
+
+func initRefs() {
+	var err error
 	ref, err = client.NewRef("_adminsdk/go/dinodb")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	dinos, err = ref.Child("dinosaurs")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -51,12 +69,45 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	setup()
-
-	os.Exit(m.Run())
 }
 
-func setup() {
+func initRules() {
+	b, err := ioutil.ReadFile(internal.Resource("dinosaurs_index.json"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	pid, err := internal.ProjectID()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	url := fmt.Sprintf("https://%s.firebaseio.com/.settings/rules.json", pid)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(b))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	hc, err := internal.NewHTTPClient(context.Background())
+	if err != nil {
+		log.Fatalln(err)
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Body.Close()
+
+	b, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	} else if resp.StatusCode != http.StatusOK {
+		log.Fatalln("failed to update rules: %q", string(b))
+	}
+}
+
+func initData() {
 	b, err := ioutil.ReadFile(internal.Resource("dinosaurs.json"))
 	if err != nil {
 		log.Fatalln(err)

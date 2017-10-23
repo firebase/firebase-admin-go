@@ -21,6 +21,12 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+var FirebaseScopes = []string{
+	"https://www.googleapis.com/auth/devstorage.full_control",
+	"https://www.googleapis.com/auth/firebase",
+	"https://www.googleapis.com/auth/userinfo.email",
+}
+
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
 	Opts      []option.ClientOption
