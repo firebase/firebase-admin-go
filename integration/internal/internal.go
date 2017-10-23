@@ -24,6 +24,8 @@ import (
 
 	"golang.org/x/net/context"
 
+	"fmt"
+
 	firebase "firebase.google.com/go"
 	"google.golang.org/api/option"
 )
@@ -48,7 +50,8 @@ func NewTestApp(ctx context.Context) (*firebase.App, error) {
 		return nil, err
 	}
 	config := &firebase.Config{
-		StorageBucket: pid + ".appspot.com",
+		DatabaseURL:   fmt.Sprintf("https://%s.firebaseio.com", pid),
+		StorageBucket: fmt.Sprintf("%s.appspot.com", pid),
 	}
 	return firebase.NewApp(ctx, config, option.WithCredentialsFile(Resource(certPath)))
 }

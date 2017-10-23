@@ -18,14 +18,12 @@ package db
 import (
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 
-	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"
 
 	"net/url"
-
-	"runtime"
 
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
@@ -33,8 +31,7 @@ import (
 )
 
 const invalidChars = "[].#$"
-
-var userAgent = fmt.Sprintf("Firebase/HTTP/%s/%s/AdminGo", firebase.Version, runtime.Version())
+const userAgent = "Firebase/HTTP/%s/%s/AdminGo"
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
@@ -43,6 +40,7 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
+	userAgent := fmt.Sprintf(userAgent, c.Version, runtime.Version())
 	o := []option.ClientOption{option.WithUserAgent(userAgent)}
 	o = append(o, c.Opts...)
 

@@ -1,10 +1,12 @@
 package db
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -24,6 +26,7 @@ import (
 
 const testURL = "https://test-db.firebaseio.com"
 
+var testUserAgent string
 var testOpts = []option.ClientOption{
 	option.WithTokenSource(&mockTokenSource{"mock-token"}),
 }
@@ -33,7 +36,7 @@ var ref *Ref
 
 func TestMain(m *testing.M) {
 	var err error
-	conf := &internal.DatabaseConfig{Opts: testOpts, BaseURL: testURL}
+	conf := &internal.DatabaseConfig{Opts: testOpts, BaseURL: testURL, Version: "1.2.3"}
 	client, err = NewClient(context.Background(), conf)
 	if err != nil {
 		log.Fatalln(err)
@@ -43,6 +46,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	testUserAgent = fmt.Sprintf(userAgent, "1.2.3", runtime.Version())
 	os.Exit(m.Run())
 }
 
@@ -203,6 +208,61 @@ func TestGetWithETag(t *testing.T) {
 		Method: "GET",
 		Path:   "/peter.json",
 		Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+	})
+}
+
+func TestGetIfChanged(t *testing.T) {
+	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
+	mock := &mockServer{
+		Resp:   want,
+		Header: map[string]string{"ETag": "new-etag"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got map[string]interface{}
+	ok, etag, err := ref.GetIfChanged("old-etag", &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("Get() = %v; want = %v", ok, true)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	if etag != "new-etag" {
+		t.Errorf("ETag = %q; want = %q", etag, "new-etag")
+	}
+
+	mock.Status = http.StatusNotModified
+	mock.Resp = nil
+	var got2 map[string]interface{}
+	ok, etag, err = ref.GetIfChanged("new-etag", &got2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Errorf("Get() = %v; want = %v", ok, false)
+	}
+	if got2 != nil {
+		t.Errorf("Get() = %v; want nil", got2)
+	}
+	if etag != "new-etag" {
+		t.Errorf("ETag = %q; want = %q", etag, "new-etag")
+	}
+
+	checkAllRequests(t, mock.Reqs, []*testReq{
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"If-None-Match": []string{"old-etag"}},
+		},
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"If-None-Match": []string{"new-etag"}},
+		},
 	})
 }
 
@@ -542,8 +602,8 @@ func checkRequest(t *testing.T, got, want *testReq) {
 	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
 	}
-	if h := got.Header.Get("User-Agent"); h != userAgent {
-		t.Errorf("User-Agent = %q; want = %q", h, userAgent)
+	if h := got.Header.Get("User-Agent"); h != testUserAgent {
+		t.Errorf("User-Agent = %q; want = %q", h, testUserAgent)
 	}
 
 	if got.Method != want.Method {

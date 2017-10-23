@@ -31,6 +31,7 @@ type AuthConfig struct {
 type DatabaseConfig struct {
 	Opts    []option.ClientOption
 	BaseURL string
+	Version string
 }
 
 // StorageConfig represents the configuration of Google Cloud Storage service.

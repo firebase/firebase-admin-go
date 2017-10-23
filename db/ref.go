@@ -64,6 +64,18 @@ func (r *Ref) GetWithETag(v interface{}) (string, error) {
 	return resp.Header.Get("Etag"), nil
 }
 
+func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
+	resp, err := r.send("GET", nil, withHeader("If-None-Match", etag))
+	if err != nil {
+		return false, "", err
+	} else if err := resp.CheckAndParse(http.StatusOK, v); err == nil {
+		return true, resp.Header.Get("ETag"), nil
+	} else if err := resp.CheckStatus(http.StatusNotModified); err != nil {
+		return false, "", err
+	}
+	return false, etag, nil
+}
+
 func (r *Ref) Set(v interface{}) error {
 	resp, err := r.send("PUT", v, withQueryParam("print", "silent"))
 	if err != nil {
