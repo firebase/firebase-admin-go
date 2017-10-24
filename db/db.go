@@ -25,6 +25,8 @@ import (
 
 	"net/url"
 
+	"encoding/json"
+
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -37,6 +39,7 @@ const userAgent = "Firebase/HTTP/%s/%s/AdminGo"
 type Client struct {
 	hc      *http.Client
 	baseURL string
+	ao      string
 }
 
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
@@ -59,9 +62,18 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	} else if !strings.HasSuffix(url.Host, ".firebaseio.com") {
 		return nil, fmt.Errorf("invalid database URL (incorrest host): %q", c.BaseURL)
 	}
+
+	var ao []byte
+	if c.AuthOverrides != nil {
+		ao, err = json.Marshal(c.AuthOverrides)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &Client{
 		hc:      hc,
 		baseURL: fmt.Sprintf("https://%s", url.Host),
+		ao:      string(ao),
 	}, nil
 }
 
@@ -76,11 +88,17 @@ func (c *Client) NewRef(path string) (*Ref, error) {
 		key = segs[len(segs)-1]
 	}
 
+	var opts []httpOption
+	if c.ao != "" {
+		opts = append(opts, withQueryParam("auth_variable_override", c.ao))
+	}
+
 	return &Ref{
 		Key:    key,
 		Path:   "/" + strings.Join(segs, "/"),
 		client: c,
 		segs:   segs,
+		opts:   opts,
 	}, nil
 }
 

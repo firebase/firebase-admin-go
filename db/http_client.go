@@ -25,6 +25,7 @@ func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*respon
 	if err != nil {
 		return nil, err
 	}
+	opts = append(opts, r.opts...)
 	for _, o := range opts {
 		o(req)
 	}

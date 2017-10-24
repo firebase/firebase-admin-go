@@ -23,8 +23,11 @@ func TestChildQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"orderBy": "\"messages\""},
+	})
 }
 
 func TestNestedChildQuery(t *testing.T) {
@@ -45,8 +48,11 @@ func TestNestedChildQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?orderBy=\"messages/ratings\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"orderBy": "\"messages/ratings\""},
+	})
 }
 
 func TestChildQueryWithParams(t *testing.T) {
@@ -72,8 +78,16 @@ func TestChildQueryWithParams(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?startAt=\"m4\"&endAt=\"m50\"&limitToFirst=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query: map[string]string{
+			"orderBy":      "\"messages\"",
+			"startAt":      "\"m4\"",
+			"endAt":        "\"m50\"",
+			"limitToFirst": "10",
+		},
+	})
 }
 
 func TestKeyQuery(t *testing.T) {
@@ -94,7 +108,11 @@ func TestKeyQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json?orderBy=\"$key\""})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"orderBy": "\"$key\""},
+	})
 }
 
 func TestValueQuery(t *testing.T) {
@@ -115,7 +133,11 @@ func TestValueQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json?orderBy=\"$value\""})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"orderBy": "\"$value\""},
+	})
 }
 
 func TestLimitFirstQuery(t *testing.T) {
@@ -136,8 +158,11 @@ func TestLimitFirstQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?limitToFirst=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"limitToFirst": "10", "orderBy": "\"messages\""},
+	})
 }
 
 func TestLimitLastQuery(t *testing.T) {
@@ -158,8 +183,11 @@ func TestLimitLastQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?limitToLast=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"limitToLast": "10", "orderBy": "\"messages\""},
+	})
 }
 
 func TestInvalidLimitQuery(t *testing.T) {
@@ -197,8 +225,11 @@ func TestStartAtQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?startAt=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"startAt": "10", "orderBy": "\"messages\""},
+	})
 }
 
 func TestEndAtQuery(t *testing.T) {
@@ -219,8 +250,41 @@ func TestEndAtQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?endAt=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"endAt": "10", "orderBy": "\"messages\""},
+	})
+}
+
+func TestAllParamsQuery(t *testing.T) {
+	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	q, err := ref.OrderByChild("messages", WithLimitToFirst(100), WithStartAt("bar"), WithEndAt("foo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]interface{}
+	if err := q.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query: map[string]string{
+			"limitToFirst": "100",
+			"startAt":      "\"bar\"",
+			"endAt":        "\"foo\"",
+			"orderBy":      "\"messages\"",
+		},
+	})
 }
 
 func TestEqualToQuery(t *testing.T) {
@@ -241,6 +305,9 @@ func TestEqualToQuery(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
-	p := "/peter.json?equalTo=10&orderBy=\"messages\""
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: p})
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"equalTo": "10", "orderBy": "\"messages\""},
+	})
 }

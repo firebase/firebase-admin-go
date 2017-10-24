@@ -27,20 +27,42 @@ import (
 const testURL = "https://test-db.firebaseio.com"
 
 var testUserAgent string
+var testAuthOverrides string
 var testOpts = []option.ClientOption{
 	option.WithTokenSource(&mockTokenSource{"mock-token"}),
 }
 
 var client *Client
+var aoClient *Client
 var ref *Ref
 
 func TestMain(m *testing.M) {
 	var err error
-	conf := &internal.DatabaseConfig{Opts: testOpts, BaseURL: testURL, Version: "1.2.3"}
-	client, err = NewClient(context.Background(), conf)
+	client, err = NewClient(context.Background(), &internal.DatabaseConfig{
+		Opts:    testOpts,
+		BaseURL: testURL,
+		Version: "1.2.3",
+	})
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	ao := map[string]interface{}{"uid": "user1"}
+	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{
+		Opts:          testOpts,
+		BaseURL:       testURL,
+		Version:       "1.2.3",
+		AuthOverrides: ao,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	b, err := json.Marshal(ao)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	testAuthOverrides = string(b)
 
 	ref, err = client.NewRef("peter")
 	if err != nil {
@@ -305,8 +327,9 @@ func TestSet(t *testing.T) {
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "PUT",
-		Path:   "/peter.json?print=silent",
+		Path:   "/peter.json",
 		Body:   serialize(want),
+		Query:  map[string]string{"print": "silent"},
 	})
 }
 
@@ -321,8 +344,9 @@ func TestSetWithStruct(t *testing.T) {
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "PUT",
-		Path:   "/peter.json?print=silent",
+		Path:   "/peter.json",
 		Body:   serialize(want),
+		Query:  map[string]string{"print": "silent"},
 	})
 }
 
@@ -423,8 +447,9 @@ func TestUpdate(t *testing.T) {
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "PATCH",
-		Path:   "/peter.json?print=silent",
+		Path:   "/peter.json",
 		Body:   serialize(want),
+		Query:  map[string]string{"print": "silent"},
 	})
 }
 
@@ -611,7 +636,14 @@ func checkRequest(t *testing.T, got, want *testReq) {
 		t.Errorf("Method = %q; want = %q", got.Method, want.Method)
 	}
 
-	checkURL(t, got.Path, want.Path)
+	if got.Path != want.Path {
+		t.Errorf("Path = %q; want = %q", got.Path, want.Path)
+	}
+	for k, v := range want.Query {
+		if got.Query[k] != v {
+			t.Errorf("QueryParam(%v) = %v; want = %v", k, got.Query[k], v)
+		}
+	}
 	for k, v := range want.Header {
 		if got.Header.Get(k) != v[0] {
 			t.Errorf("Header(%q) = %q; want = %q", k, got.Header.Get(k), v[0])
@@ -636,33 +668,12 @@ func checkRequest(t *testing.T, got, want *testReq) {
 	}
 }
 
-func checkURL(t *testing.T, ug, uw string) {
-	got, err := url.ParseRequestURI(ug)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := url.ParseRequestURI(uw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Path != want.Path {
-		t.Errorf("Path = %q; want = %q", got, want)
-	}
-	if len(got.Query()) != len(want.Query()) {
-		t.Errorf("QueryParams = %v; want = %v", got.Query(), want.Query())
-	}
-	for k, v := range want.Query() {
-		if !reflect.DeepEqual(v, got.Query()[k]) {
-			t.Errorf("QueryParam(%v) = %v; want = %v", k, got.Query()[k], v)
-		}
-	}
-}
-
 type testReq struct {
 	Method string
 	Path   string
 	Header http.Header
 	Body   []byte
+	Query  map[string]string
 }
 
 func newTestReq(r *http.Request) (*testReq, error) {
@@ -671,11 +682,22 @@ func newTestReq(r *http.Request) (*testReq, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	u, err := url.Parse(r.RequestURI)
+	if err != nil {
+		return nil, err
+	}
+
+	query := make(map[string]string)
+	for k, v := range u.Query() {
+		query[k] = v[0]
+	}
 	return &testReq{
 		Method: r.Method,
-		Path:   r.RequestURI,
+		Path:   u.Path,
 		Header: r.Header,
 		Body:   b,
+		Query:  query,
 	}, nil
 }
 

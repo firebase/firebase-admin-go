@@ -26,6 +26,7 @@ type Ref struct {
 
 	client *Client
 	segs   []string
+	opts   []httpOption
 }
 
 func (r *Ref) Parent() *Ref {
