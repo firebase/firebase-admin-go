@@ -216,6 +216,19 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+func TestDatabase(t *testing.T) {
+	ctx := context.Background()
+	conf := &Config{DatabaseURL: "https://mock-db.firebaseio.com"}
+	app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Database(ctx); c == nil || err != nil {
+		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+	}
+}
+
 func TestStorage(t *testing.T) {
 	ctx := context.Background()
 	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))

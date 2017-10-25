@@ -25,8 +25,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"fmt"
-
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
@@ -47,16 +45,8 @@ func Resource(name string) string {
 // NewTestApp looks for a service account JSON file named integration_cert.json
 // in the testdata directory. This file is used to initialize the newly created
 // App instance.
-func NewTestApp(ctx context.Context) (*firebase.App, error) {
-	pid, err := ProjectID()
-	if err != nil {
-		return nil, err
-	}
-	config := &firebase.Config{
-		DatabaseURL:   fmt.Sprintf("https://%s.firebaseio.com", pid),
-		StorageBucket: fmt.Sprintf("%s.appspot.com", pid),
-	}
-	return firebase.NewApp(ctx, config, option.WithCredentialsFile(Resource(certPath)))
+func NewTestApp(ctx context.Context, conf *firebase.Config) (*firebase.App, error) {
+	return firebase.NewApp(ctx, conf, option.WithCredentialsFile(Resource(certPath)))
 }
 
 // APIKey fetches a Firebase API key for integration tests.

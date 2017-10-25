@@ -40,8 +40,10 @@ func (r *Ref) Parent() *Ref {
 }
 
 func (r *Ref) Child(path string) (*Ref, error) {
-	if strings.HasPrefix(path, "/") {
-		return nil, fmt.Errorf("child path must not start with %q", "/")
+	if path == "" {
+		return nil, fmt.Errorf("child path must not be empty")
+	} else if strings.HasPrefix(path, "/") {
+		return nil, fmt.Errorf("invalid child path with '/' prefix: %q", path)
 	}
 	fp := fmt.Sprintf("%s/%s", r.Path, path)
 	return r.client.NewRef(fp)

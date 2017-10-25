@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"firebase.google.com/go"
+
 	"io/ioutil"
 
 	"encoding/json"
@@ -22,11 +24,17 @@ import (
 )
 
 var client *db.Client
+var aoClient *db.Client
+var guestClient *db.Client
+
 var ref *db.Ref
 var users *db.Ref
 var dinos *db.Ref
+
 var testData map[string]interface{}
 var parsedTestData map[string]Dinosaur
+
+const permDenied = "http error status: 401; reason: Permission denied"
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -35,13 +43,17 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	pid, err := internal.ProjectID()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.Database(ctx)
+	client, err = initClient(pid)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	aoClient, err = initOverrideClient(pid)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -51,6 +63,31 @@ func TestMain(m *testing.M) {
 	initData()
 
 	os.Exit(m.Run())
+}
+
+func initClient(pid string) (*db.Client, error) {
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx, &firebase.Config{
+		DatabaseURL: fmt.Sprintf("https://%s.firebaseio.com", pid),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return app.Database(ctx)
+}
+
+func initOverrideClient(pid string) (*db.Client, error) {
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx, &firebase.Config{
+		DatabaseURL:   fmt.Sprintf("https://%s.firebaseio.com", pid),
+		AuthOverrides: map[string]interface{}{"uid": "user1"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return app.Database(ctx)
 }
 
 func initRefs() {
@@ -519,6 +556,83 @@ func TestDelete(t *testing.T) {
 	if got2 != "" {
 		t.Errorf("Get() = %q; want = %q", got2, "")
 	}
+}
+
+func TestNoAccess(t *testing.T) {
+	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/admin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := r.Get(&got); err == nil || got != "" {
+		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+	if err := r.Set("update"); err == nil {
+		t.Errorf("Set() = nil; want = error")
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+}
+
+func TestReadAccess(t *testing.T) {
+	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := r.Get(&got); err != nil || got != "test" {
+		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
+	}
+	if err := r.Set("update"); err == nil {
+		t.Errorf("Set() = nil; want = error")
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+}
+
+func TestReadWriteAccess(t *testing.T) {
+	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := r.Get(&got); err != nil || got != "test" {
+		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
+	}
+	if err := r.Set("update"); err != nil {
+		t.Errorf("Set() = %v; want = nil", err)
+	}
+}
+
+func TestQueryAccess(t *testing.T) {
+	r, err := aoClient.NewRef("_adminsdk/go/protected")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q, err := r.OrderByKey(db.WithLimitToFirst(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]interface{})
+	if err := q.Get(&got); err == nil {
+		t.Errorf("OrderByQuery() = nil; want = error")
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+}
+
+func protectedRef(t *testing.T, p string) string {
+	r, err := client.NewRef(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Set("test"); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 type Dinosaur struct {
