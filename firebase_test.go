@@ -30,6 +30,9 @@ import (
 
 	"encoding/json"
 
+	"reflect"
+
+	"firebase.google.com/go/db"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
@@ -224,8 +227,37 @@ func TestDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if app.ao == nil || len(app.ao) != 0 {
+		t.Errorf("AuthOverrides = %v; want = empty map", app.ao)
+	}
 	if c, err := app.Database(ctx); c == nil || err != nil {
 		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+	}
+}
+
+func TestDatabaseAuthOverrides(t *testing.T) {
+	cases := []map[string]interface{}{
+		nil,
+		map[string]interface{}{},
+		map[string]interface{}{"uid": "user1"},
+	}
+	for _, tc := range cases {
+		ctx := context.Background()
+		conf := &Config{
+			AuthOverrides: &db.AuthOverrides{tc},
+			DatabaseURL:   "https://mock-db.firebaseio.com",
+		}
+		app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(app.ao, tc) {
+			t.Errorf("AuthOverrides = %v; want = %v", app.ao, tc)
+		}
+		if c, err := app.Database(ctx); c == nil || err != nil {
+			t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+		}
 	}
 }
 

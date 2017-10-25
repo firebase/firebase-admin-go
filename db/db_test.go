@@ -42,6 +42,7 @@ func TestMain(m *testing.M) {
 		Opts:    testOpts,
 		BaseURL: testURL,
 		Version: "1.2.3",
+		AO:      map[string]interface{}{},
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -49,10 +50,10 @@ func TestMain(m *testing.M) {
 
 	ao := map[string]interface{}{"uid": "user1"}
 	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:          testOpts,
-		BaseURL:       testURL,
-		Version:       "1.2.3",
-		AuthOverrides: ao,
+		Opts:    testOpts,
+		BaseURL: testURL,
+		Version: "1.2.3",
+		AO:      ao,
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -77,14 +78,49 @@ func TestNewClient(t *testing.T) {
 	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
 		Opts:    testOpts,
 		BaseURL: testURL,
+		AO:      make(map[string]interface{}),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.baseURL != testURL {
 		t.Errorf("BaseURL = %q; want: %q", c.baseURL, testURL)
-	} else if c.hc == nil {
+	}
+	if c.hc == nil {
 		t.Errorf("http.Client = nil; want non-nil")
+	}
+	if c.ao != "" {
+		t.Errorf("AuthOverrides = %q; want %q", c.ao, "")
+	}
+}
+
+func TestNewClientAuthOverrides(t *testing.T) {
+	cases := []map[string]interface{}{
+		nil,
+		map[string]interface{}{"uid": "user1"},
+	}
+	for _, tc := range cases {
+		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+			Opts:    testOpts,
+			BaseURL: testURL,
+			AO:      tc,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.baseURL != testURL {
+			t.Errorf("BaseURL = %q; want: %q", c.baseURL, testURL)
+		}
+		if c.hc == nil {
+			t.Errorf("http.Client = nil; want non-nil")
+		}
+		b, err := json.Marshal(tc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.ao != string(b) {
+			t.Errorf("AuthOverrides = %q; want %q", c.ao, string(b))
+		}
 	}
 }
 
@@ -255,6 +291,9 @@ func checkRequest(t *testing.T, got, want *testReq) {
 
 	if got.Path != want.Path {
 		t.Errorf("Path = %q; want = %q", got.Path, want.Path)
+	}
+	if len(want.Query) != len(got.Query) {
+		t.Errorf("QueryParam = %v; want = %v", got.Query, want.Query)
 	}
 	for k, v := range want.Query {
 		if got.Query[k] != v {

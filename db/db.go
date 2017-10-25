@@ -42,6 +42,10 @@ type Client struct {
 	ao      string
 }
 
+type AuthOverrides struct {
+	Map map[string]interface{}
+}
+
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
 	userAgent := fmt.Sprintf(userAgent, c.Version, runtime.Version())
 	o := []option.ClientOption{option.WithUserAgent(userAgent)}
@@ -64,8 +68,8 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	}
 
 	var ao []byte
-	if c.AuthOverrides != nil {
-		ao, err = json.Marshal(c.AuthOverrides)
+	if c.AO == nil || len(c.AO) > 0 {
+		ao, err = json.Marshal(c.AO)
 		if err != nil {
 			return nil, err
 		}

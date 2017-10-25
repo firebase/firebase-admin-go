@@ -58,6 +58,11 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
+	guestClient, err = initGuestClient(pid)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	initRefs()
 	initRules()
 	initData()
@@ -80,8 +85,23 @@ func initClient(pid string) (*db.Client, error) {
 func initOverrideClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
+		DatabaseURL: fmt.Sprintf("https://%s.firebaseio.com", pid),
+		AuthOverrides: &db.AuthOverrides{
+			Map: map[string]interface{}{"uid": "user1"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return app.Database(ctx)
+}
+
+func initGuestClient(pid string) (*db.Client, error) {
+	ctx := context.Background()
+	app, err := internal.NewTestApp(ctx, &firebase.Config{
 		DatabaseURL:   fmt.Sprintf("https://%s.firebaseio.com", pid),
-		AuthOverrides: map[string]interface{}{"uid": "user1"},
+		AuthOverrides: &db.AuthOverrides{},
 	})
 	if err != nil {
 		return nil, err
@@ -619,6 +639,53 @@ func TestQueryAccess(t *testing.T) {
 	got := make(map[string]interface{})
 	if err := q.Get(&got); err == nil {
 		t.Errorf("OrderByQuery() = nil; want = error")
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+}
+
+func TestGuestAccess(t *testing.T) {
+	r, err := guestClient.NewRef(protectedRef(t, "_adminsdk/go/public"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := r.Get(&got); err != nil || got != "test" {
+		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
+	}
+	if err := r.Set("update"); err == nil {
+		t.Errorf("Set() = nil; want = error")
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+
+	got = ""
+	r, err = guestClient.NewRef("_adminsdk/go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Get(&got); err == nil || got != "" {
+		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+
+	c, err := r.Child("protected/user2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(&got); err == nil || got != "" {
+		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
+	} else if err.Error() != permDenied {
+		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+
+	c, err = r.Child("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(&got); err == nil || got != "" {
+		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}

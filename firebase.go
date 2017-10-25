@@ -36,7 +36,7 @@ const Version = "2.0.0"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
-	authOverrides map[string]interface{}
+	ao            map[string]interface{}
 	creds         *google.DefaultCredentials
 	dbURL         string
 	projectID     string
@@ -46,7 +46,7 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	AuthOverrides map[string]interface{}
+	AuthOverrides *db.AuthOverrides
 	DatabaseURL   string
 	ProjectID     string
 	StorageBucket string
@@ -65,10 +65,10 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 // Database returns an instance of db.Client.
 func (a *App) Database(ctx context.Context) (*db.Client, error) {
 	conf := &internal.DatabaseConfig{
-		AuthOverrides: a.authOverrides,
-		BaseURL:       a.dbURL,
-		Opts:          a.opts,
-		Version:       Version,
+		AO:      a.ao,
+		BaseURL: a.dbURL,
+		Opts:    a.opts,
+		Version: Version,
 	}
 	return db.NewClient(ctx, conf)
 }
@@ -109,8 +109,13 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		pid = os.Getenv("GCLOUD_PROJECT")
 	}
 
+	ao := make(map[string]interface{})
+	if config.AuthOverrides != nil {
+		ao = config.AuthOverrides.Map
+	}
+
 	return &App{
-		authOverrides: config.AuthOverrides,
+		ao:            ao,
 		creds:         creds,
 		dbURL:         config.DatabaseURL,
 		projectID:     pid,
