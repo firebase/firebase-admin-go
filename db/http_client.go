@@ -15,7 +15,6 @@ func (c *Client) send(method, path string, body interface{}, options ...httpOpti
 	if c.ao != "" {
 		opts = append(opts, withQueryParam("auth_variable_override", c.ao))
 	}
-	opts = append(opts, options...)
 
 	var data io.Reader
 	if body != nil {
@@ -33,6 +32,7 @@ func (c *Client) send(method, path string, body interface{}, options ...httpOpti
 		return nil, err
 	}
 
+	opts = append(opts, options...)
 	for _, o := range opts {
 		req = o(req)
 	}

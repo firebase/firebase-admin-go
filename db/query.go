@@ -9,12 +9,6 @@ import (
 	"strings"
 )
 
-var reservedFilters = map[string]bool{
-	"$key":      true,
-	"$value":    true,
-	"$priority": true,
-}
-
 type Query interface {
 	Get(v interface{}) error
 	WithContext(ctx context.Context) Query
@@ -46,11 +40,10 @@ func (q *queryImpl) Get(v interface{}) error {
 }
 
 func (q *queryImpl) WithContext(ctx context.Context) Query {
-	return &queryImpl{
-		ctx:  ctx,
-		ref:  q.ref,
-		opts: q.opts,
-	}
+	q2 := new(queryImpl)
+	*q2 = *q
+	q2.ctx = ctx
+	return q2
 }
 
 type QueryOption interface {

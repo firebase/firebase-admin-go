@@ -52,6 +52,13 @@ func (r *Ref) Get(v interface{}) error {
 	return resp.CheckAndParse(http.StatusOK, v)
 }
 
+func (r *Ref) WithContext(ctx context.Context) Query {
+	r2 := new(Ref)
+	*r2 = *r
+	r2.ctx = ctx
+	return r2
+}
+
 func (r *Ref) GetWithETag(v interface{}) (string, error) {
 	resp, err := r.send("GET", nil, withHeader("X-Firebase-ETag", "true"))
 	if err != nil {
@@ -158,6 +165,9 @@ func (r *Ref) Delete() error {
 func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*response, error) {
 	if strings.ContainsAny(r.Path, invalidChars) {
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
+	}
+	if r.ctx != nil {
+		opts = append([]httpOption{withContext(r.ctx)}, opts...)
 	}
 	return r.client.send(method, r.Path, body, opts...)
 }
