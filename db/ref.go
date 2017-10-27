@@ -15,6 +15,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,27 +25,21 @@ type Ref struct {
 	Key  string
 	Path string
 
-	client *Client
 	segs   []string
-	opts   []httpOption
+	client *Client
+	ctx    context.Context
 }
 
 func (r *Ref) Parent() *Ref {
 	l := len(r.segs)
 	if l > 0 {
 		path := strings.Join(r.segs[:l-1], "/")
-		parent, _ := r.client.NewRef(path)
-		return parent
+		return r.client.NewRef(path)
 	}
 	return nil
 }
 
-func (r *Ref) Child(path string) (*Ref, error) {
-	if path == "" {
-		return nil, fmt.Errorf("child path must not be empty")
-	} else if strings.HasPrefix(path, "/") {
-		return nil, fmt.Errorf("invalid child path with '/' prefix: %q", path)
-	}
+func (r *Ref) Child(path string) *Ref {
 	fp := fmt.Sprintf("%s/%s", r.Path, path)
 	return r.client.NewRef(fp)
 }
@@ -113,7 +108,7 @@ func (r *Ref) Push(v interface{}) (*Ref, error) {
 	if err := resp.CheckAndParse(http.StatusOK, &d); err != nil {
 		return nil, err
 	}
-	return r.Child(d.Name)
+	return r.Child(d.Name), nil
 }
 
 func (r *Ref) Update(v map[string]interface{}) error {
@@ -158,4 +153,11 @@ func (r *Ref) Delete() error {
 		return err
 	}
 	return resp.CheckStatus(http.StatusOK)
+}
+
+func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*response, error) {
+	if strings.ContainsAny(r.Path, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
+	}
+	return r.client.send(method, r.Path, body, opts...)
 }

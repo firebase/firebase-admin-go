@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,17 +15,42 @@ var reservedFilters = map[string]bool{
 	"$priority": true,
 }
 
-type Query struct {
-	ref *Ref
-	qp  queryParams
+type Query interface {
+	Get(v interface{}) error
+	WithContext(ctx context.Context) Query
 }
 
-func (q *Query) Get(v interface{}) error {
-	resp, err := q.ref.send("GET", nil, withQueryParams(q.qp))
+type queryImpl struct {
+	ctx  context.Context
+	ref  *Ref
+	opts []QueryOption
+}
+
+func (q *queryImpl) Get(v interface{}) error {
+	qp := make(queryParams)
+	for _, o := range q.opts {
+		if err := o.apply(qp); err != nil {
+			return err
+		}
+	}
+
+	opts := []httpOption{withQueryParams(qp)}
+	if q.ctx != nil {
+		opts = append(opts, withContext(q.ctx))
+	}
+	resp, err := q.ref.send("GET", nil, opts...)
 	if err != nil {
 		return err
 	}
 	return resp.CheckAndParse(http.StatusOK, v)
+}
+
+func (q *queryImpl) WithContext(ctx context.Context) Query {
+	return &queryImpl{
+		ctx:  ctx,
+		ref:  q.ref,
+		opts: q.opts,
+	}
 }
 
 type QueryOption interface {
@@ -51,42 +77,43 @@ func WithEqualTo(v interface{}) QueryOption {
 	return &filterParam{"equalTo", v}
 }
 
-func (r *Ref) OrderByChild(child string, opts ...QueryOption) (*Query, error) {
-	if child == "" {
-		return nil, fmt.Errorf("child path must be a non-empty string")
-	}
-	if _, ok := reservedFilters[child]; ok {
-		return nil, fmt.Errorf("invalid child path: %s", child)
-	}
-	segs, err := parsePath(child)
-	if err != nil {
-		return nil, err
-	}
-	opts = append(opts, orderByParam(strings.Join(segs, "/")))
+func (r *Ref) OrderByChild(child string, opts ...QueryOption) Query {
+	opts = append(opts, orderByChild(child))
 	return newQuery(r, opts)
 }
 
-func (r *Ref) OrderByKey(opts ...QueryOption) (*Query, error) {
+func (r *Ref) OrderByKey(opts ...QueryOption) Query {
 	opts = append(opts, orderByParam("$key"))
 	return newQuery(r, opts)
 }
 
-func (r *Ref) OrderByValue(opts ...QueryOption) (*Query, error) {
+func (r *Ref) OrderByValue(opts ...QueryOption) Query {
 	opts = append(opts, orderByParam("$value"))
 	return newQuery(r, opts)
 }
 
-func newQuery(r *Ref, opts []QueryOption) (*Query, error) {
-	qp := make(queryParams)
-	for _, o := range opts {
-		if err := o.apply(qp); err != nil {
-			return nil, err
-		}
-	}
-	return &Query{ref: r, qp: qp}, nil
+func newQuery(r *Ref, opts []QueryOption) Query {
+	return &queryImpl{ref: r, opts: opts}
 }
 
 type queryParams map[string]string
+
+type orderByChild string
+
+func (p orderByChild) apply(qp queryParams) error {
+	if p == "" {
+		return fmt.Errorf("empty child path")
+	} else if strings.ContainsAny(string(p), invalidChars) {
+		return fmt.Errorf("invalid child path with illegal characters: %q", p)
+	}
+	segs := parsePath(string(p))
+	b, err := json.Marshal(strings.Join(segs, "/"))
+	if err != nil {
+		return nil
+	}
+	qp["orderBy"] = string(b)
+	return nil
+}
 
 type orderByParam string
 

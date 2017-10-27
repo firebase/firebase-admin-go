@@ -9,11 +9,7 @@ func TestAuthOverrideGet(t *testing.T) {
 	srv := mock.Start(aoClient)
 	defer srv.Close()
 
-	ref, err := aoClient.NewRef("peter")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	ref := aoClient.NewRef("peter")
 	var got string
 	if err := ref.Get(&got); err != nil {
 		t.Fatal(err)
@@ -33,11 +29,7 @@ func TestAuthOverrideSet(t *testing.T) {
 	srv := mock.Start(aoClient)
 	defer srv.Close()
 
-	ref, err := aoClient.NewRef("peter")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	ref := aoClient.NewRef("peter")
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
 	if err := ref.Set(want); err != nil {
 		t.Fatal(err)
@@ -55,17 +47,9 @@ func TestAuthOverrideQuery(t *testing.T) {
 	srv := mock.Start(aoClient)
 	defer srv.Close()
 
-	ref, err := aoClient.NewRef("peter")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	q, err := ref.OrderByChild("foo")
-	if err != nil {
-		t.Fatal(err)
-	}
+	ref := aoClient.NewRef("peter")
 	var got string
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("foo").Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {
@@ -86,17 +70,9 @@ func TestAuthOverrideRangeQuery(t *testing.T) {
 	srv := mock.Start(aoClient)
 	defer srv.Close()
 
-	ref, err := aoClient.NewRef("peter")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	q, err := ref.OrderByChild("foo", WithStartAt(1), WithEndAt(10))
-	if err != nil {
-		t.Fatal(err)
-	}
+	ref := aoClient.NewRef("peter")
 	var got string
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("foo", WithStartAt(1), WithEndAt(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {

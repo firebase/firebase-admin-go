@@ -111,21 +111,9 @@ func initGuestClient(pid string) (*db.Client, error) {
 }
 
 func initRefs() {
-	var err error
-	ref, err = client.NewRef("_adminsdk/go/dinodb")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	dinos, err = ref.Child("dinosaurs")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	users, err = ref.Parent().Child("users")
-	if err != nil {
-		log.Fatalln(err)
-	}
+	ref = client.NewRef("_adminsdk/go/dinodb")
+	dinos = ref.Child("dinosaurs")
+	users = ref.Parent().Child("users")
 }
 
 func initRules() {
@@ -196,10 +184,7 @@ func TestRef(t *testing.T) {
 }
 
 func TestChild(t *testing.T) {
-	c, err := ref.Child("dinosaurs")
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := ref.Child("dinosaurs")
 	if c.Key != "dinosaurs" {
 		t.Errorf("Key = %q; want = %q", c.Key, "dinosaurs")
 	}
@@ -269,11 +254,7 @@ func TestGetIfChanged(t *testing.T) {
 }
 
 func TestGetChildValue(t *testing.T) {
-	c, err := ref.Child("dinosaurs")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	c := ref.Child("dinosaurs")
 	var m map[string]interface{}
 	if err := c.Get(&m); err != nil {
 		t.Fatal(err)
@@ -284,11 +265,7 @@ func TestGetChildValue(t *testing.T) {
 }
 
 func TestGetGrandChildValue(t *testing.T) {
-	c, err := ref.Child("dinosaurs/lambeosaurus")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	c := ref.Child("dinosaurs/lambeosaurus")
 	var got Dinosaur
 	if err := c.Get(&got); err != nil {
 		t.Fatal(err)
@@ -300,11 +277,7 @@ func TestGetGrandChildValue(t *testing.T) {
 }
 
 func TestGetNonExistingChild(t *testing.T) {
-	c, err := ref.Child("non_existing")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	c := ref.Child("non_existing")
 	var i interface{}
 	if err := c.Get(&i); err != nil {
 		t.Fatal(err)
@@ -530,10 +503,7 @@ func TestTransaction(t *testing.T) {
 }
 
 func TestTransactionScalar(t *testing.T) {
-	cnt, err := users.Child("count")
-	if err != nil {
-		t.Fatal(err)
-	}
+	cnt := users.Child("count")
 	if err := cnt.Set(42); err != nil {
 		t.Fatal(err)
 	}
@@ -579,10 +549,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestNoAccess(t *testing.T) {
-	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/admin"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/admin"))
 	var got string
 	if err := r.Get(&got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
@@ -597,10 +564,7 @@ func TestNoAccess(t *testing.T) {
 }
 
 func TestReadAccess(t *testing.T) {
-	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user2"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user2"))
 	var got string
 	if err := r.Get(&got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
@@ -613,10 +577,7 @@ func TestReadAccess(t *testing.T) {
 }
 
 func TestReadWriteAccess(t *testing.T) {
-	r, err := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user1"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user1"))
 	var got string
 	if err := r.Get(&got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
@@ -627,15 +588,8 @@ func TestReadWriteAccess(t *testing.T) {
 }
 
 func TestQueryAccess(t *testing.T) {
-	r, err := aoClient.NewRef("_adminsdk/go/protected")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	q, err := r.OrderByKey(db.WithLimitToFirst(2))
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := aoClient.NewRef("_adminsdk/go/protected")
+	q := r.OrderByKey(db.WithLimitToFirst(2))
 	got := make(map[string]interface{})
 	if err := q.Get(&got); err == nil {
 		t.Errorf("OrderByQuery() = nil; want = error")
@@ -645,10 +599,7 @@ func TestQueryAccess(t *testing.T) {
 }
 
 func TestGuestAccess(t *testing.T) {
-	r, err := guestClient.NewRef(protectedRef(t, "_adminsdk/go/public"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := guestClient.NewRef(protectedRef(t, "_adminsdk/go/public"))
 	var got string
 	if err := r.Get(&got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
@@ -660,30 +611,21 @@ func TestGuestAccess(t *testing.T) {
 	}
 
 	got = ""
-	r, err = guestClient.NewRef("_adminsdk/go")
-	if err != nil {
-		t.Fatal(err)
-	}
+	r = guestClient.NewRef("_adminsdk/go")
 	if err := r.Get(&got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}
 
-	c, err := r.Child("protected/user2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := r.Child("protected/user2")
 	if err := c.Get(&got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}
 
-	c, err = r.Child("admin")
-	if err != nil {
-		t.Fatal(err)
-	}
+	c = r.Child("admin")
 	if err := c.Get(&got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
@@ -692,10 +634,7 @@ func TestGuestAccess(t *testing.T) {
 }
 
 func protectedRef(t *testing.T, p string) string {
-	r, err := client.NewRef(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := client.NewRef(p)
 	if err := r.Set("test"); err != nil {
 		t.Fatal(err)
 	}

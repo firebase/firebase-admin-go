@@ -2,6 +2,7 @@ package db
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,8 +10,13 @@ import (
 	"net/http"
 )
 
-func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*response, error) {
-	url := fmt.Sprintf("%s%s%s", r.client.baseURL, r.Path, ".json")
+func (c *Client) send(method, path string, body interface{}, options ...httpOption) (*response, error) {
+	var opts []httpOption
+	if c.ao != "" {
+		opts = append(opts, withQueryParam("auth_variable_override", c.ao))
+	}
+	opts = append(opts, options...)
+
 	var data io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -21,16 +27,17 @@ func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*respon
 		opts = append(opts, withHeader("Content-Type", "application/json"))
 	}
 
+	url := fmt.Sprintf("%s%s%s", c.url, path, ".json")
 	req, err := http.NewRequest(method, url, data)
 	if err != nil {
 		return nil, err
 	}
-	opts = append(opts, r.opts...)
+
 	for _, o := range opts {
-		o(req)
+		req = o(req)
 	}
 
-	resp, err := r.client.hc.Do(req)
+	resp, err := c.hc.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -79,28 +86,37 @@ func (r *response) CheckAndParse(want int, v interface{}) error {
 	return nil
 }
 
-type httpOption func(*http.Request)
+type httpOption func(*http.Request) *http.Request
 
 func withHeader(key, value string) httpOption {
-	return func(r *http.Request) {
+	return func(r *http.Request) *http.Request {
 		r.Header.Set(key, value)
+		return r
 	}
 }
 
 func withQueryParam(key, value string) httpOption {
-	return func(r *http.Request) {
+	return func(r *http.Request) *http.Request {
 		q := r.URL.Query()
 		q.Add(key, value)
 		r.URL.RawQuery = q.Encode()
+		return r
 	}
 }
 
 func withQueryParams(qp queryParams) httpOption {
-	return func(r *http.Request) {
+	return func(r *http.Request) *http.Request {
 		q := r.URL.Query()
 		for k, v := range qp {
 			q.Add(k, v)
 		}
 		r.URL.RawQuery = q.Encode()
+		return r
+	}
+}
+
+func withContext(ctx context.Context) httpOption {
+	return func(r *http.Request) *http.Request {
+		return r.WithContext(ctx)
 	}
 }

@@ -16,6 +16,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -25,45 +26,39 @@ import (
 
 	"net/url"
 
-	"encoding/json"
-
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
 const invalidChars = "[].#$"
-const userAgent = "Firebase/HTTP/%s/%s/AdminGo"
+const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
-	hc      *http.Client
-	baseURL string
-	ao      string
-}
-
-type AuthOverrides struct {
-	Map map[string]interface{}
+	hc  *http.Client
+	url string
+	ao  string
 }
 
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
-	userAgent := fmt.Sprintf(userAgent, c.Version, runtime.Version())
-	o := []option.ClientOption{option.WithUserAgent(userAgent)}
-	o = append(o, c.Opts...)
-
-	hc, _, err := transport.NewHTTPClient(ctx, o...)
+	opts := append([]option.ClientOption{}, c.Opts...)
+	ua := fmt.Sprintf(userAgentFormat, c.Version, runtime.Version())
+	opts = append(opts, option.WithUserAgent(ua))
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
+
 	if c.BaseURL == "" {
 		return nil, fmt.Errorf("database url not specified")
 	}
-	url, err := url.Parse(c.BaseURL)
+	p, err := url.Parse(c.BaseURL)
 	if err != nil {
 		return nil, err
-	} else if url.Scheme != "https" {
+	} else if p.Scheme != "https" {
 		return nil, fmt.Errorf("invalid database URL (incorrect scheme): %q", c.BaseURL)
-	} else if !strings.HasSuffix(url.Host, ".firebaseio.com") {
+	} else if !strings.HasSuffix(p.Host, ".firebaseio.com") {
 		return nil, fmt.Errorf("invalid database URL (incorrest host): %q", c.BaseURL)
 	}
 
@@ -74,27 +69,35 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 			return nil, err
 		}
 	}
+
 	return &Client{
-		hc:      hc,
-		baseURL: fmt.Sprintf("https://%s", url.Host),
-		ao:      string(ao),
+		hc:  hc,
+		url: fmt.Sprintf("https://%s", p.Host),
+		ao:  string(ao),
 	}, nil
 }
 
-func (c *Client) NewRef(path string) (*Ref, error) {
-	segs, err := parsePath(path)
-	if err != nil {
-		return nil, err
+func newHTTPOptions(m map[string]interface{}) ([]httpOption, error) {
+	var opts []httpOption
+	if m == nil || len(m) > 0 {
+		ao, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, withQueryParam("auth_variable_override", string(ao)))
 	}
+	return opts, nil
+}
 
+type AuthOverrides struct {
+	Map map[string]interface{}
+}
+
+func (c *Client) NewRef(path string) *Ref {
+	segs := parsePath(path)
 	key := ""
 	if len(segs) > 0 {
 		key = segs[len(segs)-1]
-	}
-
-	var opts []httpOption
-	if c.ao != "" {
-		opts = append(opts, withQueryParam("auth_variable_override", c.ao))
 	}
 
 	return &Ref{
@@ -102,19 +105,15 @@ func (c *Client) NewRef(path string) (*Ref, error) {
 		Path:   "/" + strings.Join(segs, "/"),
 		client: c,
 		segs:   segs,
-		opts:   opts,
-	}, nil
+	}
 }
 
-func parsePath(path string) ([]string, error) {
-	if strings.ContainsAny(path, invalidChars) {
-		return nil, fmt.Errorf("path %q contains one or more invalid characters", path)
-	}
+func parsePath(path string) []string {
 	var segs []string
 	for _, s := range strings.Split(path, "/") {
 		if s != "" {
 			segs = append(segs, s)
 		}
 	}
-	return segs, nil
+	return segs
 }

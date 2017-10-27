@@ -65,12 +65,8 @@ func TestMain(m *testing.M) {
 	}
 	testAuthOverrides = string(b)
 
-	ref, err = client.NewRef("peter")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	testUserAgent = fmt.Sprintf(userAgent, "1.2.3", runtime.Version())
+	ref = client.NewRef("peter")
+	testUserAgent = fmt.Sprintf(userAgentFormat, "1.2.3", runtime.Version())
 	os.Exit(m.Run())
 }
 
@@ -83,8 +79,8 @@ func TestNewClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.baseURL != testURL {
-		t.Errorf("BaseURL = %q; want: %q", c.baseURL, testURL)
+	if c.url != testURL {
+		t.Errorf("BaseURL = %q; want: %q", c.url, testURL)
 	}
 	if c.hc == nil {
 		t.Errorf("http.Client = nil; want non-nil")
@@ -108,8 +104,8 @@ func TestNewClientAuthOverrides(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.baseURL != testURL {
-			t.Errorf("BaseURL = %q; want: %q", c.baseURL, testURL)
+		if c.url != testURL {
+			t.Errorf("BaseURL = %q; want: %q", c.url, testURL)
 		}
 		if c.hc == nil {
 			t.Errorf("http.Client = nil; want non-nil")
@@ -157,10 +153,7 @@ func TestNewRef(t *testing.T) {
 		{"/foo/bar/", "/foo/bar", "bar"},
 	}
 	for _, tc := range cases {
-		r, err := client.NewRef(tc.Path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		r := client.NewRef(tc.Path)
 		if r.client == nil {
 			t.Errorf("Client = nil; want = %v", client)
 		}
@@ -169,16 +162,6 @@ func TestNewRef(t *testing.T) {
 		}
 		if r.Key != tc.WantKey {
 			t.Errorf("Key = %q; want = %q", r.Key, tc.WantKey)
-		}
-	}
-}
-
-func TestInvalidNewRef(t *testing.T) {
-	cases := []string{"foo#", "foo.", "foo$", "foo[", "foo]"}
-	for _, tc := range cases {
-		r, err := client.NewRef(tc)
-		if r != nil || err == nil {
-			t.Errorf("NewRef(%q) = (%v, %v); want = (nil, err)", tc, r, err)
 		}
 	}
 }
@@ -198,12 +181,7 @@ func TestParent(t *testing.T) {
 		{"/foo/bar/", true, "foo"},
 	}
 	for _, tc := range cases {
-		r, err := client.NewRef(tc.Path)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		r = r.Parent()
+		r := client.NewRef(tc.Path).Parent()
 		if tc.HasParent {
 			if r == nil {
 				t.Fatalf("Parent = nil; want = %q", tc.Want)
@@ -221,25 +199,28 @@ func TestParent(t *testing.T) {
 }
 
 func TestChild(t *testing.T) {
-	r, err := client.NewRef("/test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	r := client.NewRef("/test")
 	cases := []struct {
 		Path   string
 		Want   string
 		Parent string
 	}{
+		{"", "/test", "/"},
 		{"foo", "/test/foo", "/test"},
+		{"/foo", "/test/foo", "/test"},
+		{"foo/", "/test/foo", "/test"},
+		{"/foo/", "/test/foo", "/test"},
+		{"//foo//", "/test/foo", "/test"},
 		{"foo/bar", "/test/foo/bar", "/test/foo"},
+		{"/foo/bar", "/test/foo/bar", "/test/foo"},
 		{"foo/bar/", "/test/foo/bar", "/test/foo"},
+		{"/foo/bar/", "/test/foo/bar", "/test/foo"},
+		{"//foo/bar", "/test/foo/bar", "/test/foo"},
+		{"foo//bar/", "/test/foo/bar", "/test/foo"},
+		{"foo/bar//", "/test/foo/bar", "/test/foo"},
 	}
 	for _, tc := range cases {
-		c, err := r.Child(tc.Path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		c := r.Child(tc.Path)
 		if c.Path != tc.Want {
 			t.Errorf("Child(%q) = %q; want = %q", tc.Path, c.Path, tc.Want)
 		}
@@ -249,18 +230,24 @@ func TestChild(t *testing.T) {
 	}
 }
 
-func TestInvalidChild(t *testing.T) {
-	r, err := client.NewRef("/test")
-	if err != nil {
-		t.Fatal(err)
+func TestInvalidPath(t *testing.T) {
+	mock := &mockServer{Resp: "test"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []string{
+		"foo$", "foo.", "foo#", "foo]", "foo[",
+	}
+	for _, tc := range cases {
+		r := client.NewRef(tc)
+		var got string
+		if err := r.Get(&got); got != "" || err == nil {
+			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
+		}
 	}
 
-	cases := []string{"", "/", "/foo", "foo#bar"}
-	for _, tc := range cases {
-		c, err := r.Child(tc)
-		if c != nil || err == nil {
-			t.Errorf("Child(%q) = (%v, %v); want = (nil, err)", tc, c, err)
-		}
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
 	}
 }
 
@@ -389,7 +376,7 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 		w.Write(b)
 	})
 	s.srv = httptest.NewServer(handler)
-	c.baseURL = s.srv.URL
+	c.url = s.srv.URL
 	return s.srv
 }
 

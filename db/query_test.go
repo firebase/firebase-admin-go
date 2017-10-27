@@ -11,13 +11,8 @@ func TestChildQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages").Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -36,13 +31,8 @@ func TestNestedChildQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages/ratings")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages/ratings").Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -66,13 +56,8 @@ func TestChildQueryWithParams(t *testing.T) {
 		WithEndAt("m50"),
 		WithLimitToFirst(10),
 	}
-	q, err := ref.OrderByChild("messages", opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", opts...).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -90,19 +75,34 @@ func TestChildQueryWithParams(t *testing.T) {
 	})
 }
 
+func TestInvalidChildPath(t *testing.T) {
+	mock := &mockServer{Resp: "test"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	r := client.NewRef("/")
+	cases := []string{
+		"foo$", "foo.", "foo#", "foo]", "foo[",
+	}
+	for _, tc := range cases {
+		var got string
+		if err := r.OrderByChild(tc).Get(&got); got != "" || err == nil {
+			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
+		}
+	}
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+	}
+}
+
 func TestKeyQuery(t *testing.T) {
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
 	mock := &mockServer{Resp: want}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByKey().Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -121,13 +121,8 @@ func TestValueQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByValue()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByValue().Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -146,13 +141,8 @@ func TestLimitFirstQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithLimitToFirst(10))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", WithLimitToFirst(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -171,13 +161,8 @@ func TestLimitLastQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithLimitToLast(10))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", WithLimitToLast(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -191,19 +176,18 @@ func TestLimitLastQuery(t *testing.T) {
 }
 
 func TestInvalidLimitQuery(t *testing.T) {
-	q, err := ref.OrderByChild("messages", WithLimitToFirst(10), WithLimitToLast(10))
-	if q != nil || err == nil {
-		t.Errorf("Query(first=10, last=10) = (%v, %v); want (nil, error)", q, err)
-	}
+	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
 
-	q, err = ref.OrderByChild("messages", WithLimitToFirst(-10))
-	if q != nil || err == nil {
-		t.Errorf("Query(first=-10) = (%v, %v); want (nil, error)", q, err)
+	var got map[string]interface{}
+	q := ref.OrderByChild("messages", WithLimitToFirst(10), WithLimitToLast(10))
+	if err := q.Get(&got); got != nil || err == nil {
+		t.Errorf("Get() = (%v, %v); want = (nil, error)", got, err)
 	}
-
-	q, err = ref.OrderByChild("messages", WithLimitToLast(-10))
-	if q != nil || err == nil {
-		t.Errorf("Query(last=-10) = (%v, %v); want (nil, error)", q, err)
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
 	}
 }
 
@@ -213,13 +197,8 @@ func TestStartAtQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithStartAt(10))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", WithStartAt(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -238,13 +217,8 @@ func TestEndAtQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithEndAt(10))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", WithEndAt(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -263,11 +237,7 @@ func TestAllParamsQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithLimitToFirst(100), WithStartAt("bar"), WithEndAt("foo"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	q := ref.OrderByChild("messages", WithLimitToFirst(100), WithStartAt("bar"), WithEndAt("foo"))
 	var got map[string]interface{}
 	if err := q.Get(&got); err != nil {
 		t.Fatal(err)
@@ -293,13 +263,8 @@ func TestEqualToQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q, err := ref.OrderByChild("messages", WithEqualTo(10))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := ref.OrderByChild("messages", WithEqualTo(10)).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
