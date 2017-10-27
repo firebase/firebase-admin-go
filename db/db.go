@@ -50,16 +50,13 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return nil, err
 	}
 
-	if c.BaseURL == "" {
-		return nil, fmt.Errorf("database url not specified")
-	}
-	p, err := url.Parse(c.BaseURL)
+	p, err := url.Parse(c.URL)
 	if err != nil {
 		return nil, err
 	} else if p.Scheme != "https" {
-		return nil, fmt.Errorf("invalid database URL (incorrect scheme): %q", c.BaseURL)
+		return nil, fmt.Errorf("invalid database URL (incorrect scheme): %q", c.URL)
 	} else if !strings.HasSuffix(p.Host, ".firebaseio.com") {
-		return nil, fmt.Errorf("invalid database URL (incorrest host): %q", c.BaseURL)
+		return nil, fmt.Errorf("invalid database URL (incorrest host): %q", c.URL)
 	}
 
 	var ao []byte
@@ -75,18 +72,6 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		url: fmt.Sprintf("https://%s", p.Host),
 		ao:  string(ao),
 	}, nil
-}
-
-func newHTTPOptions(m map[string]interface{}) ([]httpOption, error) {
-	var opts []httpOption
-	if m == nil || len(m) > 0 {
-		ao, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, withQueryParam("auth_variable_override", string(ao)))
-	}
-	return opts, nil
 }
 
 type AuthOverrides struct {

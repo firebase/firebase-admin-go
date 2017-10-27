@@ -71,22 +71,15 @@ func WithEqualTo(v interface{}) QueryOption {
 }
 
 func (r *Ref) OrderByChild(child string, opts ...QueryOption) Query {
-	opts = append(opts, orderByChild(child))
-	return newQuery(r, opts)
+	return &queryImpl{ref: r, opts: append(opts, orderByChild(child))}
 }
 
 func (r *Ref) OrderByKey(opts ...QueryOption) Query {
-	opts = append(opts, orderByParam("$key"))
-	return newQuery(r, opts)
+	return &queryImpl{ref: r, opts: append(opts, orderByParam("$key"))}
 }
 
 func (r *Ref) OrderByValue(opts ...QueryOption) Query {
-	opts = append(opts, orderByParam("$value"))
-	return newQuery(r, opts)
-}
-
-func newQuery(r *Ref, opts []QueryOption) Query {
-	return &queryImpl{ref: r, opts: opts}
+	return &queryImpl{ref: r, opts: append(opts, orderByParam("$value"))}
 }
 
 type queryParams map[string]string

@@ -36,7 +36,7 @@ type AuthConfig struct {
 
 type DatabaseConfig struct {
 	Opts    []option.ClientOption
-	BaseURL string
+	URL     string
 	Version string
 	AO      map[string]interface{}
 }

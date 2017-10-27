@@ -66,7 +66,7 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 func (a *App) Database(ctx context.Context) (*db.Client, error) {
 	conf := &internal.DatabaseConfig{
 		AO:      a.ao,
-		BaseURL: a.dbURL,
+		URL:     a.dbURL,
 		Opts:    a.opts,
 		Version: Version,
 	}

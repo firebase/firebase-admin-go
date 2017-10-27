@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	var err error
 	client, err = NewClient(context.Background(), &internal.DatabaseConfig{
 		Opts:    testOpts,
-		BaseURL: testURL,
+		URL:     testURL,
 		Version: "1.2.3",
 		AO:      map[string]interface{}{},
 	})
@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 	ao := map[string]interface{}{"uid": "user1"}
 	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{
 		Opts:    testOpts,
-		BaseURL: testURL,
+		URL:     testURL,
 		Version: "1.2.3",
 		AO:      ao,
 	})
@@ -72,9 +72,9 @@ func TestMain(m *testing.M) {
 
 func TestNewClient(t *testing.T) {
 	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:    testOpts,
-		BaseURL: testURL,
-		AO:      make(map[string]interface{}),
+		Opts: testOpts,
+		URL:  testURL,
+		AO:   make(map[string]interface{}),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -97,9 +97,9 @@ func TestNewClientAuthOverrides(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts:    testOpts,
-			BaseURL: testURL,
-			AO:      tc,
+			Opts: testOpts,
+			URL:  testURL,
+			AO:   tc,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -129,8 +129,8 @@ func TestNewClientError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts:    testOpts,
-			BaseURL: tc,
+			Opts: testOpts,
+			URL:  tc,
 		})
 		if c != nil || err == nil {
 			t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)
