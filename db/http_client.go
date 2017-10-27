@@ -8,17 +8,28 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
-func (c *Client) send(method, path string, body interface{}, options ...httpOption) (*response, error) {
-	var opts []httpOption
-	if c.ao != "" {
-		opts = append(opts, withQueryParam("auth_variable_override", c.ao))
+const invalidChars = "[].#$"
+const authVarOverride = "auth_variable_override"
+
+type request struct {
+	Method string
+	Path   string
+	Body   interface{}
+	Opts   []httpOption
+}
+
+func (c *Client) send(ctx context.Context, r *request) (*response, error) {
+	if strings.ContainsAny(r.Path, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
 	}
 
+	var opts []httpOption
 	var data io.Reader
-	if body != nil {
-		b, err := json.Marshal(body)
+	if r.Body != nil {
+		b, err := json.Marshal(r.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -26,18 +37,30 @@ func (c *Client) send(method, path string, body interface{}, options ...httpOpti
 		opts = append(opts, withHeader("Content-Type", "application/json"))
 	}
 
-	url := fmt.Sprintf("%s%s%s", c.url, path, ".json")
-	req, err := http.NewRequest(method, url, data)
+	url := fmt.Sprintf("%s%s.json", c.url, r.Path)
+	req, err := http.NewRequest(r.Method, url, data)
 	if err != nil {
 		return nil, err
 	}
 
-	opts = append(opts, options...)
-	for _, o := range opts {
-		req = o(req)
+	if ctx != nil {
+		req = req.WithContext(ctx)
 	}
 
-	resp, err := c.hc.Do(req)
+	if c.ao != "" {
+		opts = append(opts, withQueryParam(authVarOverride, c.ao))
+	}
+	opts = append(opts, r.Opts...)
+
+	return doSend(c.hc, req, opts...)
+}
+
+func doSend(hc *http.Client, req *http.Request, opts ...httpOption) (*response, error) {
+	for _, o := range opts {
+		o(req)
+	}
+
+	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -86,37 +109,28 @@ func (r *response) CheckAndParse(want int, v interface{}) error {
 	return nil
 }
 
-type httpOption func(*http.Request) *http.Request
+type httpOption func(*http.Request)
 
 func withHeader(key, value string) httpOption {
-	return func(r *http.Request) *http.Request {
+	return func(r *http.Request) {
 		r.Header.Set(key, value)
-		return r
 	}
 }
 
 func withQueryParam(key, value string) httpOption {
-	return func(r *http.Request) *http.Request {
+	return func(r *http.Request) {
 		q := r.URL.Query()
 		q.Add(key, value)
 		r.URL.RawQuery = q.Encode()
-		return r
 	}
 }
 
 func withQueryParams(qp queryParams) httpOption {
-	return func(r *http.Request) *http.Request {
+	return func(r *http.Request) {
 		q := r.URL.Query()
 		for k, v := range qp {
 			q.Add(k, v)
 		}
 		r.URL.RawQuery = q.Encode()
-		return r
-	}
-}
-
-func withContext(ctx context.Context) httpOption {
-	return func(r *http.Request) *http.Request {
-		return r.WithContext(ctx)
 	}
 }

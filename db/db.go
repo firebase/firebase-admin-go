@@ -31,7 +31,6 @@ import (
 	"google.golang.org/api/transport"
 )
 
-const invalidChars = "[].#$"
 const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
 
 // Client is the interface for the Firebase Realtime Database service.

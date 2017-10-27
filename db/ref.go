@@ -45,7 +45,7 @@ func (r *Ref) Child(path string) *Ref {
 }
 
 func (r *Ref) Get(v interface{}) error {
-	resp, err := r.send("GET", nil)
+	resp, err := r.send("GET")
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (r *Ref) WithContext(ctx context.Context) Query {
 }
 
 func (r *Ref) GetWithETag(v interface{}) (string, error) {
-	resp, err := r.send("GET", nil, withHeader("X-Firebase-ETag", "true"))
+	resp, err := r.send("GET", withHeader("X-Firebase-ETag", "true"))
 	if err != nil {
 		return "", err
 	} else if err := resp.CheckAndParse(http.StatusOK, v); err != nil {
@@ -70,7 +70,7 @@ func (r *Ref) GetWithETag(v interface{}) (string, error) {
 }
 
 func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
-	resp, err := r.send("GET", nil, withHeader("If-None-Match", etag))
+	resp, err := r.send("GET", withHeader("If-None-Match", etag))
 	if err != nil {
 		return false, "", err
 	} else if err := resp.CheckAndParse(http.StatusOK, v); err == nil {
@@ -82,7 +82,7 @@ func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
 }
 
 func (r *Ref) Set(v interface{}) error {
-	resp, err := r.send("PUT", v, withQueryParam("print", "silent"))
+	resp, err := r.sendWithBody("PUT", v, withQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (r *Ref) Set(v interface{}) error {
 }
 
 func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
-	resp, err := r.send("PUT", v, withHeader("If-Match", etag))
+	resp, err := r.sendWithBody("PUT", v, withHeader("If-Match", etag))
 	if err != nil {
 		return false, err
 	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
@@ -105,7 +105,7 @@ func (r *Ref) Push(v interface{}) (*Ref, error) {
 	if v == nil {
 		v = ""
 	}
-	resp, err := r.send("POST", v)
+	resp, err := r.sendWithBody("POST", v)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (r *Ref) Update(v map[string]interface{}) error {
 	if len(v) == 0 {
 		return fmt.Errorf("value argument must be a non-empty map")
 	}
-	resp, err := r.send("PATCH", v, withQueryParam("print", "silent"))
+	resp, err := r.sendWithBody("PATCH", v, withQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 		if err != nil {
 			return err
 		}
-		resp, err := r.send("PUT", new, withHeader("If-Match", etag))
+		resp, err := r.sendWithBody("PUT", new, withHeader("If-Match", etag))
 		if err := resp.CheckStatus(http.StatusOK); err == nil {
 			return nil
 		} else if err := resp.CheckAndParse(http.StatusPreconditionFailed, &curr); err != nil {
@@ -155,19 +155,23 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 }
 
 func (r *Ref) Delete() error {
-	resp, err := r.send("DELETE", nil)
+	resp, err := r.send("DELETE")
 	if err != nil {
 		return err
 	}
 	return resp.CheckStatus(http.StatusOK)
 }
 
-func (r *Ref) send(method string, body interface{}, opts ...httpOption) (*response, error) {
-	if strings.ContainsAny(r.Path, invalidChars) {
-		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
+func (r *Ref) send(method string, opts ...httpOption) (*response, error) {
+	return r.sendWithBody(method, nil, opts...)
+}
+
+func (r *Ref) sendWithBody(method string, body interface{}, opts ...httpOption) (*response, error) {
+	req := &request{
+		Method: method,
+		Body:   body,
+		Path:   r.Path,
+		Opts:   opts,
 	}
-	if r.ctx != nil {
-		opts = append([]httpOption{withContext(r.ctx)}, opts...)
-	}
-	return r.client.send(method, r.Path, body, opts...)
+	return r.client.send(r.ctx, req)
 }

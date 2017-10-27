@@ -15,24 +15,26 @@ type Query interface {
 }
 
 type queryImpl struct {
-	ctx  context.Context
-	ref  *Ref
-	opts []QueryOption
+	Ctx    context.Context
+	Client *Client
+	Path   string
+	Opts   []QueryOption
 }
 
 func (q *queryImpl) Get(v interface{}) error {
 	qp := make(queryParams)
-	for _, o := range q.opts {
+	for _, o := range q.Opts {
 		if err := o.apply(qp); err != nil {
 			return err
 		}
 	}
 
-	opts := []httpOption{withQueryParams(qp)}
-	if q.ctx != nil {
-		opts = append(opts, withContext(q.ctx))
+	req := &request{
+		Method: "GET",
+		Path:   q.Path,
+		Opts:   []httpOption{withQueryParams(qp)},
 	}
-	resp, err := q.ref.send("GET", nil, opts...)
+	resp, err := q.Client.send(q.Ctx, req)
 	if err != nil {
 		return err
 	}
@@ -42,7 +44,7 @@ func (q *queryImpl) Get(v interface{}) error {
 func (q *queryImpl) WithContext(ctx context.Context) Query {
 	q2 := new(queryImpl)
 	*q2 = *q
-	q2.ctx = ctx
+	q2.Ctx = ctx
 	return q2
 }
 
@@ -71,15 +73,24 @@ func WithEqualTo(v interface{}) QueryOption {
 }
 
 func (r *Ref) OrderByChild(child string, opts ...QueryOption) Query {
-	return &queryImpl{ref: r, opts: append(opts, orderByChild(child))}
+	return newQuery(r, orderByChild(child), opts...)
 }
 
 func (r *Ref) OrderByKey(opts ...QueryOption) Query {
-	return &queryImpl{ref: r, opts: append(opts, orderByParam("$key"))}
+	return newQuery(r, orderByParam("$key"), opts...)
 }
 
 func (r *Ref) OrderByValue(opts ...QueryOption) Query {
-	return &queryImpl{ref: r, opts: append(opts, orderByParam("$value"))}
+	return newQuery(r, orderByParam("$value"), opts...)
+}
+
+func newQuery(r *Ref, orderBy QueryOption, opts ...QueryOption) Query {
+	return &queryImpl{
+		Ctx:    r.ctx,
+		Client: r.client,
+		Path:   r.Path,
+		Opts:   append(opts, orderBy),
+	}
 }
 
 type queryParams map[string]string
