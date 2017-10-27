@@ -63,7 +63,10 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
-	initRefs()
+	ref = client.NewRef("_adminsdk/go/dinodb")
+	dinos = ref.Child("dinosaurs")
+	users = ref.Parent().Child("users")
+
 	initRules()
 	initData()
 
@@ -108,12 +111,6 @@ func initGuestClient(pid string) (*db.Client, error) {
 	}
 
 	return app.Database(ctx)
-}
-
-func initRefs() {
-	ref = client.NewRef("_adminsdk/go/dinodb")
-	dinos = ref.Child("dinosaurs")
-	users = ref.Parent().Child("users")
 }
 
 func initRules() {
@@ -630,6 +627,23 @@ func TestGuestAccess(t *testing.T) {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+}
+
+func TestWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var m map[string]interface{}
+	if err := ref.WithContext(ctx).Get(&m); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(testData, m) {
+		t.Errorf("Get() = %v; want = %v", m, testData)
+	}
+
+	cancel()
+	m = nil
+	if err := ref.WithContext(ctx).Get(&m); len(m) != 0 || err == nil {
+		t.Errorf("Get() = (%v, %v); want = (empty, error)", m, err)
 	}
 }
 

@@ -1,7 +1,11 @@
 package db
 
-import "testing"
-import "firebase.google.com/go/db"
+import (
+	"context"
+	"testing"
+
+	"firebase.google.com/go/db"
+)
 
 var heightSorted = []string{
 	"linhenykus", "pterodactyl", "lambeosaurus",
@@ -180,5 +184,30 @@ func TestOrderByValue(t *testing.T) {
 		if _, ok := m[d]; !ok {
 			t.Errorf("OrderByValue() = %v; want key %q", m, d)
 		}
+	}
+}
+
+func TestQueryWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	q := dinos.OrderByKey(db.WithLimitToFirst(2)).WithContext(ctx)
+	var m map[string]Dinosaur
+	if err := q.Get(&m); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"bruhathkayosaurus", "lambeosaurus"}
+	if len(m) != len(want) {
+		t.Errorf("OrderByKey() = %v; want = %v", m, want)
+	}
+	for _, d := range want {
+		if _, ok := m[d]; !ok {
+			t.Errorf("OrderByKey() = %v; want key %q", m, d)
+		}
+	}
+
+	cancel()
+	m = nil
+	if err := q.Get(&m); len(m) != 0 || err == nil {
+		t.Errorf("Get() = (%v, %v); want = (empty, error)", m, err)
 	}
 }

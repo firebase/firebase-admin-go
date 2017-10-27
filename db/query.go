@@ -1,12 +1,13 @@
 package db
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 type Query interface {
@@ -18,11 +19,15 @@ type queryImpl struct {
 	Ctx    context.Context
 	Client *Client
 	Path   string
+	OB     orderBy
 	Opts   []QueryOption
 }
 
 func (q *queryImpl) Get(v interface{}) error {
 	qp := make(queryParams)
+	if err := q.OB.apply(qp); err != nil {
+		return err
+	}
 	for _, o := range q.Opts {
 		if err := o.apply(qp); err != nil {
 			return err
@@ -46,6 +51,12 @@ func (q *queryImpl) WithContext(ctx context.Context) Query {
 	*q2 = *q
 	q2.Ctx = ctx
 	return q2
+}
+
+type queryParams map[string]string
+
+type orderBy interface {
+	apply(qp queryParams) error
 }
 
 type QueryOption interface {
@@ -77,23 +88,22 @@ func (r *Ref) OrderByChild(child string, opts ...QueryOption) Query {
 }
 
 func (r *Ref) OrderByKey(opts ...QueryOption) Query {
-	return newQuery(r, orderByParam("$key"), opts...)
+	return newQuery(r, orderByProperty("$key"), opts...)
 }
 
 func (r *Ref) OrderByValue(opts ...QueryOption) Query {
-	return newQuery(r, orderByParam("$value"), opts...)
+	return newQuery(r, orderByProperty("$value"), opts...)
 }
 
-func newQuery(r *Ref, orderBy QueryOption, opts ...QueryOption) Query {
+func newQuery(r *Ref, ob orderBy, opts ...QueryOption) Query {
 	return &queryImpl{
 		Ctx:    r.ctx,
 		Client: r.client,
 		Path:   r.Path,
-		Opts:   append(opts, orderBy),
+		OB:     ob,
+		Opts:   opts,
 	}
 }
-
-type queryParams map[string]string
 
 type orderByChild string
 
@@ -112,9 +122,9 @@ func (p orderByChild) apply(qp queryParams) error {
 	return nil
 }
 
-type orderByParam string
+type orderByProperty string
 
-func (p orderByParam) apply(qp queryParams) error {
+func (p orderByProperty) apply(qp queryParams) error {
 	b, err := json.Marshal(p)
 	if err != nil {
 		return err

@@ -4,7 +4,42 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"golang.org/x/net/context"
 )
+
+func TestRefWithContext(t *testing.T) {
+	r := client.NewRef("peter")
+	if r.ctx != nil {
+		t.Errorf("Ctx = %v; want nil", r.ctx)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r = r.WithContext(ctx)
+	if r.ctx != ctx {
+		t.Errorf("Ctx = %v; want %v", r.ctx, ctx)
+	}
+
+	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got map[string]interface{}
+	if err := r.Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+
+	cancel()
+	got = nil
+	if err := r.Get(&got); len(got) != 0 || err == nil {
+		t.Errorf("Get() = (%v, %v); want = (empty, error)", got, err)
+	}
+}
 
 func TestGet(t *testing.T) {
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
@@ -13,7 +48,7 @@ func TestGet(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := ref.Get(&got); err != nil {
+	if err := testref.Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -29,7 +64,7 @@ func TestGetWithStruct(t *testing.T) {
 	defer srv.Close()
 
 	var got person
-	if err := ref.Get(&got); err != nil {
+	if err := testref.Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if want != got {
@@ -48,7 +83,7 @@ func TestGetWithETag(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	etag, err := ref.GetWithETag(&got)
+	etag, err := testref.GetWithETag(&got)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +110,7 @@ func TestGetIfChanged(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	ok, etag, err := ref.GetIfChanged("old-etag", &got)
+	ok, etag, err := testref.GetIfChanged("old-etag", &got)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +127,7 @@ func TestGetIfChanged(t *testing.T) {
 	mock.Status = http.StatusNotModified
 	mock.Resp = nil
 	var got2 map[string]interface{}
-	ok, etag, err = ref.GetIfChanged("new-etag", &got2)
+	ok, etag, err = testref.GetIfChanged("new-etag", &got2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +161,7 @@ func TestWerlformedHttpError(t *testing.T) {
 	defer srv.Close()
 
 	var got person
-	err := ref.Get(&got)
+	err := testref.Get(&got)
 	want := "http error status: 500; reason: test error"
 	if err == nil || err.Error() != want {
 		t.Errorf("Get() = %v; want = %v", err, want)
@@ -140,7 +175,7 @@ func TestUnexpectedHttpError(t *testing.T) {
 	defer srv.Close()
 
 	var got person
-	err := ref.Get(&got)
+	err := testref.Get(&got)
 	want := "http error status: 500; message: \"unexpected error\""
 	if err == nil || err.Error() != want {
 		t.Errorf("Get() = %v; want = %v", err, want)
@@ -154,7 +189,7 @@ func TestSet(t *testing.T) {
 	defer srv.Close()
 
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	if err := ref.Set(want); err != nil {
+	if err := testref.Set(want); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
@@ -171,7 +206,7 @@ func TestSetWithStruct(t *testing.T) {
 	defer srv.Close()
 
 	want := &person{"Peter Parker", 17}
-	if err := ref.Set(&want); err != nil {
+	if err := testref.Set(&want); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
@@ -188,7 +223,7 @@ func TestSetIfUnchanged(t *testing.T) {
 	defer srv.Close()
 
 	want := &person{"Peter Parker", 17}
-	ok, err := ref.SetIfUnchanged("mock-etag", &want)
+	ok, err := testref.SetIfUnchanged("mock-etag", &want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +247,7 @@ func TestSetIfUnchangedError(t *testing.T) {
 	defer srv.Close()
 
 	want := &person{"Peter Parker", 17}
-	ok, err := ref.SetIfUnchanged("mock-etag", &want)
+	ok, err := testref.SetIfUnchanged("mock-etag", &want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +267,7 @@ func TestPush(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	child, err := ref.Push(nil)
+	child, err := testref.Push(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +288,7 @@ func TestPushWithValue(t *testing.T) {
 	defer srv.Close()
 
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	child, err := ref.Push(want)
+	child, err := testref.Push(want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +309,7 @@ func TestUpdate(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	if err := ref.Update(want); err != nil {
+	if err := testref.Update(want); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
@@ -286,12 +321,12 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestInvalidUpdate(t *testing.T) {
-	if err := ref.Update(nil); err == nil {
+	if err := testref.Update(nil); err == nil {
 		t.Errorf("Update(nil) = nil; want error")
 	}
 
 	m := make(map[string]interface{})
-	if err := ref.Update(m); err == nil {
+	if err := testref.Update(m); err == nil {
 		t.Errorf("Update(map{}) = nil; want error")
 	}
 }
@@ -309,7 +344,7 @@ func TestTransaction(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	if err := ref.Transaction(fn); err != nil {
+	if err := testref.Transaction(fn); err != nil {
 		t.Fatal(err)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
@@ -352,7 +387,7 @@ func TestTransactionRetry(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	if err := ref.Transaction(fn); err != nil {
+	if err := testref.Transaction(fn); err != nil {
 		t.Fatal(err)
 	}
 	if cnt != 2 {
@@ -404,7 +439,7 @@ func TestTransactionAbort(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	err := ref.Transaction(fn)
+	err := testref.Transaction(fn)
 	if err == nil {
 		t.Errorf("Transaction() = nil; want error")
 	}
@@ -434,7 +469,7 @@ func TestDelete(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	if err := ref.Delete(); err != nil {
+	if err := testref.Delete(); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{

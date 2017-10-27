@@ -15,10 +15,11 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 type Ref struct {
@@ -52,7 +53,7 @@ func (r *Ref) Get(v interface{}) error {
 	return resp.CheckAndParse(http.StatusOK, v)
 }
 
-func (r *Ref) WithContext(ctx context.Context) Query {
+func (r *Ref) WithContext(ctx context.Context) *Ref {
 	r2 := new(Ref)
 	*r2 = *r
 	r2.ctx = ctx

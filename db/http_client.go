@@ -2,13 +2,14 @@ package db
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 const invalidChars = "[].#$"

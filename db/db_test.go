@@ -34,7 +34,7 @@ var testOpts = []option.ClientOption{
 
 var client *Client
 var aoClient *Client
-var ref *Ref
+var testref *Ref
 
 func TestMain(m *testing.M) {
 	var err error
@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 	}
 	testAuthOverrides = string(b)
 
-	ref = client.NewRef("peter")
+	testref = client.NewRef("peter")
 	testUserAgent = fmt.Sprintf(userAgentFormat, "1.2.3", runtime.Version())
 	os.Exit(m.Run())
 }
@@ -155,7 +155,10 @@ func TestNewRef(t *testing.T) {
 	for _, tc := range cases {
 		r := client.NewRef(tc.Path)
 		if r.client == nil {
-			t.Errorf("Client = nil; want = %v", client)
+			t.Errorf("Client = nil; want = %v", r.client)
+		}
+		if r.ctx != nil {
+			t.Errorf("Ctx = %v; want nil", r.ctx)
 		}
 		if r.Path != tc.WantPath {
 			t.Errorf("Path = %q; want = %q", r.Path, tc.WantPath)
@@ -242,6 +245,27 @@ func TestInvalidPath(t *testing.T) {
 		r := client.NewRef(tc)
 		var got string
 		if err := r.Get(&got); got != "" || err == nil {
+			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
+		}
+	}
+
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+	}
+}
+
+func TestInvalidChildPath(t *testing.T) {
+	mock := &mockServer{Resp: "test"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []string{
+		"foo$", "foo.", "foo#", "foo]", "foo[",
+	}
+	r := client.NewRef("test")
+	for _, tc := range cases {
+		var got string
+		if err := r.Child(tc).Get(&got); got != "" || err == nil {
 			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
 		}
 	}
