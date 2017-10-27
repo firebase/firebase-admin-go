@@ -145,7 +145,9 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 			return err
 		}
 		resp, err := r.sendWithBody("PUT", new, withHeader("If-Match", etag))
-		if err := resp.CheckStatus(http.StatusOK); err == nil {
+		if err != nil {
+			return err
+		} else if err := resp.CheckStatus(http.StatusOK); err == nil {
 			return nil
 		} else if err := resp.CheckAndParse(http.StatusPreconditionFailed, &curr); err != nil {
 			return err

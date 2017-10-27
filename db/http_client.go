@@ -126,7 +126,7 @@ func withQueryParam(key, value string) httpOption {
 	}
 }
 
-func withQueryParams(qp queryParams) httpOption {
+func withQueryParams(qp map[string]string) httpOption {
 	return func(r *http.Request) {
 		q := r.URL.Query()
 		for k, v := range qp {

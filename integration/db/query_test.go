@@ -3,8 +3,6 @@ package db
 import (
 	"context"
 	"testing"
-
-	"firebase.google.com/go/db"
 )
 
 var heightSorted = []string{
@@ -14,9 +12,8 @@ var heightSorted = []string{
 
 func TestLimitToFirst(t *testing.T) {
 	for _, tc := range []int{2, 10} {
-		q := dinos.OrderByChild("height", db.WithLimitToFirst(tc))
 		var m map[string]Dinosaur
-		if err := q.Get(&m); err != nil {
+		if err := dinos.OrderByChild("height").WithLimitToFirst(tc).Get(&m); err != nil {
 			t.Fatal(err)
 		}
 
@@ -38,9 +35,8 @@ func TestLimitToFirst(t *testing.T) {
 
 func TestLimitToLast(t *testing.T) {
 	for _, tc := range []int{2, 10} {
-		q := dinos.OrderByChild("height", db.WithLimitToLast(tc))
 		var m map[string]Dinosaur
-		if err := q.Get(&m); err != nil {
+		if err := dinos.OrderByChild("height").WithLimitToLast(tc).Get(&m); err != nil {
 			t.Fatal(err)
 		}
 
@@ -61,9 +57,8 @@ func TestLimitToLast(t *testing.T) {
 }
 
 func TestStartAt(t *testing.T) {
-	q := dinos.OrderByChild("height", db.WithStartAt(3.5))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").WithStartAt(3.5).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,9 +74,8 @@ func TestStartAt(t *testing.T) {
 }
 
 func TestEndAt(t *testing.T) {
-	q := dinos.OrderByChild("height", db.WithEndAt(3.5))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").WithEndAt(3.5).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,9 +91,8 @@ func TestEndAt(t *testing.T) {
 }
 
 func TestStartAndEndAt(t *testing.T) {
-	q := dinos.OrderByChild("height", db.WithStartAt(2.5), db.WithEndAt(5))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").WithStartAt(2.5).WithEndAt(5).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,9 +108,8 @@ func TestStartAndEndAt(t *testing.T) {
 }
 
 func TestEqualTo(t *testing.T) {
-	q := dinos.OrderByChild("height", db.WithEqualTo(0.6))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").WithEqualTo(0.6).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,9 +125,8 @@ func TestEqualTo(t *testing.T) {
 }
 
 func TestOrderByNestedChild(t *testing.T) {
-	q := dinos.OrderByChild("ratings/pos", db.WithStartAt(4))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByChild("ratings/pos").WithStartAt(4).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,9 +142,8 @@ func TestOrderByNestedChild(t *testing.T) {
 }
 
 func TestOrderByKey(t *testing.T) {
-	q := dinos.OrderByKey(db.WithLimitToFirst(2))
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := dinos.OrderByKey().WithLimitToFirst(2).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,9 +160,8 @@ func TestOrderByKey(t *testing.T) {
 
 func TestOrderByValue(t *testing.T) {
 	scores := ref.Child("scores")
-	q := scores.OrderByValue(db.WithLimitToLast(2))
 	var m map[string]int
-	if err := q.Get(&m); err != nil {
+	if err := scores.OrderByValue().WithLimitToLast(2).Get(&m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,7 +178,7 @@ func TestOrderByValue(t *testing.T) {
 
 func TestQueryWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	q := dinos.OrderByKey(db.WithLimitToFirst(2)).WithContext(ctx)
+	q := dinos.OrderByKey().WithLimitToFirst(2).WithContext(ctx)
 	var m map[string]Dinosaur
 	if err := q.Get(&m); err != nil {
 		t.Fatal(err)

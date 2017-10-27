@@ -8,14 +8,14 @@ import (
 
 func TestQueryWithContext(t *testing.T) {
 	q := client.NewRef("peter").OrderByChild("messages")
-	if q.(*queryImpl).Ctx != nil {
-		t.Errorf("Ctx = %v; want nil", q.(*queryImpl).Ctx)
+	if q.ctx != nil {
+		t.Errorf("Ctx = %v; want nil", q.ctx)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	q = q.WithContext(ctx)
-	if q.(*queryImpl).Ctx != ctx {
-		t.Errorf("Ctx = %v; want %v", q.(*queryImpl).Ctx, ctx)
+	if q.ctx != ctx {
+		t.Errorf("Ctx = %v; want %v", q.ctx, ctx)
 	}
 
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
@@ -46,8 +46,8 @@ func TestQueryWithContext(t *testing.T) {
 func TestQueryFromRefWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	q := client.NewRef("peter").WithContext(ctx).OrderByChild("messages")
-	if q.(*queryImpl).Ctx != ctx {
-		t.Errorf("Ctx = %v; want %v", q.(*queryImpl).Ctx, ctx)
+	if q.ctx != ctx {
+		t.Errorf("Ctx = %v; want %v", q.ctx, ctx)
 	}
 
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
@@ -81,8 +81,8 @@ func TestQueryWithContextPrecedence(t *testing.T) {
 
 	r := client.NewRef("peter").WithContext(ctx1)
 	q := r.OrderByChild("messages").WithContext(ctx2)
-	if q.(*queryImpl).Ctx != ctx2 {
-		t.Errorf("Ctx = %v; want %v", q.(*queryImpl).Ctx, ctx2)
+	if q.ctx != ctx2 {
+		t.Errorf("Ctx = %v; want %v", q.ctx, ctx2)
 	}
 
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
@@ -120,18 +120,26 @@ func TestChildQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").Get(&got); err != nil {
-		t.Fatal(err)
+	cases := []string{
+		"messages", "messages/", "/messages",
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
+	var reqs []*testReq
+	for _, tc := range cases {
+		var got map[string]interface{}
+		if err := testref.OrderByChild(tc).Get(&got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(want, got) {
+			t.Errorf("Get() = %v; want = %v", got, want)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": "\"messages\""},
+		})
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "GET",
-		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"messages\""},
-	})
+
+	checkAllRequests(t, mock.Reqs, reqs)
 }
 
 func TestNestedChildQuery(t *testing.T) {
@@ -160,13 +168,9 @@ func TestChildQueryWithParams(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	opts := []QueryOption{
-		WithStartAt("m4"),
-		WithEndAt("m50"),
-		WithLimitToFirst(10),
-	}
+	q := testref.OrderByChild("messages").WithStartAt("m4").WithEndAt("m50").WithLimitToFirst(10)
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", opts...).Get(&got); err != nil {
+	if err := q.Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -191,7 +195,8 @@ func TestInvalidOrderByChild(t *testing.T) {
 
 	r := client.NewRef("/")
 	cases := []string{
-		"foo$", "foo.", "foo#", "foo]", "foo[",
+		"", "/", "foo$", "foo.", "foo#", "foo]",
+		"foo[", "$key", "$value", "$priority",
 	}
 	for _, tc := range cases {
 		var got string
@@ -251,7 +256,7 @@ func TestLimitFirstQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", WithLimitToFirst(10)).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithLimitToFirst(10).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -271,7 +276,7 @@ func TestLimitLastQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", WithLimitToLast(10)).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithLimitToLast(10).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -290,13 +295,20 @@ func TestInvalidLimitQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got map[string]interface{}
-	q := testref.OrderByChild("messages", WithLimitToFirst(10), WithLimitToLast(10))
-	if err := q.Get(&got); got != nil || err == nil {
-		t.Errorf("Get() = (%v, %v); want = (nil, error)", got, err)
+	q := testref.OrderByChild("messages")
+	cases := []*Query{
+		q.WithLimitToFirst(10).WithLimitToLast(10),
+		q.WithLimitToFirst(-10),
+		q.WithLimitToLast(-10),
 	}
-	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+	for _, tc := range cases {
+		var got map[string]interface{}
+		if err := tc.Get(&got); got != nil || err == nil {
+			t.Errorf("Get() = (%v, %v); want = (nil, error)", got, err)
+		}
+		if len(mock.Reqs) != 0 {
+			t.Errorf("Requests: %v; want: empty", mock.Reqs)
+		}
 	}
 }
 
@@ -307,7 +319,7 @@ func TestStartAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", WithStartAt(10)).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithStartAt(10).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -327,7 +339,7 @@ func TestEndAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", WithEndAt(10)).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithEndAt(10).Get(&got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -340,13 +352,56 @@ func TestEndAtQuery(t *testing.T) {
 	})
 }
 
+func TestEqualToQuery(t *testing.T) {
+	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got map[string]interface{}
+	if err := testref.OrderByChild("messages").WithEqualTo(10).Get(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"equalTo": "10", "orderBy": "\"messages\""},
+	})
+}
+
+func TestInvalidFilterQuery(t *testing.T) {
+	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	q := testref.OrderByChild("messages")
+	cases := []*Query{
+		q.WithStartAt(func() {}),
+		q.WithEndAt(func() {}),
+		q.WithEqualTo(func() {}),
+	}
+	for _, tc := range cases {
+		var got map[string]interface{}
+		if err := tc.Get(&got); got != nil || err == nil {
+			t.Errorf("Get() = (%v, %v); want = (nil, error)", got, err)
+		}
+		if len(mock.Reqs) != 0 {
+			t.Errorf("Requests: %v; want: empty", mock.Reqs)
+		}
+	}
+}
+
 func TestAllParamsQuery(t *testing.T) {
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
 	mock := &mockServer{Resp: want}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q := testref.OrderByChild("messages", WithLimitToFirst(100), WithStartAt("bar"), WithEndAt("foo"))
+	q := testref.OrderByChild("messages").WithLimitToFirst(100).WithStartAt("bar").WithEndAt("foo")
 	var got map[string]interface{}
 	if err := q.Get(&got); err != nil {
 		t.Fatal(err)
@@ -363,25 +418,5 @@ func TestAllParamsQuery(t *testing.T) {
 			"endAt":        "\"foo\"",
 			"orderBy":      "\"messages\"",
 		},
-	})
-}
-
-func TestEqualToQuery(t *testing.T) {
-	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
-	mock := &mockServer{Resp: want}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	var got map[string]interface{}
-	if err := testref.OrderByChild("messages", WithEqualTo(10)).Get(&got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
-	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "GET",
-		Path:   "/peter.json",
-		Query:  map[string]string{"equalTo": "10", "orderBy": "\"messages\""},
 	})
 }

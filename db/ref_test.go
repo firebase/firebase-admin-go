@@ -1,12 +1,55 @@
 package db
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 
 	"golang.org/x/net/context"
 )
+
+type refOp func(r *Ref) error
+
+var testOps = []refOp{
+	func(r *Ref) error {
+		var got string
+		return r.Get(&got)
+	},
+	func(r *Ref) error {
+		var got string
+		_, err := r.GetWithETag(&got)
+		return err
+	},
+	func(r *Ref) error {
+		var got string
+		_, _, err := r.GetIfChanged("etag", &got)
+		return err
+	},
+	func(r *Ref) error {
+		return r.Set("foo")
+	},
+	func(r *Ref) error {
+		_, err := r.SetIfUnchanged("etag", "foo")
+		return err
+	},
+	func(r *Ref) error {
+		_, err := r.Push("foo")
+		return err
+	},
+	func(r *Ref) error {
+		return r.Update(map[string]interface{}{"foo": "bar"})
+	},
+	func(r *Ref) error {
+		return r.Delete()
+	},
+	func(r *Ref) error {
+		fn := func(v interface{}) (interface{}, error) {
+			return v, nil
+		}
+		return r.Transaction(fn)
+	},
+}
 
 func TestRefWithContext(t *testing.T) {
 	r := client.NewRef("peter")
@@ -53,6 +96,19 @@ func TestGet(t *testing.T) {
 	}
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Get() = %v; want = %v", got, want)
+	}
+	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+}
+
+func TestInvalidGet(t *testing.T) {
+	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
+	mock := &mockServer{Resp: want}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	got := func() {}
+	if err := testref.Get(&got); err == nil {
+		t.Errorf("Get() = nil; want error")
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
 }
@@ -160,13 +216,17 @@ func TestWerlformedHttpError(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got person
-	err := testref.Get(&got)
 	want := "http error status: 500; reason: test error"
-	if err == nil || err.Error() != want {
-		t.Errorf("Get() = %v; want = %v", err, want)
+	for _, tc := range testOps {
+		err := tc(testref)
+		if err == nil || err.Error() != want {
+			t.Errorf("Get() = %v; want = %v", err, want)
+		}
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+
+	if len(mock.Reqs) != len(testOps) {
+		t.Errorf("Requests = %d; want = %d", len(mock.Reqs), len(testOps))
+	}
 }
 
 func TestUnexpectedHttpError(t *testing.T) {
@@ -174,13 +234,63 @@ func TestUnexpectedHttpError(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got person
-	err := testref.Get(&got)
 	want := "http error status: 500; message: \"unexpected error\""
-	if err == nil || err.Error() != want {
-		t.Errorf("Get() = %v; want = %v", err, want)
+	for _, tc := range testOps {
+		err := tc(testref)
+		if err == nil || err.Error() != want {
+			t.Errorf("Get() = %v; want = %v", err, want)
+		}
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+
+	if len(mock.Reqs) != len(testOps) {
+		t.Errorf("Requests = %d; want = %d", len(mock.Reqs), len(testOps))
+	}
+}
+
+func TestInvalidPath(t *testing.T) {
+	mock := &mockServer{Resp: "test"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []string{
+		"foo$", "foo.", "foo#", "foo]", "foo[",
+	}
+	for _, tc := range cases {
+		r := client.NewRef(tc)
+		for _, op := range testOps {
+			err := op(r)
+			if err == nil {
+				t.Errorf("Get() = nil; want = error")
+			}
+		}
+	}
+
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+	}
+}
+
+func TestInvalidChildPath(t *testing.T) {
+	mock := &mockServer{Resp: "test"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []string{
+		"foo$", "foo.", "foo#", "foo]", "foo[",
+	}
+	for _, tc := range cases {
+		r := testref.Child(tc)
+		for _, op := range testOps {
+			err := op(r)
+			if err == nil {
+				t.Errorf("Get() = nil; want = error")
+			}
+		}
+	}
+
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+	}
 }
 
 func TestSet(t *testing.T) {
@@ -188,33 +298,45 @@ func TestSet(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	if err := testref.Set(want); err != nil {
-		t.Fatal(err)
+	cases := []interface{}{
+		1,
+		true,
+		"foo",
+		map[string]interface{}{"name": "Peter Parker", "age": float64(17)},
+		&person{"Peter Parker", 17},
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "PUT",
-		Path:   "/peter.json",
-		Body:   serialize(want),
-		Query:  map[string]string{"print": "silent"},
-	})
+	var want []*testReq
+	for _, tc := range cases {
+		if err := testref.Set(tc); err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, &testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body:   serialize(tc),
+			Query:  map[string]string{"print": "silent"},
+		})
+	}
+	checkAllRequests(t, mock.Reqs, want)
 }
 
-func TestSetWithStruct(t *testing.T) {
+func TestInvalidSet(t *testing.T) {
 	mock := &mockServer{}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	want := &person{"Peter Parker", 17}
-	if err := testref.Set(&want); err != nil {
-		t.Fatal(err)
+	cases := []interface{}{
+		func() {},
+		make(chan int),
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "PUT",
-		Path:   "/peter.json",
-		Body:   serialize(want),
-		Query:  map[string]string{"print": "silent"},
-	})
+	for _, tc := range cases {
+		if err := testref.Set(tc); err == nil {
+			t.Errorf("Set() = nil; want error")
+		}
+	}
+	if len(mock.Reqs) != 0 {
+		t.Errorf("Requests = %v; want = empty", mock.Reqs)
+	}
 }
 
 func TestSetIfUnchanged(t *testing.T) {
@@ -416,6 +538,53 @@ func TestTransactionRetry(t *testing.T) {
 				"age":  20,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag2"}},
+		},
+	})
+}
+
+func TestTransactionError(t *testing.T) {
+	mock := &mockServer{
+		Resp:   &person{"Peter Parker", 17},
+		Header: map[string]string{"ETag": "mock-etag1"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cnt := 0
+	want := "user error"
+	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+		if cnt == 0 {
+			mock.Status = http.StatusPreconditionFailed
+			mock.Header = map[string]string{"ETag": "mock-etag2"}
+			mock.Resp = &person{"Peter Parker", 19}
+		} else if cnt == 1 {
+			return nil, fmt.Errorf(want)
+		}
+		cnt++
+		p := i.(map[string]interface{})
+		p["age"] = p["age"].(float64) + 1.0
+		return p, nil
+	}
+	if err := testref.Transaction(fn); err == nil || err.Error() != want {
+		t.Errorf("Transaction() = %v; want = %q", err, want)
+	}
+	if cnt != 1 {
+		t.Errorf("Retry Count = %d; want = %d", cnt, 1)
+	}
+	checkAllRequests(t, mock.Reqs, []*testReq{
+		&testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+		},
+		&testReq{
+			Method: "PUT",
+			Path:   "/peter.json",
+			Body: serialize(map[string]interface{}{
+				"name": "Peter Parker",
+				"age":  18,
+			}),
+			Header: http.Header{"If-Match": []string{"mock-etag1"}},
 		},
 	})
 }

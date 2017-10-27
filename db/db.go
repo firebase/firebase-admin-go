@@ -49,7 +49,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return nil, err
 	}
 
-	p, err := url.Parse(c.URL)
+	p, err := url.ParseRequestURI(c.URL)
 	if err != nil {
 		return nil, err
 	} else if p.Scheme != "https" {

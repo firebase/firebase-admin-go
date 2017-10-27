@@ -586,9 +586,8 @@ func TestReadWriteAccess(t *testing.T) {
 
 func TestQueryAccess(t *testing.T) {
 	r := aoClient.NewRef("_adminsdk/go/protected")
-	q := r.OrderByKey(db.WithLimitToFirst(2))
 	got := make(map[string]interface{})
-	if err := q.Get(&got); err == nil {
+	if err := r.OrderByKey().WithLimitToFirst(2).Get(&got); err == nil {
 		t.Errorf("OrderByQuery() = nil; want = error")
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)

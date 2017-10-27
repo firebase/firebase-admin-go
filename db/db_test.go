@@ -120,7 +120,7 @@ func TestNewClientAuthOverrides(t *testing.T) {
 	}
 }
 
-func TestNewClientError(t *testing.T) {
+func TestInvalidURL(t *testing.T) {
 	cases := []string{
 		"",
 		"foo",
@@ -135,6 +135,17 @@ func TestNewClientError(t *testing.T) {
 		if c != nil || err == nil {
 			t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)
 		}
+	}
+}
+
+func TestInvalidAuthOverride(t *testing.T) {
+	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+		Opts: testOpts,
+		URL:  testURL,
+		AO:   map[string]interface{}{"uid": func() {}},
+	})
+	if c != nil || err == nil {
+		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)
 	}
 }
 
@@ -230,48 +241,6 @@ func TestChild(t *testing.T) {
 		if c.Parent().Path != tc.Parent {
 			t.Errorf("Child().Parent() = %q; want = %q", c.Parent().Path, tc.Parent)
 		}
-	}
-}
-
-func TestInvalidPath(t *testing.T) {
-	mock := &mockServer{Resp: "test"}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	cases := []string{
-		"foo$", "foo.", "foo#", "foo]", "foo[",
-	}
-	for _, tc := range cases {
-		r := client.NewRef(tc)
-		var got string
-		if err := r.Get(&got); got != "" || err == nil {
-			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
-		}
-	}
-
-	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests: %v; want: empty", mock.Reqs)
-	}
-}
-
-func TestInvalidChildPath(t *testing.T) {
-	mock := &mockServer{Resp: "test"}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	cases := []string{
-		"foo$", "foo.", "foo#", "foo]", "foo[",
-	}
-	r := client.NewRef("test")
-	for _, tc := range cases {
-		var got string
-		if err := r.Child(tc).Get(&got); got != "" || err == nil {
-			t.Errorf("Get() = (%q, %v); want = (%q, error)", got, err, "")
-		}
-	}
-
-	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests: %v; want: empty", mock.Reqs)
 	}
 }
 
