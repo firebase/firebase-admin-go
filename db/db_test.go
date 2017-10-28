@@ -1,3 +1,17 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package db
 
 import (
@@ -80,13 +94,13 @@ func TestNewClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.url != testURL {
-		t.Errorf("BaseURL = %q; want: %q", c.url, testURL)
+		t.Errorf("NewClient().url = %q; want = %q", c.url, testURL)
 	}
 	if c.hc == nil {
-		t.Errorf("http.Client = nil; want non-nil")
+		t.Errorf("NewClient().hc = nil; want non-nil")
 	}
 	if c.ao != "" {
-		t.Errorf("AuthOverrides = %q; want %q", c.ao, "")
+		t.Errorf("NewClient().ao = %q; want = %q", c.ao, "")
 	}
 }
 
@@ -105,17 +119,17 @@ func TestNewClientAuthOverrides(t *testing.T) {
 			t.Fatal(err)
 		}
 		if c.url != testURL {
-			t.Errorf("BaseURL = %q; want: %q", c.url, testURL)
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
 		}
 		if c.hc == nil {
-			t.Errorf("http.Client = nil; want non-nil")
+			t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
 		}
 		b, err := json.Marshal(tc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if c.ao != string(b) {
-			t.Errorf("AuthOverrides = %q; want %q", c.ao, string(b))
+			t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.ao, string(b))
 		}
 	}
 }
@@ -133,7 +147,7 @@ func TestInvalidURL(t *testing.T) {
 			URL:  tc,
 		})
 		if c != nil || err == nil {
-			t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)
+			t.Errorf("NewClient(%q) = (%v, %v); want = (nil, error)", tc, c, err)
 		}
 	}
 }
@@ -166,16 +180,16 @@ func TestNewRef(t *testing.T) {
 	for _, tc := range cases {
 		r := client.NewRef(tc.Path)
 		if r.client == nil {
-			t.Errorf("Client = nil; want = %v", r.client)
+			t.Errorf("NewRef(%q).client = nil; want = %v", tc.Path, r.client)
 		}
 		if r.ctx != nil {
-			t.Errorf("Ctx = %v; want nil", r.ctx)
+			t.Errorf("NewRef(%q).ctx = %v; want nil", tc.Path, r.ctx)
 		}
 		if r.Path != tc.WantPath {
-			t.Errorf("Path = %q; want = %q", r.Path, tc.WantPath)
+			t.Errorf("NewRef(%q).Path = %q; want = %q", tc.Path, r.Path, tc.WantPath)
 		}
 		if r.Key != tc.WantKey {
-			t.Errorf("Key = %q; want = %q", r.Key, tc.WantKey)
+			t.Errorf("NewRef(%q).Key = %q; want = %q", tc.Path, r.Key, tc.WantKey)
 		}
 	}
 }
@@ -198,16 +212,16 @@ func TestParent(t *testing.T) {
 		r := client.NewRef(tc.Path).Parent()
 		if tc.HasParent {
 			if r == nil {
-				t.Fatalf("Parent = nil; want = %q", tc.Want)
+				t.Fatalf("Parent(%q) = nil; want = Ref(%q)", tc.Path, tc.Want)
 			}
 			if r.client == nil {
-				t.Errorf("Client = nil; want = %v", client)
+				t.Errorf("Parent(%q).client = nil; want = %v", tc.Path, client)
 			}
 			if r.Key != tc.Want {
-				t.Errorf("Key = %q; want = %q", r.Key, tc.Want)
+				t.Errorf("Parent(%q).Key = %q; want = %q", tc.Path, r.Key, tc.Want)
 			}
 		} else if r != nil {
-			t.Fatalf("Parent = %v; want = nil", r)
+			t.Fatalf("Parent(%q) = %v; want = nil", tc.Path, r)
 		}
 	}
 }
@@ -239,7 +253,7 @@ func TestChild(t *testing.T) {
 			t.Errorf("Child(%q) = %q; want = %q", tc.Path, c.Path, tc.Want)
 		}
 		if c.Parent().Path != tc.Parent {
-			t.Errorf("Child().Parent() = %q; want = %q", c.Parent().Path, tc.Parent)
+			t.Errorf("Child(%q).Parent() = %q; want = %q", tc.Path, c.Parent().Path, tc.Parent)
 		}
 	}
 }

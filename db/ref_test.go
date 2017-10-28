@@ -1,3 +1,17 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package db
 
 import (
@@ -60,7 +74,7 @@ func TestRefWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	r = r.WithContext(ctx)
 	if r.ctx != ctx {
-		t.Errorf("Ctx = %v; want %v", r.ctx, ctx)
+		t.Errorf("WithContext().Ctx = %v; want = %v", r.ctx, ctx)
 	}
 
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
@@ -73,14 +87,14 @@ func TestRefWithContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
+		t.Errorf("WithContext().Get() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
 
 	cancel()
 	got = nil
 	if err := r.Get(&got); len(got) != 0 || err == nil {
-		t.Errorf("Get() = (%v, %v); want = (empty, error)", got, err)
+		t.Errorf("WithContext().Get() = (%v, %v); want = (empty, error)", got, err)
 	}
 }
 
@@ -108,7 +122,7 @@ func TestInvalidGet(t *testing.T) {
 
 	got := func() {}
 	if err := testref.Get(&got); err == nil {
-		t.Errorf("Get() = nil; want error")
+		t.Errorf("Get(func) = nil; want error")
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
 }
@@ -124,7 +138,7 @@ func TestGetWithStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want != got {
-		t.Errorf("Get() = %v; want = %v", got, want)
+		t.Errorf("Get(struct) = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
 }
@@ -144,10 +158,10 @@ func TestGetWithETag(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
+		t.Errorf("GetWithETag() = %v; want = %v", got, want)
 	}
 	if etag != "mock-etag" {
-		t.Errorf("ETag = %q; want = %q", etag, "mock-etag")
+		t.Errorf("GetWithETag() = %q; want = %q", etag, "mock-etag")
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -171,13 +185,13 @@ func TestGetIfChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !ok {
-		t.Errorf("Get() = %v; want = %v", ok, true)
+		t.Errorf("GetIfChanged() = %v; want = %v", ok, true)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
+		t.Errorf("GetIfChanged() = %v; want = %v", got, want)
 	}
 	if etag != "new-etag" {
-		t.Errorf("ETag = %q; want = %q", etag, "new-etag")
+		t.Errorf("GetIfChanged() = %q; want = %q", etag, "new-etag")
 	}
 
 	mock.Status = http.StatusNotModified
@@ -188,13 +202,13 @@ func TestGetIfChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ok {
-		t.Errorf("Get() = %v; want = %v", ok, false)
+		t.Errorf("GetIfChanged() = %v; want = %v", ok, false)
 	}
 	if got2 != nil {
-		t.Errorf("Get() = %v; want nil", got2)
+		t.Errorf("GetIfChanged() = %v; want nil", got2)
 	}
 	if etag != "new-etag" {
-		t.Errorf("ETag = %q; want = %q", etag, "new-etag")
+		t.Errorf("GetIfChanged() = %q; want = %q", etag, "new-etag")
 	}
 
 	checkAllRequests(t, mock.Reqs, []*testReq{
@@ -331,11 +345,11 @@ func TestInvalidSet(t *testing.T) {
 	}
 	for _, tc := range cases {
 		if err := testref.Set(tc); err == nil {
-			t.Errorf("Set() = nil; want error")
+			t.Errorf("Set(%v) = nil; want error", tc)
 		}
 	}
 	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests = %v; want = empty", mock.Reqs)
+		t.Errorf("Set() = %v; want = empty", mock.Reqs)
 	}
 }
 
@@ -443,13 +457,15 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestInvalidUpdate(t *testing.T) {
-	if err := testref.Update(nil); err == nil {
-		t.Errorf("Update(nil) = nil; want error")
+	cases := []map[string]interface{}{
+		nil,
+		make(map[string]interface{}),
+		map[string]interface{}{"foo": func() {}},
 	}
-
-	m := make(map[string]interface{})
-	if err := testref.Update(m); err == nil {
-		t.Errorf("Update(map{}) = nil; want error")
+	for _, tc := range cases {
+		if err := testref.Update(tc); err == nil {
+			t.Errorf("Update(%v) = nil; want error", tc)
+		}
 	}
 }
 
@@ -513,7 +529,7 @@ func TestTransactionRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	if cnt != 2 {
-		t.Errorf("Retry Count = %d; want = %d", cnt, 2)
+		t.Errorf("Transaction() retries = %d; want = %d", cnt, 2)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
 		&testReq{
@@ -569,7 +585,7 @@ func TestTransactionError(t *testing.T) {
 		t.Errorf("Transaction() = %v; want = %q", err, want)
 	}
 	if cnt != 1 {
-		t.Errorf("Retry Count = %d; want = %d", cnt, 1)
+		t.Errorf("Transaction() retries = %d; want = %d", cnt, 1)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
 		&testReq{
