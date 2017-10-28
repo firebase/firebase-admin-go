@@ -24,6 +24,14 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Query represents a complex query that can be executed on a Ref.
+//
+// Complex queries can consist of up to 2 components: a required ordering constraint, and an
+// optional filtering constraint. At the server, data is first sorted according to the given
+// ordering constraint (e.g. order by child). Then the filtering constraint (e.g. limit, range) is
+// applied on the sorted data to produce the final result. Despite the ordering constraint, the
+// final result is returned by the server as an unordered collection. Therefore the values read
+// from a Query instance are not ordered.
 type Query struct {
 	ctx                 context.Context
 	client              *Client
@@ -33,6 +41,9 @@ type Query struct {
 	start, end, equalTo interface{}
 }
 
+// WithStartAt returns a shallow copy of the Query with v set as a lower bound of a range query.
+//
+// The resulting Query will only return child nodes with a value greater than or equal to v.
 func (q *Query) WithStartAt(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
@@ -40,6 +51,9 @@ func (q *Query) WithStartAt(v interface{}) *Query {
 	return q2
 }
 
+// WithEndAt returns a shallow copy of the Query with v set as a upper bound of a range query.
+//
+// The resulting Query will only return child nodes with a value less than or equal to v.
 func (q *Query) WithEndAt(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
@@ -47,6 +61,9 @@ func (q *Query) WithEndAt(v interface{}) *Query {
 	return q2
 }
 
+// WithEqualTo returns a shallow copy of the Query with v set as an equals constraint.
+//
+// The resulting Query will only return child nodes whose values equal to v.
 func (q *Query) WithEqualTo(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
@@ -54,20 +71,27 @@ func (q *Query) WithEqualTo(v interface{}) *Query {
 	return q2
 }
 
-func (q *Query) WithLimitToFirst(lim int) *Query {
+// WithLimitToFirst returns a shallow copy of the Query, which is anchored to the first n
+// elements of the window.
+func (q *Query) WithLimitToFirst(n int) *Query {
 	q2 := new(Query)
 	*q2 = *q
-	q2.limFirst = lim
+	q2.limFirst = n
 	return q2
 }
 
-func (q *Query) WithLimitToLast(lim int) *Query {
+// WithLimitToLast returns a shallow copy of the Query, which is anchored to the last n
+// elements of the window.
+func (q *Query) WithLimitToLast(n int) *Query {
 	q2 := new(Query)
 	*q2 = *q
-	q2.limLast = lim
+	q2.limLast = n
 	return q2
 }
 
+// WithContext returns a shallow copy of this Query with its context changed to ctx.
+//
+// The resulting Query will use ctx for all subsequent RPC calls.
 func (q *Query) WithContext(ctx context.Context) *Query {
 	q2 := new(Query)
 	*q2 = *q
@@ -75,6 +99,9 @@ func (q *Query) WithContext(ctx context.Context) *Query {
 	return q2
 }
 
+// Get executes the Query and populates v with the results.
+//
+// Results will not be stored in any particular order in v.
 func (q *Query) Get(v interface{}) error {
 	qp := make(map[string]string)
 	ob, err := q.ob.encode()
@@ -119,14 +146,29 @@ func (q *Query) Get(v interface{}) error {
 	return resp.CheckAndParse(http.StatusOK, v)
 }
 
+// OrderByChild returns a Query that orders data by child values before applying filters.
+//
+// Returned Query can be used to set additional parameters, and execute complex database queries
+// (e.g. limit queries, range queries). If r has a context associated with it, the resulting Query
+// will inherit it.
 func (r *Ref) OrderByChild(child string) *Query {
 	return newQuery(r, orderByChild(child))
 }
 
+// OrderByKey returns a Query that orders data by key before applying filters.
+//
+// Returned Query can be used to set additional parameters, and execute complex database queries
+// (e.g. limit queries, range queries). If r has a context associated with it, the resulting Query
+// will inherit it.
 func (r *Ref) OrderByKey() *Query {
 	return newQuery(r, orderByProperty("$key"))
 }
 
+// OrderByValue returns a Query that orders data by value before applying filters.
+//
+// Returned Query can be used to set additional parameters, and execute complex database queries
+// (e.g. limit queries, range queries). If r has a context associated with it, the resulting Query
+// will inherit it.
 func (r *Ref) OrderByValue() *Query {
 	return newQuery(r, orderByProperty("$value"))
 }
