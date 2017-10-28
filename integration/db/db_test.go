@@ -89,7 +89,7 @@ func initOverrideClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
 		DatabaseURL: fmt.Sprintf("https://%s.firebaseio.com", pid),
-		AuthOverrides: &db.AuthOverrides{
+		AuthOverride: &db.AuthOverride{
 			Map: map[string]interface{}{"uid": "user1"},
 		},
 	})
@@ -103,8 +103,8 @@ func initOverrideClient(pid string) (*db.Client, error) {
 func initGuestClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL:   fmt.Sprintf("https://%s.firebaseio.com", pid),
-		AuthOverrides: &db.AuthOverrides{},
+		DatabaseURL:  fmt.Sprintf("https://%s.firebaseio.com", pid),
+		AuthOverride: &db.AuthOverride{},
 	})
 	if err != nil {
 		return nil, err

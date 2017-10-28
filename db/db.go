@@ -40,6 +40,10 @@ type Client struct {
 	ao  string
 }
 
+// NewClient creates a new instance of the Firebase Database Client.
+//
+// This function can only be invoked from within the SDK. Client applications should access the
+// Database service through firebase.App.
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
 	opts := append([]option.ClientOption{}, c.Opts...)
 	ua := fmt.Sprintf(userAgentFormat, c.Version, runtime.Version())
@@ -73,10 +77,21 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	}, nil
 }
 
-type AuthOverrides struct {
+// AuthOverride regulates how Firebase security rules are enforced on database invocations.
+//
+// By default, the database calls made by the Admin SDK have administrative privileges, thereby
+// allowing them to completely bypass all Firebase security rules. This behavior can be overridden
+// by setting an AuthOverride. When specified, the AuthOverride value will become visible to the
+// database server during security rule evaluation. Specifically, this value will be accessible
+// via the auth variable of the security rules.
+//
+// Refer to https://firebase.google.com/docs/database/admin/start#authenticate-with-limited-privileges
+// for more details and code samples.
+type AuthOverride struct {
 	Map map[string]interface{}
 }
 
+// NewRef returns a new database reference representing the node at the specified path.
 func (c *Client) NewRef(path string) *Ref {
 	segs := parsePath(path)
 	key := ""

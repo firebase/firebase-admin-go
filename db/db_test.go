@@ -265,9 +265,10 @@ func checkOnlyRequest(t *testing.T, got []*testReq, want *testReq) {
 func checkAllRequests(t *testing.T, got []*testReq, want []*testReq) {
 	if len(got) != len(want) {
 		t.Errorf("Request Count = %d; want = %d", len(got), len(want))
-	}
-	for i, r := range got {
-		checkRequest(t, r, want[i])
+	} else {
+		for i, r := range got {
+			checkRequest(t, r, want[i])
+		}
 	}
 }
 

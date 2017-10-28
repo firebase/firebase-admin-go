@@ -22,6 +22,9 @@ import (
 	"golang.org/x/net/context"
 )
 
+const txnRetries = 25
+
+// Ref represents a node in the Firebase Realtime Database.
 type Ref struct {
 	Key  string
 	Path string
@@ -31,6 +34,9 @@ type Ref struct {
 	ctx    context.Context
 }
 
+// Parent returns a reference to the parent of the current node.
+//
+// If the current reference points to the root of the database, Parent returns nil.
 func (r *Ref) Parent() *Ref {
 	l := len(r.segs)
 	if l > 0 {
@@ -40,11 +46,18 @@ func (r *Ref) Parent() *Ref {
 	return nil
 }
 
+// Child returns a reference to the specified child node.
 func (r *Ref) Child(path string) *Ref {
 	fp := fmt.Sprintf("%s/%s", r.Path, path)
 	return r.client.NewRef(fp)
 }
 
+// Get retrieves the value at the current database location, and stores it in the value pointed to
+// by v.
+//
+// Data deserialization is performed using https://golang.org/pkg/encoding/json/#Unmarshal, and
+// therefore v has the same requirements as the json package. Specifically, it must be a pointer,
+// and it must not be nil.
 func (r *Ref) Get(v interface{}) error {
 	resp, err := r.send("GET")
 	if err != nil {
@@ -53,6 +66,9 @@ func (r *Ref) Get(v interface{}) error {
 	return resp.CheckAndParse(http.StatusOK, v)
 }
 
+// WithContext returns a shallow copy of this Ref with its context changed to ctx.
+//
+// The resulting Ref will use ctx for all subsequent RPC calls.
 func (r *Ref) WithContext(ctx context.Context) *Ref {
 	r2 := new(Ref)
 	*r2 = *r
@@ -60,6 +76,7 @@ func (r *Ref) WithContext(ctx context.Context) *Ref {
 	return r2
 }
 
+// GetWithETag retrieves the value at the current database location, along with its ETag.
 func (r *Ref) GetWithETag(v interface{}) (string, error) {
 	resp, err := r.send("GET", withHeader("X-Firebase-ETag", "true"))
 	if err != nil {
@@ -70,6 +87,13 @@ func (r *Ref) GetWithETag(v interface{}) (string, error) {
 	return resp.Header.Get("Etag"), nil
 }
 
+// GetIfChanged retrieves the value and ETag of the current database location only if the specified
+// ETag does not match.
+//
+// If the specified ETag does not match, returns true along with the latest ETag of the database
+// location. The value of the database location will be stored in v just like a regular Get() call.
+// If the etag matches, returns false along with the same ETag passed into the function. No data
+// will be stored in v in this case.
 func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
 	resp, err := r.send("GET", withHeader("If-None-Match", etag))
 	if err != nil {
@@ -82,6 +106,11 @@ func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
 	return false, etag, nil
 }
 
+// Set stores the value v in the current database node.
+//
+// Set uses https://golang.org/pkg/encoding/json/#Marshal to serialize values into JSON. Therefore
+// v has the same requirements as the json package. Values like functions and channels cannot be
+// saved into Realtime Database.
 func (r *Ref) Set(v interface{}) error {
 	resp, err := r.sendWithBody("PUT", v, withQueryParam("print", "silent"))
 	if err != nil {
@@ -90,6 +119,10 @@ func (r *Ref) Set(v interface{}) error {
 	return resp.CheckStatus(http.StatusNoContent)
 }
 
+// SetIfUnchanged conditionally sets the data at this location to the given value.
+//
+// Sets the data at this location to v only if the specified ETag matches. Returns true if the
+// value is written. Returns false if no changes are made to the database.
 func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
 	resp, err := r.sendWithBody("PUT", v, withHeader("If-Match", etag))
 	if err != nil {
@@ -102,6 +135,10 @@ func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
 	return false, nil
 }
 
+// Push creates a new child node at the current location, and returns a reference to it.
+//
+// If v is not nil, it will be set as the initial value of the new child node. If v is nil, the
+// new child node will be created with empty string as the value.
 func (r *Ref) Push(v interface{}) (*Ref, error) {
 	if v == nil {
 		v = ""
@@ -119,6 +156,7 @@ func (r *Ref) Push(v interface{}) (*Ref, error) {
 	return r.Child(d.Name), nil
 }
 
+// Update modifies the specified child keys of the current location to the provided values.
 func (r *Ref) Update(v map[string]interface{}) error {
 	if len(v) == 0 {
 		return fmt.Errorf("value argument must be a non-empty map")
@@ -132,6 +170,20 @@ func (r *Ref) Update(v map[string]interface{}) error {
 
 type UpdateFn func(interface{}) (interface{}, error)
 
+// Transaction atomically modifies the data at this location.
+//
+// Unlike a normal Set(), which just overwrites the data regardless of its previous state,
+// Transaction() is used to modify the existing value to a new value, ensuring there are no
+// conflicts with other clients simultaneously writing to the same location.
+//
+// This is accomplished by passing an update function which is used to transform the current value
+// of this reference into a new value. If another client writes to this location before the new
+// value is successfully saved, the update function is called again with the new current value, and
+// the write will be retried. In case of repeated failures, this method will retry the transaction up
+// to 25 times before giving up and returning an error.
+//
+// The update function may also force an early abort by returning an error instead of returning a
+// value.
 func (r *Ref) Transaction(fn UpdateFn) error {
 	var curr interface{}
 	etag, err := r.GetWithETag(&curr)
@@ -139,7 +191,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 		return err
 	}
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < txnRetries; i++ {
 		new, err := fn(curr)
 		if err != nil {
 			return err
@@ -157,6 +209,7 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 	return fmt.Errorf("transaction aborted after failed retries")
 }
 
+// Delete removes this node from the database.
 func (r *Ref) Delete() error {
 	resp, err := r.send("DELETE")
 	if err != nil {

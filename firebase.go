@@ -46,7 +46,7 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	AuthOverrides *db.AuthOverrides
+	AuthOverride  *db.AuthOverride
 	DatabaseURL   string
 	ProjectID     string
 	StorageBucket string
@@ -110,8 +110,8 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}
 
 	ao := make(map[string]interface{})
-	if config.AuthOverrides != nil {
-		ao = config.AuthOverrides.Map
+	if config.AuthOverride != nil {
+		ao = config.AuthOverride.Map
 	}
 
 	return &App{

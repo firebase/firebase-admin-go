@@ -25,43 +25,73 @@ import (
 
 type refOp func(r *Ref) error
 
-var testOps = []refOp{
-	func(r *Ref) error {
-		var got string
-		return r.Get(&got)
+var testOps = []struct {
+	name string
+	op   refOp
+}{
+	{
+		"Get()",
+		func(r *Ref) error {
+			var got string
+			return r.Get(&got)
+		},
 	},
-	func(r *Ref) error {
-		var got string
-		_, err := r.GetWithETag(&got)
-		return err
+	{
+		"GetWithETag()",
+		func(r *Ref) error {
+			var got string
+			_, err := r.GetWithETag(&got)
+			return err
+		},
 	},
-	func(r *Ref) error {
-		var got string
-		_, _, err := r.GetIfChanged("etag", &got)
-		return err
+	{
+		"GetIfChanged()",
+		func(r *Ref) error {
+			var got string
+			_, _, err := r.GetIfChanged("etag", &got)
+			return err
+		},
 	},
-	func(r *Ref) error {
-		return r.Set("foo")
+	{
+		"Set()",
+		func(r *Ref) error {
+			return r.Set("foo")
+		},
 	},
-	func(r *Ref) error {
-		_, err := r.SetIfUnchanged("etag", "foo")
-		return err
+	{
+		"SetIfUnchanged()",
+		func(r *Ref) error {
+			_, err := r.SetIfUnchanged("etag", "foo")
+			return err
+		},
 	},
-	func(r *Ref) error {
-		_, err := r.Push("foo")
-		return err
+	{
+		"Push()",
+		func(r *Ref) error {
+			_, err := r.Push("foo")
+			return err
+		},
 	},
-	func(r *Ref) error {
-		return r.Update(map[string]interface{}{"foo": "bar"})
+	{
+		"Update()",
+		func(r *Ref) error {
+			return r.Update(map[string]interface{}{"foo": "bar"})
+		},
 	},
-	func(r *Ref) error {
-		return r.Delete()
+	{
+		"Delete()",
+		func(r *Ref) error {
+			return r.Delete()
+		},
 	},
-	func(r *Ref) error {
-		fn := func(v interface{}) (interface{}, error) {
-			return v, nil
-		}
-		return r.Transaction(fn)
+	{
+		"Transaction()",
+		func(r *Ref) error {
+			fn := func(v interface{}) (interface{}, error) {
+				return v, nil
+			}
+			return r.Transaction(fn)
+		},
 	},
 }
 
@@ -99,19 +129,27 @@ func TestRefWithContext(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	mock := &mockServer{Resp: want}
+	mock := &mockServer{}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got map[string]interface{}
-	if err := testref.Get(&got); err != nil {
-		t.Fatal(err)
+	cases := []interface{}{
+		nil, float64(1), true, "foo",
+		map[string]interface{}{"name": "Peter Parker", "age": float64(17)},
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Get() = %v; want = %v", got, want)
+	var want []*testReq
+	for _, tc := range cases {
+		mock.Resp = tc
+		var got interface{}
+		if err := testref.Get(&got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(tc, got) {
+			t.Errorf("Get() = %v; want = %v", got, tc)
+		}
+		want = append(want, &testReq{Method: "GET", Path: "/peter.json"})
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+	checkAllRequests(t, mock.Reqs, want)
 }
 
 func TestInvalidGet(t *testing.T) {
@@ -232,9 +270,9 @@ func TestWerlformedHttpError(t *testing.T) {
 
 	want := "http error status: 500; reason: test error"
 	for _, tc := range testOps {
-		err := tc(testref)
+		err := tc.op(testref)
 		if err == nil || err.Error() != want {
-			t.Errorf("Get() = %v; want = %v", err, want)
+			t.Errorf("%s = %v; want = %v", tc.name, err, want)
 		}
 	}
 
@@ -250,9 +288,9 @@ func TestUnexpectedHttpError(t *testing.T) {
 
 	want := "http error status: 500; message: \"unexpected error\""
 	for _, tc := range testOps {
-		err := tc(testref)
+		err := tc.op(testref)
 		if err == nil || err.Error() != want {
-			t.Errorf("Get() = %v; want = %v", err, want)
+			t.Errorf("%s = %v; want = %v", tc.name, err, want)
 		}
 	}
 
@@ -271,10 +309,10 @@ func TestInvalidPath(t *testing.T) {
 	}
 	for _, tc := range cases {
 		r := client.NewRef(tc)
-		for _, op := range testOps {
-			err := op(r)
+		for _, o := range testOps {
+			err := o.op(r)
 			if err == nil {
-				t.Errorf("Get() = nil; want = error")
+				t.Errorf("%s = nil; want = error", o.name)
 			}
 		}
 	}
@@ -294,10 +332,10 @@ func TestInvalidChildPath(t *testing.T) {
 	}
 	for _, tc := range cases {
 		r := testref.Child(tc)
-		for _, op := range testOps {
-			err := op(r)
+		for _, o := range testOps {
+			err := o.op(r)
 			if err == nil {
-				t.Errorf("Get() = nil; want = error")
+				t.Errorf("%s = nil; want = error", o.name)
 			}
 		}
 	}
@@ -635,7 +673,7 @@ func TestTransactionAbort(t *testing.T) {
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
 		},
 	}
-	for i := 0; i < 20; i++ {
+	for i := 0; i < txnRetries; i++ {
 		wanted = append(wanted, &testReq{
 			Method: "PUT",
 			Path:   "/peter.json",
