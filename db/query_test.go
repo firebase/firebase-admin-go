@@ -14,9 +14,10 @@
 package db
 
 import (
-	"context"
 	"reflect"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func TestQueryWithContext(t *testing.T) {

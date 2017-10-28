@@ -1,24 +1,20 @@
 package db
 
 import (
-	"context"
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"firebase.google.com/go"
-
-	"io/ioutil"
-
-	"encoding/json"
-
-	"reflect"
-
-	"bytes"
-
 	"firebase.google.com/go/db"
 	"firebase.google.com/go/integration/internal"
 )

@@ -27,10 +27,12 @@ type refOp func(r *Ref) error
 
 var testOps = []struct {
 	name string
+	resp interface{}
 	op   refOp
 }{
 	{
 		"Get()",
+		"test",
 		func(r *Ref) error {
 			var got string
 			return r.Get(&got)
@@ -38,6 +40,7 @@ var testOps = []struct {
 	},
 	{
 		"GetWithETag()",
+		"test",
 		func(r *Ref) error {
 			var got string
 			_, err := r.GetWithETag(&got)
@@ -46,6 +49,7 @@ var testOps = []struct {
 	},
 	{
 		"GetIfChanged()",
+		"test",
 		func(r *Ref) error {
 			var got string
 			_, _, err := r.GetIfChanged("etag", &got)
@@ -54,12 +58,14 @@ var testOps = []struct {
 	},
 	{
 		"Set()",
+		nil,
 		func(r *Ref) error {
 			return r.Set("foo")
 		},
 	},
 	{
 		"SetIfUnchanged()",
+		nil,
 		func(r *Ref) error {
 			_, err := r.SetIfUnchanged("etag", "foo")
 			return err
@@ -67,6 +73,7 @@ var testOps = []struct {
 	},
 	{
 		"Push()",
+		map[string]interface{}{"name": "test"},
 		func(r *Ref) error {
 			_, err := r.Push("foo")
 			return err
@@ -74,18 +81,21 @@ var testOps = []struct {
 	},
 	{
 		"Update()",
+		nil,
 		func(r *Ref) error {
 			return r.Update(map[string]interface{}{"foo": "bar"})
 		},
 	},
 	{
 		"Delete()",
+		nil,
 		func(r *Ref) error {
 			return r.Delete()
 		},
 	},
 	{
 		"Transaction()",
+		nil,
 		func(r *Ref) error {
 			fn := func(v interface{}) (interface{}, error) {
 				return v, nil
@@ -93,39 +103,6 @@ var testOps = []struct {
 			return r.Transaction(fn)
 		},
 	},
-}
-
-func TestRefWithContext(t *testing.T) {
-	r := client.NewRef("peter")
-	if r.ctx != nil {
-		t.Errorf("Ctx = %v; want nil", r.ctx)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	r = r.WithContext(ctx)
-	if r.ctx != ctx {
-		t.Errorf("WithContext().Ctx = %v; want = %v", r.ctx, ctx)
-	}
-
-	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	mock := &mockServer{Resp: want}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	var got map[string]interface{}
-	if err := r.Get(&got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("WithContext().Get() = %v; want = %v", got, want)
-	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
-
-	cancel()
-	got = nil
-	if err := r.Get(&got); len(got) != 0 || err == nil {
-		t.Errorf("WithContext().Get() = (%v, %v); want = (empty, error)", got, err)
-	}
 }
 
 func TestGet(t *testing.T) {
@@ -699,4 +676,32 @@ func TestDelete(t *testing.T) {
 		Method: "DELETE",
 		Path:   "/peter.json",
 	})
+}
+
+func TestWithContext(t *testing.T) {
+	if testref.ctx != nil {
+		t.Errorf("Ctx = %v; want nil", testref.ctx)
+	}
+
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	for _, tc := range testOps {
+		mock.Resp = tc.resp
+		ctx, cancel := context.WithCancel(context.Background())
+		r := testref.WithContext(ctx)
+		if r.ctx != ctx {
+			t.Errorf("WithContext().ctx = %v; want = %v", r.ctx, ctx)
+		}
+		if err := tc.op(r); err != nil {
+			t.Errorf("%s %v", tc.name, err)
+			t.Fatal(err)
+		}
+
+		cancel()
+		if err := tc.op(r); err == nil {
+			t.Errorf("WithContext().%s = nil; want = error", tc.name)
+		}
+	}
 }
