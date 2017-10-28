@@ -244,8 +244,8 @@ func TestDatabaseAuthOverrides(t *testing.T) {
 	for _, tc := range cases {
 		ctx := context.Background()
 		conf := &Config{
-			AuthOverrides: &db.AuthOverrides{tc},
-			DatabaseURL:   "https://mock-db.firebaseio.com",
+			AuthOverride: &db.AuthOverride{tc},
+			DatabaseURL:  "https://mock-db.firebaseio.com",
 		}
 		app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
 		if err != nil {
