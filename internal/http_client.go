@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package internal contains functionality that is only accessible from within the Admin SDK.
 package internal
 
 import (
