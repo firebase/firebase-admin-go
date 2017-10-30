@@ -15,6 +15,7 @@
 package db
 
 import (
+	"context"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func TestAuthOverrideGet(t *testing.T) {
 
 	ref := aoClient.NewRef("peter")
 	var got string
-	if err := ref.Get(&got); err != nil {
+	if err := ref.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {
@@ -45,7 +46,7 @@ func TestAuthOverrideSet(t *testing.T) {
 
 	ref := aoClient.NewRef("peter")
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	if err := ref.Set(want); err != nil {
+	if err := ref.Set(context.Background(), want); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
@@ -63,7 +64,7 @@ func TestAuthOverrideQuery(t *testing.T) {
 
 	ref := aoClient.NewRef("peter")
 	var got string
-	if err := ref.OrderByChild("foo").Get(&got); err != nil {
+	if err := ref.OrderByChild("foo").Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {
@@ -86,7 +87,7 @@ func TestAuthOverrideRangeQuery(t *testing.T) {
 
 	ref := aoClient.NewRef("peter")
 	var got string
-	if err := ref.OrderByChild("foo").WithStartAt(1).WithEndAt(10).Get(&got); err != nil {
+	if err := ref.OrderByChild("foo").WithStartAt(1).WithEndAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {

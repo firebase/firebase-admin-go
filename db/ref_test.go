@@ -35,7 +35,7 @@ var testOps = []struct {
 		"test",
 		func(r *Ref) error {
 			var got string
-			return r.Get(&got)
+			return r.Get(context.Background(), &got)
 		},
 	},
 	{
@@ -43,7 +43,7 @@ var testOps = []struct {
 		"test",
 		func(r *Ref) error {
 			var got string
-			_, err := r.GetWithETag(&got)
+			_, err := r.GetWithETag(context.Background(), &got)
 			return err
 		},
 	},
@@ -52,7 +52,7 @@ var testOps = []struct {
 		"test",
 		func(r *Ref) error {
 			var got string
-			_, _, err := r.GetIfChanged("etag", &got)
+			_, _, err := r.GetIfChanged(context.Background(), "etag", &got)
 			return err
 		},
 	},
@@ -60,14 +60,14 @@ var testOps = []struct {
 		"Set()",
 		nil,
 		func(r *Ref) error {
-			return r.Set("foo")
+			return r.Set(context.Background(), "foo")
 		},
 	},
 	{
 		"SetIfUnchanged()",
 		nil,
 		func(r *Ref) error {
-			_, err := r.SetIfUnchanged("etag", "foo")
+			_, err := r.SetIfUnchanged(context.Background(), "etag", "foo")
 			return err
 		},
 	},
@@ -75,7 +75,7 @@ var testOps = []struct {
 		"Push()",
 		map[string]interface{}{"name": "test"},
 		func(r *Ref) error {
-			_, err := r.Push("foo")
+			_, err := r.Push(context.Background(), "foo")
 			return err
 		},
 	},
@@ -83,14 +83,14 @@ var testOps = []struct {
 		"Update()",
 		nil,
 		func(r *Ref) error {
-			return r.Update(map[string]interface{}{"foo": "bar"})
+			return r.Update(context.Background(), map[string]interface{}{"foo": "bar"})
 		},
 	},
 	{
 		"Delete()",
 		nil,
 		func(r *Ref) error {
-			return r.Delete()
+			return r.Delete(context.Background())
 		},
 	},
 	{
@@ -100,7 +100,7 @@ var testOps = []struct {
 			fn := func(v interface{}) (interface{}, error) {
 				return v, nil
 			}
-			return r.Transaction(fn)
+			return r.Transaction(context.Background(), fn)
 		},
 	},
 }
@@ -118,7 +118,7 @@ func TestGet(t *testing.T) {
 	for _, tc := range cases {
 		mock.Resp = tc
 		var got interface{}
-		if err := testref.Get(&got); err != nil {
+		if err := testref.Get(context.Background(), &got); err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(tc, got) {
@@ -136,7 +136,7 @@ func TestInvalidGet(t *testing.T) {
 	defer srv.Close()
 
 	got := func() {}
-	if err := testref.Get(&got); err == nil {
+	if err := testref.Get(context.Background(), &got); err == nil {
 		t.Errorf("Get(func) = nil; want error")
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
@@ -149,7 +149,7 @@ func TestGetWithStruct(t *testing.T) {
 	defer srv.Close()
 
 	var got person
-	if err := testref.Get(&got); err != nil {
+	if err := testref.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if want != got {
@@ -168,7 +168,7 @@ func TestGetWithETag(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	etag, err := testref.GetWithETag(&got)
+	etag, err := testref.GetWithETag(context.Background(), &got)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestGetIfChanged(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	ok, etag, err := testref.GetIfChanged("old-etag", &got)
+	ok, etag, err := testref.GetIfChanged(context.Background(), "old-etag", &got)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestGetIfChanged(t *testing.T) {
 	mock.Status = http.StatusNotModified
 	mock.Resp = nil
 	var got2 map[string]interface{}
-	ok, etag, err = testref.GetIfChanged("new-etag", &got2)
+	ok, etag, err = testref.GetIfChanged(context.Background(), "new-etag", &got2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestUnexpectedHttpError(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	want := "http error status: 500; message: \"unexpected error\""
+	want := "http error status: 500; reason: \"unexpected error\""
 	for _, tc := range testOps {
 		err := tc.op(testref)
 		if err == nil || err.Error() != want {
@@ -336,7 +336,7 @@ func TestSet(t *testing.T) {
 	}
 	var want []*testReq
 	for _, tc := range cases {
-		if err := testref.Set(tc); err != nil {
+		if err := testref.Set(context.Background(), tc); err != nil {
 			t.Fatal(err)
 		}
 		want = append(want, &testReq{
@@ -359,7 +359,7 @@ func TestInvalidSet(t *testing.T) {
 		make(chan int),
 	}
 	for _, tc := range cases {
-		if err := testref.Set(tc); err == nil {
+		if err := testref.Set(context.Background(), tc); err == nil {
 			t.Errorf("Set(%v) = nil; want error", tc)
 		}
 	}
@@ -374,7 +374,7 @@ func TestSetIfUnchanged(t *testing.T) {
 	defer srv.Close()
 
 	want := &person{"Peter Parker", 17}
-	ok, err := testref.SetIfUnchanged("mock-etag", &want)
+	ok, err := testref.SetIfUnchanged(context.Background(), "mock-etag", &want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestSetIfUnchangedError(t *testing.T) {
 	defer srv.Close()
 
 	want := &person{"Peter Parker", 17}
-	ok, err := testref.SetIfUnchanged("mock-etag", &want)
+	ok, err := testref.SetIfUnchanged(context.Background(), "mock-etag", &want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestPush(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	child, err := testref.Push(nil)
+	child, err := testref.Push(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,7 +439,7 @@ func TestPushWithValue(t *testing.T) {
 	defer srv.Close()
 
 	want := map[string]interface{}{"name": "Peter Parker", "age": float64(17)}
-	child, err := testref.Push(want)
+	child, err := testref.Push(context.Background(), want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +460,7 @@ func TestUpdate(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	if err := testref.Update(want); err != nil {
+	if err := testref.Update(context.Background(), want); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
@@ -478,7 +478,7 @@ func TestInvalidUpdate(t *testing.T) {
 		map[string]interface{}{"foo": func() {}},
 	}
 	for _, tc := range cases {
-		if err := testref.Update(tc); err == nil {
+		if err := testref.Update(context.Background(), tc); err == nil {
 			t.Errorf("Update(%v) = nil; want error", tc)
 		}
 	}
@@ -497,7 +497,7 @@ func TestTransaction(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	if err := testref.Transaction(fn); err != nil {
+	if err := testref.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
@@ -540,7 +540,7 @@ func TestTransactionRetry(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	if err := testref.Transaction(fn); err != nil {
+	if err := testref.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
 	}
 	if cnt != 2 {
@@ -596,7 +596,7 @@ func TestTransactionError(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	if err := testref.Transaction(fn); err == nil || err.Error() != want {
+	if err := testref.Transaction(context.Background(), fn); err == nil || err.Error() != want {
 		t.Errorf("Transaction() = %v; want = %q", err, want)
 	}
 	if cnt != 1 {
@@ -639,7 +639,7 @@ func TestTransactionAbort(t *testing.T) {
 		p["age"] = p["age"].(float64) + 1.0
 		return p, nil
 	}
-	err := testref.Transaction(fn)
+	err := testref.Transaction(context.Background(), fn)
 	if err == nil {
 		t.Errorf("Transaction() = nil; want error")
 	}
@@ -669,39 +669,11 @@ func TestDelete(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	if err := testref.Delete(); err != nil {
+	if err := testref.Delete(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "DELETE",
 		Path:   "/peter.json",
 	})
-}
-
-func TestWithContext(t *testing.T) {
-	if testref.ctx != nil {
-		t.Errorf("Ctx = %v; want nil", testref.ctx)
-	}
-
-	mock := &mockServer{}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	for _, tc := range testOps {
-		mock.Resp = tc.resp
-		ctx, cancel := context.WithCancel(context.Background())
-		r := testref.WithContext(ctx)
-		if r.ctx != ctx {
-			t.Errorf("WithContext().ctx = %v; want = %v", r.ctx, ctx)
-		}
-		if err := tc.op(r); err != nil {
-			t.Errorf("%s %v", tc.name, err)
-			t.Fatal(err)
-		}
-
-		cancel()
-		if err := tc.op(r); err == nil {
-			t.Errorf("WithContext().%s = nil; want = error", tc.name)
-		}
-	}
 }

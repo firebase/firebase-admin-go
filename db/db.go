@@ -32,6 +32,18 @@ import (
 )
 
 const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
+const invalidChars = "[].#$"
+const authVarOverride = "auth_variable_override"
+
+var errParser = func(r *internal.Response) string {
+	var b struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(r.Body, &b); err != nil {
+		return ""
+	}
+	return b.Error
+}
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
@@ -105,6 +117,23 @@ func (c *Client) NewRef(path string) *Ref {
 		client: c,
 		segs:   segs,
 	}
+}
+
+func (c *Client) newHTTPRequest(method, path string, body interface{}, opts ...internal.HTTPOption) (*internal.Request, error) {
+	if strings.ContainsAny(path, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
+	}
+
+	if c.ao != "" {
+		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
+	}
+	url := fmt.Sprintf("%s%s.json", c.url, path)
+	return &internal.Request{
+		Method: method,
+		URL:    url,
+		Body:   body,
+		Opts:   opts,
+	}, nil
 }
 
 func parsePath(path string) []string {

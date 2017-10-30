@@ -182,9 +182,6 @@ func TestNewRef(t *testing.T) {
 		if r.client == nil {
 			t.Errorf("NewRef(%q).client = nil; want = %v", tc.Path, r.client)
 		}
-		if r.ctx != nil {
-			t.Errorf("NewRef(%q).ctx = %v; want nil", tc.Path, r.ctx)
-		}
 		if r.Path != tc.WantPath {
 			t.Errorf("NewRef(%q).Path = %q; want = %q", tc.Path, r.Path, tc.WantPath)
 		}

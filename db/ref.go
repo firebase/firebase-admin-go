@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"strings"
 
+	"firebase.google.com/go/internal"
+
 	"golang.org/x/net/context"
 )
 
@@ -31,7 +33,6 @@ type Ref struct {
 
 	segs   []string
 	client *Client
-	ctx    context.Context
 }
 
 // Parent returns a reference to the parent of the current node.
@@ -58,30 +59,20 @@ func (r *Ref) Child(path string) *Ref {
 // Data deserialization is performed using https://golang.org/pkg/encoding/json/#Unmarshal, and
 // therefore v has the same requirements as the json package. Specifically, it must be a pointer,
 // and it must not be nil.
-func (r *Ref) Get(v interface{}) error {
-	resp, err := r.send("GET")
+func (r *Ref) Get(ctx context.Context, v interface{}) error {
+	resp, err := r.send(ctx, "GET")
 	if err != nil {
 		return err
 	}
-	return resp.CheckAndParse(http.StatusOK, v)
-}
-
-// WithContext returns a shallow copy of this Ref with its context changed to ctx.
-//
-// The resulting Ref will use ctx for all subsequent RPC calls.
-func (r *Ref) WithContext(ctx context.Context) *Ref {
-	r2 := new(Ref)
-	*r2 = *r
-	r2.ctx = ctx
-	return r2
+	return resp.Unmarshal(http.StatusOK, errParser, v)
 }
 
 // GetWithETag retrieves the value at the current database location, along with its ETag.
-func (r *Ref) GetWithETag(v interface{}) (string, error) {
-	resp, err := r.send("GET", withHeader("X-Firebase-ETag", "true"))
+func (r *Ref) GetWithETag(ctx context.Context, v interface{}) (string, error) {
+	resp, err := r.send(ctx, "GET", internal.WithHeader("X-Firebase-ETag", "true"))
 	if err != nil {
 		return "", err
-	} else if err := resp.CheckAndParse(http.StatusOK, v); err != nil {
+	} else if err := resp.Unmarshal(http.StatusOK, errParser, v); err != nil {
 		return "", err
 	}
 	return resp.Header.Get("Etag"), nil
@@ -94,13 +85,13 @@ func (r *Ref) GetWithETag(v interface{}) (string, error) {
 // location. The value of the database location will be stored in v just like a regular Get() call.
 // If the etag matches, returns false along with the same ETag passed into the function. No data
 // will be stored in v in this case.
-func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
-	resp, err := r.send("GET", withHeader("If-None-Match", etag))
+func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (bool, string, error) {
+	resp, err := r.send(ctx, "GET", internal.WithHeader("If-None-Match", etag))
 	if err != nil {
 		return false, "", err
-	} else if err := resp.CheckAndParse(http.StatusOK, v); err == nil {
+	} else if err := resp.Unmarshal(http.StatusOK, errParser, v); err == nil {
 		return true, resp.Header.Get("ETag"), nil
-	} else if err := resp.CheckStatus(http.StatusNotModified); err != nil {
+	} else if err := resp.CheckStatus(http.StatusNotModified, errParser); err != nil {
 		return false, "", err
 	}
 	return false, etag, nil
@@ -111,25 +102,25 @@ func (r *Ref) GetIfChanged(etag string, v interface{}) (bool, string, error) {
 // Set uses https://golang.org/pkg/encoding/json/#Marshal to serialize values into JSON. Therefore
 // v has the same requirements as the json package. Values like functions and channels cannot be
 // saved into Realtime Database.
-func (r *Ref) Set(v interface{}) error {
-	resp, err := r.sendWithBody("PUT", v, withQueryParam("print", "silent"))
+func (r *Ref) Set(ctx context.Context, v interface{}) error {
+	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusNoContent)
+	return resp.CheckStatus(http.StatusNoContent, errParser)
 }
 
 // SetIfUnchanged conditionally sets the data at this location to the given value.
 //
 // Sets the data at this location to v only if the specified ETag matches. Returns true if the
 // value is written. Returns false if no changes are made to the database.
-func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
-	resp, err := r.sendWithBody("PUT", v, withHeader("If-Match", etag))
+func (r *Ref) SetIfUnchanged(ctx context.Context, etag string, v interface{}) (bool, error) {
+	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithHeader("If-Match", etag))
 	if err != nil {
 		return false, err
-	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
+	} else if err := resp.CheckStatus(http.StatusOK, errParser); err == nil {
 		return true, nil
-	} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
+	} else if err := resp.CheckStatus(http.StatusPreconditionFailed, errParser); err != nil {
 		return false, err
 	}
 	return false, nil
@@ -139,33 +130,33 @@ func (r *Ref) SetIfUnchanged(etag string, v interface{}) (bool, error) {
 //
 // If v is not nil, it will be set as the initial value of the new child node. If v is nil, the
 // new child node will be created with empty string as the value.
-func (r *Ref) Push(v interface{}) (*Ref, error) {
+func (r *Ref) Push(ctx context.Context, v interface{}) (*Ref, error) {
 	if v == nil {
 		v = ""
 	}
-	resp, err := r.sendWithBody("POST", v)
+	resp, err := r.sendWithBody(ctx, "POST", v)
 	if err != nil {
 		return nil, err
 	}
 	var d struct {
 		Name string `json:"name"`
 	}
-	if err := resp.CheckAndParse(http.StatusOK, &d); err != nil {
+	if err := resp.Unmarshal(http.StatusOK, errParser, &d); err != nil {
 		return nil, err
 	}
 	return r.Child(d.Name), nil
 }
 
 // Update modifies the specified child keys of the current location to the provided values.
-func (r *Ref) Update(v map[string]interface{}) error {
+func (r *Ref) Update(ctx context.Context, v map[string]interface{}) error {
 	if len(v) == 0 {
 		return fmt.Errorf("value argument must be a non-empty map")
 	}
-	resp, err := r.sendWithBody("PATCH", v, withQueryParam("print", "silent"))
+	resp, err := r.sendWithBody(ctx, "PATCH", v, internal.WithQueryParam("print", "silent"))
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusNoContent)
+	return resp.CheckStatus(http.StatusNoContent, errParser)
 }
 
 type UpdateFn func(interface{}) (interface{}, error)
@@ -184,9 +175,9 @@ type UpdateFn func(interface{}) (interface{}, error)
 //
 // The update function may also force an early abort by returning an error instead of returning a
 // value.
-func (r *Ref) Transaction(fn UpdateFn) error {
+func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
 	var curr interface{}
-	etag, err := r.GetWithETag(&curr)
+	etag, err := r.GetWithETag(ctx, &curr)
 	if err != nil {
 		return err
 	}
@@ -196,12 +187,12 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 		if err != nil {
 			return err
 		}
-		resp, err := r.sendWithBody("PUT", new, withHeader("If-Match", etag))
+		resp, err := r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
 		if err != nil {
 			return err
-		} else if err := resp.CheckStatus(http.StatusOK); err == nil {
+		} else if err := resp.CheckStatus(http.StatusOK, errParser); err == nil {
 			return nil
-		} else if err := resp.CheckAndParse(http.StatusPreconditionFailed, &curr); err != nil {
+		} else if err := resp.Unmarshal(http.StatusPreconditionFailed, errParser, &curr); err != nil {
 			return err
 		}
 		etag = resp.Header.Get("ETag")
@@ -210,24 +201,26 @@ func (r *Ref) Transaction(fn UpdateFn) error {
 }
 
 // Delete removes this node from the database.
-func (r *Ref) Delete() error {
-	resp, err := r.send("DELETE")
+func (r *Ref) Delete(ctx context.Context) error {
+	resp, err := r.send(ctx, "DELETE")
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusOK)
+	return resp.CheckStatus(http.StatusOK, errParser)
 }
 
-func (r *Ref) send(method string, opts ...httpOption) (*response, error) {
-	return r.sendWithBody(method, nil, opts...)
+func (r *Ref) send(
+	ctx context.Context, method string,
+	opts ...internal.HTTPOption) (*internal.Response, error) {
+	return r.sendWithBody(ctx, method, nil, opts...)
 }
 
-func (r *Ref) sendWithBody(method string, body interface{}, opts ...httpOption) (*response, error) {
-	req := &request{
-		Method: method,
-		Body:   body,
-		Path:   r.Path,
-		Opts:   opts,
+func (r *Ref) sendWithBody(
+	ctx context.Context, method string, body interface{},
+	opts ...internal.HTTPOption) (*internal.Response, error) {
+	req, err := r.client.newHTTPRequest(method, r.Path, body, opts...)
+	if err != nil {
+		return nil, err
 	}
-	return r.client.send(r.ctx, req)
+	return req.Send(ctx, r.client.hc)
 }

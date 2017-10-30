@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"firebase.google.com/go/internal"
+
 	"golang.org/x/net/context"
 )
 
@@ -33,7 +35,6 @@ import (
 // final result is returned by the server as an unordered collection. Therefore the values read
 // from a Query instance are not ordered.
 type Query struct {
-	ctx                 context.Context
 	client              *Client
 	path                string
 	ob                  orderBy
@@ -89,20 +90,10 @@ func (q *Query) WithLimitToLast(n int) *Query {
 	return q2
 }
 
-// WithContext returns a shallow copy of this Query with its context changed to ctx.
-//
-// The resulting Query will use ctx for all subsequent RPC calls.
-func (q *Query) WithContext(ctx context.Context) *Query {
-	q2 := new(Query)
-	*q2 = *q
-	q2.ctx = ctx
-	return q2
-}
-
 // Get executes the Query and populates v with the results.
 //
 // Results will not be stored in any particular order in v.
-func (q *Query) Get(v interface{}) error {
+func (q *Query) Get(ctx context.Context, v interface{}) error {
 	qp := make(map[string]string)
 	ob, err := q.ob.encode()
 	if err != nil {
@@ -134,16 +125,15 @@ func (q *Query) Get(v interface{}) error {
 		return err
 	}
 
-	req := &request{
-		Method: "GET",
-		Path:   q.path,
-		Opts:   []httpOption{withQueryParams(qp)},
-	}
-	resp, err := q.client.send(q.ctx, req)
+	req, err := q.client.newHTTPRequest("GET", q.path, nil, internal.WithQueryParams(qp))
 	if err != nil {
 		return err
 	}
-	return resp.CheckAndParse(http.StatusOK, v)
+	resp, err := req.Send(ctx, q.client.hc)
+	if err != nil {
+		return err
+	}
+	return resp.Unmarshal(http.StatusOK, errParser, v)
 }
 
 // OrderByChild returns a Query that orders data by child values before applying filters.
@@ -175,7 +165,6 @@ func (r *Ref) OrderByValue() *Query {
 
 func newQuery(r *Ref, ob orderBy) *Query {
 	return &Query{
-		ctx:    r.ctx,
 		client: r.client,
 		path:   r.Path,
 		ob:     ob,

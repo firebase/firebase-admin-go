@@ -20,113 +20,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestQueryWithContext(t *testing.T) {
-	q := client.NewRef("peter").OrderByChild("messages")
-	if q.ctx != nil {
-		t.Errorf("query = %v; want nil", q.ctx)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	q = q.WithContext(ctx)
-	if q.ctx != ctx {
-		t.Errorf("query.WithContext() = %v; want %v", q.ctx, ctx)
-	}
-
-	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
-	mock := &mockServer{Resp: want}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("query.WithContext() = %v; want = %v", got, want)
-	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "GET",
-		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"messages\""},
-	})
-
-	cancel()
-	got = nil
-	if err := q.Get(&got); len(got) != 0 || err == nil {
-		t.Errorf("query.WithContext() = (%v, %v); want = (empty, error)", got, err)
-	}
-}
-
-func TestQueryFromRefWithContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	q := client.NewRef("peter").WithContext(ctx).OrderByChild("messages")
-	if q.ctx != ctx {
-		t.Errorf("ref.WithContext().query = %v; want %v", q.ctx, ctx)
-	}
-
-	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
-	mock := &mockServer{Resp: want}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("ref.WithContext().query = %v; want = %v", got, want)
-	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "GET",
-		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"messages\""},
-	})
-
-	cancel()
-	got = nil
-	if err := q.Get(&got); len(got) != 0 || err == nil {
-		t.Errorf("ref.WithContext().query = (%v, %v); want = (empty, error)", got, err)
-	}
-}
-
-func TestQueryWithContextPrecedence(t *testing.T) {
-	ctx1 := context.Background()
-	ctx2, cancel := context.WithCancel(ctx1)
-
-	r := client.NewRef("peter").WithContext(ctx1)
-	q := r.OrderByChild("messages").WithContext(ctx2)
-	if q.ctx != ctx2 {
-		t.Errorf("Ctx = %v; want %v", q.ctx, ctx2)
-	}
-
-	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
-	mock := &mockServer{Resp: want}
-	srv := mock.Start(client)
-	defer srv.Close()
-
-	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("ref.WithContext().query.WithContext() = %v; want = %v", got, want)
-	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{
-		Method: "GET",
-		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"messages\""},
-	})
-
-	cancel()
-	got = nil
-	if err := q.Get(&got); len(got) != 0 || err == nil {
-		t.Errorf("ref.WithContext().query.WithContext() = (%v, %v); want = (empty, error)", got, err)
-	}
-	if err := r.Get(&got); !reflect.DeepEqual(got, want) || err != nil {
-		t.Errorf("ref.WithContext() = (%v, %v); want = (%v, nil)", got, err, want)
-	}
-}
-
 func TestChildQuery(t *testing.T) {
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
 	mock := &mockServer{Resp: want}
@@ -139,7 +32,7 @@ func TestChildQuery(t *testing.T) {
 	var reqs []*testReq
 	for _, tc := range cases {
 		var got map[string]interface{}
-		if err := testref.OrderByChild(tc).Get(&got); err != nil {
+		if err := testref.OrderByChild(tc).Get(context.Background(), &got); err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(want, got) {
@@ -162,7 +55,7 @@ func TestNestedChildQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages/ratings").Get(&got); err != nil {
+	if err := testref.OrderByChild("messages/ratings").Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -183,7 +76,7 @@ func TestChildQueryWithParams(t *testing.T) {
 
 	q := testref.OrderByChild("messages").WithStartAt("m4").WithEndAt("m50").WithLimitToFirst(10)
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := q.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -213,7 +106,7 @@ func TestInvalidOrderByChild(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got string
-		if err := r.OrderByChild(tc).Get(&got); got != "" || err == nil {
+		if err := r.OrderByChild(tc).Get(context.Background(), &got); got != "" || err == nil {
 			t.Errorf("OrderByChild(%q) = (%q, %v); want = (%q, error)", tc, got, err, "")
 		}
 	}
@@ -229,7 +122,7 @@ func TestKeyQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByKey().Get(&got); err != nil {
+	if err := testref.OrderByKey().Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -249,7 +142,7 @@ func TestValueQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByValue().Get(&got); err != nil {
+	if err := testref.OrderByValue().Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -269,7 +162,7 @@ func TestLimitFirstQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithLimitToFirst(10).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithLimitToFirst(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -289,7 +182,7 @@ func TestLimitLastQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithLimitToLast(10).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithLimitToLast(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -319,7 +212,7 @@ func TestInvalidLimitQuery(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got map[string]interface{}
-		if err := tc.q.Get(&got); got != nil || err == nil {
+		if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
 			t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
 		}
 		if len(mock.Reqs) != 0 {
@@ -335,7 +228,7 @@ func TestStartAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithStartAt(10).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithStartAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -355,7 +248,7 @@ func TestEndAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithEndAt(10).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithEndAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -375,7 +268,7 @@ func TestEqualToQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithEqualTo(10).Get(&got); err != nil {
+	if err := testref.OrderByChild("messages").WithEqualTo(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -405,7 +298,7 @@ func TestInvalidFilterQuery(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got map[string]interface{}
-		if err := tc.q.Get(&got); got != nil || err == nil {
+		if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
 			t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
 		}
 		if len(mock.Reqs) != 0 {
@@ -422,7 +315,7 @@ func TestAllParamsQuery(t *testing.T) {
 
 	q := testref.OrderByChild("messages").WithLimitToFirst(100).WithStartAt("bar").WithEndAt("foo")
 	var got map[string]interface{}
-	if err := q.Get(&got); err != nil {
+	if err := q.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
