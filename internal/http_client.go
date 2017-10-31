@@ -29,25 +29,20 @@ var Null struct{} = jsonNull{}
 
 type jsonNull struct{}
 
-// Request contains all the parameters required to construct an outgoing HTTP request.
-type Request struct {
-	Method string
-	URL    string
-	Body   interface{}
-	Opts   []HTTPOption
+// HTTPClient can be used to send and receive JSON messages over HTTP.
+type HTTPClient struct {
+	HC *http.Client
+	EP ErrorParser
 }
 
-// Send executes the current Request using the given context and HTTP client.
-//
-// If the Body is not nil, it is serialized into a JSON string. To send JSON null as the body, use
-// the internal.Null variable.
-func (r *Request) Send(ctx context.Context, hc *http.Client) (*Response, error) {
+// Do executes the given Request, and returns a Response.
+func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 	req, err := r.newHTTPRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := hc.Do(req.WithContext(ctx))
+	resp, err := c.HC.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +56,16 @@ func (r *Request) Send(ctx context.Context, hc *http.Client) (*Response, error) 
 		Status: resp.StatusCode,
 		Body:   b,
 		Header: resp.Header,
+		ep:     c.EP,
 	}, nil
+}
+
+// Request contains all the parameters required to construct an outgoing HTTP request.
+type Request struct {
+	Method string
+	URL    string
+	Body   interface{}
+	Opts   []HTTPOption
 }
 
 func (r *Request) newHTTPRequest() (*http.Request, error) {
@@ -99,20 +103,21 @@ type Response struct {
 	Status int
 	Header http.Header
 	Body   []byte
+	ep     ErrorParser
 }
 
 // CheckStatus checks whether the Response status code has the given HTTP status code.
 //
 // Returns an error if the status code does not match. If an ErroParser is specified, uses that to
 // construct the returned error message. Otherwise includes the full response body in the error.
-func (r *Response) CheckStatus(want int, ep ErrorParser) error {
+func (r *Response) CheckStatus(want int) error {
 	if r.Status == want {
 		return nil
 	}
 
 	var msg string
-	if ep != nil {
-		msg = ep(r)
+	if r.ep != nil {
+		msg = r.ep(r.Body)
 	}
 	if msg == "" {
 		msg = string(r.Body)
@@ -125,8 +130,8 @@ func (r *Response) CheckStatus(want int, ep ErrorParser) error {
 //
 // Unmarshal uses https://golang.org/pkg/encoding/json/#Unmarshal internally, and hence v has the
 // same requirements as the json package.
-func (r *Response) Unmarshal(want int, ep ErrorParser, v interface{}) error {
-	if err := r.CheckStatus(want, ep); err != nil {
+func (r *Response) Unmarshal(want int, v interface{}) error {
+	if err := r.CheckStatus(want); err != nil {
 		return err
 	} else if err := json.Unmarshal(r.Body, v); err != nil {
 		return err
@@ -135,7 +140,7 @@ func (r *Response) Unmarshal(want int, ep ErrorParser, v interface{}) error {
 }
 
 // ErrorParser is a function that is used to construct custom error messages.
-type ErrorParser func(r *Response) string
+type ErrorParser func([]byte) string
 
 // HTTPOption is an additional parameter that can be specified to customize an outgoing request.
 type HTTPOption func(*http.Request)
