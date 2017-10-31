@@ -93,7 +93,7 @@ var cases = []struct {
 	},
 }
 
-func TestSend(t *testing.T) {
+func TestHTTPClient(t *testing.T) {
 	want := map[string]interface{}{
 		"key1": "value1",
 		"key2": float64(100),
@@ -157,21 +157,22 @@ func TestSend(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	client := &HTTPClient{HC: http.DefaultClient}
 	for _, tc := range cases {
 		tc.req.URL = server.URL
-		resp, err := tc.req.Send(context.Background(), http.DefaultClient)
+		resp, err := client.Do(context.Background(), tc.req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := resp.CheckStatus(http.StatusOK, nil); err != nil {
+		if err := resp.CheckStatus(http.StatusOK); err != nil {
 			t.Errorf("CheckStatus() = %v; want nil", err)
 		}
-		if err := resp.CheckStatus(http.StatusCreated, nil); err == nil {
+		if err := resp.CheckStatus(http.StatusCreated); err == nil {
 			t.Errorf("CheckStatus() = nil; want error")
 		}
 
 		var got map[string]interface{}
-		if err := resp.Unmarshal(http.StatusOK, nil, &got); err != nil {
+		if err := resp.Unmarshal(http.StatusOK, &got); err != nil {
 			t.Errorf("Unmarshal() = %v; want nil", err)
 		}
 		if !reflect.DeepEqual(got, want) {
@@ -197,31 +198,31 @@ func TestErrorParser(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	req := &Request{
-		Method: "GET",
-		URL:    server.URL,
+	ep := func(b []byte) string {
+		var p struct {
+			Error string `json:"error"`
+		}
+		if err := json.Unmarshal(b, &p); err != nil {
+			return ""
+		}
+		return p.Error
 	}
-	resp, err := req.Send(context.Background(), http.DefaultClient)
+	client := &HTTPClient{
+		HC: http.DefaultClient,
+		EP: ep,
+	}
+	req := &Request{Method: "GET", URL: server.URL}
+	resp, err := client.Do(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ep := func(r *Response) string {
-		var b struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(r.Body, &b); err != nil {
-			return ""
-		}
-		return b.Error
-	}
-
 	want := "http error status: 500; reason: test error"
-	if err := resp.CheckStatus(http.StatusOK, ep); err.Error() != want {
+	if err := resp.CheckStatus(http.StatusOK); err.Error() != want {
 		t.Errorf("CheckStatus() = %q; want = %q", err.Error(), want)
 	}
 	var got map[string]interface{}
-	if err := resp.Unmarshal(http.StatusOK, ep, &got); err.Error() != want {
+	if err := resp.Unmarshal(http.StatusOK, &got); err.Error() != want {
 		t.Errorf("CheckStatus() = %q; want = %q", err.Error(), want)
 	}
 	if got != nil {
@@ -234,7 +235,8 @@ func TestInvalidURL(t *testing.T) {
 		Method: "GET",
 		URL:    "http://localhost:250/mock.url",
 	}
-	_, err := req.Send(context.Background(), http.DefaultClient)
+	client := &HTTPClient{HC: http.DefaultClient}
+	_, err := client.Do(context.Background(), req)
 	if err == nil {
 		t.Errorf("Send() = nil; want error")
 	}
@@ -256,17 +258,15 @@ func TestUnmarshalError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	req := &Request{
-		Method: "GET",
-		URL:    server.URL,
-	}
-	resp, err := req.Send(context.Background(), http.DefaultClient)
+	req := &Request{Method: "GET", URL: server.URL}
+	client := &HTTPClient{HC: http.DefaultClient}
+	resp, err := client.Do(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var got func()
-	if err := resp.Unmarshal(http.StatusOK, nil, &got); err == nil {
+	if err := resp.Unmarshal(http.StatusOK, &got); err == nil {
 		t.Errorf("Unmarshal() = nil; want error")
 	}
 }
