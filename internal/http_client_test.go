@@ -149,7 +149,7 @@ func TestHTTPClient(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &HTTPClient{HC: http.DefaultClient}
+	client := &HTTPClient{Client: http.DefaultClient}
 	for _, tc := range cases {
 		tc.req.URL = server.URL
 		resp, err := client.Do(context.Background(), tc.req)
@@ -200,8 +200,8 @@ func TestErrorParser(t *testing.T) {
 		return p.Error
 	}
 	client := &HTTPClient{
-		HC: http.DefaultClient,
-		EP: ep,
+		Client:    http.DefaultClient,
+		ErrParser: ep,
 	}
 	req := &Request{Method: "GET", URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
@@ -227,7 +227,7 @@ func TestInvalidURL(t *testing.T) {
 		Method: "GET",
 		URL:    "http://localhost:250/mock.url",
 	}
-	client := &HTTPClient{HC: http.DefaultClient}
+	client := &HTTPClient{Client: http.DefaultClient}
 	_, err := client.Do(context.Background(), req)
 	if err == nil {
 		t.Errorf("Send() = nil; want error")
@@ -251,7 +251,7 @@ func TestUnmarshalError(t *testing.T) {
 	defer server.Close()
 
 	req := &Request{Method: "GET", URL: server.URL}
-	client := &HTTPClient{HC: http.DefaultClient}
+	client := &HTTPClient{Client: http.DefaultClient}
 	resp, err := client.Do(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)

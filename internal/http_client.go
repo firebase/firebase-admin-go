@@ -25,10 +25,16 @@ import (
 	"golang.org/x/net/context"
 )
 
-// HTTPClient can be used to send and receive JSON messages over HTTP.
+// HTTPClient is a convenient API to make HTTP calls.
+//
+// This API handles some of the repetitive tasks such as entity serialization and deserialization
+// involved in making HTTP calls. It provides a convenient mechanism to set headers and query
+// parameters on outgoing requests, while enforcing that an explicit context is used per request.
+// Responses returned by HTTPClient can be easily parsed as JSON, and provide a simple mechanism to
+// extract error details.
 type HTTPClient struct {
-	HC *http.Client
-	EP ErrorParser
+	Client    *http.Client
+	ErrParser ErrorParser
 }
 
 // Do executes the given Request, and returns a Response.
@@ -38,7 +44,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 
-	resp, err := c.HC.Do(req.WithContext(ctx))
+	resp, err := c.Client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -49,10 +55,10 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 	return &Response{
-		Status: resp.StatusCode,
-		Body:   b,
-		Header: resp.Header,
-		ep:     c.EP,
+		Status:    resp.StatusCode,
+		Body:      b,
+		Header:    resp.Header,
+		errParser: c.ErrParser,
 	}, nil
 }
 
@@ -113,10 +119,10 @@ func (e *jsonEntity) Mime() string {
 
 // Response contains information extracted from an HTTP response.
 type Response struct {
-	Status int
-	Header http.Header
-	Body   []byte
-	ep     ErrorParser
+	Status    int
+	Header    http.Header
+	Body      []byte
+	errParser ErrorParser
 }
 
 // CheckStatus checks whether the Response status code has the given HTTP status code.
@@ -129,8 +135,8 @@ func (r *Response) CheckStatus(want int) error {
 	}
 
 	var msg string
-	if r.ep != nil {
-		msg = r.ep(r.Body)
+	if r.errParser != nil {
+		msg = r.errParser(r.Body)
 	}
 	if msg == "" {
 		msg = string(r.Body)
