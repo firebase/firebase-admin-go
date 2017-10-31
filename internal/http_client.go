@@ -25,15 +25,16 @@ import (
 	"golang.org/x/net/context"
 )
 
-// Null represents JSON null value.
-var Null struct{} = jsonNull{}
-
-type jsonNull struct{}
-
-// HTTPClient can be used to send and receive JSON messages over HTTP.
+// HTTPClient is a convenient API to make HTTP calls.
+//
+// This API handles some of the repetitive tasks such as entity serialization and deserialization
+// involved in making HTTP calls. It provides a convenient mechanism to set headers and query
+// parameters on outgoing requests, while enforcing that an explicit context is used per request.
+// Responses returned by HTTPClient can be easily parsed as JSON, and provide a simple mechanism to
+// extract error details.
 type HTTPClient struct {
-	HC *http.Client
-	EP ErrorParser
+	Client    *http.Client
+	ErrParser ErrorParser
 }
 
 // Do executes the given Request, and returns a Response.
@@ -43,7 +44,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 
-	resp, err := c.HC.Do(req.WithContext(ctx))
+	resp, err := c.Client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -54,10 +55,10 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 	return &Response{
-		Status: resp.StatusCode,
-		Body:   b,
-		Header: resp.Header,
-		ep:     c.EP,
+		Status:    resp.StatusCode,
+		Body:      b,
+		Header:    resp.Header,
+		errParser: c.ErrParser,
 	}, nil
 }
 
@@ -65,7 +66,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 type Request struct {
 	Method string
 	URL    string
-	Body   interface{}
+	Body   HTTPEntity
 	Opts   []HTTPOption
 }
 
@@ -73,18 +74,12 @@ func (r *Request) newHTTPRequest() (*http.Request, error) {
 	var opts []HTTPOption
 	var data io.Reader
 	if r.Body != nil {
-		var body interface{}
-		if r.Body == Null {
-			body = nil
-		} else {
-			body = r.Body
-		}
-		b, err := json.Marshal(body)
+		b, err := r.Body.Bytes()
 		if err != nil {
 			return nil, err
 		}
 		data = bytes.NewBuffer(b)
-		opts = append(opts, WithHeader("Content-Type", "application/json"))
+		opts = append(opts, WithHeader("Content-Type", r.Body.Mime()))
 	}
 
 	req, err := http.NewRequest(r.Method, r.URL, data)
@@ -99,12 +94,35 @@ func (r *Request) newHTTPRequest() (*http.Request, error) {
 	return req, nil
 }
 
+// HTTPEntity represents a payload that can be included in an outgoing HTTP request.
+type HTTPEntity interface {
+	Bytes() ([]byte, error)
+	Mime() string
+}
+
+type jsonEntity struct {
+	Val interface{}
+}
+
+// NewJSONEntity creates a new HTTPEntity that will be serialized into JSON.
+func NewJSONEntity(v interface{}) HTTPEntity {
+	return &jsonEntity{Val: v}
+}
+
+func (e *jsonEntity) Bytes() ([]byte, error) {
+	return json.Marshal(e.Val)
+}
+
+func (e *jsonEntity) Mime() string {
+	return "application/json"
+}
+
 // Response contains information extracted from an HTTP response.
 type Response struct {
-	Status int
-	Header http.Header
-	Body   []byte
-	ep     ErrorParser
+	Status    int
+	Header    http.Header
+	Body      []byte
+	errParser ErrorParser
 }
 
 // CheckStatus checks whether the Response status code has the given HTTP status code.
@@ -117,8 +135,8 @@ func (r *Response) CheckStatus(want int) error {
 	}
 
 	var msg string
-	if r.ep != nil {
-		msg = r.ep(r.Body)
+	if r.errParser != nil {
+		msg = r.errParser(r.Body)
 	}
 	if msg == "" {
 		msg = string(r.Body)
@@ -134,7 +152,8 @@ func (r *Response) CheckStatus(want int) error {
 func (r *Response) Unmarshal(want int, v interface{}) error {
 	if err := r.CheckStatus(want); err != nil {
 		return err
-	} else if err := json.Unmarshal(r.Body, v); err != nil {
+	}
+	if err := json.Unmarshal(r.Body, v); err != nil {
 		return err
 	}
 	return nil
