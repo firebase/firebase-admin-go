@@ -25,11 +25,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-// Null represents JSON null value.
-var Null struct{} = jsonNull{}
-
-type jsonNull struct{}
-
 // HTTPClient can be used to send and receive JSON messages over HTTP.
 type HTTPClient struct {
 	HC *http.Client
@@ -65,7 +60,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 type Request struct {
 	Method string
 	URL    string
-	Body   interface{}
+	Body   HTTPEntity
 	Opts   []HTTPOption
 }
 
@@ -73,18 +68,12 @@ func (r *Request) newHTTPRequest() (*http.Request, error) {
 	var opts []HTTPOption
 	var data io.Reader
 	if r.Body != nil {
-		var body interface{}
-		if r.Body == Null {
-			body = nil
-		} else {
-			body = r.Body
-		}
-		b, err := json.Marshal(body)
+		b, err := r.Body.Bytes()
 		if err != nil {
 			return nil, err
 		}
 		data = bytes.NewBuffer(b)
-		opts = append(opts, WithHeader("Content-Type", "application/json"))
+		opts = append(opts, WithHeader("Content-Type", r.Body.Mime()))
 	}
 
 	req, err := http.NewRequest(r.Method, r.URL, data)
@@ -97,6 +86,29 @@ func (r *Request) newHTTPRequest() (*http.Request, error) {
 		o(req)
 	}
 	return req, nil
+}
+
+// HTTPEntity represents a payload that can be included in an outgoing HTTP request.
+type HTTPEntity interface {
+	Bytes() ([]byte, error)
+	Mime() string
+}
+
+type jsonEntity struct {
+	Val interface{}
+}
+
+// NewJSONEntity creates a new HTTPEntity that will be serialized into JSON.
+func NewJSONEntity(v interface{}) HTTPEntity {
+	return &jsonEntity{Val: v}
+}
+
+func (e *jsonEntity) Bytes() ([]byte, error) {
+	return json.Marshal(e.Val)
+}
+
+func (e *jsonEntity) Mime() string {
+	return "application/json"
 }
 
 // Response contains information extracted from an HTTP response.

@@ -27,7 +27,7 @@ import (
 var cases = []struct {
 	req     *Request
 	method  string
-	body    interface{}
+	body    string
 	headers map[string]string
 	query   map[string]string
 }{
@@ -52,7 +52,7 @@ var cases = []struct {
 	{
 		req: &Request{
 			Method: "POST",
-			Body:   map[string]string{"foo": "bar"},
+			Body:   NewJSONEntity(map[string]string{"foo": "bar"}),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParam("testParam1", "value2"),
@@ -60,35 +60,35 @@ var cases = []struct {
 			},
 		},
 		method:  "POST",
-		body:    map[string]string{"foo": "bar"},
+		body:    "{\"foo\":\"bar\"}",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
 	{
 		req: &Request{
 			Method: "POST",
-			Body:   "body",
+			Body:   NewJSONEntity("body"),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParams(map[string]string{"testParam1": "value2", "testParam2": "value3"}),
 			},
 		},
 		method:  "POST",
-		body:    "body",
+		body:    "\"body\"",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
 	{
 		req: &Request{
 			Method: "PUT",
-			Body:   Null,
+			Body:   NewJSONEntity(nil),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParams(map[string]string{"testParam1": "value2", "testParam2": "value3"}),
 			},
 		},
 		method:  "PUT",
-		body:    Null,
+		body:    "null",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
@@ -127,21 +127,12 @@ func TestHTTPClient(t *testing.T) {
 				t.Errorf("[%d] Query(%q) = %q; want = %q", idx, k, q, v)
 			}
 		}
-		if want.body != nil {
+		if want.body != "" {
 			h := r.Header.Get("Content-Type")
 			if h != "application/json" {
 				t.Errorf("[%d] Content-Type = %q; want = %q", idx, h, "application/json")
 			}
-
-			var wb []byte
-			if want.body == Null {
-				wb = []byte("null")
-			} else {
-				wb, err = json.Marshal(want.body)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
+			wb := []byte(want.body)
 			gb, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				t.Fatal(err)
