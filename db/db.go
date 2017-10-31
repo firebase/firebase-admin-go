@@ -117,24 +117,23 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) send(
-	ctx context.Context, method, path string, body interface{},
-	opts ...internal.HTTPOption) (*internal.Response, error) {
+func (c *Client) newRequest(
+	method, path string,
+	body interface{},
+	opts ...internal.HTTPOption) (*internal.Request, error) {
+
 	if strings.ContainsAny(path, invalidChars) {
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
 	}
-
 	if c.ao != "" {
 		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
 	}
-	url := fmt.Sprintf("%s%s.json", c.url, path)
-	req := &internal.Request{
+	return &internal.Request{
 		Method: method,
-		URL:    url,
+		URL:    fmt.Sprintf("%s%s.json", c.url, path),
 		Body:   body,
 		Opts:   opts,
-	}
-	return c.hc.Do(ctx, req)
+	}, nil
 }
 
 func parsePath(path string) []string {

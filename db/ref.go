@@ -210,13 +210,22 @@ func (r *Ref) Delete(ctx context.Context) error {
 }
 
 func (r *Ref) send(
-	ctx context.Context, method string,
+	ctx context.Context,
+	method string,
 	opts ...internal.HTTPOption) (*internal.Response, error) {
+
 	return r.sendWithBody(ctx, method, nil, opts...)
 }
 
 func (r *Ref) sendWithBody(
-	ctx context.Context, method string, body interface{},
+	ctx context.Context,
+	method string,
+	body interface{},
 	opts ...internal.HTTPOption) (*internal.Response, error) {
-	return r.client.send(ctx, method, r.Path, body, opts...)
+
+	req, err := r.client.newRequest(method, r.Path, body, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return r.client.hc.Do(ctx, req)
 }

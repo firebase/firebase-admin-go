@@ -95,37 +95,15 @@ func (q *Query) WithLimitToLast(n int) *Query {
 // Results will not be stored in any particular order in v.
 func (q *Query) Get(ctx context.Context, v interface{}) error {
 	qp := make(map[string]string)
-	ob, err := q.ob.encode()
+	if err := initQueryParams(q, qp); err != nil {
+		return err
+	}
+
+	req, err := q.client.newRequest("GET", q.path, nil, internal.WithQueryParams(qp))
 	if err != nil {
 		return err
 	}
-	qp["orderBy"] = ob
-
-	if q.limFirst > 0 && q.limLast > 0 {
-		return fmt.Errorf("cannot set both limit parameter: first = %d, last = %d", q.limFirst, q.limLast)
-	} else if q.limFirst < 0 {
-		return fmt.Errorf("limit first cannot be negative: %d", q.limFirst)
-	} else if q.limLast < 0 {
-		return fmt.Errorf("limit last cannot be negative: %d", q.limLast)
-	}
-
-	if q.limFirst > 0 {
-		qp["limitToFirst"] = strconv.Itoa(q.limFirst)
-	} else if q.limLast > 0 {
-		qp["limitToLast"] = strconv.Itoa(q.limLast)
-	}
-
-	if err := encodeFilter("startAt", q.start, qp); err != nil {
-		return err
-	}
-	if err := encodeFilter("endAt", q.end, qp); err != nil {
-		return err
-	}
-	if err := encodeFilter("equalTo", q.equalTo, qp); err != nil {
-		return err
-	}
-
-	resp, err := q.client.send(ctx, "GET", q.path, nil, internal.WithQueryParams(qp))
+	resp, err := q.client.hc.Do(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -165,6 +143,39 @@ func newQuery(r *Ref, ob orderBy) *Query {
 		path:   r.Path,
 		ob:     ob,
 	}
+}
+
+func initQueryParams(q *Query, qp map[string]string) error {
+	ob, err := q.ob.encode()
+	if err != nil {
+		return err
+	}
+	qp["orderBy"] = ob
+
+	if q.limFirst > 0 && q.limLast > 0 {
+		return fmt.Errorf("cannot set both limit parameter: first = %d, last = %d", q.limFirst, q.limLast)
+	} else if q.limFirst < 0 {
+		return fmt.Errorf("limit first cannot be negative: %d", q.limFirst)
+	} else if q.limLast < 0 {
+		return fmt.Errorf("limit last cannot be negative: %d", q.limLast)
+	}
+
+	if q.limFirst > 0 {
+		qp["limitToFirst"] = strconv.Itoa(q.limFirst)
+	} else if q.limLast > 0 {
+		qp["limitToLast"] = strconv.Itoa(q.limLast)
+	}
+
+	if err := encodeFilter("startAt", q.start, qp); err != nil {
+		return err
+	}
+	if err := encodeFilter("endAt", q.end, qp); err != nil {
+		return err
+	}
+	if err := encodeFilter("equalTo", q.equalTo, qp); err != nil {
+		return err
+	}
+	return nil
 }
 
 func encodeFilter(key string, val interface{}, m map[string]string) error {
