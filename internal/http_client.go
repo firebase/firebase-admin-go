@@ -152,7 +152,8 @@ func (r *Response) CheckStatus(want int) error {
 func (r *Response) Unmarshal(want int, v interface{}) error {
 	if err := r.CheckStatus(want); err != nil {
 		return err
-	} else if err := json.Unmarshal(r.Body, v); err != nil {
+	}
+	if err := json.Unmarshal(r.Body, v); err != nil {
 		return err
 	}
 	return nil
