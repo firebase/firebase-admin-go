@@ -18,7 +18,6 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"runtime"
 	"strings"
 
@@ -35,19 +34,9 @@ const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
 const invalidChars = "[].#$"
 const authVarOverride = "auth_variable_override"
 
-var errParser = func(r *internal.Response) string {
-	var b struct {
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal(r.Body, &b); err != nil {
-		return ""
-	}
-	return b.Error
-}
-
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
-	hc  *http.Client
+	hc  *internal.HTTPClient
 	url string
 	ao  string
 }
@@ -82,8 +71,17 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		}
 	}
 
+	errParser := func(b []byte) string {
+		var p struct {
+			Error string `json:"error"`
+		}
+		if err := json.Unmarshal(b, &p); err != nil {
+			return ""
+		}
+		return p.Error
+	}
 	return &Client{
-		hc:  hc,
+		hc:  &internal.HTTPClient{HC: hc, EP: errParser},
 		url: fmt.Sprintf("https://%s", p.Host),
 		ao:  string(ao),
 	}, nil
@@ -119,7 +117,9 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) newHTTPRequest(method, path string, body interface{}, opts ...internal.HTTPOption) (*internal.Request, error) {
+func (c *Client) send(
+	ctx context.Context, method, path string, body interface{},
+	opts ...internal.HTTPOption) (*internal.Response, error) {
 	if strings.ContainsAny(path, invalidChars) {
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
 	}
@@ -128,12 +128,13 @@ func (c *Client) newHTTPRequest(method, path string, body interface{}, opts ...i
 		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
 	}
 	url := fmt.Sprintf("%s%s.json", c.url, path)
-	return &internal.Request{
+	req := &internal.Request{
 		Method: method,
 		URL:    url,
 		Body:   body,
 		Opts:   opts,
-	}, nil
+	}
+	return c.hc.Do(ctx, req)
 }
 
 func parsePath(path string) []string {

@@ -64,7 +64,7 @@ func (r *Ref) Get(ctx context.Context, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	return resp.Unmarshal(http.StatusOK, errParser, v)
+	return resp.Unmarshal(http.StatusOK, v)
 }
 
 // GetWithETag retrieves the value at the current database location, along with its ETag.
@@ -72,7 +72,7 @@ func (r *Ref) GetWithETag(ctx context.Context, v interface{}) (string, error) {
 	resp, err := r.send(ctx, "GET", internal.WithHeader("X-Firebase-ETag", "true"))
 	if err != nil {
 		return "", err
-	} else if err := resp.Unmarshal(http.StatusOK, errParser, v); err != nil {
+	} else if err := resp.Unmarshal(http.StatusOK, v); err != nil {
 		return "", err
 	}
 	return resp.Header.Get("Etag"), nil
@@ -89,9 +89,9 @@ func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (boo
 	resp, err := r.send(ctx, "GET", internal.WithHeader("If-None-Match", etag))
 	if err != nil {
 		return false, "", err
-	} else if err := resp.Unmarshal(http.StatusOK, errParser, v); err == nil {
+	} else if err := resp.Unmarshal(http.StatusOK, v); err == nil {
 		return true, resp.Header.Get("ETag"), nil
-	} else if err := resp.CheckStatus(http.StatusNotModified, errParser); err != nil {
+	} else if err := resp.CheckStatus(http.StatusNotModified); err != nil {
 		return false, "", err
 	}
 	return false, etag, nil
@@ -107,7 +107,7 @@ func (r *Ref) Set(ctx context.Context, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusNoContent, errParser)
+	return resp.CheckStatus(http.StatusNoContent)
 }
 
 // SetIfUnchanged conditionally sets the data at this location to the given value.
@@ -118,9 +118,9 @@ func (r *Ref) SetIfUnchanged(ctx context.Context, etag string, v interface{}) (b
 	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithHeader("If-Match", etag))
 	if err != nil {
 		return false, err
-	} else if err := resp.CheckStatus(http.StatusOK, errParser); err == nil {
+	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
 		return true, nil
-	} else if err := resp.CheckStatus(http.StatusPreconditionFailed, errParser); err != nil {
+	} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
 		return false, err
 	}
 	return false, nil
@@ -141,7 +141,7 @@ func (r *Ref) Push(ctx context.Context, v interface{}) (*Ref, error) {
 	var d struct {
 		Name string `json:"name"`
 	}
-	if err := resp.Unmarshal(http.StatusOK, errParser, &d); err != nil {
+	if err := resp.Unmarshal(http.StatusOK, &d); err != nil {
 		return nil, err
 	}
 	return r.Child(d.Name), nil
@@ -156,7 +156,7 @@ func (r *Ref) Update(ctx context.Context, v map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusNoContent, errParser)
+	return resp.CheckStatus(http.StatusNoContent)
 }
 
 type UpdateFn func(interface{}) (interface{}, error)
@@ -190,9 +190,9 @@ func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
 		resp, err := r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
 		if err != nil {
 			return err
-		} else if err := resp.CheckStatus(http.StatusOK, errParser); err == nil {
+		} else if err := resp.CheckStatus(http.StatusOK); err == nil {
 			return nil
-		} else if err := resp.Unmarshal(http.StatusPreconditionFailed, errParser, &curr); err != nil {
+		} else if err := resp.Unmarshal(http.StatusPreconditionFailed, &curr); err != nil {
 			return err
 		}
 		etag = resp.Header.Get("ETag")
@@ -206,7 +206,7 @@ func (r *Ref) Delete(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return resp.CheckStatus(http.StatusOK, errParser)
+	return resp.CheckStatus(http.StatusOK)
 }
 
 func (r *Ref) send(
@@ -218,9 +218,5 @@ func (r *Ref) send(
 func (r *Ref) sendWithBody(
 	ctx context.Context, method string, body interface{},
 	opts ...internal.HTTPOption) (*internal.Response, error) {
-	req, err := r.client.newHTTPRequest(method, r.Path, body, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return req.Send(ctx, r.client.hc)
+	return r.client.send(ctx, method, r.Path, body, opts...)
 }

@@ -13,7 +13,9 @@ var heightSorted = []string{
 func TestLimitToFirst(t *testing.T) {
 	for _, tc := range []int{2, 10} {
 		var m map[string]Dinosaur
-		if err := dinos.OrderByChild("height").WithLimitToFirst(tc).Get(&m); err != nil {
+		if err := dinos.OrderByChild("height").
+			WithLimitToFirst(tc).
+			Get(context.Background(), &m); err != nil {
 			t.Fatal(err)
 		}
 
@@ -36,7 +38,9 @@ func TestLimitToFirst(t *testing.T) {
 func TestLimitToLast(t *testing.T) {
 	for _, tc := range []int{2, 10} {
 		var m map[string]Dinosaur
-		if err := dinos.OrderByChild("height").WithLimitToLast(tc).Get(&m); err != nil {
+		if err := dinos.OrderByChild("height").
+			WithLimitToLast(tc).
+			Get(context.Background(), &m); err != nil {
 			t.Fatal(err)
 		}
 
@@ -58,7 +62,9 @@ func TestLimitToLast(t *testing.T) {
 
 func TestStartAt(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByChild("height").WithStartAt(3.5).Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").
+		WithStartAt(3.5).
+		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -75,7 +81,9 @@ func TestStartAt(t *testing.T) {
 
 func TestEndAt(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByChild("height").WithEndAt(3.5).Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").
+		WithEndAt(3.5).
+		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,7 +100,10 @@ func TestEndAt(t *testing.T) {
 
 func TestStartAndEndAt(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByChild("height").WithStartAt(2.5).WithEndAt(5).Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").
+		WithStartAt(2.5).
+		WithEndAt(5).
+		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +120,9 @@ func TestStartAndEndAt(t *testing.T) {
 
 func TestEqualTo(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByChild("height").WithEqualTo(0.6).Get(&m); err != nil {
+	if err := dinos.OrderByChild("height").
+		WithEqualTo(0.6).
+		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,7 +139,9 @@ func TestEqualTo(t *testing.T) {
 
 func TestOrderByNestedChild(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByChild("ratings/pos").WithStartAt(4).Get(&m); err != nil {
+	if err := dinos.OrderByChild("ratings/pos").
+		WithStartAt(4).
+		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,7 +158,7 @@ func TestOrderByNestedChild(t *testing.T) {
 
 func TestOrderByKey(t *testing.T) {
 	var m map[string]Dinosaur
-	if err := dinos.OrderByKey().WithLimitToFirst(2).Get(&m); err != nil {
+	if err := dinos.OrderByKey().WithLimitToFirst(2).Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -161,7 +176,7 @@ func TestOrderByKey(t *testing.T) {
 func TestOrderByValue(t *testing.T) {
 	scores := ref.Child("scores")
 	var m map[string]int
-	if err := scores.OrderByValue().WithLimitToLast(2).Get(&m); err != nil {
+	if err := scores.OrderByValue().WithLimitToLast(2).Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,9 +193,9 @@ func TestOrderByValue(t *testing.T) {
 
 func TestQueryWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	q := dinos.OrderByKey().WithLimitToFirst(2).WithContext(ctx)
+	q := dinos.OrderByKey().WithLimitToFirst(2)
 	var m map[string]Dinosaur
-	if err := q.Get(&m); err != nil {
+	if err := q.Get(ctx, &m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +211,7 @@ func TestQueryWithContext(t *testing.T) {
 
 	cancel()
 	m = nil
-	if err := q.Get(&m); len(m) != 0 || err == nil {
+	if err := q.Get(ctx, &m); len(m) != 0 || err == nil {
 		t.Errorf("Get() = (%v, %v); want = (empty, error)", m, err)
 	}
 }

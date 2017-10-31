@@ -162,7 +162,7 @@ func initData() {
 		log.Fatalln(err)
 	}
 
-	if err = ref.Set(testData); err != nil {
+	if err = ref.Set(context.Background(), testData); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -198,7 +198,7 @@ func TestParent(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	var m map[string]interface{}
-	if err := ref.Get(&m); err != nil {
+	if err := ref.Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, m) {
@@ -208,7 +208,7 @@ func TestGet(t *testing.T) {
 
 func TestGetWithETag(t *testing.T) {
 	var m map[string]interface{}
-	etag, err := ref.GetWithETag(&m)
+	etag, err := ref.GetWithETag(context.Background(), &m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestGetWithETag(t *testing.T) {
 
 func TestGetIfChanged(t *testing.T) {
 	var m map[string]interface{}
-	ok, etag, err := ref.GetIfChanged("wrong-etag", &m)
+	ok, etag, err := ref.GetIfChanged(context.Background(), "wrong-etag", &m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestGetIfChanged(t *testing.T) {
 	}
 
 	var m2 map[string]interface{}
-	ok, etag2, err := ref.GetIfChanged(etag, &m2)
+	ok, etag2, err := ref.GetIfChanged(context.Background(), etag, &m2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestGetIfChanged(t *testing.T) {
 func TestGetChildValue(t *testing.T) {
 	c := ref.Child("dinosaurs")
 	var m map[string]interface{}
-	if err := c.Get(&m); err != nil {
+	if err := c.Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData["dinosaurs"], m) {
@@ -260,7 +260,7 @@ func TestGetChildValue(t *testing.T) {
 func TestGetGrandChildValue(t *testing.T) {
 	c := ref.Child("dinosaurs/lambeosaurus")
 	var got Dinosaur
-	if err := c.Get(&got); err != nil {
+	if err := c.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := parsedTestData["lambeosaurus"]
@@ -272,7 +272,7 @@ func TestGetGrandChildValue(t *testing.T) {
 func TestGetNonExistingChild(t *testing.T) {
 	c := ref.Child("non_existing")
 	var i interface{}
-	if err := c.Get(&i); err != nil {
+	if err := c.Get(context.Background(), &i); err != nil {
 		t.Fatal(err)
 	}
 	if i != nil {
@@ -281,7 +281,7 @@ func TestGetNonExistingChild(t *testing.T) {
 }
 
 func TestPush(t *testing.T) {
-	u, err := users.Push(nil)
+	u, err := users.Push(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestPush(t *testing.T) {
 	}
 
 	var i interface{}
-	if err := u.Get(&i); err != nil {
+	if err := u.Get(context.Background(), &i); err != nil {
 		t.Fatal(err)
 	}
 	if i != "" {
@@ -300,7 +300,7 @@ func TestPush(t *testing.T) {
 
 func TestPushWithValue(t *testing.T) {
 	want := User{"Luis Alvarez", 1911}
-	u, err := users.Push(&want)
+	u, err := users.Push(context.Background(), &want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestPushWithValue(t *testing.T) {
 	}
 
 	var got User
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if want != got {
@@ -318,15 +318,15 @@ func TestPushWithValue(t *testing.T) {
 }
 
 func TestSetPrimitiveValue(t *testing.T) {
-	u, err := users.Push(nil)
+	u, err := users.Push(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := u.Set("value"); err != nil {
+	if err := u.Set(context.Background(), "value"); err != nil {
 		t.Fatal(err)
 	}
 	var got string
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "value" {
@@ -335,17 +335,17 @@ func TestSetPrimitiveValue(t *testing.T) {
 }
 
 func TestSetComplexValue(t *testing.T) {
-	u, err := users.Push(nil)
+	u, err := users.Push(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := User{"Mary Anning", 1799}
-	if err := u.Set(&want); err != nil {
+	if err := u.Set(context.Background(), &want); err != nil {
 		t.Fatal(err)
 	}
 	var got User
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != want {
@@ -354,7 +354,7 @@ func TestSetComplexValue(t *testing.T) {
 }
 
 func TestUpdateChildren(t *testing.T) {
-	u, err := users.Push(nil)
+	u, err := users.Push(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,11 +363,11 @@ func TestUpdateChildren(t *testing.T) {
 		"name":  "Robert Bakker",
 		"since": float64(1945),
 	}
-	if err := u.Update(want); err != nil {
+	if err := u.Update(context.Background(), want); err != nil {
 		t.Fatal(err)
 	}
 	var got map[string]interface{}
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
@@ -376,7 +376,7 @@ func TestUpdateChildren(t *testing.T) {
 }
 
 func TestUpdateChildrenWithExistingValue(t *testing.T) {
-	u, err := users.Push(map[string]interface{}{
+	u, err := users.Push(context.Background(), map[string]interface{}{
 		"name":  "Edwin Colbert",
 		"since": float64(1900),
 	})
@@ -385,11 +385,11 @@ func TestUpdateChildrenWithExistingValue(t *testing.T) {
 	}
 
 	update := map[string]interface{}{"since": float64(1905)}
-	if err := u.Update(update); err != nil {
+	if err := u.Update(context.Background(), update); err != nil {
 		t.Fatal(err)
 	}
 	var got map[string]interface{}
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
@@ -402,11 +402,15 @@ func TestUpdateChildrenWithExistingValue(t *testing.T) {
 }
 
 func TestUpdateNestedChildren(t *testing.T) {
-	edward, err := users.Push(map[string]interface{}{"name": "Edward Cope", "since": float64(1800)})
+	edward, err := users.Push(context.Background(), map[string]interface{}{
+		"name": "Edward Cope", "since": float64(1800),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	jack, err := users.Push(map[string]interface{}{"name": "Jack Horner", "since": float64(1940)})
+	jack, err := users.Push(context.Background(), map[string]interface{}{
+		"name": "Jack Horner", "since": float64(1940),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,11 +418,11 @@ func TestUpdateNestedChildren(t *testing.T) {
 		fmt.Sprintf("%s/since", edward.Key): 1840,
 		fmt.Sprintf("%s/since", jack.Key):   1946,
 	}
-	if err := users.Update(delta); err != nil {
+	if err := users.Update(context.Background(), delta); err != nil {
 		t.Fatal(err)
 	}
 	var got map[string]interface{}
-	if err := edward.Get(&got); err != nil {
+	if err := edward.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{"name": "Edward Cope", "since": float64(1840)}
@@ -426,7 +430,7 @@ func TestUpdateNestedChildren(t *testing.T) {
 		t.Errorf("Get() = %v; want = %v", got, want)
 	}
 
-	if err := jack.Get(&got); err != nil {
+	if err := jack.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want = map[string]interface{}{"name": "Jack Horner", "since": float64(1946)}
@@ -436,13 +440,13 @@ func TestUpdateNestedChildren(t *testing.T) {
 }
 
 func TestSetIfChanged(t *testing.T) {
-	edward, err := users.Push(&User{"Edward Cope", 1800})
+	edward, err := users.Push(context.Background(), &User{"Edward Cope", 1800})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	update := User{"Jack Horner", 1940}
-	ok, err := edward.SetIfUnchanged("invalid-etag", &update)
+	ok, err := edward.SetIfUnchanged(context.Background(), "invalid-etag", &update)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,11 +455,11 @@ func TestSetIfChanged(t *testing.T) {
 	}
 
 	var u User
-	etag, err := edward.GetWithETag(&u)
+	etag, err := edward.GetWithETag(context.Background(), &u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err = edward.SetIfUnchanged(etag, &update)
+	ok, err = edward.SetIfUnchanged(context.Background(), etag, &update)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +467,7 @@ func TestSetIfChanged(t *testing.T) {
 		t.Errorf("SetIfUnchanged() = %v; want = %v", ok, true)
 	}
 
-	if err := edward.Get(&u); err != nil {
+	if err := edward.Get(context.Background(), &u); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(update, u) {
@@ -472,7 +476,7 @@ func TestSetIfChanged(t *testing.T) {
 }
 
 func TestTransaction(t *testing.T) {
-	u, err := users.Push(&User{Name: "Richard"})
+	u, err := users.Push(context.Background(), &User{Name: "Richard"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,11 +486,11 @@ func TestTransaction(t *testing.T) {
 		snap["since"] = 1804
 		return snap, nil
 	}
-	if err := u.Transaction(fn); err != nil {
+	if err := u.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
 	}
 	var got User
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := User{"Richard Owen", 1804}
@@ -497,18 +501,18 @@ func TestTransaction(t *testing.T) {
 
 func TestTransactionScalar(t *testing.T) {
 	cnt := users.Child("count")
-	if err := cnt.Set(42); err != nil {
+	if err := cnt.Set(context.Background(), 42); err != nil {
 		t.Fatal(err)
 	}
 	fn := func(curr interface{}) (interface{}, error) {
 		snap := curr.(float64)
 		return snap + 1, nil
 	}
-	if err := cnt.Transaction(fn); err != nil {
+	if err := cnt.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
 	}
 	var got float64
-	if err := cnt.Get(&got); err != nil {
+	if err := cnt.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != 43.0 {
@@ -517,23 +521,23 @@ func TestTransactionScalar(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	u, err := users.Push("foo")
+	u, err := users.Push(context.Background(), "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got string
-	if err := u.Get(&got); err != nil {
+	if err := u.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "foo" {
 		t.Errorf("Get() = %q; want = %q", got, "foo")
 	}
-	if err := u.Delete(); err != nil {
+	if err := u.Delete(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
 	var got2 string
-	if err := u.Get(&got2); err != nil {
+	if err := u.Get(context.Background(), &got2); err != nil {
 		t.Fatal(err)
 	}
 	if got2 != "" {
@@ -544,12 +548,12 @@ func TestDelete(t *testing.T) {
 func TestNoAccess(t *testing.T) {
 	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/admin"))
 	var got string
-	if err := r.Get(&got); err == nil || got != "" {
+	if err := r.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}
-	if err := r.Set("update"); err == nil {
+	if err := r.Set(context.Background(), "update"); err == nil {
 		t.Errorf("Set() = nil; want = error")
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
@@ -559,10 +563,10 @@ func TestNoAccess(t *testing.T) {
 func TestReadAccess(t *testing.T) {
 	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user2"))
 	var got string
-	if err := r.Get(&got); err != nil || got != "test" {
+	if err := r.Get(context.Background(), &got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
 	}
-	if err := r.Set("update"); err == nil {
+	if err := r.Set(context.Background(), "update"); err == nil {
 		t.Errorf("Set() = nil; want = error")
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
@@ -572,10 +576,10 @@ func TestReadAccess(t *testing.T) {
 func TestReadWriteAccess(t *testing.T) {
 	r := aoClient.NewRef(protectedRef(t, "_adminsdk/go/protected/user1"))
 	var got string
-	if err := r.Get(&got); err != nil || got != "test" {
+	if err := r.Get(context.Background(), &got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
 	}
-	if err := r.Set("update"); err != nil {
+	if err := r.Set(context.Background(), "update"); err != nil {
 		t.Errorf("Set() = %v; want = nil", err)
 	}
 }
@@ -583,7 +587,7 @@ func TestReadWriteAccess(t *testing.T) {
 func TestQueryAccess(t *testing.T) {
 	r := aoClient.NewRef("_adminsdk/go/protected")
 	got := make(map[string]interface{})
-	if err := r.OrderByKey().WithLimitToFirst(2).Get(&got); err == nil {
+	if err := r.OrderByKey().WithLimitToFirst(2).Get(context.Background(), &got); err == nil {
 		t.Errorf("OrderByQuery() = nil; want = error")
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
@@ -593,10 +597,10 @@ func TestQueryAccess(t *testing.T) {
 func TestGuestAccess(t *testing.T) {
 	r := guestClient.NewRef(protectedRef(t, "_adminsdk/go/public"))
 	var got string
-	if err := r.Get(&got); err != nil || got != "test" {
+	if err := r.Get(context.Background(), &got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
 	}
-	if err := r.Set("update"); err == nil {
+	if err := r.Set(context.Background(), "update"); err == nil {
 		t.Errorf("Set() = nil; want = error")
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
@@ -604,21 +608,21 @@ func TestGuestAccess(t *testing.T) {
 
 	got = ""
 	r = guestClient.NewRef("_adminsdk/go")
-	if err := r.Get(&got); err == nil || got != "" {
+	if err := r.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}
 
 	c := r.Child("protected/user2")
-	if err := c.Get(&got); err == nil || got != "" {
+	if err := c.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
 	}
 
 	c = r.Child("admin")
-	if err := c.Get(&got); err == nil || got != "" {
+	if err := c.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
 	} else if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
@@ -628,7 +632,7 @@ func TestGuestAccess(t *testing.T) {
 func TestWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var m map[string]interface{}
-	if err := ref.WithContext(ctx).Get(&m); err != nil {
+	if err := ref.Get(ctx, &m); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, m) {
@@ -637,14 +641,14 @@ func TestWithContext(t *testing.T) {
 
 	cancel()
 	m = nil
-	if err := ref.WithContext(ctx).Get(&m); len(m) != 0 || err == nil {
+	if err := ref.Get(ctx, &m); len(m) != 0 || err == nil {
 		t.Errorf("Get() = (%v, %v); want = (empty, error)", m, err)
 	}
 }
 
 func protectedRef(t *testing.T, p string) string {
 	r := client.NewRef(p)
-	if err := r.Set("test"); err != nil {
+	if err := r.Set(context.Background(), "test"); err != nil {
 		t.Fatal(err)
 	}
 	return p

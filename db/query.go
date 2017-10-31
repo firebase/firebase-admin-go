@@ -125,15 +125,11 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 		return err
 	}
 
-	req, err := q.client.newHTTPRequest("GET", q.path, nil, internal.WithQueryParams(qp))
+	resp, err := q.client.send(ctx, "GET", q.path, nil, internal.WithQueryParams(qp))
 	if err != nil {
 		return err
 	}
-	resp, err := req.Send(ctx, q.client.hc)
-	if err != nil {
-		return err
-	}
-	return resp.Unmarshal(http.StatusOK, errParser, v)
+	return resp.Unmarshal(http.StatusOK, v)
 }
 
 // OrderByChild returns a Query that orders data by child values before applying filters.
