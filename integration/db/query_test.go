@@ -1,8 +1,9 @@
 package db
 
 import (
-	"context"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 var heightSorted = []string{
