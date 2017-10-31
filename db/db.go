@@ -71,7 +71,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		}
 	}
 
-	errParser := func(b []byte) string {
+	ep := func(b []byte) string {
 		var p struct {
 			Error string `json:"error"`
 		}
@@ -81,7 +81,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return p.Error
 	}
 	return &Client{
-		hc:  &internal.HTTPClient{HC: hc, EP: errParser},
+		hc:  &internal.HTTPClient{Client: hc, ErrParser: ep},
 		url: fmt.Sprintf("https://%s", p.Host),
 		ao:  string(ao),
 	}, nil
@@ -117,8 +117,8 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) send(ctx context.Context, r *request) (*internal.Response, error) {
-	req, err := r.NewInternalRequest(c)
+func (c *Client) send(ctx context.Context, r *dbReq) (*internal.Response, error) {
+	req, err := r.NewHTTPRequest(c)
 	if err != nil {
 		return nil, err
 	}
@@ -135,26 +135,29 @@ func parsePath(path string) []string {
 	return segs
 }
 
-type request struct {
+type dbReq struct {
 	Method, Path string
 	Body         interface{}
 	Opts         []internal.HTTPOption
 }
 
-func (r *request) NewInternalRequest(c *Client) (*internal.Request, error) {
+func (r *dbReq) NewHTTPRequest(c *Client) (*internal.Request, error) {
 	if strings.ContainsAny(r.Path, invalidChars) {
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
 	}
 
 	var opts []internal.HTTPOption
-	opts = append(opts, r.Opts...)
 	if c.ao != "" {
 		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
+	}
+	var b internal.HTTPEntity
+	if r.Body != nil {
+		b = internal.NewJSONEntity(r.Body)
 	}
 	return &internal.Request{
 		Method: r.Method,
 		URL:    fmt.Sprintf("%s%s.json", c.url, r.Path),
-		Body:   r.Body,
-		Opts:   opts,
+		Body:   b,
+		Opts:   append(opts, r.Opts...),
 	}, nil
 }

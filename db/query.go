@@ -99,7 +99,7 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 		return err
 	}
 
-	req := &request{
+	req := &dbReq{
 		Method: "GET",
 		Path:   q.path,
 		Opts:   []internal.HTTPOption{internal.WithQueryParams(qp)},

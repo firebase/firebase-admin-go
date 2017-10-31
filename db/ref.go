@@ -89,12 +89,17 @@ func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (boo
 	resp, err := r.send(ctx, "GET", internal.WithHeader("If-None-Match", etag))
 	if err != nil {
 		return false, "", err
-	} else if err := resp.Unmarshal(http.StatusOK, v); err == nil {
-		return true, resp.Header.Get("ETag"), nil
-	} else if err := resp.CheckStatus(http.StatusNotModified); err != nil {
+	}
+	if resp.Status == http.StatusNotModified {
+		return false, etag, nil
+	}
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
 		return false, "", err
 	}
-	return false, etag, nil
+	if err := resp.Unmarshal(http.StatusOK, v); err != nil {
+		return false, "", err
+	}
+	return true, resp.Header.Get("ETag"), nil
 }
 
 // Set stores the value v in the current database node.
@@ -118,12 +123,14 @@ func (r *Ref) SetIfUnchanged(ctx context.Context, etag string, v interface{}) (b
 	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithHeader("If-Match", etag))
 	if err != nil {
 		return false, err
-	} else if err := resp.CheckStatus(http.StatusOK); err == nil {
-		return true, nil
-	} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
+	}
+	if resp.Status == http.StatusPreconditionFailed {
+		return false, nil
+	}
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
 		return false, err
 	}
-	return false, nil
+	return true, nil
 }
 
 // Push creates a new child node at the current location, and returns a reference to it.
@@ -190,9 +197,11 @@ func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
 		resp, err := r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
 		if err != nil {
 			return err
-		} else if err := resp.CheckStatus(http.StatusOK); err == nil {
+		}
+		if err := resp.CheckStatus(http.StatusOK); err == nil {
 			return nil
-		} else if err := resp.Unmarshal(http.StatusPreconditionFailed, &curr); err != nil {
+		}
+		if err := resp.Unmarshal(http.StatusPreconditionFailed, &curr); err != nil {
 			return err
 		}
 		etag = resp.Header.Get("ETag")
@@ -223,7 +232,7 @@ func (r *Ref) sendWithBody(
 	body interface{},
 	opts ...internal.HTTPOption) (*internal.Response, error) {
 
-	req := &request{
+	req := &dbReq{
 		Method: method,
 		Path:   r.Path,
 		Body:   body,
