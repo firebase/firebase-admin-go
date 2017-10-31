@@ -16,12 +16,13 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"golang.org/x/net/context"
 )
 
 // Null represents JSON null value.
