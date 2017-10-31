@@ -117,23 +117,12 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) newRequest(
-	method, path string,
-	body interface{},
-	opts ...internal.HTTPOption) (*internal.Request, error) {
-
-	if strings.ContainsAny(path, invalidChars) {
-		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
+func (c *Client) send(ctx context.Context, r *request) (*internal.Response, error) {
+	req, err := r.NewInternalRequest(c)
+	if err != nil {
+		return nil, err
 	}
-	if c.ao != "" {
-		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
-	}
-	return &internal.Request{
-		Method: method,
-		URL:    fmt.Sprintf("%s%s.json", c.url, path),
-		Body:   body,
-		Opts:   opts,
-	}, nil
+	return c.hc.Do(ctx, req)
 }
 
 func parsePath(path string) []string {
@@ -144,4 +133,28 @@ func parsePath(path string) []string {
 		}
 	}
 	return segs
+}
+
+type request struct {
+	Method, Path string
+	Body         interface{}
+	Opts         []internal.HTTPOption
+}
+
+func (r *request) NewInternalRequest(c *Client) (*internal.Request, error) {
+	if strings.ContainsAny(r.Path, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
+	}
+
+	var opts []internal.HTTPOption
+	opts = append(opts, r.Opts...)
+	if c.ao != "" {
+		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
+	}
+	return &internal.Request{
+		Method: r.Method,
+		URL:    fmt.Sprintf("%s%s.json", c.url, r.Path),
+		Body:   r.Body,
+		Opts:   opts,
+	}, nil
 }

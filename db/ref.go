@@ -223,9 +223,11 @@ func (r *Ref) sendWithBody(
 	body interface{},
 	opts ...internal.HTTPOption) (*internal.Response, error) {
 
-	req, err := r.client.newRequest(method, r.Path, body, opts...)
-	if err != nil {
-		return nil, err
+	req := &request{
+		Method: method,
+		Path:   r.Path,
+		Body:   body,
+		Opts:   opts,
 	}
-	return r.client.hc.Do(ctx, req)
+	return r.client.send(ctx, req)
 }

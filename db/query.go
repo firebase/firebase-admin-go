@@ -99,11 +99,12 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 		return err
 	}
 
-	req, err := q.client.newRequest("GET", q.path, nil, internal.WithQueryParams(qp))
-	if err != nil {
-		return err
+	req := &request{
+		Method: "GET",
+		Path:   q.path,
+		Opts:   []internal.HTTPOption{internal.WithQueryParams(qp)},
 	}
-	resp, err := q.client.hc.Do(ctx, req)
+	resp, err := q.client.send(ctx, req)
 	if err != nil {
 		return err
 	}
