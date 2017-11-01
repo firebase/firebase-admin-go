@@ -117,12 +117,24 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) send(ctx context.Context, r *dbReq) (*internal.Response, error) {
-	req, err := r.NewHTTPRequest(c)
-	if err != nil {
-		return nil, err
+func (c *Client) send(
+	ctx context.Context,
+	method, path string,
+	body internal.HTTPEntity,
+	opts ...internal.HTTPOption) (*internal.Response, error) {
+
+	if strings.ContainsAny(path, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
 	}
-	return c.hc.Do(ctx, req)
+	if c.ao != "" {
+		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
+	}
+	return c.hc.Do(ctx, &internal.Request{
+		Method: method,
+		URL:    fmt.Sprintf("%s%s.json", c.url, path),
+		Body:   body,
+		Opts:   opts,
+	})
 }
 
 func parsePath(path string) []string {
@@ -133,31 +145,4 @@ func parsePath(path string) []string {
 		}
 	}
 	return segs
-}
-
-type dbReq struct {
-	Method, Path string
-	Body         interface{}
-	Opts         []internal.HTTPOption
-}
-
-func (r *dbReq) NewHTTPRequest(c *Client) (*internal.Request, error) {
-	if strings.ContainsAny(r.Path, invalidChars) {
-		return nil, fmt.Errorf("invalid path with illegal characters: %q", r.Path)
-	}
-
-	var opts []internal.HTTPOption
-	if c.ao != "" {
-		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
-	}
-	var b internal.HTTPEntity
-	if r.Body != nil {
-		b = internal.NewJSONEntity(r.Body)
-	}
-	return &internal.Request{
-		Method: r.Method,
-		URL:    fmt.Sprintf("%s%s.json", c.url, r.Path),
-		Body:   b,
-		Opts:   append(opts, r.Opts...),
-	}, nil
 }

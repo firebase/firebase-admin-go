@@ -93,9 +93,6 @@ func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (boo
 	if resp.Status == http.StatusNotModified {
 		return false, etag, nil
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return false, "", err
-	}
 	if err := resp.Unmarshal(http.StatusOK, v); err != nil {
 		return false, "", err
 	}
@@ -166,6 +163,7 @@ func (r *Ref) Update(ctx context.Context, v map[string]interface{}) error {
 	return resp.CheckStatus(http.StatusNoContent)
 }
 
+// UpdateFn represents a function type that can be passed into Transaction().
 type UpdateFn func(interface{}) (interface{}, error)
 
 // Transaction atomically modifies the data at this location.
@@ -198,7 +196,7 @@ func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
 		if err != nil {
 			return err
 		}
-		if err := resp.CheckStatus(http.StatusOK); err == nil {
+		if resp.Status == http.StatusOK {
 			return nil
 		}
 		if err := resp.Unmarshal(http.StatusPreconditionFailed, &curr); err != nil {
@@ -223,7 +221,7 @@ func (r *Ref) send(
 	method string,
 	opts ...internal.HTTPOption) (*internal.Response, error) {
 
-	return r.sendWithBody(ctx, method, nil, opts...)
+	return r.client.send(ctx, method, r.Path, nil, opts...)
 }
 
 func (r *Ref) sendWithBody(
@@ -232,11 +230,5 @@ func (r *Ref) sendWithBody(
 	body interface{},
 	opts ...internal.HTTPOption) (*internal.Response, error) {
 
-	req := &dbReq{
-		Method: method,
-		Path:   r.Path,
-		Body:   body,
-		Opts:   opts,
-	}
-	return r.client.send(ctx, req)
+	return r.client.send(ctx, method, r.Path, internal.NewJSONEntity(body), opts...)
 }

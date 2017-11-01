@@ -98,13 +98,7 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 	if err := initQueryParams(q, qp); err != nil {
 		return err
 	}
-
-	req := &dbReq{
-		Method: "GET",
-		Path:   q.path,
-		Opts:   []internal.HTTPOption{internal.WithQueryParams(qp)},
-	}
-	resp, err := q.client.send(ctx, req)
+	resp, err := q.client.send(ctx, "GET", q.path, nil, internal.WithQueryParams(qp))
 	if err != nil {
 		return err
 	}
