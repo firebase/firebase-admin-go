@@ -39,7 +39,7 @@ type HTTPClient struct {
 
 // Do executes the given Request, and returns a Response.
 func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
-	req, err := r.newHTTPRequest()
+	req, err := r.buildHTTPRequest()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ type Request struct {
 	Opts   []HTTPOption
 }
 
-func (r *Request) newHTTPRequest() (*http.Request, error) {
+func (r *Request) buildHTTPRequest() (*http.Request, error) {
 	var opts []HTTPOption
 	var data io.Reader
 	if r.Body != nil {
