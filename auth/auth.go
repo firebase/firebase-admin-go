@@ -22,7 +22,11 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
@@ -30,6 +34,7 @@ import (
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
 const issuerPrefix = "https://securetoken.google.com/"
 const tokenExpSeconds = 3600
 
@@ -60,9 +65,10 @@ type Token struct {
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	ks        keySource
-	projectID string
-	snr       signer
+	transportClient *internal.HTTPClient
+	ks              keySource
+	projectID       string
+	snr             signer
 }
 
 type signer interface {
@@ -77,30 +83,64 @@ type UserInfo struct {
 	DisplayName string
 	Email       string
 	PhoneNumber string
-	PhotoUrl    string
+	PhotoURL    string
 	// This can be short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
-	ProviderId string
-	Uid        string
+	ProviderID string
+	UID        string
 }
 
 //UserMetadata contains additional metadata associated with a user account.
 type UserMetadata struct {
-	CreationTimestamp   int64
-	LastSignInTimestamp int64
+	CreationTimestamp  int64
+	LastLogInTimestamp int64
 }
 
 // UserRecord contains metadata associated with a Firebase user account.
 type UserRecord struct {
 	*UserInfo
-	Disabled      bool
-	Emailverified bool
-	Providerdata  []UserInfo
-	Usermetadata  UserMetadata
+	CustomClaims     map[string]string
+	Disabled         bool
+	EmailVerified    bool
+	ProviderUserInfo []*UserInfo
+	UserMetadata     *UserMetadata
 }
 
-func (c *Client) CreateUser(uid) UserRecord {
-	return UserRecord{}
+type ExportedUserRecord struct {
+	*UserRecord
+	PasswordHash string
+	PasswordSalt string
+}
+
+type ListUsersPage struct {
+	Users      []*ExportedUserRecord
+	PageToken  string
+	maxResults int
+	client     *Client
+}
+
+type ListUsersRequest struct {
+	MaxResults int
+	PageToken  string
+}
+
+// Getter for the toolkit URL
+func IDToolKitURL() string {
+	return idToolKitURL
+}
+
+func newHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
+	var hc *http.Client
+	if ctx != nil && len(opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, opts...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hc = http.DefaultClient
+	}
+	return hc, nil
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -138,17 +178,61 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
+	hc, err := newHTTPClient(ctx, c.Opts...)
+	if err != nil {
+		return nil, err
+	}
 
-	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
+	ks, err := newHTTPKeySource(googleCertURL, hc)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		ks:        ks,
-		projectID: c.ProjectID,
-		snr:       snr,
+		transportClient: &internal.HTTPClient{Client: hc},
+		ks:              ks,
+		projectID:       c.ProjectID,
+		snr:             snr,
 	}, nil
+}
+
+func (c *Client) httpClient() *internal.HTTPClient {
+	return c.transportClient
+}
+
+// Passes the request struct, returns a byte array of the json
+func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[string]interface{}) ([]byte, error) {
+	url := IDToolKitURL() + serviceName
+	request := &internal.Request{
+		Method: "POST",
+		URL:    url,
+		Body:   internal.NewJSONEntity(m),
+	}
+
+	resp, err := c.httpClient().Do(ctx, request)
+
+	if err != nil {
+		return nil, err
+	}
+	if resp.Status != 200 {
+		return nil, fmt.Errorf("unexpected http status code: %d\n Contents: %s\n", resp.Status, string(resp.Body))
+
+	}
+	return resp.Body, nil
+}
+
+func parseResponse(b []byte) (map[string]interface{}, error) {
+	var responseJson map[string]interface{}
+	err := json.Unmarshal(b, &responseJson)
+
+	if err != nil {
+		return nil, err
+	}
+	return responseJson, nil
+}
+
+type requestStruct interface {
+	Validate() (bool, error)
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting

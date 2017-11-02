@@ -32,7 +32,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
+const verifyCustomToken = "verifyCustomToken?key=%s"
 
 var client *auth.Client
 
@@ -55,6 +55,61 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(m.Run())
+}
+
+func testCreateUserBlank(t *testing.T) string {
+	u, err := client.CreateUser(context.Background())
+	if err != nil {
+		t.Fatalf("Error: %v\nDebug Info:%#v", err, u)
+	}
+	return u.UID
+}
+func testCreateUserWithIdEmail(t *testing.T, uid, email string) {
+	u, err := client.CreateUser(context.Background(), auth.WithUID(uid), auth.WithEmail(email))
+	if err != nil {
+		t.Fatalf("Error: %v\nDebug Info:%s", err, u)
+	}
+}
+
+func testDeleteUser(t *testing.T, uid string) {
+	err := client.DeleteUser(context.Background(), uid)
+
+	if err != nil {
+		t.Fatalf("Error: %v\nDebug Info:%s", err, uid)
+	}
+
+}
+
+func TestGetUser(t *testing.T) {
+	uid := "test_get_user"
+	testCreateUserWithIdEmail(t, uid, "test_get_user@aaa.cc")
+
+	u, err := client.GetUser(context.Background(), uid)
+
+	if err != nil {
+		t.Errorf("error getting user %s", err)
+	}
+	if u.UID != uid {
+		t.Errorf("wrong user: %#v", u)
+	}
+	testDeleteUser(t, uid)
+
+}
+func TestListUsers(t *testing.T) {
+
+	lp, err := client.ListUsersWithMaxResults(context.Background(), "", 4)
+	if err != nil {
+		t.Errorf("error %s", err)
+	}
+
+	for ui := range lp.IterateAll(context.Background()) {
+		u, e := ui.Value()
+		if e != nil {
+			t.Errorf("Error in iterator")
+		}
+		fmt.Printf("%#v  \n%#v\n%#v\n\n", *u, u.Email, u.UserInfo)
+	}
+
 }
 
 func TestCustomToken(t *testing.T) {
@@ -120,7 +175,7 @@ func signInWithCustomToken(token string) (string, error) {
 		return "", err
 	}
 
-	resp, err := postRequest(fmt.Sprintf(idToolKitURL, apiKey), req)
+	resp, err := postRequest(fmt.Sprintf(auth.IDToolKitURL()+verifyCustomToken, apiKey), req)
 	if err != nil {
 		return "", err
 	}

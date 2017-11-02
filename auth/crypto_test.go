@@ -43,7 +43,7 @@ type mockReadCloser struct {
 	closeCount int
 }
 
-func newHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
+func newHTTPClientMock(data []byte) (*http.Client, *mockReadCloser) {
 	rc := &mockReadCloser{
 		data:       string(data),
 		closeCount: 0,
@@ -87,20 +87,28 @@ func TestHTTPKeySource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url")
+	hc, rc := newHTTPClientMock(data)
+	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if ks.HTTPClient == nil {
-		t.Errorf("HTTPClient = nil; want non-nil")
-	}
-	hc, rc := newHTTPClient(data)
-	ks.HTTPClient = hc
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
 	}
+}
+func TestNewHTTPClientWithOptionClient(t *testing.T) {
+
+	hc, _ := newHTTPClientMock([]byte(""))
+	ctx := context.Background()
+	hcnew, err := newHTTPClient(ctx, option.WithHTTPClient(hc))
+	if err != nil {
+		t.Error()
+	}
+	if hcnew != hc {
+		t.Errorf("HTTPClient = %v; want %v", hcnew, hc)
+	}
+
 }
 
 func TestHTTPKeySourceWithClient(t *testing.T) {
@@ -109,23 +117,20 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hc, rc := newHTTPClient(data)
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	hc, rc := newHTTPClientMock(data)
+	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if ks.HTTPClient != hc {
-		t.Errorf("HTTPClient = %v; want %v", ks.HTTPClient, hc)
-	}
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestHTTPKeySourceEmptyResponse(t *testing.T) {
-	hc, _ := newHTTPClient([]byte(""))
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	hc, _ := newHTTPClientMock([]byte(""))
+	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,8 +141,8 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 }
 
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
-	hc, _ := newHTTPClient([]byte("{\"foo\": 1}"))
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	hc, _ := newHTTPClientMock([]byte("{\"foo\": 1}"))
+	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +158,7 @@ func TestHTTPKeySourceTransportError(t *testing.T) {
 			Err: errors.New("transport error"),
 		},
 	}
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
 	}

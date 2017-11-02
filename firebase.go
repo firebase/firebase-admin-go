@@ -33,6 +33,7 @@ import (
 var firebaseScopes = []string{
 	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
+	"https://www.googleapis.com/auth/identitytoolkit",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
 

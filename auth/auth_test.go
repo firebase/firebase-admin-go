@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -33,7 +34,6 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
-	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"
 )
 
@@ -326,6 +326,9 @@ type mockKeySource struct {
 	err  error
 }
 
+func (f *mockKeySource) httpClient() *http.Client {
+	return &http.Client{}
+}
 func (t *mockKeySource) Keys() ([]*publicKey, error) {
 	return t.keys, t.err
 }
@@ -336,6 +339,9 @@ type fileKeySource struct {
 	CachedKeys []*publicKey
 }
 
+func (f *fileKeySource) httpClient() *http.Client {
+	return &http.Client{}
+}
 func (f *fileKeySource) Keys() ([]*publicKey, error) {
 	if f.CachedKeys == nil {
 		certs, err := ioutil.ReadFile(f.FilePath)
@@ -373,41 +379,22 @@ func newAEKeySource(ctx context.Context) (keySource, error) {
 	return aeKeySource{keys}, nil
 }
 
+func (k aeKeySource) httpClient() *http.Client {
+	return &http.Client{}
+}
+
 // Keys returns the RSA Public Keys managed by App Engine.
 func (k aeKeySource) Keys() ([]*publicKey, error) {
 	return k.keys, nil
 }
 
-func TestAppCreation(t *testing.T) {
-	config := &firebase.Config{ProjectID: "mock-project-id"}
+func TestNewHTTPClientNoOpts(t *testing.T) {
 	ctx := context.Background()
-	app, err := NewApp(ctx, nil, option.WithTokenSource(config.TokenSource(ctx)))
+	hc, err := newHTTPClient(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Error()
 	}
-
+	if hc == nil {
+		t.Errorf("HTTPClient = nil; want non-nil")
+	}
 }
-
-// Adding tests for user management
-/*
-func TestUserRecordMetadata(t *testing.T) {
-	metadata := client.UserMetadata(map[string]interface{}{
-		"createdAt":   10,
-		"lastLoginAt": 20})
-	if created, err := metadata.CreationTimestamp(); err != nil || created != 10 {
-		t.Errorf("metadata createdAt not propagated (%v %v)", created, err)
-	}
-	if last, err := metadata.LastSignInTimestamp(); err != nil || last != 20 {
-		t.Errorf("metadata last sign in not propagated  (%v %v)", last, err)
-	}
-	metadata = client.UserMetadata(map[string]interface{}{})
-
-	if _, err := metadata.CreationTimestamp(); err == nil {
-		t.Errorf("not expecting metadata createdAt")
-	}
-	if _, err := metadata.LastSignInTimestamp(); err == nil {
-		t.Errorf("not expecting metadata last sign in ")
-	}
-
-}
-*/
