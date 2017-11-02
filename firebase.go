@@ -78,7 +78,8 @@ func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 	return storage.NewClient(ctx, conf)
 }
 
-// Firestore returns a new instance of firestore.Client from the cloud.google.com/go package.
+// Firestore returns a new firestore.Client instance from the https://godoc.org/cloud.google.com/go/firestore
+// package.
 func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
 	if a.projectID == "" {
 		return nil, errors.New("project id is required to access Firestore")
