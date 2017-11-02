@@ -18,6 +18,10 @@
 package firebase
 
 import (
+	"errors"
+
+	"cloud.google.com/go/firestore"
+
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/storage"
@@ -31,6 +35,8 @@ import (
 )
 
 var firebaseScopes = []string{
+	"https://www.googleapis.com/auth/cloud-platform",
+	"https://www.googleapis.com/auth/datastore",
 	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
 	"https://www.googleapis.com/auth/userinfo.email",
@@ -70,6 +76,14 @@ func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 		Bucket: a.storageBucket,
 	}
 	return storage.NewClient(ctx, conf)
+}
+
+// Firestore returns a new instance of firestore.Client from the cloud.google.com/go package.
+func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
+	if a.projectID == "" {
+		return nil, errors.New("project id is required to access Firestore")
+	}
+	return firestore.NewClient(ctx, a.projectID, a.opts...)
 }
 
 // NewApp creates a new App from the provided config and client options.

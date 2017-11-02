@@ -228,6 +228,59 @@ func TestStorage(t *testing.T) {
 	}
 }
 
+func TestFirestore(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Firestore(ctx); c == nil || err != nil {
+		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	}
+}
+
+func TestFirestoreWithProjectID(t *testing.T) {
+	varName := "GCLOUD_PROJECT"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, ""); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
+	ctx := context.Background()
+	config := &Config{ProjectID: "project-id"}
+	app, err := NewApp(ctx, config, option.WithCredentialsFile("testdata/refresh_token.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Firestore(ctx); c == nil || err != nil {
+		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	}
+}
+
+func TestFirestoreWithNoProjectID(t *testing.T) {
+	varName := "GCLOUD_PROJECT"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, ""); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/refresh_token.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Firestore(ctx); c != nil || err == nil {
+		t.Errorf("Firestore() = (%v, %v); want (nil, error)", c, err)
+	}
+}
+
 func TestCustomTokenSource(t *testing.T) {
 	ctx := context.Background()
 	ts := &testTokenSource{AccessToken: "mock-token-from-custom"}

@@ -16,9 +16,8 @@
 package internal
 
 import (
-	"google.golang.org/api/option"
-
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 // AuthConfig represents the configuration of Firebase Auth service.
