@@ -26,10 +26,10 @@ import (
 	"os"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 const verifyCustomToken = "verifyCustomToken?key=%s"
