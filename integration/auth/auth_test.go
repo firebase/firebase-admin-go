@@ -26,15 +26,21 @@ import (
 	"os"
 	"testing"
 
-	"golang.org/x/net/context"
-
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
+
+	"golang.org/x/net/context"
 )
 
 const verifyCustomToken = "verifyCustomToken?key=%s"
 
 var client *auth.Client
+
+var testFixtures = struct {
+	uidList            []string
+	sampleUserBlank    *auth.UserRecord
+	sampleUserWithData *auth.UserRecord
+}{}
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -53,63 +59,68 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	if ok := prepareTests(); !ok {
+		os.Exit(1)
+	}
 
-	os.Exit(m.Run())
+	exitVal := m.Run()
+
+	if ok := cleanupTests(); !ok {
+		os.Exit(1)
+	}
+	os.Exit(exitVal)
 }
 
-func testCreateUserBlank(t *testing.T) string {
+func prepareTests() bool {
+	for i := 0; i < 11; i++ {
+		u, err := client.CreateUser(context.Background())
+		if err != nil {
+			return false
+		}
+		testFixtures.uidList = append(testFixtures.uidList, u.UID)
+	}
 	u, err := client.CreateUser(context.Background())
 	if err != nil {
-		t.Fatalf("Error: %v\nDebug Info:%#v", err, u)
+		return false
 	}
-	return u.UID
-}
-func testCreateUserWithIdEmail(t *testing.T, uid, email string) {
-	u, err := client.CreateUser(context.Background(), auth.WithUID(uid), auth.WithEmail(email))
+	testFixtures.sampleUserBlank = u
+	u, err = client.CreateUser(context.Background(), auth.WithUID("testuid123"),
+		auth.WithEmail("email123@test.com"), auth.WithDisplayName("display_name"))
 	if err != nil {
-		t.Fatalf("Error: %v\nDebug Info:%s", err, u)
+		return false
 	}
+	testFixtures.sampleUserWithData = u
+	return true
 }
-
-func testDeleteUser(t *testing.T, uid string) {
-	err := client.DeleteUser(context.Background(), uid)
-
+func cleanupTests() bool {
+	lp, err := client.ListUsersWithMaxResults(context.Background(), "", 4)
 	if err != nil {
-		t.Fatalf("Error: %v\nDebug Info:%s", err, uid)
+		return false
 	}
 
+	for ui := range lp.IterateAll(context.Background()) {
+		u, err := ui.Value()
+		if err != nil {
+			return false
+		}
+		err = client.DeleteUser(context.Background(), u.UID)
+		if err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func TestGetUser(t *testing.T) {
-	uid := "test_get_user"
-	testCreateUserWithIdEmail(t, uid, "test_get_user@aaa.cc")
-
+	uid := "testuid123"
 	u, err := client.GetUser(context.Background(), uid)
 
 	if err != nil {
 		t.Errorf("error getting user %s", err)
 	}
-	if u.UID != uid {
-		t.Errorf("wrong user: %#v", u)
+	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserInfo)
 	}
-	testDeleteUser(t, uid)
-
-}
-func TestListUsers(t *testing.T) {
-
-	lp, err := client.ListUsersWithMaxResults(context.Background(), "", 4)
-	if err != nil {
-		t.Errorf("error %s", err)
-	}
-
-	for ui := range lp.IterateAll(context.Background()) {
-		u, e := ui.Value()
-		if e != nil {
-			t.Errorf("Error in iterator")
-		}
-		fmt.Printf("%#v  \n%#v\n%#v\n\n", *u, u.Email, u.UserInfo)
-	}
-
 }
 
 func TestCustomToken(t *testing.T) {

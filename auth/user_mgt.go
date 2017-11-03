@@ -36,7 +36,18 @@ func WithDisplayName(dn string) withDisplayName { return withDisplayName(dn) }
 type withDisplayName string
 
 func (dn withDisplayName) applyForCreateUser(uf *UserFields) { uf.payload["displayName"] = dn }
-func (dn withDisplayName) applyForUpdateUser(uf *UserFields) { uf.payload["displayName"] = dn }
+func (dn withDisplayName) applyForUpdateUser(uf *UserFields) {
+	if dn == "" {
+		if _, ok := uf.payload["deleteAttribute"]; ok {
+			uf.payload["deleteAttribute"] = append(uf.payload["deleteAttribute"].([]string), "displayName")
+		} else {
+			uf.payload["deleteAttribute"] = []string{"displayName"}
+		}
+
+	} else {
+		uf.payload["displayName"] = dn
+	}
+}
 
 // Email option
 func WithEmail(em string) withEmail { return withEmail(em) }
@@ -88,19 +99,6 @@ func (da withDisabled) applyForUpdateUser(uf *UserFields) { uf.payload["disabled
 
 // Remove Options (Update Only)
 
-// Remove Display Name
-func WithRemoveDisplayName() withRemoveDisplayName { return withRemoveDisplayName{} }
-
-type withRemoveDisplayName struct{}
-
-func (dn withRemoveDisplayName) applyForUpdateUser(uf *UserFields) {
-	if _, ok := uf.payload["deleteAttribute"]; ok {
-		uf.payload["deleteAttribute"] = append(uf.payload["deleteAttribute"].([]string), "displayName")
-	} else {
-		uf.payload["deleteAttribute"] = []string{"displayName"}
-	}
-}
-
 // Remove Phone Number
 func WithRemovePhoneNumber() withRemovePhoneNumber { return withRemovePhoneNumber{} }
 
@@ -148,6 +146,13 @@ func (uf *UserFields) Validate() (bool, error) {
 				if _, found := uf.payload[deleteAtt]; found {
 					return false, fmt.Errorf("trying to delete and set %s", deleteAtt)
 				}
+			}
+		}
+	}
+	for _, non_empty := range []string{"displayName", "photoURL", "phoneNumber"} {
+		if val, ok := uf.payload[non_empty]; ok {
+			if val == "" {
+				return false, fmt.Errorf("empty field %s", non_empty)
 			}
 		}
 	}
