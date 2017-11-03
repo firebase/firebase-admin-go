@@ -122,8 +122,8 @@ do not already have one suitable for running the tests against. Then obtain the
 following credentials from the project:
 
 1. *Service account certificate*: This can be downloaded as a JSON file from
-   the "Settings > Service Accounts" tab of the Firebase console. Copy the
-   file into your Go workspace as
+   the "Settings > Service Accounts" tab of the Firebase console. Click 
+   "GENERATE NEW PRIVATE KEY" and copy the file into your Go workspace as
    `src/firebase.google.com/go/testdata/integration_cert.json`.
 2. *Web API key*: This is displayed in the "Settings > General" tab of the
    console. Copy it and save to a new text file. Copy this text file into
