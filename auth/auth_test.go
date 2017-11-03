@@ -40,6 +40,12 @@ import (
 var client *Client
 var testIDToken string
 
+type testFixtures struct {
+	userIdList         []string
+	userWithSomeParams *UserRecord
+	blankUser          *UserRecord
+}
+
 func TestMain(m *testing.M) {
 	var (
 		err   error

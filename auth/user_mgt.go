@@ -97,6 +97,13 @@ type withDisabled bool
 func (da withDisabled) applyForCreateUser(uf *UserFields) { uf.payload["disabled"] = da }
 func (da withDisabled) applyForUpdateUser(uf *UserFields) { uf.payload["disabled"] = da }
 
+// Disabled option
+func withCustomClaims(cc map[string]interface{}) customClaims { return customClaims(cc) }
+
+type customClaims map[string]interface{}
+
+func (cc customClaims) applyForUpdateUser(uf *UserFields) { uf.payload["customAttributes"] = cc }
+
 // Remove Options (Update Only)
 
 // Remove Phone Number
@@ -158,6 +165,7 @@ func (uf *UserFields) Validate() (bool, error) {
 	}
 	return true, nil
 }
+
 func NewUserFields() UserFields {
 	return UserFields{payload: make(map[string]interface{})}
 }
@@ -171,20 +179,33 @@ func (c *Client) CreateUser(ctx context.Context, opts ...CreateUserOption) (ur *
 	for _, opt := range opts {
 		opt.applyForCreateUser(&f)
 	}
+	return c.updateCreateUser(ctx, "signupNewUser", &f)
 
+}
+func (c *Client) UpdateUser(ctx context.Context, uid string, opts ...UpdateUserOption) (ur *UserRecord, err error) {
+
+	f := NewUserFields()
+	f.payload["localId"] = uid
+	for _, opt := range opts {
+		opt.applyForUpdateUser(&f)
+	}
+	return c.updateCreateUser(ctx, "setAccountInfo", &f)
+}
+
+func (c *Client) updateCreateUser(ctx context.Context, action string, f *UserFields) (ur *UserRecord, err error) {
 	if ok, err := f.Validate(); !ok || err != nil {
 		return nil, err
 	}
 
-	ans, err := c.makeUserRequest(ctx, "signupNewUser", f.payload)
+	resp, err := c.makeUserRequest(ctx, action, f.payload)
 
 	if err != nil {
-		return nil, fmt.Errorf("bad request %s, %s", string(ans), err)
+		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
 	}
 
-	jsonMap, err := parseResponse(ans)
+	jsonMap, err := parseResponse(resp)
 	if err != nil {
-		return nil, fmt.Errorf("bad json %s, %s", string(ans), err)
+		return nil, fmt.Errorf("bad json %s, %s", string(resp), err)
 	}
 	uid := jsonMap["localId"].(string)
 
@@ -221,7 +242,7 @@ type ResponseUserRecord struct {
 	CreationTimestamp  int64             `json:"createdAt,string,omitempty"`
 	LastLogInTimestamp int64             `json:"lastLoginAt,string,omitempty"`
 	ProviderID         string            `json:"providerID,omitempty"`
-	CustomClaims       map[string]string `json:"customClaims,omitempty"`
+	CustomClaims       map[string]string `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
 	Disabled           bool              `json:"disabled,omitempty"`
 	EmailVerified      bool              `json:"emailVerified,omitempty"`
 	ProviderUserInfo   []*UserInfo       `json:"providerMata,omitempty"`
@@ -240,7 +261,7 @@ func (c *Client) GetUser(ctx context.Context, uid string) (*ExportedUserRecord, 
 	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
 }
 func makeExportedUser(rur ResponseUserRecord) *ExportedUserRecord {
-	ans := &ExportedUserRecord{
+	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
 				DisplayName: rur.DisplayName,
@@ -262,8 +283,7 @@ func makeExportedUser(rur ResponseUserRecord) *ExportedUserRecord {
 		PasswordHash: rur.PasswordHash,
 		PasswordSalt: rur.PasswordSalt,
 	}
-	//	fmt.Printf("rur %+v\nrur %#v\n-------------\nans %+v\nans %#v\n\n========\n", rur, rur, ans, ans)
-	return ans
+	return resp
 }
 
 func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*ExportedUserRecord, error) {
@@ -281,6 +301,11 @@ func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*Export
 	return makeExportedUser(gur.Users[0]), nil
 }
 
+func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims map[string]interface{}) error {
+	_, err := c.UpdateUser(ctx, uid, withCustomClaims(claims))
+	return err
+}
+
 func (c *Client) ListUsers(ctx context.Context, pageToken string) (*ListUsersPage, error) {
 	return c.ListUsersWithMaxResults(ctx, pageToken, MaxResults)
 }
@@ -290,7 +315,7 @@ func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, 
 	if len(pageToken) > 0 {
 		payload["nextPageToken"] = pageToken
 	}
-	ans, err := c.makeUserRequest(
+	resp, err := c.makeUserRequest(
 		ctx,
 		"downloadAccount",
 		payload)
@@ -299,7 +324,7 @@ func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, 
 	}
 
 	var lur ListUsersResponse
-	err2 := json.Unmarshal(ans, &lur)
+	err2 := json.Unmarshal(resp, &lur)
 	if err2 != nil {
 		return nil, err2
 	}
