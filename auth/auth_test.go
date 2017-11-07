@@ -41,7 +41,7 @@ var client *Client
 var testIDToken string
 
 type testFixtures struct {
-	userIdList         []string
+	userIDList         []string
 	userWithSomeParams *UserRecord
 	blankUser          *UserRecord
 }
@@ -332,11 +332,12 @@ type mockKeySource struct {
 	err  error
 }
 
-func (f *mockKeySource) httpClient() *http.Client {
+func (k *mockKeySource) httpClient() *http.Client {
 	return &http.Client{}
 }
-func (t *mockKeySource) Keys() ([]*publicKey, error) {
-	return t.keys, t.err
+
+func (k *mockKeySource) Keys() ([]*publicKey, error) {
+	return k.keys, k.err
 }
 
 // fileKeySource loads a set of public keys from the local file system.
