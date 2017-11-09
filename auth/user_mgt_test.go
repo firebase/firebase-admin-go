@@ -52,6 +52,7 @@ type mockAuthServer struct {
 	Status int
 	Reqs   []*testReq
 	srv    *httptest.Server
+	client *Client
 }
 
 func EchoServer(resp interface{}) *mockAuthServer {
@@ -76,8 +77,12 @@ func EchoServer(resp interface{}) *mockAuthServer {
 		&internal.AuthConfig{
 			Opts: []option.ClientOption{option.WithHTTPClient(s.srv.Client())},
 		})
-	client.transportClient.Client = s.srv.Client()
+	_ = err
+	s.client = authClient
 	return &s
+}
+func (s *mockAuthServer) Client() *Client {
+	return s.client
 }
 
 func TestExportPayload(t *testing.T) {
@@ -86,7 +91,20 @@ func TestExportPayload(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
-	srv := EchoServer(client, "message5")
+	s := EchoServer("message5")
+	t.Errorf(" a %+v\n b %+v\n c %+v\n==\n1 %#v\n2 %#v\n3 %#v\n==================-------=-=-=--", s, s.srv, s.srv.URL,
+		s.client.transportClient, s.client.httpClient().Client, s.srv.Client())
 
-	t.Errorf("%v", client)
+	respo, err := s.client.transportClient.Client.Get("fdfdfdfdfdf")
+	if err != nil {
+		t.Errorf("= - = - = - %s\n%#v\n\n", err, respo)
+
+	}
+	t.Fatalf("= - = - = - %s\n%#v\n\n", err, respo)
+	defer s.srv.Close()
+
+	user, err := s.Client().GetUser(context.Background(), "asdf")
+	_ = user
+	_ = err
+	//	t.Errorf("%v\n>> > > > \n>\n>\n> > \n%+v\n >>>>> %+v\n >> %s", user, s, s.Client(), err)
 }

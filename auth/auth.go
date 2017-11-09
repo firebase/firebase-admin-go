@@ -202,15 +202,19 @@ func (c *Client) httpClient() *internal.HTTPClient {
 
 // Passes the request struct, returns a byte array of the json
 func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[string]interface{}) ([]byte, error) {
+	fmt.Printf("1-23- - -- %+v\n\n", c.transportClient.Client.Transport)
+
 	url := IDToolKitURL() + serviceName
 	request := &internal.Request{
 		Method: "POST",
 		URL:    url,
 		Body:   internal.NewJSONEntity(m),
 	}
-
+	fmt.Println("1-234-", request)
 	resp, err := c.httpClient().Do(ctx, request)
 
+	fmt.Println("1-2345-body - ", string(resp.Body))
+	fmt.Println("1-2346- - err -", err)
 	if err != nil {
 		return nil, err
 	}
