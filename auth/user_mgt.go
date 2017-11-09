@@ -288,22 +288,16 @@ func makeExportedUser(rur ResponseUserRecord) *ExportedUserRecord {
 
 func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*ExportedUserRecord, error) {
 	resp, err := c.makeUserRequest(ctx, "getAccountInfo", m)
-	fmt.Println("1-2-3-", m)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
-	fmt.Println("1-2-3-4")
-
 	var gur GetUserResponse
 	err = json.Unmarshal(resp, &gur)
-	fmt.Println("1-2-3-5")
-
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
-	fmt.Println("1-2-3-6")
 
 	return makeExportedUser(gur.Users[0]), nil
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 
 	"firebase.google.com/go/internal"
@@ -55,7 +56,7 @@ type mockAuthServer struct {
 	client *Client
 }
 
-func EchoServer(resp interface{}) *mockAuthServer {
+func echoServer(resp interface{}) *mockAuthServer {
 	s := mockAuthServer{Resp: resp}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,22 +93,55 @@ func TestExportPayload(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
-	s := EchoServer("message5")
-	t.Errorf(" a %+v\n b %+v\n c %+v\n==\n1 %#v\n2 %#v\n3 %#v\n==================-------=-=-=--", s, s.srv, s.srv.URL,
-		s.client.transportClient, s.client.httpClient().Client, s.srv.Client())
 
-	respo, err := s.client.transportClient.Client.Get(s.srv.URL)
+	//	b, err := ioutil.ReadFile(internal.Resource("get_user_data.json"))
+	//	if err != nil {
+	//		log.Fatalln(err)
+	//	}
+	//	t.Fatalf("%#v \n\n%s\n", b, string(b))
+	s := echoServer(map[string]interface{}{
+		"kind": "identitytoolkit#GetAccountInfoResponse",
+		"users": []map[string]interface{}{
+			{
+				"localId":       "ZY1rJK0...",
+				"email":         "user@example.com",
+				"emailVerified": false,
+				"displayName":   "John Doe",
+				"providerUserInfo": []map[string]interface{}{
+					{
+						"providerId":  "password",
+						"displayName": "John Doe",
+						"photoUrl":    "http://localhost:8080/img1234567890/photo.png",
+						"email":       "user@example.com",
+					},
+				},
+				"photoUrl":     "https://lh5.googleusercontent.com/.../photo.jpg",
+				"passwordHash": "...",
+				"disabled":     false,
+				"lastLoginAt":  "1484628946000",
+				"createdAt":    "1484124142000",
+			},
+		},
+	})
+
+	defer s.srv.Close()
+	//	t.Errorf(" a %+v\n b %+v\n c %+v\n==\n1 %#v\n2 %#v\n3 %#v\n==================-------=-=-=--", s, s.srv, s.srv.URL,
+	//		s.client.transportClient, s.client.httpClient().Client, s.srv.Client())
+
+	user, err := s.Client().GetUser(context.Background(), "ignored_id")
 	if err != nil {
-		t.Errorf("= - = - = - %s\n%#v\n\n", err, respo)
+		t.Error(err)
 
 	}
-
-	//	b, err := ioutil.ReadAll(respo.Body)
-	//	t.Fatalf("= - = - = - %s\n%#v\n\n", err, string(b))
-	defer s.srv.Close()
-
-	user, err := s.Client().GetUser(context.Background(), "asdf")
-	_ = user
-	_ = err
-	t.Errorf("%v\n>> > > > \n>\n>\n> > \n%+v\n >>>>> %+v\n >> %s", user, s, s.Client(), err)
+	if user.UID != "ZY1rJK0..." {
+		t.Errorf("wanted 'ZY1rJK0...' got %s", user.UID)
+	}
+	want_metadata := &UserMetadata{
+		CreationTimestamp:  1484124142000,
+		LastLogInTimestamp: 1484628946000,
+	}
+	if !reflect.DeepEqual(want_metadata, user.UserMetadata) {
+		t.Errorf("got %v wanted %v", user.UserMetadata, want_metadata)
+	}
+	//	t.Errorf("%#v %#v", user.UserMetadata, user.CustomClaims)
 }

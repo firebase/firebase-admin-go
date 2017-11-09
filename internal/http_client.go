@@ -153,10 +153,7 @@ func (r *Response) Unmarshal(want int, v interface{}) error {
 	if err := r.CheckStatus(want); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(r.Body, v); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(r.Body, v)
 }
 
 // ErrorParser is a function that is used to construct custom error messages.
