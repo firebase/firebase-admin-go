@@ -78,7 +78,7 @@ func EchoServer(resp interface{}) *mockAuthServer {
 			Opts: []option.ClientOption{option.WithHTTPClient(s.srv.Client())},
 		})
 	_ = err
-	authClient.url = s.srv.Client().URL
+	authClient.url = s.srv.URL
 	s.client = authClient
 	return &s
 }
@@ -96,16 +96,18 @@ func TestGetUser(t *testing.T) {
 	t.Errorf(" a %+v\n b %+v\n c %+v\n==\n1 %#v\n2 %#v\n3 %#v\n==================-------=-=-=--", s, s.srv, s.srv.URL,
 		s.client.transportClient, s.client.httpClient().Client, s.srv.Client())
 
-	respo, err := s.client.transportClient.Client.Get("fdfdfdfdfdf")
+	respo, err := s.client.transportClient.Client.Get(s.srv.URL)
 	if err != nil {
 		t.Errorf("= - = - = - %s\n%#v\n\n", err, respo)
 
 	}
-	t.Fatalf("= - = - = - %s\n%#v\n\n", err, respo)
+
+	//	b, err := ioutil.ReadAll(respo.Body)
+	//	t.Fatalf("= - = - = - %s\n%#v\n\n", err, string(b))
 	defer s.srv.Close()
 
 	user, err := s.Client().GetUser(context.Background(), "asdf")
 	_ = user
 	_ = err
-	//	t.Errorf("%v\n>> > > > \n>\n>\n> > \n%+v\n >>>>> %+v\n >> %s", user, s, s.Client(), err)
+	t.Errorf("%v\n>> > > > \n>\n>\n> > \n%+v\n >>>>> %+v\n >> %s", user, s, s.Client(), err)
 }

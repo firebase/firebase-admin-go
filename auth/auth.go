@@ -208,7 +208,7 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[
 
 	request := &internal.Request{
 		Method: "POST",
-		URL:    c.url + serviceName,
+		URL:    c.url + "/" + serviceName,
 		Body:   internal.NewJSONEntity(m),
 	}
 	fmt.Println("1-234-", request)
