@@ -78,6 +78,7 @@ func EchoServer(resp interface{}) *mockAuthServer {
 			Opts: []option.ClientOption{option.WithHTTPClient(s.srv.Client())},
 		})
 	_ = err
+	authClient.url = s.srv.Client().URL
 	s.client = authClient
 	return &s
 }

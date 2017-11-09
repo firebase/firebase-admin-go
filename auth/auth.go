@@ -69,6 +69,7 @@ type Client struct {
 	ks              keySource
 	projectID       string
 	snr             signer
+	url             string
 }
 
 type signer interface {
@@ -193,6 +194,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		ks:              ks,
 		projectID:       c.ProjectID,
 		snr:             snr,
+		url:             IDToolKitURL(),
 	}, nil
 }
 
@@ -204,10 +206,9 @@ func (c *Client) httpClient() *internal.HTTPClient {
 func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[string]interface{}) ([]byte, error) {
 	fmt.Printf("1-23- - -- %+v\n\n", c.transportClient.Client.Transport)
 
-	url := IDToolKitURL() + serviceName
 	request := &internal.Request{
 		Method: "POST",
-		URL:    url,
+		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(m),
 	}
 	fmt.Println("1-234-", request)
