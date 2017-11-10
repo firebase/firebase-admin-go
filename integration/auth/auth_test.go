@@ -71,21 +71,24 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
+var uid string
+
 func prepareTests() bool {
-	for i := 0; i < 11; i++ {
+	uid = "tefwfd1234"
+	for i := 0; i < 5; i++ {
 		u, err := client.CreateUser(context.Background())
 		if err != nil {
 			return false
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background())
+	u, err := client.CreateUser(context.Background(), auth.WithPassword("ggfdghh"))
 	if err != nil {
 		return false
 	}
 	testFixtures.sampleUserBlank = u
-	u, err = client.CreateUser(context.Background(), auth.WithUID("testuid123"),
-		auth.WithEmail("email123@test.com"), auth.WithDisplayName("display_name"))
+	u, err = client.CreateUser(context.Background(), auth.WithUID(uid),
+		auth.WithEmail(uid+"eml5f@test.com"), auth.WithDisplayName("display_name"), auth.WithPassword("assawd"))
 	if err != nil {
 		return false
 	}
@@ -97,7 +100,6 @@ func cleanupTests() bool {
 	if err != nil {
 		return false
 	}
-
 	for ui := range lp.IterateAll(context.Background()) {
 		u, err := ui.Value()
 		if err != nil {
@@ -110,9 +112,14 @@ func cleanupTests() bool {
 	}
 	return true
 }
-
+func TestListUsers(t *testing.T) {
+	page, _ := client.ListUsers(context.Background(), "")
+	for i, u := range page.Users {
+		fmt.Printf("%#v %#v", i, u)
+	}
+}
 func TestGetUser(t *testing.T) {
-	uid := "testuid123"
+
 	u, err := client.GetUser(context.Background(), uid)
 
 	if err != nil {

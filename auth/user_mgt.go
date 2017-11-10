@@ -21,16 +21,16 @@ import (
 	"golang.org/x/net/context"
 )
 
-const MaxResults = 1000
+const maxResults = 1000
 
-// UID option ("localId" in the REST), Create only
+// WithUID returns a string to be used in the create function.("localId" in the REST)
 func WithUID(uid string) withUID { return withUID(uid) }
 
 type withUID string
 
 func (uid withUID) applyForCreateUser(uf *UserFields) { uf.payload["localId"] = uid }
 
-// DisplayName option
+// WithDisplayName returns a string to be used in the create and update functions.
 func WithDisplayName(dn string) withDisplayName { return withDisplayName(dn) }
 
 type withDisplayName string
@@ -49,7 +49,7 @@ func (dn withDisplayName) applyForUpdateUser(uf *UserFields) {
 	}
 }
 
-// Email option
+// WithEmail returns a string to be used in the create and update functions.
 func WithEmail(em string) withEmail { return withEmail(em) }
 
 type withEmail string
@@ -138,7 +138,6 @@ type UserFields struct{ payload map[string]interface{} }
 
 func (uf UserFields) ExportPayload() ([]byte, error) {
 	req, err := json.Marshal(&uf.payload)
-	//	fmt.Println(string(req), uf, uf.payload, err)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +201,6 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, f *UserFie
 	if err != nil {
 		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
 	}
-
 	jsonMap, err := parseResponse(resp)
 	if err != nil {
 		return nil, fmt.Errorf("bad json %s, %s", string(resp), err)
@@ -247,7 +245,7 @@ type ResponseUserRecord struct {
 	EmailVerified      bool              `json:"emailVerified,omitempty"`
 	ProviderUserInfo   []*UserInfo       `json:"providerMata,omitempty"`
 	PasswordHash       string            `json:"passwordHash,omitempty"`
-	PasswordSalt       string            `json:"passwordSalt,omitempty"`
+	PasswordSalt       string            `json:"salt,omitempty"`
 	ValidSince         int64             `json:"validSince,string,omitempty"`
 }
 
@@ -289,16 +287,16 @@ func makeExportedUser(rur ResponseUserRecord) *ExportedUserRecord {
 func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*ExportedUserRecord, error) {
 	resp, err := c.makeUserRequest(ctx, "getAccountInfo", m)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	var gur GetUserResponse
 	err = json.Unmarshal(resp, &gur)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-
+	if len(gur.Users) == 0 {
+		return nil, fmt.Errorf("cannot find user %v", m)
+	}
 	return makeExportedUser(gur.Users[0]), nil
 }
 
@@ -308,7 +306,7 @@ func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims map[str
 }
 
 func (c *Client) ListUsers(ctx context.Context, pageToken string) (*ListUsersPage, error) {
-	return c.ListUsersWithMaxResults(ctx, pageToken, MaxResults)
+	return c.ListUsersWithMaxResults(ctx, pageToken, maxResults)
 }
 
 func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, numResults int) (*ListUsersPage, error) {
@@ -323,7 +321,6 @@ func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, 
 	if err != nil {
 		return nil, err
 	}
-
 	var lur ListUsersResponse
 	err2 := json.Unmarshal(resp, &lur)
 	if err2 != nil {

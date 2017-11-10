@@ -51,7 +51,7 @@ type mockAuthServer struct {
 	Resp   interface{}
 	Header map[string]string
 	Status int
-	Reqs   []*testReq
+	Req    *http.Request
 	srv    *httptest.Server
 	client *Client
 }
@@ -60,8 +60,8 @@ func echoServer(resp interface{}) *mockAuthServer {
 	s := mockAuthServer{Resp: resp}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tr, _ := newTestReq(r)
-		s.Reqs = append(s.Reqs, tr)
+
+		s.Req = r
 
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
@@ -92,6 +92,62 @@ func TestExportPayload(t *testing.T) {
 	_ = uf
 }
 
+/*
+users := []map[string]interface{}{
+{
+        "localId" : "testuser0",
+        "email" : "testuser@example.com",
+        "phoneNumber" : "+1234567890",
+        "emailVerified" : true,
+        "displayName" : "Test User",
+        "providerUserInfo" : [ {
+            "providerId" : "password",
+            "displayName" : "Test User",
+            "photoUrl" : "http://www.example.com/testuser/photo.png",
+            "federatedId" : "testuser@example.com",
+            "email" : "testuser@example.com",
+            "rawId" : "testuser@example.com"
+        }, {
+            "providerId" : "phone",
+            "phoneNumber" : "+1234567890",
+            "rawId" : "+1234567890"
+        } ],
+        "photoUrl" : "http://www.example.com/testuser/photo.png",
+        "passwordHash" : "passwordHash",
+        "salt": "passwordSalt",
+        "passwordUpdatedAt" : 1.494364393E+12,
+        "validSince" : "1494364393",
+        "disabled" : false,
+        "createdAt" : "1234567890",
+        "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
+    }, {
+        "localId" : "testuser1",
+        "email" : "testuser@example.com",
+        "phoneNumber" : "+1234567890",
+        "emailVerified" : true,
+        "displayName" : "Test User",
+        "providerUserInfo" : [ {
+            "providerId" : "password",
+            "displayName" : "Test User",
+            "photoUrl" : "http://www.example.com/testuser/photo.png",
+            "federatedId" : "testuser@example.com",
+            "email" : "testuser@example.com",
+            "rawId" : "testuser@example.com"
+        }, {
+            "providerId" : "phone",
+            "phoneNumber" : "+1234567890",
+            "rawId" : "+1234567890"
+        } ],
+        "photoUrl" : "http://www.example.com/testuser/photo.png",
+        "passwordHash" : "passwordHash",
+        "salt": "passwordSalt",
+        "passwordUpdatedAt" : 1.494364393E+12,
+        "validSince" : "1494364393",
+        "disabled" : false,
+        "createdAt" : "1234567890",
+        "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
+    } ]
+*/
 func TestGetUser(t *testing.T) {
 
 	//	b, err := ioutil.ReadFile(internal.Resource("get_user_data.json"))
@@ -105,7 +161,7 @@ func TestGetUser(t *testing.T) {
 			{
 				"localId":       "ZY1rJK0...",
 				"email":         "user@example.com",
-				"emailVerified": false,
+				"emailVerified": true,
 				"displayName":   "John Doe",
 				"providerUserInfo": []map[string]interface{}{
 					{
@@ -125,23 +181,34 @@ func TestGetUser(t *testing.T) {
 	})
 
 	defer s.srv.Close()
-	//	t.Errorf(" a %+v\n b %+v\n c %+v\n==\n1 %#v\n2 %#v\n3 %#v\n==================-------=-=-=--", s, s.srv, s.srv.URL,
-	//		s.client.transportClient, s.client.httpClient().Client, s.srv.Client())
-
 	user, err := s.Client().GetUser(context.Background(), "ignored_id")
 	if err != nil {
 		t.Error(err)
 
 	}
-	if user.UID != "ZY1rJK0..." {
-		t.Errorf("wanted 'ZY1rJK0...' got %s", user.UID)
+	tests := []struct {
+		got  interface{}
+		want interface{}
+	}{
+		{user.UID, "ZY1rJK0..."},
+		{user.UserMetadata, &UserMetadata{CreationTimestamp: 1484124142000, LastLogInTimestamp: 1484628946000}},
+		{user.Email, "user@example.com"},
+		{user.EmailVerified, true},
+		{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
+		{user.Disabled, false},
+		/*	{user.ProviderUserInfo, []map[string]interface{}{
+			{
+				"providerId":  "password",
+				"displayName": "John Doe",
+				"photoUrl":    "http://localhost:8080/img1234567890/photo.png",
+				"email":       "user@example.com",
+			},
+		}},*/
 	}
-	want_metadata := &UserMetadata{
-		CreationTimestamp:  1484124142000,
-		LastLogInTimestamp: 1484628946000,
-	}
-	if !reflect.DeepEqual(want_metadata, user.UserMetadata) {
-		t.Errorf("got %v wanted %v", user.UserMetadata, want_metadata)
+	for _, test := range tests {
+		if !reflect.DeepEqual(test.want, test.got) {
+			t.Errorf("got %#v wanted %#v", test.got, test.want)
+		}
 	}
 	//	t.Errorf("%#v %#v", user.UserMetadata, user.CustomClaims)
 }

@@ -34,7 +34,7 @@ import (
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
+const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty"
 const issuerPrefix = "https://securetoken.google.com/"
 const tokenExpSeconds = 3600
 
@@ -210,10 +210,12 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[
 		URL:    c.url + "/" + serviceName,
 		Body:   internal.NewJSONEntity(m),
 	}
-
+	//	fmt.Printf("ASDFASDF %#v ", request)
 	resp, err := c.httpClient().Do(ctx, request)
 
 	if err != nil {
+		fmt.Printf("L217 %#v ", err)
+
 		return nil, err
 	}
 	if resp.Status != 200 {
