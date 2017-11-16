@@ -14,40 +14,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-/*
-type testReq struct {
-	Method string
-	Path   string
-	Header http.Header
-	Body   []byte
-	Query  map[string]string
-}
-
-func newTestReq(r *http.Request) (*testReq, error) {
-	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	u, err := url.Parse(r.RequestURI)
-	if err != nil {
-		return nil, err
-	}
-
-	query := make(map[string]string)
-	for k, v := range u.Query() {
-		query[k] = v[0]
-	}
-	return &testReq{
-		Method: r.Method,
-		Path:   u.Path,
-		Header: r.Header,
-		Body:   b,
-		Query:  query,
-	}, nil
-}
-*/
 type mockAuthServer struct {
 	Resp   interface{}
 	Header map[string]string
@@ -88,29 +54,29 @@ func (s *mockAuthServer) Client() *Client {
 	return s.client
 }
 
-type UserCParams struct {
+/*
+type userCParams struct {
 	CustomClaims *CustomClaimsMap `json:"lucsc,omitempty"`
 	Disabled     *bool            `json:"l2,omitempty"`
 	DisplayName  *string          `json:"displayn,omitempty"`
 	Dd           string           `json:"l5"`
 }
-
+*/
 func TestCreateParams(t *testing.T) {
-	//	t.Errorf(*utils.StringP("-=-=4"))
-	t1 := UserCParams{
+	t1 := UserCreateParams{
 		DisplayName: utils.StringP(""),
 		Disabled:    utils.BoolP(false),
 		CustomClaims: &CustomClaimsMap{"asdf": "ff",
 			"asdff": "ffdf"},
-		Dd: "asd",
 	}
-
-	t2 := UserCParams{
+	m, e := json.Marshal(t1)
+	fmt.Printf("%s\n--\n %#v\n---===\n\n", e, string(m))
+	t2 := UserCreateParams{
 		DisplayName:  t1.DisplayName,
 		CustomClaims: t1.CustomClaims,
 	}
-	m, e := json.Marshal(t2)
-	fmt.Printf("%s, %#v", e, string(m))
+	m, e = json.Marshal(t2)
+	fmt.Printf("%s\n--\n %#v\n", e, string(m))
 
 }
 func TestExportPayload(t *testing.T) {
@@ -222,7 +188,7 @@ func TestGetUser(t *testing.T) {
 		{user.EmailVerified, true},
 		{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
 		{user.Disabled, false},
-		/*	{user.ProviderUserInfo, []map[string]interface{}{
+		/*{user.ProviderUserInfo, []map[string]interface{}{
 			{
 				"providerId":  "password",
 				"displayName": "John Doe",

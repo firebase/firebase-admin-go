@@ -17,6 +17,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"firebase.google.com/go/utils"
@@ -47,14 +48,14 @@ type UserCreateParams struct {
 //
 // Used to expose profile information returned by an identity provider.
 type UserInfo struct {
-	DisplayName string
-	Email       string
-	PhoneNumber string
-	PhotoURL    string
-	// This can be short domain name (e.g. google.com),
+	DisplayName string `json:"displayName,omitempty"`
+	Email       string `json:"email,omitempty"`
+	PhoneNumber string `json:"phoneNumber,omitempty"`
+	PhotoURL    string `json:"photoURL,omitempty"`
+	// ProviderID can be short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
-	ProviderID string
-	UID        string
+	ProviderID string `json:"providerId,omitempty"`
+	UID        string `json:"localId,omitempty"`
 }
 
 //UserMetadata contains additional metadata associated with a user account.
@@ -218,7 +219,7 @@ func validateCustomClaims(cc *CustomClaimsMap) *string {
 			return utils.StringP(key + " is a reserved claim")
 		}
 	}
-	b, err := json.Marshal(cc)
+	b, err := json.Marshal(*cc)
 	if err != nil {
 		return utils.StringP(fmt.Sprintf("can't convert claims to json %v", *cc))
 	}
@@ -227,16 +228,30 @@ func validateCustomClaims(cc *CustomClaimsMap) *string {
 	}
 	return nil
 }
+func validatePhoneNumber(phone *string) *string {
+	if phone == nil {
+		return nil
+	}
+	if !strings.HasPrefix(*phone, "+") {
+		return utils.StringP("phone # must begin with a +")
+	}
+	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
+	if !isAlphaNum(*phone) {
+		return utils.StringP("phone # must contain an alphanumeric character")
+	}
+	return nil
+}
 
 func validated(up userParams) (bool, error) {
 	errors := []*string{
 		validateCustomClaims(up.getCustomClaims()),
+		validatePhoneNumber(up.getPhoneNumber()),
+
 		validateStringLenGTE(up.getPassword(), "password", 6),
 		validateStringLenLTE(up.getUID(), "uid", 128),
 		validateStringLenGTE(up.getUID(), "uid", 0),
 		validateStringLenGTE(up.getDisplayName(), "displayName", 0),
 		validateStringLenGTE(up.getPhotoURL(), "photoURL", 0),
-		validateStringLenGTE(up.getPhoneNumber(), "phoneNumber", 0),
 
 		validateStringLenGTE(up.getEmail(), "email", 0),
 		validateString(up.getEmail(),
