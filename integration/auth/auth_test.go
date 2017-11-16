@@ -26,6 +26,8 @@ import (
 	"os"
 	"testing"
 
+	"firebase.google.com/go/utils"
+
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
 
@@ -60,13 +62,13 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	if ok := prepareTests(); !ok {
-		os.Exit(1)
+		os.Exit(11)
 	}
 
 	exitVal := m.Run()
 
 	if ok := cleanupTests(); !ok {
-		os.Exit(1)
+		os.Exit(12)
 	}
 	os.Exit(exitVal)
 }
@@ -74,22 +76,33 @@ func TestMain(m *testing.M) {
 var uid string
 
 func prepareTests() bool {
+	if ok := cleanupTests(); !ok {
+		fmt.Println("trouble cleaning up from previous run.")
+		return false
+	}
 	uid = "tefwfd1234"
-	for i := 0; i < 5; i++ {
-		u, err := client.CreateUser(context.Background())
+	for i := 0; i < 3; i++ {
+		u, err := client.CreateUser(context.Background(), nil)
 		if err != nil {
 			return false
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background(), auth.WithPassword("ggfdghh"))
+	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{DisplayName: utils.StringP("stringh")})
 	if err != nil {
+		fmt.Println(90)
 		return false
 	}
 	testFixtures.sampleUserBlank = u
-	u, err = client.CreateUser(context.Background(), auth.WithUID(uid),
-		auth.WithEmail(uid+"eml5f@test.com"), auth.WithDisplayName("display_name"), auth.WithPassword("assawd"))
+	u, err = client.CreateUser(context.Background(), &auth.UserCreateParams{
+		UID:         utils.StringP(uid),
+		Email:       utils.StringP(uid + "eml5f@test.com"),
+		DisplayName: utils.StringP("display_name"),
+		Password:    utils.StringP("assawd"),
+	})
 	if err != nil {
+		fmt.Println(100)
+		fmt.Println(err, u)
 		return false
 	}
 	testFixtures.sampleUserWithData = u
@@ -113,9 +126,74 @@ func cleanupTests() bool {
 	return true
 }
 func TestListUsers(t *testing.T) {
-	page, _ := client.ListUsers(context.Background(), "")
+	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
+	num := 0
 	for i, u := range page.Users {
-		fmt.Printf("%#v %#v", i, u)
+		fmt.Printf("%#v %#v\n", i, u)
+		num++
+	}
+	if num != 2 {
+		t.Errorf("expecting %d users got %d", 2, num)
+	}
+}
+func TestPagingMax(t *testing.T) {
+	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
+	npages := 0
+	var err error
+	for page != nil {
+		fmt.Printf("page++  %d -- - \n", npages)
+		fmt.Printf("%#v \n%#v\n-\n", page, page.Users)
+		for _, u := range page.Users {
+			fmt.Printf(" - - %#v\n", u.UserInfo)
+		}
+		npages++
+		page, err = page.Next(context.Background())
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	fmt.Printf("page  %d -- == \n", npages)
+	fmt.Printf("%#v \n ", page)
+
+	if npages != 4 {
+		t.Errorf("expecting %d pages, seen %d", 4, npages) // the last page is not nil, but contains 0 users
+	}
+}
+func TestPaging(t *testing.T) {
+	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 10)
+	npages := 0
+	var err error
+	for page != nil {
+		fmt.Printf("page  %d -- - \n", npages)
+		fmt.Printf("%#v \n%#v\n-\n", page, page.Users)
+		for _, u := range page.Users {
+			fmt.Printf(" - - %#v\n", u.UserInfo)
+		}
+		npages++
+		page, err = page.Next(context.Background())
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	fmt.Printf("page  %d -- == \n", npages)
+	fmt.Printf("%#v \n ", page)
+
+	if npages != 2 {
+		t.Errorf("expecting %d pages, seen %d", 2, npages) // the last page is not nil, but contains 0 users
+	}
+}
+func TestIterator(t *testing.T) {
+	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
+	nitems := 0
+	for ui := range page.IterateAll(context.Background()) {
+		_, err := ui.Value()
+		if err != nil {
+			t.Error(err)
+		}
+		nitems++
+	}
+	if nitems != 5 {
+		t.Errorf("expecting %d items, seen %d", 5, nitems)
 	}
 }
 func TestGetUser(t *testing.T) {
@@ -132,6 +210,7 @@ func TestGetUser(t *testing.T) {
 
 func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken("user1")
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +271,6 @@ func signInWithCustomToken(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	resp, err := postRequest(fmt.Sprintf(auth.IDToolKitURL()+verifyCustomToken, apiKey), req)
 	if err != nil {
 		return "", err

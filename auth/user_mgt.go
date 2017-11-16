@@ -17,186 +17,196 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"firebase.google.com/go/utils"
 
 	"golang.org/x/net/context"
 )
 
 const maxResults = 1000
 
-// WithUID returns a string to be used in the create function.("localId" in the REST)
-func WithUID(uid string) withUID { return withUID(uid) }
+type CustomClaimsMap map[string]interface{}
 
-type withUID string
+type UserCreateParams struct {
+	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
+	Disabled      *bool            `json:"disabled,omitempty"`
+	DisplayName   *string          `json:"displayName,omitempty"`
+	Email         *string          `json:"email,omitempty"`
+	EmailVerified *bool            `json:"emailVerified,omitempty"`
+	Password      *string          `json:"password,omitempty"`
+	PhoneNumber   *string          `json:"phoneNumber,omitempty"`
+	PhotoURL      *string          `json:"photoURL,omitempty"`
+	UID           *string          `json:"localId,omitempty"`
+}
 
-func (uid withUID) applyForCreateUser(uf *UserFields) { uf.payload["localId"] = uid }
+func (c *Client) CreateUser(ctx context.Context, params *UserCreateParams) (ur *UserRecord, err error) {
+	if params == nil {
+		params = &UserCreateParams{}
+	}
+	return c.updateCreateUser(ctx, "signupNewUser", params)
+}
 
-// WithDisplayName returns a string to be used in the create and update functions.
-func WithDisplayName(dn string) withDisplayName { return withDisplayName(dn) }
+type UserUpdateParams struct {
+	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
+	Disabled      *bool            `json:"disabled,omitempty"`
+	DisplayName   *string          `json:"displayName,omitempty"`
+	Email         *string          `json:"email,omitempty"`
+	EmailVerified *bool            `json:"emailVerified,omitempty"`
+	Password      *string          `json:"password,omitempty"`
+	PhoneNumber   *string          `json:"phoneNumber,omitempty"`
+	PhotoURL      *string          `json:"photoURL,omitempty"`
+}
 
-type withDisplayName string
+type userUpdateParams struct {
+	*UserUpdateParams
+	UID                 *string  `json:"localId,omitempty"`
+	DeleteAttributeList []string `json:"deleteAttribute,omitempty"`
+	DeleteProviderList  []string `json:"deleteProvider,omitempty"`
+}
 
-func (dn withDisplayName) applyForCreateUser(uf *UserFields) { uf.payload["displayName"] = dn }
-func (dn withDisplayName) applyForUpdateUser(uf *UserFields) {
-	if dn == "" {
-		if _, ok := uf.payload["deleteAttribute"]; ok {
-			uf.payload["deleteAttribute"] = append(uf.payload["deleteAttribute"].([]string), "displayName")
-		} else {
-			uf.payload["deleteAttribute"] = []string{"displayName"}
+func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserUpdateParams) (ur *UserRecord, err error) {
+	up := &userUpdateParams{
+		UserUpdateParams: params,
+		UID:              utils.StringP(uid),
+	}
+	up.setDeleteFields()
+
+	return c.updateCreateUser(ctx, "setAccountInfo", up)
+}
+func isEmptyString(ps *string) bool {
+	return ps != nil && *ps == ""
+}
+func (up *userUpdateParams) setDeleteFields() {
+	var deleteProvList, deleteAttrList []string
+	if isEmptyString(up.DisplayName) {
+		deleteAttrList = append(deleteAttrList, "DISPLAY_NAME")
+		up.DisplayName = nil
+	}
+	if isEmptyString(up.PhotoURL) {
+		deleteAttrList = append(deleteAttrList, "PHOTO_URL")
+		up.PhotoURL = nil
+	}
+	if isEmptyString(up.PhoneNumber) {
+		deleteProvList = append(deleteProvList, "phone")
+		up.PhoneNumber = nil
+	}
+	if deleteAttrList != nil {
+		up.DeleteAttributeList = deleteAttrList
+	}
+	if deleteProvList != nil {
+		up.DeleteProviderList = deleteProvList
+	}
+}
+
+type userParams interface {
+	getUID() *string
+	getDisplayName() *string
+	getDisabled() *bool
+	getEmail() *string
+	getEmailVerified() *bool
+	getCustomClaims() *CustomClaimsMap
+	getPassword() *string
+	getPhotoURL() *string
+	getPhoneNumber() *string
+}
+
+func (cp *UserCreateParams) getUID() *string { return cp.UID }
+func (up *userUpdateParams) getUID() *string { return up.UID }
+
+func (cp *UserCreateParams) getDisplayName() *string { return cp.DisplayName }
+func (up *userUpdateParams) getDisplayName() *string { return up.DisplayName }
+
+func (cp *UserCreateParams) getDisabled() *bool { return cp.Disabled }
+func (up *userUpdateParams) getDisabled() *bool { return up.Disabled }
+
+func (cp *UserCreateParams) getEmail() *string { return cp.Email }
+func (up *userUpdateParams) getEmail() *string { return up.Email }
+
+func (cp *UserCreateParams) getEmailVerified() *bool { return cp.EmailVerified }
+func (up *userUpdateParams) getEmailVerified() *bool { return up.EmailVerified }
+
+func (cp *UserCreateParams) getCustomClaims() *CustomClaimsMap { return cp.CustomClaims }
+func (up *userUpdateParams) getCustomClaims() *CustomClaimsMap { return up.CustomClaims }
+
+func (cp *UserCreateParams) getPassword() *string { return cp.Password }
+func (up *userUpdateParams) getPassword() *string { return up.Password }
+
+func (cp *UserCreateParams) getPhotoURL() *string { return cp.PhotoURL }
+func (up *userUpdateParams) getPhotoURL() *string { return up.PhotoURL }
+
+func (cp *UserCreateParams) getPhoneNumber() *string { return cp.PhoneNumber }
+func (up *userUpdateParams) getPhoneNumber() *string { return up.PhoneNumber }
+
+func validateString(s *string, condition func(string) bool, message string) *string {
+	if s == nil || condition(*s) {
+		return nil
+	}
+	return &message
+}
+func validateStringLenGTE(s *string, name string, length int) *string {
+	return validateString(s, func(st string) bool { return len(st) >= length }, fmt.Sprintf("%s must be at least %d chars long", name, length))
+}
+
+func validateStringLenLTE(s *string, name string, length int) *string {
+	return validateString(s, func(st string) bool { return len(st) <= length }, fmt.Sprintf("%s must be at most %d chars long", name, length))
+}
+
+func validateCustomClaims(cc *CustomClaimsMap) *string {
+	if cc == nil {
+		return nil
+	}
+	for _, key := range reservedClaims {
+		if _, ok := (*cc)[key]; !ok {
+			return utils.StringP(key + " is a reserved claim")
 		}
-
-	} else {
-		uf.payload["displayName"] = dn
 	}
-}
-
-// WithEmail returns a string to be used in the create and update functions.
-func WithEmail(em string) withEmail { return withEmail(em) }
-
-type withEmail string
-
-func (em withEmail) applyForCreateUser(uf *UserFields) { uf.payload["email"] = em }
-func (em withEmail) applyForUpdateUser(uf *UserFields) { uf.payload["email"] = em }
-
-// EmailVerified option
-func WithEmailVerified(ev bool) withEmailVerified { return withEmailVerified(ev) }
-
-type withEmailVerified bool
-
-func (ev withEmailVerified) applyForCreateUser(uf *UserFields) { uf.payload["emailVerified"] = ev }
-func (ev withEmailVerified) applyForUpdateUser(uf *UserFields) { uf.payload["emailVerified"] = ev }
-
-// PhoneNumber option
-func WithPhoneNumber(pn string) withPhoneNumber { return withPhoneNumber(pn) }
-
-type withPhoneNumber string
-
-func (pn withPhoneNumber) applyForCreateUser(uf *UserFields) { uf.payload["phoneNumber"] = pn }
-func (pn withPhoneNumber) applyForUpdateUser(uf *UserFields) { uf.payload["phoneNumber"] = pn }
-
-// PhotoUTL option
-func WithPhotoURL(pu string) withPhotoURL { return withPhotoURL(pu) }
-
-type withPhotoURL string
-
-func (pu withPhotoURL) applyForCreateUser(uf *UserFields) { uf.payload["photoURL"] = pu }
-func (pu withPhotoURL) applyForUpdateUser(uf *UserFields) { uf.payload["photoURL"] = pu }
-
-//Password option
-func WithPassword(pw string) withPassword { return withPassword(pw) }
-
-type withPassword string
-
-func (pw withPassword) applyForCreateUser(uf *UserFields) { uf.payload["password"] = pw }
-func (pw withPassword) applyForUpdateUser(uf *UserFields) { uf.payload["password"] = pw }
-
-// Disabled option
-func WithDisabled(da bool) withDisabled { return withDisabled(da) }
-
-type withDisabled bool
-
-func (da withDisabled) applyForCreateUser(uf *UserFields) { uf.payload["disabled"] = da }
-func (da withDisabled) applyForUpdateUser(uf *UserFields) { uf.payload["disabled"] = da }
-
-// Disabled option
-func withCustomClaims(cc map[string]interface{}) customClaims { return customClaims(cc) }
-
-type customClaims map[string]interface{}
-
-func (cc customClaims) applyForUpdateUser(uf *UserFields) { uf.payload["customAttributes"] = cc }
-
-// Remove Options (Update Only)
-
-// Remove Phone Number
-func WithRemovePhoneNumber() withRemovePhoneNumber { return withRemovePhoneNumber{} }
-
-type withRemovePhoneNumber struct{}
-
-func (dn withRemovePhoneNumber) applyForUpdateUser(uf *UserFields) {
-	if _, ok := uf.payload["deleteProvider"]; ok {
-		uf.payload["deleteProvider"] = append(uf.payload["deleteProvider"].([]string), "phoneNumber")
-	} else {
-		uf.payload["deleteProvider"] = []string{"phoneNumber"}
-	}
-}
-
-// Remove Photo Url
-func WithRemovePhotoURL() withRemovePhotoURL { return withRemovePhotoURL{} }
-
-type withRemovePhotoURL struct{}
-
-func (dn withRemovePhotoURL) applyForUpdateUser(uf *UserFields) {
-	if _, ok := uf.payload["deleteAttribute"]; ok {
-		uf.payload["deleteAttribute"] = append(uf.payload["deleteAttribute"].([]string), "photoURL")
-	} else {
-		uf.payload["deleteAttribute"] = []string{"photoURL"}
-	}
-}
-
-// -------- drafts.
-
-type UserFields struct{ payload map[string]interface{} }
-
-func (uf UserFields) ExportPayload() ([]byte, error) {
-	req, err := json.Marshal(&uf.payload)
+	b, err := json.Marshal(cc)
 	if err != nil {
-		return nil, err
+		return utils.StringP(fmt.Sprintf("can't convert claims to json %v", *cc))
 	}
-	return req, nil
-
+	if len(b) > 1000 {
+		return utils.StringP("length of custom claims cannot exceed 1000 chars")
+	}
+	return nil
 }
 
-func (uf *UserFields) Validate() (bool, error) {
-	for _, deleteList := range []string{"deleteAttribute", "deleteProvider"} {
-		if delete, exists := uf.payload[deleteList]; exists {
-			for _, deleteAtt := range delete.([]string) {
-				if _, found := uf.payload[deleteAtt]; found {
-					return false, fmt.Errorf("trying to delete and set %s", deleteAtt)
-				}
-			}
+func validated(up userParams) (bool, error) {
+	errors := []*string{
+		validateCustomClaims(up.getCustomClaims()),
+		validateStringLenGTE(up.getPassword(), "password", 6),
+		validateStringLenLTE(up.getUID(), "uid", 128),
+		validateStringLenGTE(up.getUID(), "uid", 0),
+		validateStringLenGTE(up.getDisplayName(), "displayName", 0),
+		validateStringLenGTE(up.getPhotoURL(), "photoURL", 0),
+		validateStringLenGTE(up.getPhoneNumber(), "phoneNumber", 0),
+
+		validateStringLenGTE(up.getEmail(), "email", 0),
+		validateString(up.getEmail(),
+			func(s string) bool { return strings.Count(s, "@") == 1 },
+			"email must contain exactly one '@' sign"),
+		validateString(up.getEmail(),
+			func(s string) bool { return strings.Index(s, "@") > 0 && strings.LastIndex(s, "@") < (len(s)-1) },
+			"email must have non empty account and domain"),
+	}
+	var res []string
+	for _, e := range errors {
+		if e != nil {
+			res = append(res, *e)
 		}
 	}
-	for _, non_empty := range []string{"displayName", "photoURL", "phoneNumber"} {
-		if val, ok := uf.payload[non_empty]; ok {
-			if val == "" {
-				return false, fmt.Errorf("empty field %s", non_empty)
-			}
-		}
+	if res == nil {
+		return true, nil
 	}
-	return true, nil
+
+	return false, fmt.Errorf("error in params: %s", strings.Join(res, ", "))
 }
-
-func NewUserFields() UserFields {
-	return UserFields{payload: make(map[string]interface{})}
-}
-
-type CreateUserOption interface {
-	applyForCreateUser(*UserFields)
-}
-
-func (c *Client) CreateUser(ctx context.Context, opts ...CreateUserOption) (ur *UserRecord, err error) {
-	f := NewUserFields()
-	for _, opt := range opts {
-		opt.applyForCreateUser(&f)
-	}
-	return c.updateCreateUser(ctx, "signupNewUser", &f)
-
-}
-func (c *Client) UpdateUser(ctx context.Context, uid string, opts ...UpdateUserOption) (ur *UserRecord, err error) {
-
-	f := NewUserFields()
-	f.payload["localId"] = uid
-	for _, opt := range opts {
-		opt.applyForUpdateUser(&f)
-	}
-	return c.updateCreateUser(ctx, "setAccountInfo", &f)
-}
-
-func (c *Client) updateCreateUser(ctx context.Context, action string, f *UserFields) (ur *UserRecord, err error) {
-	if ok, err := f.Validate(); !ok || err != nil {
+func (c *Client) updateCreateUser(ctx context.Context, action string, p userParams) (ur *UserRecord, err error) {
+	//	return nil, nil
+	if ok, err := validated(p); !ok || err != nil {
 		return nil, err
 	}
-
-	resp, err := c.makeUserRequest(ctx, action, f.payload)
+	resp, err := c.makeUserRequest(ctx, action, p)
 
 	if err != nil {
 		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
@@ -212,6 +222,7 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, f *UserFie
 		return nil, err
 	}
 	return user.UserRecord, nil
+	/**/
 }
 
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
@@ -221,10 +232,11 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	return err
 }
 
+/*
 type UpdateUserOption interface {
 	applyForUpdateUser(*UserFields)
 }
-
+*/
 ///----
 type GetUserResponse struct {
 	RequestType string               `json:"kind,omitempty"`
@@ -300,8 +312,8 @@ func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*Export
 	return makeExportedUser(gur.Users[0]), nil
 }
 
-func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims map[string]interface{}) error {
-	_, err := c.UpdateUser(ctx, uid, withCustomClaims(claims))
+func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims *CustomClaimsMap) error {
+	_, err := c.UpdateUser(ctx, uid, &UserUpdateParams{CustomClaims: claims})
 	return err
 }
 

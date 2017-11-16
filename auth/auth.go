@@ -34,7 +34,7 @@ import (
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty"
+const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
 const issuerPrefix = "https://securetoken.google.com/"
 const tokenExpSeconds = 3600
 
@@ -203,21 +203,20 @@ func (c *Client) httpClient() *internal.HTTPClient {
 }
 
 // Passes the request struct, returns a byte array of the json
-func (c *Client) makeUserRequest(ctx context.Context, serviceName string, m map[string]interface{}) ([]byte, error) {
+func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}) ([]byte, error) {
 
 	request := &internal.Request{
 		Method: "POST",
-		URL:    c.url + "/" + serviceName,
-		Body:   internal.NewJSONEntity(m),
+		URL:    c.url + serviceName,
+		Body:   internal.NewJSONEntity(up),
 	}
-	//	fmt.Printf("ASDFASDF %#v ", request)
+
 	resp, err := c.httpClient().Do(ctx, request)
 
 	if err != nil {
-		fmt.Printf("L217 %#v ", err)
-
 		return nil, err
 	}
+
 	if resp.Status != 200 {
 		return nil, fmt.Errorf("unexpected http status code: %d\n Contents: %s\n", resp.Status, string(resp.Body))
 
@@ -281,6 +280,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
+
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
