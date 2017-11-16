@@ -26,8 +26,11 @@ import (
 
 const maxResults = 1000
 
+// CustomClaimsMap is an alias for readability.
 type CustomClaimsMap map[string]interface{}
 
+// UserCreateParams encapsulates the named calling params for CreateUser
+// the json tags are used to convert this to the format expected by the API with the right names
 type UserCreateParams struct {
 	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
 	Disabled      *bool            `json:"disabled,omitempty"`
@@ -40,6 +43,52 @@ type UserCreateParams struct {
 	UID           *string          `json:"localId,omitempty"`
 }
 
+// UserInfo A collection of standard profile information for a user.
+//
+// Used to expose profile information returned by an identity provider.
+type UserInfo struct {
+	DisplayName string
+	Email       string
+	PhoneNumber string
+	PhotoURL    string
+	// This can be short domain name (e.g. google.com),
+	// or the identity of an OpenID identity provider.
+	ProviderID string
+	UID        string
+}
+
+//UserMetadata contains additional metadata associated with a user account.
+type UserMetadata struct {
+	CreationTimestamp  int64
+	LastLogInTimestamp int64
+}
+
+// UserRecord contains metadata associated with a Firebase user account.
+type UserRecord struct {
+	*UserInfo
+	CustomClaims     map[string]string
+	Disabled         bool
+	EmailVerified    bool
+	ProviderUserInfo []*UserInfo
+	UserMetadata     *UserMetadata
+}
+
+// ExportedUserRecord is the returned user value used when listing all the users.
+type ExportedUserRecord struct {
+	*UserRecord
+	PasswordHash string
+	PasswordSalt string
+}
+
+// ListUsersPage is the page object containing at most maxResults Users. this is the anchor for iterating over users.
+type ListUsersPage struct {
+	Users      []*ExportedUserRecord
+	PageToken  string
+	maxResults int
+	client     *Client
+}
+
+// CreateUser creates a new user with the specified properties.
 func (c *Client) CreateUser(ctx context.Context, params *UserCreateParams) (ur *UserRecord, err error) {
 	if params == nil {
 		params = &UserCreateParams{}
@@ -47,6 +96,11 @@ func (c *Client) CreateUser(ctx context.Context, params *UserCreateParams) (ur *
 	return c.updateCreateUser(ctx, "signupNewUser", params)
 }
 
+// UserUpdateParams encapsulates the named calling params for UpdateUser
+// the json tags are used to convert this to the format expected by the API with the right names
+// This struct will be amended with other data before the call.
+// DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record
+// nil pointers will remain unchanged.
 type UserUpdateParams struct {
 	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
 	Disabled      *bool            `json:"disabled,omitempty"`
@@ -65,6 +119,9 @@ type userUpdateParams struct {
 	DeleteProviderList  []string `json:"deleteProvider,omitempty"`
 }
 
+// UpdateUser updates a user with the given params
+// DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record
+// nil pointers in the UserUpdateParams will remain unchanged.
 func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserUpdateParams) (ur *UserRecord, err error) {
 	up := &userUpdateParams{
 		UserUpdateParams: params,
@@ -225,6 +282,7 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, p userPara
 	/**/
 }
 
+// DeleteUser deletes the user by the given UID
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 
 	_, err := c.makeUserRequest(ctx, "deleteAccount",
@@ -232,18 +290,12 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	return err
 }
 
-/*
-type UpdateUserOption interface {
-	applyForUpdateUser(*UserFields)
-}
-*/
-///----
-type GetUserResponse struct {
+type getUserResponse struct {
 	RequestType string               `json:"kind,omitempty"`
-	Users       []ResponseUserRecord `json:"users,omitempty"`
+	Users       []responseUserRecord `json:"users,omitempty"`
 }
 
-type ResponseUserRecord struct {
+type responseUserRecord struct {
 	UID                string            `json:"localId,omitempty"`
 	DisplayName        string            `json:"displayName,omitempty"`
 	Email              string            `json:"email,omitempty"`
@@ -261,16 +313,13 @@ type ResponseUserRecord struct {
 	ValidSince         int64             `json:"validSince,string,omitempty"`
 }
 
-type ListUsersResponse struct {
+type listUsersResponse struct {
 	RequestType string               `json:"kind,omitempty"`
-	Users       []ResponseUserRecord `json:"users,omitempty"`
+	Users       []responseUserRecord `json:"users,omitempty"`
 	NextPage    string               `json:"nextPageToken,omitempty"`
 }
 
-func (c *Client) GetUser(ctx context.Context, uid string) (*ExportedUserRecord, error) {
-	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
-}
-func makeExportedUser(rur ResponseUserRecord) *ExportedUserRecord {
+func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -301,7 +350,7 @@ func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*Export
 	if err != nil {
 		return nil, err
 	}
-	var gur GetUserResponse
+	var gur getUserResponse
 	err = json.Unmarshal(resp, &gur)
 	if err != nil {
 		return nil, err
@@ -312,15 +361,36 @@ func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*Export
 	return makeExportedUser(gur.Users[0]), nil
 }
 
+//GetUser returns the user by UID
+func (c *Client) GetUser(ctx context.Context, uid string) (*ExportedUserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
+}
+
+//GetUserByPhone returns the user by phone number
+func (c *Client) GetUserByPhone(ctx context.Context, phone string) (*ExportedUserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
+}
+
+//GetUserByEmail returns the user by the email
+func (c *Client) GetUserByEmail(ctx context.Context, email string) (*ExportedUserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
+}
+
+// SetCustomClaims sets the custom user claims, the json []byte of the custom claims map cannot exceed 1000 chars in length
 func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims *CustomClaimsMap) error {
 	_, err := c.UpdateUser(ctx, uid, &UserUpdateParams{CustomClaims: claims})
 	return err
 }
 
+// ListUsers returns a ListUsersPage object. Subsequently page.Users can be listed, or page.IterateAll can be called
+// This makes a call with the default maxResults (1000)
+// Note that the last page may have zero Users
 func (c *Client) ListUsers(ctx context.Context, pageToken string) (*ListUsersPage, error) {
 	return c.ListUsersWithMaxResults(ctx, pageToken, maxResults)
 }
 
+// ListUsersWithMaxResults is the same as ListUsers, but allows specification of the max results per page.
+// Note that the last page may have zero Users
 func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, numResults int) (*ListUsersPage, error) {
 	payload := map[string]interface{}{"maxResults": numResults}
 	if len(pageToken) > 0 {
@@ -333,7 +403,7 @@ func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, 
 	if err != nil {
 		return nil, err
 	}
-	var lur ListUsersResponse
+	var lur listUsersResponse
 	err2 := json.Unmarshal(resp, &lur)
 	if err2 != nil {
 		return nil, err2
@@ -350,10 +420,15 @@ func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, 
 	}, nil
 }
 
+// HasNext indicates whether there is a next page.
+// Calling Next() when HasNext is false will result in nil
 func (lup *ListUsersPage) HasNext() bool {
 	return lup.PageToken != ""
 }
 
+// Next returns a pointer to the next page of users.
+// It will use the same number of maxUsers as the current page.
+// Calling Next() when HasNext is false will result in nil
 func (lup *ListUsersPage) Next(ctx context.Context) (*ListUsersPage, error) {
 	if lup.PageToken == "" {
 		return nil, nil
@@ -361,22 +436,32 @@ func (lup *ListUsersPage) Next(ctx context.Context) (*ListUsersPage, error) {
 	return lup.client.ListUsersWithMaxResults(ctx, lup.PageToken, lup.maxResults)
 }
 
-type UserItem struct {
+type userItem struct {
 	user *ExportedUserRecord
 	err  error
 }
 
-func (ui *UserItem) Value() (*ExportedUserRecord, error) {
+// UserItem is returned by the Iterator
+type UserItem interface {
+	Value() (*ExportedUserRecord, error)
+}
+
+func (ui *userItem) Value() (*ExportedUserRecord, error) {
 	return ui.user, ui.err
 }
-func (lup *ListUsersPage) IterateAll(ctx context.Context) chan *UserItem {
 
-	ch := make(chan *UserItem, lup.maxResults)
+// IterateAll returns a channel of UserItem s that can be used with ":= range ..."
+// Note that the values can be retrieved by the Value() functions, and errors in retrieving the next page
+// will be propagated through the channel in that manner.
+// Exiting the loop that handles the received values and having the caller go out of scope will terminate the channel.
+// No specific closing needed.
+func (lup *ListUsersPage) IterateAll(ctx context.Context) chan UserItem {
+	ch := make(chan UserItem, lup.maxResults)
 	go func() {
 		var err error
 		for lup != nil {
 			for _, u := range lup.Users {
-				ch <- &UserItem{
+				ch <- &userItem{
 					user: u,
 					err:  nil,
 				}
@@ -384,7 +469,7 @@ func (lup *ListUsersPage) IterateAll(ctx context.Context) chan *UserItem {
 
 			lup, err = lup.Next(ctx)
 			if err != nil {
-				ch <- &UserItem{
+				ch <- &userItem{
 					user: nil,
 					err:  err,
 				}

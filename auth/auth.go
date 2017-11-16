@@ -77,55 +77,7 @@ type signer interface {
 	Sign(b []byte) ([]byte, error)
 }
 
-// UserInfo A collection of standard profile information for a user.
-//
-// Used to expose profile information returned by an identity provider.
-type UserInfo struct {
-	DisplayName string
-	Email       string
-	PhoneNumber string
-	PhotoURL    string
-	// This can be short domain name (e.g. google.com),
-	// or the identity of an OpenID identity provider.
-	ProviderID string
-	UID        string
-}
-
-//UserMetadata contains additional metadata associated with a user account.
-type UserMetadata struct {
-	CreationTimestamp  int64
-	LastLogInTimestamp int64
-}
-
-// UserRecord contains metadata associated with a Firebase user account.
-type UserRecord struct {
-	*UserInfo
-	CustomClaims     map[string]string
-	Disabled         bool
-	EmailVerified    bool
-	ProviderUserInfo []*UserInfo
-	UserMetadata     *UserMetadata
-}
-
-type ExportedUserRecord struct {
-	*UserRecord
-	PasswordHash string
-	PasswordSalt string
-}
-
-type ListUsersPage struct {
-	Users      []*ExportedUserRecord
-	PageToken  string
-	maxResults int
-	client     *Client
-}
-
-type ListUsersRequest struct {
-	MaxResults int
-	PageToken  string
-}
-
-// Getter for the toolkit URL
+// IDToolKitURL is a getter for the toolkit URL
 func IDToolKitURL() string {
 	return idToolKitURL
 }
@@ -218,20 +170,20 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 	}
 
 	if resp.Status != 200 {
-		return nil, fmt.Errorf("unexpected http status code: %d\n Contents: %s\n", resp.Status, string(resp.Body))
+		return nil, fmt.Errorf("unexpected http status code: %d\n contents: %s", resp.Status, string(resp.Body))
 
 	}
 	return resp.Body, nil
 }
 
 func parseResponse(b []byte) (map[string]interface{}, error) {
-	var responseJson map[string]interface{}
-	err := json.Unmarshal(b, &responseJson)
+	var responseJSON map[string]interface{}
+	err := json.Unmarshal(b, &responseJSON)
 
 	if err != nil {
 		return nil, err
 	}
-	return responseJson, nil
+	return responseJSON, nil
 }
 
 type requestStruct interface {
