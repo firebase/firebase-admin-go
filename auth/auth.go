@@ -162,9 +162,7 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(up),
 	}
-
 	resp, err := c.httpClient().Do(ctx, request)
-
 	if err != nil {
 		return nil, err
 	}

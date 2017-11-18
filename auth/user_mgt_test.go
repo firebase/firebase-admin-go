@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
-	"firebase.google.com/go/utils"
+	"firebase.google.com/go/p"
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 )
@@ -64,19 +64,19 @@ type userCParams struct {
 */
 func TestCreateParams(t *testing.T) {
 	t1 := UserCreateParams{
-		DisplayName: utils.StringP(""),
-		Disabled:    utils.BoolP(false),
+		DisplayName: p.String(""),
+		Disabled:    p.Bool(false),
 		CustomClaims: &CustomClaimsMap{"asdf": "ff",
 			"asdff": "ffdf"},
 	}
 	m, e := json.Marshal(t1)
-	fmt.Printf("%s\n--\n %#v\n---===\n\n", e, string(m))
 	t2 := UserCreateParams{
 		DisplayName:  t1.DisplayName,
 		CustomClaims: t1.CustomClaims,
 	}
+	fmt.Println(m, e)
 	m, e = json.Marshal(t2)
-	fmt.Printf("%s\n--\n %#v\n", e, string(m))
+	fmt.Println(m, e)
 
 }
 func TestExportPayload(t *testing.T) {

@@ -20,7 +20,8 @@ import (
 	"regexp"
 	"strings"
 
-	"firebase.google.com/go/utils"
+	"firebase.google.com/go/p"
+	"google.golang.org/api/iterator"
 
 	"golang.org/x/net/context"
 )
@@ -51,7 +52,7 @@ type UserInfo struct {
 	DisplayName string `json:"displayName,omitempty"`
 	Email       string `json:"email,omitempty"`
 	PhoneNumber string `json:"phoneNumber,omitempty"`
-	PhotoURL    string `json:"photoURL,omitempty"`
+	PhotoURL    string `json:"photoUrl,omitempty"`
 	// ProviderID can be short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
 	ProviderID string `json:"providerId,omitempty"`
@@ -79,14 +80,6 @@ type ExportedUserRecord struct {
 	*UserRecord
 	PasswordHash string
 	PasswordSalt string
-}
-
-// ListUsersPage is the page object containing at most maxResults Users. this is the anchor for iterating over users.
-type ListUsersPage struct {
-	Users      []*ExportedUserRecord
-	PageToken  string
-	maxResults int
-	client     *Client
 }
 
 // CreateUser creates a new user with the specified properties.
@@ -126,7 +119,7 @@ type userUpdateParams struct {
 func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserUpdateParams) (ur *UserRecord, err error) {
 	up := &userUpdateParams{
 		UserUpdateParams: params,
-		UID:              utils.StringP(uid),
+		UID:              p.String(uid),
 	}
 	up.setDeleteFields()
 
@@ -216,15 +209,15 @@ func validateCustomClaims(cc *CustomClaimsMap) *string {
 	}
 	for _, key := range reservedClaims {
 		if _, ok := (*cc)[key]; !ok {
-			return utils.StringP(key + " is a reserved claim")
+			return p.String(key + " is a reserved claim")
 		}
 	}
 	b, err := json.Marshal(*cc)
 	if err != nil {
-		return utils.StringP(fmt.Sprintf("can't convert claims to json %v", *cc))
+		return p.String(fmt.Sprintf("can't convert claims to json %v", *cc))
 	}
 	if len(b) > 1000 {
-		return utils.StringP("length of custom claims cannot exceed 1000 chars")
+		return p.String("length of custom claims cannot exceed 1000 chars")
 	}
 	return nil
 }
@@ -233,11 +226,11 @@ func validatePhoneNumber(phone *string) *string {
 		return nil
 	}
 	if !strings.HasPrefix(*phone, "+") {
-		return utils.StringP("phone # must begin with a +")
+		return p.String("phone # must begin with a +")
 	}
 	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
 	if !isAlphaNum(*phone) {
-		return utils.StringP("phone # must contain an alphanumeric character")
+		return p.String("phone # must contain an alphanumeric character")
 	}
 	return nil
 }
@@ -318,7 +311,7 @@ type responseUserRecord struct {
 	PhotoURL           string            `json:"photoURL,omitempty"`
 	CreationTimestamp  int64             `json:"createdAt,string,omitempty"`
 	LastLogInTimestamp int64             `json:"lastLoginAt,string,omitempty"`
-	ProviderID         string            `json:"providerID,omitempty"`
+	ProviderID         string            `json:"providerId,omitempty"`
 	CustomClaims       map[string]string `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
 	Disabled           bool              `json:"disabled,omitempty"`
 	EmailVerified      bool              `json:"emailVerified,omitempty"`
@@ -397,101 +390,83 @@ func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims *Custom
 	return err
 }
 
-// ListUsers returns a ListUsersPage object. Subsequently page.Users can be listed, or page.IterateAll can be called
-// This makes a call with the default maxResults (1000)
-// Note that the last page may have zero Users
-func (c *Client) ListUsers(ctx context.Context, pageToken string) (*ListUsersPage, error) {
-	return c.ListUsersWithMaxResults(ctx, pageToken, maxResults)
+// // // /// / /// // // // // / // / // / /// / / // / // / /  / // //
+
+// UserIterator is the struct behind the Users Iterator
+// https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
+type UserIterator struct {
+	client   *Client
+	ctx      context.Context
+	nextFunc func() error
+	pageInfo *iterator.PageInfo
+	users    []*ExportedUserRecord
 }
 
-// ListUsersWithMaxResults is the same as ListUsers, but allows specification of the max results per page.
-// Note that the last page may have zero Users
-func (c *Client) ListUsersWithMaxResults(ctx context.Context, pageToken string, numResults int) (*ListUsersPage, error) {
-	payload := map[string]interface{}{"maxResults": numResults}
+// Users returns an iterator over the Users
+func (c *Client) Users(ctx context.Context, opts ...func(u *UserIterator)) *UserIterator {
+	it := &UserIterator{
+		ctx:    ctx,
+		client: c,
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
+		it.fetch,
+		func() int { return len(it.users) },
+		func() interface{} { b := it.users; it.users = nil; return b })
+	it.pageInfo.MaxSize = maxResults
+	for _, opt := range opts {
+		opt(it)
+	}
+	return it
+}
+
+// WithPageToken can be used concatenated to the Users constructor or it can be applied later. can be chained.
+func WithPageToken(token string) func(u *UserIterator) {
+	return func(u *UserIterator) { u.pageInfo.Token = token }
+}
+
+// WithMaxSize can be used concatenated to the Users constructor or it can be applied later. can be chained.
+func WithMaxSize(size int) func(u *UserIterator) {
+	return func(u *UserIterator) { u.pageInfo.MaxSize = size }
+}
+
+func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
+	payload := map[string]interface{}{"maxResults": pageSize}
 	if len(pageToken) > 0 {
 		payload["nextPageToken"] = pageToken
 	}
-	resp, err := c.makeUserRequest(
-		ctx,
+	resp, err := it.client.makeUserRequest(
+		it.ctx,
 		"downloadAccount",
 		payload)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	var lur listUsersResponse
-	err2 := json.Unmarshal(resp, &lur)
-	if err2 != nil {
-		return nil, err2
+	err = json.Unmarshal(resp, &lur)
+	if err != nil {
+		return "", err
 	}
 	usersList := make([]*ExportedUserRecord, 0)
 	for _, u := range lur.Users {
 		usersList = append(usersList, makeExportedUser(u))
 	}
-	return &ListUsersPage{
-		Users:      usersList,
-		PageToken:  lur.NextPage,
-		maxResults: numResults,
-		client:     c,
-	}, nil
+	it.users = usersList
+	it.pageInfo.Token = lur.NextPage
+	return lur.NextPage, nil
 }
 
-// HasNext indicates whether there is a next page.
-// Calling Next() when HasNext is false will result in nil
-func (lup *ListUsersPage) HasNext() bool {
-	return lup.PageToken != ""
-}
+// PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
+// This makes UserIterator comply with the Pageable interface.
+func (it *UserIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
 
-// Next returns a pointer to the next page of users.
-// It will use the same number of maxUsers as the current page.
-// Calling Next() when HasNext is false will result in nil
-func (lup *ListUsersPage) Next(ctx context.Context) (*ListUsersPage, error) {
-	if lup.PageToken == "" {
-		return nil, nil
+// Next returns the next result. Its second return value is iterator.Done if
+// there are no more results. Once Next returns iterator.Done, all subsequent
+// calls will return iterator.Done.
+func (it *UserIterator) Next() (*ExportedUserRecord, error) {
+	if err := it.nextFunc(); err != nil {
+		return nil, err
 	}
-	return lup.client.ListUsersWithMaxResults(ctx, lup.PageToken, lup.maxResults)
-}
-
-type userItem struct {
-	user *ExportedUserRecord
-	err  error
-}
-
-// UserItem is returned by the Iterator
-type UserItem interface {
-	Value() (*ExportedUserRecord, error)
-}
-
-func (ui *userItem) Value() (*ExportedUserRecord, error) {
-	return ui.user, ui.err
-}
-
-// IterateAll returns a channel of UserItem s that can be used with ":= range ..."
-// Note that the values can be retrieved by the Value() functions, and errors in retrieving the next page
-// will be propagated through the channel in that manner.
-// Exiting the loop that handles the received values and having the caller go out of scope will terminate the channel.
-// No specific closing needed.
-func (lup *ListUsersPage) IterateAll(ctx context.Context) chan UserItem {
-	ch := make(chan UserItem, lup.maxResults)
-	go func() {
-		var err error
-		for lup != nil {
-			for _, u := range lup.Users {
-				ch <- &userItem{
-					user: u,
-					err:  nil,
-				}
-			}
-
-			lup, err = lup.Next(ctx)
-			if err != nil {
-				ch <- &userItem{
-					user: nil,
-					err:  err,
-				}
-			}
-
-		}
-		close(ch)
-	}()
-	return ch
+	user := it.users[0]
+	it.users = it.users[1:]
+	return user, nil
 }

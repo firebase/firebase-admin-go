@@ -26,7 +26,8 @@ import (
 	"os"
 	"testing"
 
-	"firebase.google.com/go/utils"
+	"firebase.google.com/go/p"
+	"google.golang.org/api/iterator"
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
@@ -88,20 +89,19 @@ func prepareTests() bool {
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{DisplayName: utils.StringP("stringh")})
+	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{DisplayName: p.String("stringh")})
 	if err != nil {
-		fmt.Println(90)
+		fmt.Println(err)
 		return false
 	}
 	testFixtures.sampleUserBlank = u
 	u, err = client.CreateUser(context.Background(), &auth.UserCreateParams{
-		UID:         utils.StringP(uid),
-		Email:       utils.StringP(uid + "eml5f@test.com"),
-		DisplayName: utils.StringP("display_name"),
-		Password:    utils.StringP("assawd"),
+		UID:         p.String(uid),
+		Email:       p.String(uid + "eml5f@test.com"),
+		DisplayName: p.String("display_name"),
+		Password:    p.String("assawd"),
 	})
 	if err != nil {
-		fmt.Println(100)
 		fmt.Println(err, u)
 		return false
 	}
@@ -109,92 +109,82 @@ func prepareTests() bool {
 	return true
 }
 func cleanupTests() bool {
-	lp, err := client.ListUsersWithMaxResults(context.Background(), "", 4)
-	if err != nil {
-		return false
-	}
-	for ui := range lp.IterateAll(context.Background()) {
-		u, err := ui.Value()
-		if err != nil {
+	iter := client.Users(context.Background(), auth.WithMaxSize(20))
+	var uids []string
+loop:
+	for {
+		user, err := iter.Next()
+		switch err {
+		case nil:
+			uids = append(uids, user.UID)
+
+		case iterator.Done:
+			break loop
+		default:
+			fmt.Println("error ", err)
 			return false
 		}
-		err = client.DeleteUser(context.Background(), u.UID)
+	}
+	for _, uid := range uids {
+		fmt.Println(uid)
+		err := client.DeleteUser(context.Background(), uid)
 		if err != nil {
+			fmt.Println("error deleting uid ", uid, err)
 			return false
 		}
 	}
 	return true
-}
-func TestListUsers(t *testing.T) {
-	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
-	num := 0
-	for i, u := range page.Users {
-		fmt.Printf("%#v %#v\n", i, u)
-		num++
-	}
-	if num != 2 {
-		t.Errorf("expecting %d users got %d", 2, num)
-	}
-}
-func TestPagingMax(t *testing.T) {
-	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
-	npages := 0
-	var err error
-	for page != nil {
-		fmt.Printf("page++  %d -- - \n", npages)
-		fmt.Printf("%#v \n%#v\n-\n", page, page.Users)
-		for _, u := range page.Users {
-			fmt.Printf(" - - %#v\n", u.UserInfo)
-		}
-		npages++
-		page, err = page.Next(context.Background())
-		if err != nil {
-			t.Error(err)
-		}
-	}
-	fmt.Printf("page  %d -- == \n", npages)
-	fmt.Printf("%#v \n ", page)
 
-	if npages != 4 {
-		t.Errorf("expecting %d pages, seen %d", 4, npages) // the last page is not nil, but contains 0 users
-	}
 }
-func TestPaging(t *testing.T) {
-	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 10)
-	npages := 0
-	var err error
-	for page != nil {
-		fmt.Printf("page  %d -- - \n", npages)
-		fmt.Printf("%#v \n%#v\n-\n", page, page.Users)
-		for _, u := range page.Users {
-			fmt.Printf(" - - %#v\n", u.UserInfo)
-		}
-		npages++
-		page, err = page.Next(context.Background())
-		if err != nil {
-			t.Error(err)
-		}
-	}
-	fmt.Printf("page  %d -- == \n", npages)
-	fmt.Printf("%#v \n ", page)
 
-	if npages != 2 {
-		t.Errorf("expecting %d pages, seen %d", 2, npages) // the last page is not nil, but contains 0 users
+func TestUserIterator(t *testing.T) {
+	iter := client.Users(context.Background(), auth.WithMaxSize(2))
+	var uids []string
+	gotCount := 0
+	for {
+		u, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		gotCount++
+		uids = append(uids, u.UID)
+	}
+	if gotCount != 5 {
+		t.Errorf("\n-----hhh---\n%#v -MMMMM M MMM M- %v\n", iter, uids)
 	}
 }
-func TestIterator(t *testing.T) {
-	page, _ := client.ListUsersWithMaxResults(context.Background(), "", 2)
-	nitems := 0
-	for ui := range page.IterateAll(context.Background()) {
-		_, err := ui.Value()
-		if err != nil {
-			t.Error(err)
+func TestIterPage(t *testing.T) {
+	iter := client.Users(context.Background(), auth.WithMaxSize(2))
+	pager := iterator.NewPager(iter, 2, "")
+	userCount := 0
+	pageCount := 0
+
+	for {
+		pageCount++
+		fmt.Println("page ", pageCount)
+		var users []*auth.ExportedUserRecord
+		nextPageToken, err := pager.NextPage(&users)
+		userCount += len(users)
+		fmt.Println(len(users))
+		fmt.Printf("----\n%#v\n------\n", iter.PageInfo())
+		for i, u := range users {
+			fmt.Println(" __ ", i, u.UID, u.DisplayName, userCount)
 		}
-		nitems++
+		if err != nil {
+			t.Errorf("paging error %v", err)
+		}
+		for _, u := range users {
+			fmt.Println(u)
+		}
+		if nextPageToken == "" {
+			break
+		}
 	}
-	if nitems != 5 {
-		t.Errorf("expecting %d items, seen %d", 5, nitems)
-	}
+	//	t.Errorf("%d,%d", userCount, pageCount)
+
 }
 func TestGetUser(t *testing.T) {
 
