@@ -54,14 +54,6 @@ func (s *mockAuthServer) Client() *Client {
 	return s.client
 }
 
-/*
-type userCParams struct {
-	CustomClaims *CustomClaimsMap `json:"lucsc,omitempty"`
-	Disabled     *bool            `json:"l2,omitempty"`
-	DisplayName  *string          `json:"displayn,omitempty"`
-	Dd           string           `json:"l5"`
-}
-*/
 func TestCreateParams(t *testing.T) {
 	t1 := UserCreateParams{
 		DisplayName: p.String(""),
@@ -80,8 +72,6 @@ func TestCreateParams(t *testing.T) {
 
 }
 func TestExportPayload(t *testing.T) {
-	//	uf := NewUserFields()
-	//	_ = uf
 }
 
 /*
@@ -188,19 +178,19 @@ func TestGetUser(t *testing.T) {
 		{user.EmailVerified, true},
 		{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
 		{user.Disabled, false},
-		/*{user.ProviderUserInfo, []map[string]interface{}{
+		{user.ProviderUserInfo, []*UserInfo{
 			{
-				"providerId":  "password",
-				"displayName": "John Doe",
-				"photoUrl":    "http://localhost:8080/img1234567890/photo.png",
-				"email":       "user@example.com",
+				ProviderID:  "password",
+				DisplayName: "John Doe",
+				PhotoURL:    "http://localhost:8080/img1234567890/photo.png",
+				Email:       "user@example.com",
 			},
-		}},*/
+		}},
 	}
 	for _, test := range tests {
 		if !reflect.DeepEqual(test.want, test.got) {
 			t.Errorf("got %#v wanted %#v", test.got, test.want)
 		}
 	}
-	//	t.Errorf("%#v %#v", user.UserMetadata, user.CustomClaims)
+
 }

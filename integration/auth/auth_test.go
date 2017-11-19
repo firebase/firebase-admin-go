@@ -83,7 +83,7 @@ func prepareTests() bool {
 	}
 	uid = "tefwfd1234"
 	for i := 0; i < 3; i++ {
-		u, err := client.CreateUser(context.Background(), nil)
+		u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
 		if err != nil {
 			return false
 		}
@@ -164,15 +164,9 @@ func TestIterPage(t *testing.T) {
 
 	for {
 		pageCount++
-		fmt.Println("page ", pageCount)
 		var users []*auth.ExportedUserRecord
 		nextPageToken, err := pager.NextPage(&users)
 		userCount += len(users)
-		fmt.Println(len(users))
-		fmt.Printf("----\n%#v\n------\n", iter.PageInfo())
-		for i, u := range users {
-			fmt.Println(" __ ", i, u.UID, u.DisplayName, userCount)
-		}
 		if err != nil {
 			t.Errorf("paging error %v", err)
 		}
@@ -183,7 +177,7 @@ func TestIterPage(t *testing.T) {
 			break
 		}
 	}
-	//	t.Errorf("%d,%d", userCount, pageCount)
+	t.Errorf("%d,%d", userCount, pageCount)
 
 }
 func TestGetUser(t *testing.T) {

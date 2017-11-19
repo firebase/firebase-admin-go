@@ -103,7 +103,7 @@ type UserUpdateParams struct {
 	EmailVerified *bool            `json:"emailVerified,omitempty"`
 	Password      *string          `json:"password,omitempty"`
 	PhoneNumber   *string          `json:"phoneNumber,omitempty"`
-	PhotoURL      *string          `json:"photoURL,omitempty"`
+	PhotoURL      *string          `json:"photoUrl,omitempty"`
 }
 
 type userUpdateParams struct {
@@ -315,7 +315,7 @@ type responseUserRecord struct {
 	CustomClaims       map[string]string `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
 	Disabled           bool              `json:"disabled,omitempty"`
 	EmailVerified      bool              `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo       `json:"providerMata,omitempty"`
+	ProviderUserInfo   []*UserInfo       `json:"providerUserInfo,omitempty"`
 	PasswordHash       string            `json:"passwordHash,omitempty"`
 	PasswordSalt       string            `json:"salt,omitempty"`
 	ValidSince         int64             `json:"validSince,string,omitempty"`
@@ -429,30 +429,50 @@ func WithMaxSize(size int) func(u *UserIterator) {
 	return func(u *UserIterator) { u.pageInfo.MaxSize = size }
 }
 
-func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	payload := map[string]interface{}{"maxResults": pageSize}
-	if len(pageToken) > 0 {
-		payload["nextPageToken"] = pageToken
+func (c *Client) retriveUsers(ctx context.Context, number int, startAfter string) (string, []*ExportedUserRecord, error) {
+	payload := map[string]interface{}{"maxResults": number}
+	if startAfter != "" {
+		payload["nextPageToken"] = startAfter
 	}
-	resp, err := it.client.makeUserRequest(
-		it.ctx,
+	resp, err := c.makeUserRequest(
+		ctx,
 		"downloadAccount",
 		payload)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	var lur listUsersResponse
 	err = json.Unmarshal(resp, &lur)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	usersList := make([]*ExportedUserRecord, 0)
 	for _, u := range lur.Users {
 		usersList = append(usersList, makeExportedUser(u))
 	}
+	return lur.NextPage, usersList, nil
+}
+func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
+	token, usersList, err := it.client.retriveUsers(it.ctx, pageSize, pageToken)
+	if err != nil {
+		return "", err
+	}
+	// TODO: remove this after b/69406469 is fixed.
+	// after the last non empty page behaviour is fixed to return "", this code should be unreachable.
+	if needed := pageSize - len(usersList); needed > 0 && token != "" {
+		vToken, vUsersList, err := it.client.retriveUsers(it.ctx, needed, token)
+		if err != nil {
+			return "", err
+		}
+		// verify that we are actually at the of the iterator. This is the expected behaviour
+		if vToken == "" && len(vUsersList) == 0 {
+			return "", nil
+		}
+		return "", fmt.Errorf("unexpected iterator behavoiour, page is not full and not last")
+	}
 	it.users = usersList
-	it.pageInfo.Token = lur.NextPage
-	return lur.NextPage, nil
+	it.pageInfo.Token = token
+	return token, nil
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
