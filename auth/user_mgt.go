@@ -443,14 +443,9 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	usersList := make([]*ExportedUserRecord, 0)
 	for _, u := range lur.Users {
-		usersList = append(usersList, makeExportedUser(u))
+		it.users = append(it.users, makeExportedUser(u))
 	}
-	if err != nil {
-		return "", err
-	}
-	it.users = append(it.users, usersList...)
 	it.pageInfo.Token = lur.NextPage
 	return lur.NextPage, nil
 }
