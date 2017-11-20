@@ -429,48 +429,30 @@ func WithMaxSize(size int) func(u *UserIterator) {
 	return func(u *UserIterator) { u.pageInfo.MaxSize = size }
 }
 
-func (c *Client) retriveUsers(ctx context.Context, number int, startAfter string) (string, []*ExportedUserRecord, error) {
-	params := map[string]interface{}{"maxResults": number}
-	if startAfter != "" {
-		params["nextPageToken"] = startAfter
+func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
+	params := map[string]interface{}{"maxResults": pageSize}
+	if pageToken != "" {
+		params["nextPageToken"] = pageToken
 	}
-	resp, err := c.makeUserRequest(ctx, "downloadAccount", params)
+	resp, err := it.client.makeUserRequest(it.ctx, "downloadAccount", params)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	var lur listUsersResponse
 	err = json.Unmarshal(resp, &lur)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	usersList := make([]*ExportedUserRecord, 0)
 	for _, u := range lur.Users {
 		usersList = append(usersList, makeExportedUser(u))
 	}
-	return lur.NextPage, usersList, nil
-}
-func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	token, usersList, err := it.client.retriveUsers(it.ctx, pageSize, pageToken)
 	if err != nil {
 		return "", err
 	}
-	// TODO: remove this after b/69406469 is fixed.
-	// after the last non empty page behaviour is fixed to return "", this code should be unreachable.
-	if needed := pageSize - len(usersList); needed > 0 && token != "" {
-		vToken, vUsersList, err := it.client.retriveUsers(it.ctx, needed, token)
-		if err != nil {
-			return "", err
-		}
-		// verify that we are actually at the of the iterator. This is the expected behaviour
-		if vToken == "" && len(vUsersList) == 0 {
-			token = ""
-		} else {
-			return "", fmt.Errorf("unexpected iterator behavoiour, page is not full and not last")
-		}
-	}
-	it.users = usersList
-	it.pageInfo.Token = token
-	return token, nil
+	it.users = append(it.users, usersList...)
+	it.pageInfo.Token = lur.NextPage
+	return lur.NextPage, nil
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
