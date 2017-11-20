@@ -85,6 +85,7 @@ func prepareTests() bool {
 	for i := 0; i < 3; i++ {
 		u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
 		if err != nil {
+			fmt.Println("trouble creating", i, err)
 			return false
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
@@ -109,7 +110,7 @@ func prepareTests() bool {
 	return true
 }
 func cleanupTests() bool {
-	iter := client.Users(context.Background(), auth.WithMaxSize(20))
+	iter := client.Users(context.Background(), auth.WithMaxSize(19))
 	var uids []string
 loop:
 	for {
@@ -117,7 +118,6 @@ loop:
 		switch err {
 		case nil:
 			uids = append(uids, user.UID)
-
 		case iterator.Done:
 			break loop
 		default:
@@ -125,7 +125,9 @@ loop:
 			return false
 		}
 	}
-	for _, uid := range uids {
+	fmt.Println(uids)
+	for i, uid := range uids {
+		println("deleting ", i, uid)
 		fmt.Println(uid)
 		err := client.DeleteUser(context.Background(), uid)
 		if err != nil {
@@ -153,7 +155,7 @@ func TestUserIterator(t *testing.T) {
 		uids = append(uids, u.UID)
 	}
 	if gotCount != 5 {
-		t.Errorf("\n-----hhh---\n%#v -MMMMM M MMM M- %v\n", iter, uids)
+		t.Errorf("\n-----hhh---\n%#v -MMMMM M MMM M- %v\n%d\n", iter, uids, gotCount)
 	}
 }
 func TestIterPage(t *testing.T) {
@@ -177,8 +179,9 @@ func TestIterPage(t *testing.T) {
 			break
 		}
 	}
-	t.Errorf("%d,%d", userCount, pageCount)
-
+	if userCount != 5 || pageCount != 3 {
+		t.Errorf("expecting %d pages with %d users, got %d with %d ", pageCount, userCount, 3, 5)
+	}
 }
 func TestGetUser(t *testing.T) {
 

@@ -15,7 +15,7 @@ import (
 )
 
 type mockAuthServer struct {
-	Resp   interface{}
+	Resp   []byte
 	Header map[string]string
 	Status int
 	Req    *http.Request
@@ -24,7 +24,15 @@ type mockAuthServer struct {
 }
 
 func echoServer(resp interface{}) *mockAuthServer {
-	s := mockAuthServer{Resp: resp}
+
+	//	if reflect.ValueOf(resp).Type() == reflect.ValueOf([]byte("")) {
+	//b = []byte()
+	//	}
+
+	var b []byte
+
+	b, _ = json.Marshal(resp)
+	s := mockAuthServer{Resp: b}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -36,9 +44,9 @@ func echoServer(resp interface{}) *mockAuthServer {
 		if s.Status != 0 {
 			w.WriteHeader(s.Status)
 		}
-		b, _ := json.Marshal(s.Resp)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
+		w.Write(s.Resp)
+
 	})
 	s.srv = httptest.NewServer(handler)
 	authClient, err := NewClient(context.Background(),
@@ -72,6 +80,7 @@ func TestCreateParams(t *testing.T) {
 
 }
 func TestExportPayload(t *testing.T) {
+
 }
 
 /*
@@ -131,19 +140,20 @@ users := []map[string]interface{}{
     } ]
 */
 func TestGetUser(t *testing.T) {
-
-	//	b, err := ioutil.ReadFile(internal.Resource("get_user_data.json"))
-	//	if err != nil {
-	//		log.Fatalln(err)
-	//	}
-	//	t.Fatalf("%#v \n\n%s\n", b, string(b))
+	/*
+		b, err := ioutil.ReadFile(internal.Resource("get_user_data.json"))
+		if err != nil {
+			log.Fatalln(err)
+		}*/
+	//	s2 := echoServer(true, b)
+	//	defer s2.srv.Close()
 	s := echoServer(map[string]interface{}{
 		"kind": "identitytoolkit#GetAccountInfoResponse",
 		"users": []map[string]interface{}{
 			{
 				"localId":       "ZY1rJK0...",
 				"email":         "user@example.com",
-				"emailVerified": true,
+				"emailVerified": false,
 				"displayName":   "John Doe",
 				"providerUserInfo": []map[string]interface{}{
 					{
@@ -163,34 +173,40 @@ func TestGetUser(t *testing.T) {
 	})
 
 	defer s.srv.Close()
-	user, err := s.Client().GetUser(context.Background(), "ignored_id")
-	if err != nil {
-		t.Error(err)
+	for _, serv := range []*mockAuthServer{s} {
+		user, err := serv.Client().GetUser(context.Background(), "ignored_id")
+		if err != nil {
+			t.Error(err)
 
-	}
-	tests := []struct {
-		got  interface{}
-		want interface{}
-	}{
-		{user.UID, "ZY1rJK0..."},
-		{user.UserMetadata, &UserMetadata{CreationTimestamp: 1484124142000, LastLogInTimestamp: 1484628946000}},
-		{user.Email, "user@example.com"},
-		{user.EmailVerified, true},
-		{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
-		{user.Disabled, false},
-		{user.ProviderUserInfo, []*UserInfo{
-			{
-				ProviderID:  "password",
-				DisplayName: "John Doe",
-				PhotoURL:    "http://localhost:8080/img1234567890/photo.png",
-				Email:       "user@example.com",
-			},
-		}},
-	}
-	for _, test := range tests {
-		if !reflect.DeepEqual(test.want, test.got) {
-			t.Errorf("got %#v wanted %#v", test.got, test.want)
+		}
+		tests := []struct {
+			got  interface{}
+			want interface{}
+		}{
+			{user.UID, "ZY1rJK0..."},
+			{user.UserMetadata, &UserMetadata{CreationTimestamp: 1484124142000, LastLogInTimestamp: 1484628946000}},
+			{user.Email, "user@example.com"},
+			{user.EmailVerified, false},
+			{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
+			{user.Disabled, false},
+			{user.ProviderUserInfo, []*UserInfo{
+				{
+					ProviderID:  "password",
+					DisplayName: "John Doe",
+					PhotoURL:    "http://localhost:8080/img1234567890/photo.png",
+					Email:       "user@example.com",
+				},
+			}},
+			{user.DisplayName, "John Doe"},
+			{user.PasswordHash, "..."},
+		}
+		for _, test := range tests {
+			if !reflect.DeepEqual(test.want, test.got) {
+				t.Errorf("got %#v wanted %#v", test.got, test.want)
+			}
 		}
 	}
 
 }
+
+// -- --

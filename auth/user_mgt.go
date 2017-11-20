@@ -266,12 +266,12 @@ func validated(up userParams) (bool, error) {
 
 	return false, fmt.Errorf("error in params: %s", strings.Join(res, ", "))
 }
-func (c *Client) updateCreateUser(ctx context.Context, action string, p userParams) (ur *UserRecord, err error) {
+func (c *Client) updateCreateUser(ctx context.Context, action string, params userParams) (ur *UserRecord, err error) {
 	//	return nil, nil
-	if ok, err := validated(p); !ok || err != nil {
+	if ok, err := validated(params); !ok || err != nil {
 		return nil, err
 	}
-	resp, err := c.makeUserRequest(ctx, action, p)
+	resp, err := c.makeUserRequest(ctx, action, params)
 
 	if err != nil {
 		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
@@ -353,8 +353,8 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 	return resp
 }
 
-func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*ExportedUserRecord, error) {
-	resp, err := c.makeUserRequest(ctx, "getAccountInfo", m)
+func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*ExportedUserRecord, error) {
+	resp, err := c.makeUserRequest(ctx, "getAccountInfo", params)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func (c *Client) getUser(ctx context.Context, m map[string]interface{}) (*Export
 		return nil, err
 	}
 	if len(gur.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user %v", m)
+		return nil, fmt.Errorf("cannot find user %v", params)
 	}
 	return makeExportedUser(gur.Users[0]), nil
 }
@@ -430,14 +430,11 @@ func WithMaxSize(size int) func(u *UserIterator) {
 }
 
 func (c *Client) retriveUsers(ctx context.Context, number int, startAfter string) (string, []*ExportedUserRecord, error) {
-	payload := map[string]interface{}{"maxResults": number}
+	params := map[string]interface{}{"maxResults": number}
 	if startAfter != "" {
-		payload["nextPageToken"] = startAfter
+		params["nextPageToken"] = startAfter
 	}
-	resp, err := c.makeUserRequest(
-		ctx,
-		"downloadAccount",
-		payload)
+	resp, err := c.makeUserRequest(ctx, "downloadAccount", params)
 	if err != nil {
 		return "", nil, err
 	}
@@ -466,9 +463,10 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		}
 		// verify that we are actually at the of the iterator. This is the expected behaviour
 		if vToken == "" && len(vUsersList) == 0 {
-			return "", nil
+			token = ""
+		} else {
+			return "", fmt.Errorf("unexpected iterator behavoiour, page is not full and not last")
 		}
-		return "", fmt.Errorf("unexpected iterator behavoiour, page is not full and not last")
 	}
 	it.users = usersList
 	it.pageInfo.Token = token
