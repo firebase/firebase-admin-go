@@ -74,7 +74,8 @@ func TestCreateParams(t *testing.T) {
 	t1 := UserParams{
 		DisplayName: p.String(""),
 		Disabled:    p.Bool(false),
-		CustomClaims: &CustomClaimsMap{"asdf": "ff",
+		CustomClaims: &map[string]interface{}{
+			"asdf":  "ff",
 			"asdff": true},
 	}
 	m, e := json.Marshal(t1)
@@ -91,62 +92,6 @@ func TestExportPayload(t *testing.T) {
 
 }
 
-/*
-users := []map[string]interface{}{
-{
-        "localId" : "testuser0",
-        "email" : "testuser@example.com",
-        "phoneNumber" : "+1234567890",
-        "emailVerified" : true,
-        "displayName" : "Test User",
-        "providerUserInfo" : [ {
-            "providerId" : "password",
-            "displayName" : "Test User",
-            "photoUrl" : "http://www.example.com/testuser/photo.png",
-            "federatedId" : "testuser@example.com",
-            "email" : "testuser@example.com",
-            "rawId" : "testuser@example.com"
-        }, {
-            "providerId" : "phone",
-            "phoneNumber" : "+1234567890",
-            "rawId" : "+1234567890"
-        } ],
-        "photoUrl" : "http://www.example.com/testuser/photo.png",
-        "passwordHash" : "passwordHash",
-        "salt": "passwordSalt",
-        "passwordUpdatedAt" : 1.494364393E+12,
-        "validSince" : "1494364393",
-        "disabled" : false,
-        "createdAt" : "1234567890",
-        "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
-    }, {
-        "localId" : "testuser1",
-        "email" : "testuser@example.com",
-        "phoneNumber" : "+1234567890",
-        "emailVerified" : true,
-        "displayName" : "Test User",
-        "providerUserInfo" : [ {
-            "providerId" : "password",
-            "displayName" : "Test User",
-            "photoUrl" : "http://www.example.com/testuser/photo.png",
-            "federatedId" : "testuser@example.com",
-            "email" : "testuser@example.com",
-            "rawId" : "testuser@example.com"
-        }, {
-            "providerId" : "phone",
-            "phoneNumber" : "+1234567890",
-            "rawId" : "+1234567890"
-        } ],
-        "photoUrl" : "http://www.example.com/testuser/photo.png",
-        "passwordHash" : "passwordHash",
-        "salt": "passwordSalt",
-        "passwordUpdatedAt" : 1.494364393E+12,
-        "validSince" : "1494364393",
-        "disabled" : false,
-        "createdAt" : "1234567890",
-        "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
-    } ]
-*/
 func TestGetUser(t *testing.T) {
 
 	b, err := ioutil.ReadFile(internal.Resource("get_user.json"))
@@ -186,7 +131,7 @@ func TestGetUser(t *testing.T) {
 		}},
 		{user.DisplayName, "Test User"},
 		{user.PasswordHash, "passwordhash"},
-		{user.CustomClaims, CustomClaimsMap{"admin": true, "package": "gold"}},
+		{user.CustomClaims, &map[string]interface{}{"admin": true, "package": "gold"}},
 	}
 	for _, test := range tests {
 		if !reflect.DeepEqual(test.want, test.got) {

@@ -28,21 +28,6 @@ import (
 
 const maxResults = 1000
 
-// CustomClaimsMap is an alias for readability.
-type CustomClaimsMap map[string]interface{}
-
-/*
-func (cc CustomClaimsMap) MarshalJSON() ([]byte, error) {
-	cm := map[string]interface{}(cc)
-
-	b, err := json.Marshal(cm)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-*/
-
 // UserInfo A collection of standard profile information for a user.
 //
 // Used to expose profile information returned by an identity provider.
@@ -66,7 +51,7 @@ type UserMetadata struct {
 // UserRecord contains metadata associated with a Firebase user account.
 type UserRecord struct {
 	*UserInfo
-	CustomClaims     CustomClaimsMap
+	CustomClaims     *map[string]interface{}
 	Disabled         bool
 	EmailVerified    bool
 	ProviderUserInfo []*UserInfo
@@ -83,18 +68,15 @@ type ExportedUserRecord struct {
 // UserParams encapsulates the named calling params for CreateUser and UpdateUser
 // Update User also calls a distinct UID field, the one in the struct must match or be empty
 type UserParams struct {
-	//	CustomClaims *CustomClaimsMap `json:"customAttributes,omitempty"`
-
-	CustomClaims     *CustomClaimsMap `json:"-"` // https://play.golang.org/p/JB1_jHu1mm
-	CustomAttributes *string          `json:"customAttributes,omitempty"`
-	Disabled         *bool            `json:"disabled,omitempty"`
-	DisplayName      *string          `json:"displayName,omitempty"`
-	Email            *string          `json:"email,omitempty"`
-	EmailVerified    *bool            `json:"emailVerified,omitempty"`
-	Password         *string          `json:"password,omitempty"`
-	PhoneNumber      *string          `json:"phoneNumber,omitempty"`
-	PhotoURL         *string          `json:"photoURL,omitempty"`
-	UID              *string          `json:"localId,omitempty"`
+	CustomClaims  *map[string]interface{} `json:"-"` // https://play.golang.org/p/JB1_jHu1mm
+	Disabled      *bool                   `json:"disabled,omitempty"`
+	DisplayName   *string                 `json:"displayName,omitempty"`
+	Email         *string                 `json:"email,omitempty"`
+	EmailVerified *bool                   `json:"emailVerified,omitempty"`
+	Password      *string                 `json:"password,omitempty"`
+	PhoneNumber   *string                 `json:"phoneNumber,omitempty"`
+	PhotoURL      *string                 `json:"photoURL,omitempty"`
+	UID           *string                 `json:"localId,omitempty"`
 }
 
 func (up *userParams) setClaimsField() error {
@@ -324,7 +306,7 @@ func makeExportedUser(rur responseUserRecord) (*ExportedUserRecord, error) {
 				ProviderID:  rur.ProviderID,
 				UID:         rur.UID,
 			},
-			CustomClaims:     cc,
+			CustomClaims:     &cc,
 			Disabled:         rur.Disabled,
 			EmailVerified:    rur.EmailVerified,
 			ProviderUserInfo: rur.ProviderUserInfo,

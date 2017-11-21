@@ -20,6 +20,7 @@
     } ],
     "photoUrl" : "http://www.example.com/testuser/photo.png",
     "passwordHash" : "passwordhash",
+    "salt" : "salt===",
     "passwordUpdatedAt" : 1.494364393E+12,
     "validSince" : "1494364393",
     "disabled" : false,

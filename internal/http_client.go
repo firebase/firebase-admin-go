@@ -54,6 +54,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("\n\n\n\n%s\n\n", b)
 	return &Response{
 		Status:    resp.StatusCode,
 		Body:      b,

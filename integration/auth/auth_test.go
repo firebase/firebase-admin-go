@@ -108,7 +108,7 @@ func prepareTests() bool {
 		return false
 	}
 	u, err = client.UpdateUser(context.Background(), uid, &auth.UserParams{
-		CustomClaims: &auth.CustomClaimsMap{"asssssdf": true, "asssssdfdf": "ffd"},
+		CustomClaims: &map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
 	})
 
 	if err != nil {
