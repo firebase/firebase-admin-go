@@ -68,7 +68,7 @@ type UserMetadata struct {
 // UserRecord contains metadata associated with a Firebase user account.
 type UserRecord struct {
 	*UserInfo
-	CustomClaims     map[string]string
+	CustomClaims     CustomClaimsMap
 	Disabled         bool
 	EmailVerified    bool
 	ProviderUserInfo []*UserInfo
@@ -208,10 +208,12 @@ func validateCustomClaims(cc *CustomClaimsMap) *string {
 		return nil
 	}
 	for _, key := range reservedClaims {
-		if _, ok := (*cc)[key]; !ok {
+		fmt.Println(key)
+		if _, ok := (*cc)[key]; ok {
+			fmt.Printf("O O O : %#v\n%v\n-----\n", *cc, reservedClaims)
 			return p.String(key + " is a reserved claim")
 		}
-	}
+	} // play a7Pwwf92Sz
 	b, err := json.Marshal(*cc)
 	if err != nil {
 		return p.String(fmt.Sprintf("can't convert claims to json %v", *cc))
@@ -271,11 +273,13 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, params use
 	if ok, err := validated(params); !ok || err != nil {
 		return nil, err
 	}
-	resp, err := c.makeUserRequest(ctx, action, params)
 
+	resp, err := c.makeUserRequest(ctx, action, params)
 	if err != nil {
 		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
 	}
+
+	fmt.Printf("DEBUG 2 %#v - \n- -%s \n", params, resp)
 	jsonMap, err := parseResponse(resp)
 	if err != nil {
 		return nil, fmt.Errorf("bad json %s, %s", string(resp), err)
@@ -304,21 +308,21 @@ type getUserResponse struct {
 }
 
 type responseUserRecord struct {
-	UID                string            `json:"localId,omitempty"`
-	DisplayName        string            `json:"displayName,omitempty"`
-	Email              string            `json:"email,omitempty"`
-	PhoneNumber        string            `json:"phoneNumber,omitempty"`
-	PhotoURL           string            `json:"photoURL,omitempty"`
-	CreationTimestamp  int64             `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64             `json:"lastLoginAt,string,omitempty"`
-	ProviderID         string            `json:"providerId,omitempty"`
-	CustomClaims       map[string]string `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
-	Disabled           bool              `json:"disabled,omitempty"`
-	EmailVerified      bool              `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo       `json:"providerUserInfo,omitempty"`
-	PasswordHash       string            `json:"passwordHash,omitempty"`
-	PasswordSalt       string            `json:"salt,omitempty"`
-	ValidSince         int64             `json:"validSince,string,omitempty"`
+	UID                string      `json:"localId,omitempty"`
+	DisplayName        string      `json:"displayName,omitempty"`
+	Email              string      `json:"email,omitempty"`
+	PhoneNumber        string      `json:"phoneNumber,omitempty"`
+	PhotoURL           string      `json:"photoURL,omitempty"`
+	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
+	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
+	ProviderID         string      `json:"providerId,omitempty"`
+	CustomClaims       string      `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
+	Disabled           bool        `json:"disabled,omitempty"`
+	EmailVerified      bool        `json:"emailVerified,omitempty"`
+	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
+	PasswordHash       string      `json:"passwordHash,omitempty"`
+	PasswordSalt       string      `json:"salt,omitempty"`
+	ValidSince         int64       `json:"validSince,string,omitempty"`
 }
 
 type listUsersResponse struct {
@@ -328,6 +332,14 @@ type listUsersResponse struct {
 }
 
 func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
+	cc := make(map[string]interface{})
+	if rur.CustomClaims != "" {
+		err := json.Unmarshal([]byte(rur.CustomClaims), &cc)
+		if err != nil {
+			fmt.Println("unmarshaling error")
+		}
+	}
+	fmt.Println("+++++++++++++++++++++++++++++++++", cc)
 	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -338,7 +350,7 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 				ProviderID:  rur.ProviderID,
 				UID:         rur.UID,
 			},
-			CustomClaims:     rur.CustomClaims,
+			CustomClaims:     cc,
 			Disabled:         rur.Disabled,
 			EmailVerified:    rur.EmailVerified,
 			ProviderUserInfo: rur.ProviderUserInfo,
@@ -356,16 +368,20 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*ExportedUserRecord, error) {
 	resp, err := c.makeUserRequest(ctx, "getAccountInfo", params)
 	if err != nil {
+		fmt.Println(371)
 		return nil, err
 	}
+	fmt.Println("RESP _ _ _ __ _ __ _ ++ _ + _ + _", string(resp))
 	var gur getUserResponse
 	err = json.Unmarshal(resp, &gur)
 	if err != nil {
+		fmt.Println(378)
 		return nil, err
 	}
 	if len(gur.Users) == 0 {
 		return nil, fmt.Errorf("cannot find user %v", params)
 	}
+
 	return makeExportedUser(gur.Users[0]), nil
 }
 

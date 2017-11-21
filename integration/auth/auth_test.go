@@ -82,7 +82,7 @@ func prepareTests() bool {
 		return false
 	}
 	uid = "tefwfd1234"
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 1; i++ {
 		u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
 		if err != nil {
 			fmt.Println("trouble creating", i, err)
@@ -90,22 +90,24 @@ func prepareTests() bool {
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{DisplayName: p.String("stringh")})
+	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{})
 	if err != nil {
 		fmt.Println(err)
 		return false
 	}
 	testFixtures.sampleUserBlank = u
 	u, err = client.CreateUser(context.Background(), &auth.UserCreateParams{
-		UID:         p.String(uid),
-		Email:       p.String(uid + "eml5f@test.com"),
-		DisplayName: p.String("display_name"),
-		Password:    p.String("assawd"),
+		UID:          p.String(uid),
+		Email:        p.String(uid + "eml5f@test.com"),
+		DisplayName:  p.String("display_name"),
+		Password:     p.String("assawd"),
+		CustomClaims: &auth.CustomClaimsMap{"asdf": true, "asdfdf": "ffd"},
 	})
 	if err != nil {
 		fmt.Println(err, u)
 		return false
 	}
+	fmt.Printf("DEBUG %#v \n", u)
 	testFixtures.sampleUserWithData = u
 	return true
 }

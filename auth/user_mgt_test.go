@@ -3,6 +3,8 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -23,21 +25,27 @@ type mockAuthServer struct {
 	client *Client
 }
 
-func echoServer(resp interface{}) *mockAuthServer {
-
-	//	if reflect.ValueOf(resp).Type() == reflect.ValueOf([]byte("")) {
-	//b = []byte()
-	//	}
-
+func echoServer(resp interface{}) (*mockAuthServer, error) {
 	var b []byte
 
-	b, _ = json.Marshal(resp)
+	switch v := resp.(type) {
+	case []byte:
+		b = v
+	default:
+		var err error
+		b, err = json.Marshal(resp)
+
+		if err != nil {
+			fmt.Println("marshaling error")
+			return nil, err
+		}
+	}
 	s := mockAuthServer{Resp: b}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		s.Req = r
-
+		fmt.Println("DEBUG TEMP", r)
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}
@@ -56,8 +64,9 @@ func echoServer(resp interface{}) *mockAuthServer {
 	_ = err
 	authClient.url = s.srv.URL + "/"
 	s.client = authClient
-	return &s
+	return &s, nil
 }
+
 func (s *mockAuthServer) Client() *Client {
 	return s.client
 }
@@ -67,7 +76,7 @@ func TestCreateParams(t *testing.T) {
 		DisplayName: p.String(""),
 		Disabled:    p.Bool(false),
 		CustomClaims: &CustomClaimsMap{"asdf": "ff",
-			"asdff": "ffdf"},
+			"asdff": true},
 	}
 	m, e := json.Marshal(t1)
 	t2 := UserCreateParams{
@@ -140,73 +149,50 @@ users := []map[string]interface{}{
     } ]
 */
 func TestGetUser(t *testing.T) {
-	/*
-		b, err := ioutil.ReadFile(internal.Resource("get_user_data.json"))
-		if err != nil {
-			log.Fatalln(err)
-		}*/
-	//	s2 := echoServer(true, b)
-	//	defer s2.srv.Close()
-	s := echoServer(map[string]interface{}{
-		"kind": "identitytoolkit#GetAccountInfoResponse",
-		"users": []map[string]interface{}{
-			{
-				"localId":       "ZY1rJK0...",
-				"email":         "user@example.com",
-				"emailVerified": false,
-				"displayName":   "John Doe",
-				"providerUserInfo": []map[string]interface{}{
-					{
-						"providerId":  "password",
-						"displayName": "John Doe",
-						"photoUrl":    "http://localhost:8080/img1234567890/photo.png",
-						"email":       "user@example.com",
-					},
-				},
-				"photoUrl":     "https://lh5.googleusercontent.com/.../photo.jpg",
-				"passwordHash": "...",
-				"disabled":     false,
-				"lastLoginAt":  "1484628946000",
-				"createdAt":    "1484124142000",
-			},
-		},
-	})
 
+	b, err := ioutil.ReadFile(internal.Resource("get_user.json"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	s, err := echoServer(b)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	defer s.srv.Close()
-	for _, serv := range []*mockAuthServer{s} {
-		user, err := serv.Client().GetUser(context.Background(), "ignored_id")
-		if err != nil {
-			t.Error(err)
 
-		}
-		tests := []struct {
-			got  interface{}
-			want interface{}
-		}{
-			{user.UID, "ZY1rJK0..."},
-			{user.UserMetadata, &UserMetadata{CreationTimestamp: 1484124142000, LastLogInTimestamp: 1484628946000}},
-			{user.Email, "user@example.com"},
-			{user.EmailVerified, false},
-			{user.PhotoURL, "https://lh5.googleusercontent.com/.../photo.jpg"},
-			{user.Disabled, false},
-			{user.ProviderUserInfo, []*UserInfo{
-				{
-					ProviderID:  "password",
-					DisplayName: "John Doe",
-					PhotoURL:    "http://localhost:8080/img1234567890/photo.png",
-					Email:       "user@example.com",
-				},
-			}},
-			{user.DisplayName, "John Doe"},
-			{user.PasswordHash, "..."},
-		}
-		for _, test := range tests {
-			if !reflect.DeepEqual(test.want, test.got) {
-				t.Errorf("got %#v wanted %#v", test.got, test.want)
-			}
+	user, err := s.Client().GetUser(context.Background(), "ignored_id")
+	if err != nil {
+		t.Error(err)
+	}
+	tests := []struct {
+		got  interface{}
+		want interface{}
+	}{
+		{user.UID, "testuser"},
+		{user.UserMetadata, &UserMetadata{CreationTimestamp: 1234567890, LastLogInTimestamp: 0}},
+		{user.Email, "testuser@example.com"},
+		{user.EmailVerified, true},
+		{user.PhotoURL, "http://www.example.com/testuser/photo.png"},
+		{user.Disabled, false},
+		{user.ProviderUserInfo, []*UserInfo{
+			{
+				ProviderID:  "password",
+				DisplayName: "Test User",
+				PhotoURL:    "http://www.example.com/testuser/photo.png",
+				Email:       "testuser@example.com",
+			}, {
+				ProviderID:  "phone",
+				PhoneNumber: "+1234567890",
+			},
+		}},
+		{user.DisplayName, "Test User"},
+		{user.PasswordHash, "passwordhash"},
+	}
+	for _, test := range tests {
+		if !reflect.DeepEqual(test.want, test.got) {
+			t.Errorf("got %#v wanted %#v", test.got, test.want)
 		}
 	}
-
 }
 
 // -- --

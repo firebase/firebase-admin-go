@@ -78,6 +78,7 @@ func (r *Request) buildHTTPRequest() (*http.Request, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("DEBUG _ REQUEST_ : ", string(b))
 		data = bytes.NewBuffer(b)
 		opts = append(opts, WithHeader("Content-Type", r.Body.Mime()))
 	}

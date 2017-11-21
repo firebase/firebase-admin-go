@@ -163,6 +163,7 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		Body:   internal.NewJSONEntity(up),
 	}
 	resp, err := c.httpClient().Do(ctx, request)
+	fmt.Println("DEBUG respont", string(resp.Body))
 	if err != nil {
 		return nil, err
 	}
