@@ -166,6 +166,7 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 	if err != nil {
 		return nil, err
 	}
+
 	if resp.Status != 200 {
 		return nil, fmt.Errorf("unexpected http status code: %d\n contents: %s", resp.Status, string(resp.Body))
 
