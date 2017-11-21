@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"strings"
 
-	"firebase.google.com/go/p"
+	"firebase.google.com/go/ptr"
 	"google.golang.org/api/iterator"
 
 	"golang.org/x/net/context"
@@ -173,11 +173,11 @@ func validateCustomClaims(up *userParams) *string {
 	cc := up.CustomClaims
 	for _, key := range reservedClaims {
 		if _, ok := (*cc)[key]; ok {
-			return p.String(key + " is a reserved claim")
+			return ptr.String(key + " is a reserved claim")
 		}
 	}
 	if up.CustomAttributes == "" {
-		return p.String("attributes were not set, for non nil custom claims")
+		return ptr.String("attributes were not set, for non nil custom claims")
 	}
 	return validateStringLenLTE(&up.CustomAttributes, "stringified JSON claims", 1000)
 }
@@ -186,11 +186,11 @@ func validatePhoneNumber(phone *string) *string {
 		return nil
 	}
 	if !strings.HasPrefix(*phone, "+") {
-		return p.String("phone # must begin with a +")
+		return ptr.String("phone # must begin with a +")
 	}
 	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
 	if !isAlphaNum(*phone) {
-		return p.String("phone # must contain an alphanumeric character")
+		return ptr.String("phone # must contain an alphanumeric character")
 	}
 	return nil
 }
@@ -367,7 +367,7 @@ type UserIterator struct {
 }
 
 // Users returns an iterator over the Users
-func (c *Client) Users(ctx context.Context, opts ...func(u *UserIterator)) *UserIterator {
+func (c *Client) Users(ctx context.Context, startToken string) *UserIterator {
 	it := &UserIterator{
 		ctx:    ctx,
 		client: c,
@@ -377,20 +377,8 @@ func (c *Client) Users(ctx context.Context, opts ...func(u *UserIterator)) *User
 		func() int { return len(it.users) },
 		func() interface{} { b := it.users; it.users = nil; return b })
 	it.pageInfo.MaxSize = maxResults
-	for _, opt := range opts {
-		opt(it)
-	}
+	it.pageInfo.Token = startToken
 	return it
-}
-
-// WithPageToken can be used concatenated to the Users constructor or it can be applied later. can be chained.
-func WithPageToken(token string) func(u *UserIterator) {
-	return func(u *UserIterator) { u.pageInfo.Token = token }
-}
-
-// WithMaxSize can be used concatenated to the Users constructor or it can be applied later. can be chained.
-func WithMaxSize(size int) func(u *UserIterator) {
-	return func(u *UserIterator) { u.pageInfo.MaxSize = size }
 }
 
 func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {

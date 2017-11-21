@@ -119,7 +119,7 @@ func prepareTests() bool {
 	return true
 }
 func cleanupTests() bool {
-	iter := client.Users(context.Background(), auth.WithMaxSize(19))
+	iter := client.Users(context.Background(), "")
 	var uids []string
 loop:
 	for {
@@ -149,7 +149,7 @@ loop:
 }
 
 func TestUserIterator(t *testing.T) {
-	iter := client.Users(context.Background(), auth.WithMaxSize(2))
+	iter := client.Users(context.Background(), "")
 	var uids []string
 	gotCount := 0
 	for {
@@ -168,7 +168,7 @@ func TestUserIterator(t *testing.T) {
 	}
 }
 func TestIterPage(t *testing.T) {
-	iter := client.Users(context.Background(), auth.WithMaxSize(2))
+	iter := client.Users(context.Background(), "")
 	pager := iterator.NewPager(iter, 2, "")
 	userCount := 0
 	pageCount := 0
