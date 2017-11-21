@@ -26,7 +26,7 @@ import (
 	"os"
 	"testing"
 
-	"firebase.google.com/go/p"
+	"firebase.google.com/go/ptr"
 	"google.golang.org/api/iterator"
 
 	"firebase.google.com/go/auth"
@@ -81,7 +81,7 @@ func prepareTests() bool {
 	}
 
 	for i := 0; i < 3; i++ {
-		u, err := client.CreateUser(context.Background(), &auth.UserParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
+		u, err := client.CreateUser(context.Background(), &auth.UserParams{UID: ptr.String(fmt.Sprintf("user -- %d.", i))})
 		if err != nil {
 			fmt.Println("trouble creating", i, err)
 			return false
@@ -97,10 +97,10 @@ func prepareTests() bool {
 
 	uid := "tefwfd1234"
 	u, err = client.CreateUser(context.Background(), &auth.UserParams{
-		UID:         p.String(uid),
-		Email:       p.String(uid + "eml5f@test.com"),
-		DisplayName: p.String("display_name"),
-		Password:    p.String("assawd"),
+		UID:         ptr.String(uid),
+		Email:       ptr.String(uid + "eml5f@test.com"),
+		DisplayName: ptr.String("display_name"),
+		Password:    ptr.String("assawd"),
 	})
 
 	if err != nil {
@@ -193,7 +193,6 @@ func TestIterPage(t *testing.T) {
 	}
 }
 func TestGetUser(t *testing.T) {
-
 	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
-	"firebase.google.com/go/p"
+	"firebase.google.com/go/ptr"
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 )
@@ -72,8 +72,8 @@ func (s *mockAuthServer) Client() *Client {
 
 func TestCreateParams(t *testing.T) {
 	t1 := UserParams{
-		DisplayName: p.String(""),
-		Disabled:    p.Bool(false),
+		DisplayName: ptr.String(""),
+		Disabled:    ptr.Bool(false),
 		CustomClaims: &map[string]interface{}{
 			"asdf":  "ff",
 			"asdff": true},
