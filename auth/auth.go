@@ -163,11 +163,9 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		Body:   internal.NewJSONEntity(up),
 	}
 	resp, err := c.httpClient().Do(ctx, request)
-	fmt.Println("DEBUG respont", string(resp.Body))
 	if err != nil {
 		return nil, err
 	}
-
 	if resp.Status != 200 {
 		return nil, fmt.Errorf("unexpected http status code: %d\n contents: %s", resp.Status, string(resp.Body))
 

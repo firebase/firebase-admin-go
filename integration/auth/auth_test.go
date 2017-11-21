@@ -74,40 +74,47 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
-var uid string
-
 func prepareTests() bool {
 	if ok := cleanupTests(); !ok {
 		fmt.Println("trouble cleaning up from previous run.")
 		return false
 	}
-	uid = "tefwfd1234"
-	for i := 0; i < 1; i++ {
-		u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
+
+	for i := 0; i < 3; i++ {
+		u, err := client.CreateUser(context.Background(), &auth.UserParams{UID: p.String(fmt.Sprintf("user -- %d.", i))})
 		if err != nil {
 			fmt.Println("trouble creating", i, err)
 			return false
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background(), &auth.UserCreateParams{})
+	u, err := client.CreateUser(context.Background(), &auth.UserParams{})
 	if err != nil {
 		fmt.Println(err)
 		return false
 	}
 	testFixtures.sampleUserBlank = u
-	u, err = client.CreateUser(context.Background(), &auth.UserCreateParams{
-		UID:          p.String(uid),
-		Email:        p.String(uid + "eml5f@test.com"),
-		DisplayName:  p.String("display_name"),
-		Password:     p.String("assawd"),
-		CustomClaims: &auth.CustomClaimsMap{"asdf": true, "asdfdf": "ffd"},
+
+	uid := "tefwfd1234"
+	u, err = client.CreateUser(context.Background(), &auth.UserParams{
+		UID:         p.String(uid),
+		Email:       p.String(uid + "eml5f@test.com"),
+		DisplayName: p.String("display_name"),
+		Password:    p.String("assawd"),
 	})
+
 	if err != nil {
 		fmt.Println(err, u)
 		return false
 	}
-	fmt.Printf("DEBUG %#v \n", u)
+	u, err = client.UpdateUser(context.Background(), uid, &auth.UserParams{
+		CustomClaims: &auth.CustomClaimsMap{"asssssdf": true, "asssssdfdf": "ffd"},
+	})
+
+	if err != nil {
+		fmt.Println(err, u)
+		return false
+	}
 	testFixtures.sampleUserWithData = u
 	return true
 }
@@ -157,7 +164,7 @@ func TestUserIterator(t *testing.T) {
 		uids = append(uids, u.UID)
 	}
 	if gotCount != 5 {
-		t.Errorf("\n-----hhh---\n%#v -MMMMM M MMM M- %v\n%d\n", iter, uids, gotCount)
+		t.Errorf("expecting 5 users got %d", gotCount)
 	}
 }
 func TestIterPage(t *testing.T) {
@@ -182,12 +189,12 @@ func TestIterPage(t *testing.T) {
 		}
 	}
 	if userCount != 5 || pageCount != 3 {
-		t.Errorf("expecting %d pages with %d users, got %d with %d ", pageCount, userCount, 3, 5)
+		t.Errorf("expecting %d pages with %d users, got %d with %d ", 3, 5, pageCount, userCount)
 	}
 }
 func TestGetUser(t *testing.T) {
 
-	u, err := client.GetUser(context.Background(), uid)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 
 	if err != nil {
 		t.Errorf("error getting user %s", err)

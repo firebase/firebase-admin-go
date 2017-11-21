@@ -31,19 +31,17 @@ const maxResults = 1000
 // CustomClaimsMap is an alias for readability.
 type CustomClaimsMap map[string]interface{}
 
-// UserCreateParams encapsulates the named calling params for CreateUser
-// the json tags are used to convert this to the format expected by the API with the right names
-type UserCreateParams struct {
-	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
-	Disabled      *bool            `json:"disabled,omitempty"`
-	DisplayName   *string          `json:"displayName,omitempty"`
-	Email         *string          `json:"email,omitempty"`
-	EmailVerified *bool            `json:"emailVerified,omitempty"`
-	Password      *string          `json:"password,omitempty"`
-	PhoneNumber   *string          `json:"phoneNumber,omitempty"`
-	PhotoURL      *string          `json:"photoURL,omitempty"`
-	UID           *string          `json:"localId,omitempty"`
+/*
+func (cc CustomClaimsMap) MarshalJSON() ([]byte, error) {
+	cm := map[string]interface{}(cc)
+
+	b, err := json.Marshal(cm)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
+*/
 
 // UserInfo A collection of standard profile information for a user.
 //
@@ -82,45 +80,67 @@ type ExportedUserRecord struct {
 	PasswordSalt string
 }
 
-// CreateUser creates a new user with the specified properties.
-func (c *Client) CreateUser(ctx context.Context, params *UserCreateParams) (ur *UserRecord, err error) {
-	if params == nil {
-		params = &UserCreateParams{}
+// UserParams encapsulates the named calling params for CreateUser and UpdateUser
+// Update User also calls a distinct UID field, the one in the struct must match or be empty
+type UserParams struct {
+	//	CustomClaims *CustomClaimsMap `json:"customAttributes,omitempty"`
+
+	CustomClaims     *CustomClaimsMap `json:"-"` // https://play.golang.org/p/JB1_jHu1mm
+	CustomAttributes *string          `json:"customAttributes,omitempty"`
+	Disabled         *bool            `json:"disabled,omitempty"`
+	DisplayName      *string          `json:"displayName,omitempty"`
+	Email            *string          `json:"email,omitempty"`
+	EmailVerified    *bool            `json:"emailVerified,omitempty"`
+	Password         *string          `json:"password,omitempty"`
+	PhoneNumber      *string          `json:"phoneNumber,omitempty"`
+	PhotoURL         *string          `json:"photoURL,omitempty"`
+	UID              *string          `json:"localId,omitempty"`
+}
+
+func (up *userParams) setClaimsField() error {
+	if up.CustomClaims == nil {
+		return nil
 	}
-	return c.updateCreateUser(ctx, "signupNewUser", params)
+	b, err := json.Marshal(*up.CustomClaims)
+	if err != nil {
+		return err
+	}
+	up.CustomAttributes = string(b)
+	return nil
 }
 
-// UserUpdateParams encapsulates the named calling params for UpdateUser
-// the json tags are used to convert this to the format expected by the API with the right names
-// This struct will be amended with other data before the call.
-// DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record
-// nil pointers will remain unchanged.
-type UserUpdateParams struct {
-	CustomClaims  *CustomClaimsMap `json:"customAttributes,omitempty"` // https://play.golang.org/p/JB1_jHu1mm
-	Disabled      *bool            `json:"disabled,omitempty"`
-	DisplayName   *string          `json:"displayName,omitempty"`
-	Email         *string          `json:"email,omitempty"`
-	EmailVerified *bool            `json:"emailVerified,omitempty"`
-	Password      *string          `json:"password,omitempty"`
-	PhoneNumber   *string          `json:"phoneNumber,omitempty"`
-	PhotoURL      *string          `json:"photoUrl,omitempty"`
+// CreateUser creates a new user with the specified properties.
+func (c *Client) CreateUser(ctx context.Context, p *UserParams) (ur *UserRecord, err error) {
+	if p == nil {
+		p = &UserParams{}
+	}
+	up := &userParams{UserParams: p}
+	up.setClaimsField()
+	return c.updateCreateUser(ctx, "signupNewUser", up)
 }
 
-type userUpdateParams struct {
-	*UserUpdateParams
-	UID                 *string  `json:"localId,omitempty"`
+type userParams struct {
+	*UserParams
 	DeleteAttributeList []string `json:"deleteAttribute,omitempty"`
 	DeleteProviderList  []string `json:"deleteProvider,omitempty"`
+	CustomAttributes    string   `json:"customAttributes,omitempty"`
 }
 
 // UpdateUser updates a user with the given params
 // DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record
-// nil pointers in the UserUpdateParams will remain unchanged.
-func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserUpdateParams) (ur *UserRecord, err error) {
-	up := &userUpdateParams{
-		UserUpdateParams: params,
-		UID:              p.String(uid),
+// nil pointers in the UserParams will remain unchanged.
+func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserParams) (ur *UserRecord, err error) {
+	if uid == "" {
+		return nil, fmt.Errorf("uid must not be empty")
 	}
+	if params.UID != nil && *params.UID != uid {
+		return nil, fmt.Errorf("uid mismatch")
+	}
+	params.UID = &uid
+	up := &userParams{
+		UserParams: params,
+	}
+	up.setClaimsField()
 	up.setDeleteFields()
 
 	return c.updateCreateUser(ctx, "setAccountInfo", up)
@@ -128,7 +148,7 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserUpdateP
 func isEmptyString(ps *string) bool {
 	return ps != nil && *ps == ""
 }
-func (up *userUpdateParams) setDeleteFields() {
+func (up *userParams) setDeleteFields() {
 	var deleteProvList, deleteAttrList []string
 	if isEmptyString(up.DisplayName) {
 		deleteAttrList = append(deleteAttrList, "DISPLAY_NAME")
@@ -150,45 +170,6 @@ func (up *userUpdateParams) setDeleteFields() {
 	}
 }
 
-type userParams interface {
-	getUID() *string
-	getDisplayName() *string
-	getDisabled() *bool
-	getEmail() *string
-	getEmailVerified() *bool
-	getCustomClaims() *CustomClaimsMap
-	getPassword() *string
-	getPhotoURL() *string
-	getPhoneNumber() *string
-}
-
-func (cp *UserCreateParams) getUID() *string { return cp.UID }
-func (up *userUpdateParams) getUID() *string { return up.UID }
-
-func (cp *UserCreateParams) getDisplayName() *string { return cp.DisplayName }
-func (up *userUpdateParams) getDisplayName() *string { return up.DisplayName }
-
-func (cp *UserCreateParams) getDisabled() *bool { return cp.Disabled }
-func (up *userUpdateParams) getDisabled() *bool { return up.Disabled }
-
-func (cp *UserCreateParams) getEmail() *string { return cp.Email }
-func (up *userUpdateParams) getEmail() *string { return up.Email }
-
-func (cp *UserCreateParams) getEmailVerified() *bool { return cp.EmailVerified }
-func (up *userUpdateParams) getEmailVerified() *bool { return up.EmailVerified }
-
-func (cp *UserCreateParams) getCustomClaims() *CustomClaimsMap { return cp.CustomClaims }
-func (up *userUpdateParams) getCustomClaims() *CustomClaimsMap { return up.CustomClaims }
-
-func (cp *UserCreateParams) getPassword() *string { return cp.Password }
-func (up *userUpdateParams) getPassword() *string { return up.Password }
-
-func (cp *UserCreateParams) getPhotoURL() *string { return cp.PhotoURL }
-func (up *userUpdateParams) getPhotoURL() *string { return up.PhotoURL }
-
-func (cp *UserCreateParams) getPhoneNumber() *string { return cp.PhoneNumber }
-func (up *userUpdateParams) getPhoneNumber() *string { return up.PhoneNumber }
-
 func validateString(s *string, condition func(string) bool, message string) *string {
 	if s == nil || condition(*s) {
 		return nil
@@ -203,25 +184,20 @@ func validateStringLenLTE(s *string, name string, length int) *string {
 	return validateString(s, func(st string) bool { return len(st) <= length }, fmt.Sprintf("%s must be at most %d chars long", name, length))
 }
 
-func validateCustomClaims(cc *CustomClaimsMap) *string {
-	if cc == nil {
+func validateCustomClaims(up *userParams) *string {
+	if up.CustomClaims == nil {
 		return nil
 	}
+	cc := up.CustomClaims
 	for _, key := range reservedClaims {
-		fmt.Println(key)
 		if _, ok := (*cc)[key]; ok {
-			fmt.Printf("O O O : %#v\n%v\n-----\n", *cc, reservedClaims)
 			return p.String(key + " is a reserved claim")
 		}
-	} // play a7Pwwf92Sz
-	b, err := json.Marshal(*cc)
-	if err != nil {
-		return p.String(fmt.Sprintf("can't convert claims to json %v", *cc))
 	}
-	if len(b) > 1000 {
-		return p.String("length of custom claims cannot exceed 1000 chars")
+	if up.CustomAttributes == "" {
+		return p.String("attributes were not set, for non nil custom claims")
 	}
-	return nil
+	return validateStringLenLTE(&up.CustomAttributes, "stringified JSON claims", 1000)
 }
 func validatePhoneNumber(phone *string) *string {
 	if phone == nil {
@@ -237,22 +213,22 @@ func validatePhoneNumber(phone *string) *string {
 	return nil
 }
 
-func validated(up userParams) (bool, error) {
+func validated(up *userParams) (bool, error) {
 	errors := []*string{
-		validateCustomClaims(up.getCustomClaims()),
-		validatePhoneNumber(up.getPhoneNumber()),
+		validateCustomClaims(up),
+		validatePhoneNumber(up.PhoneNumber),
 
-		validateStringLenGTE(up.getPassword(), "password", 6),
-		validateStringLenLTE(up.getUID(), "uid", 128),
-		validateStringLenGTE(up.getUID(), "uid", 0),
-		validateStringLenGTE(up.getDisplayName(), "displayName", 0),
-		validateStringLenGTE(up.getPhotoURL(), "photoURL", 0),
+		validateStringLenGTE(up.Password, "password", 6),
+		validateStringLenLTE(up.UID, "uid", 128),
+		validateStringLenGTE(up.UID, "uid", 0),
+		validateStringLenGTE(up.DisplayName, "displayName", 0),
+		validateStringLenGTE(up.PhotoURL, "photoURL", 0),
 
-		validateStringLenGTE(up.getEmail(), "email", 0),
-		validateString(up.getEmail(),
+		validateStringLenGTE(up.Email, "email", 0),
+		validateString(up.Email,
 			func(s string) bool { return strings.Count(s, "@") == 1 },
 			"email must contain exactly one '@' sign"),
-		validateString(up.getEmail(),
+		validateString(up.Email,
 			func(s string) bool { return strings.Index(s, "@") > 0 && strings.LastIndex(s, "@") < (len(s)-1) },
 			"email must have non empty account and domain"),
 	}
@@ -268,7 +244,7 @@ func validated(up userParams) (bool, error) {
 
 	return false, fmt.Errorf("error in params: %s", strings.Join(res, ", "))
 }
-func (c *Client) updateCreateUser(ctx context.Context, action string, params userParams) (ur *UserRecord, err error) {
+func (c *Client) updateCreateUser(ctx context.Context, action string, params *userParams) (ur *UserRecord, err error) {
 	//	return nil, nil
 	if ok, err := validated(params); !ok || err != nil {
 		return nil, err
@@ -279,7 +255,6 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, params use
 		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
 	}
 
-	fmt.Printf("DEBUG 2 %#v - \n- -%s \n", params, resp)
 	jsonMap, err := parseResponse(resp)
 	if err != nil {
 		return nil, fmt.Errorf("bad json %s, %s", string(resp), err)
@@ -339,7 +314,6 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 			fmt.Println("unmarshaling error")
 		}
 	}
-	fmt.Println("+++++++++++++++++++++++++++++++++", cc)
 	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -368,16 +342,16 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*ExportedUserRecord, error) {
 	resp, err := c.makeUserRequest(ctx, "getAccountInfo", params)
 	if err != nil {
-		fmt.Println(371)
 		return nil, err
 	}
-	fmt.Println("RESP _ _ _ __ _ __ _ ++ _ + _ + _", string(resp))
+
 	var gur getUserResponse
 	err = json.Unmarshal(resp, &gur)
 	if err != nil {
-		fmt.Println(378)
+
 		return nil, err
 	}
+
 	if len(gur.Users) == 0 {
 		return nil, fmt.Errorf("cannot find user %v", params)
 	}
@@ -399,14 +373,6 @@ func (c *Client) GetUserByPhone(ctx context.Context, phone string) (*ExportedUse
 func (c *Client) GetUserByEmail(ctx context.Context, email string) (*ExportedUserRecord, error) {
 	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
 }
-
-// SetCustomClaims sets the custom user claims, the json []byte of the custom claims map cannot exceed 1000 chars in length
-func (c *Client) SetCustomClaims(ctx context.Context, uid string, claims *CustomClaimsMap) error {
-	_, err := c.UpdateUser(ctx, uid, &UserUpdateParams{CustomClaims: claims})
-	return err
-}
-
-// // // /// / /// // // // // / // / // / /// / / // / // / /  / // //
 
 // UserIterator is the struct behind the Users Iterator
 // https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines

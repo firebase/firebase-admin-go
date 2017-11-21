@@ -24,6 +24,6 @@
     "validSince" : "1494364393",
     "disabled" : false,
     "createdAt" : "1234567890",
-    "customAttributes" : "{'admin': true, 'package': 'gold'}"
+    "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
   } ]
 }

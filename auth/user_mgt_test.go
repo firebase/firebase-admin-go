@@ -45,7 +45,6 @@ func echoServer(resp interface{}) (*mockAuthServer, error) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		s.Req = r
-		fmt.Println("DEBUG TEMP", r)
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}
@@ -72,14 +71,14 @@ func (s *mockAuthServer) Client() *Client {
 }
 
 func TestCreateParams(t *testing.T) {
-	t1 := UserCreateParams{
+	t1 := UserParams{
 		DisplayName: p.String(""),
 		Disabled:    p.Bool(false),
 		CustomClaims: &CustomClaimsMap{"asdf": "ff",
 			"asdff": true},
 	}
 	m, e := json.Marshal(t1)
-	t2 := UserCreateParams{
+	t2 := UserParams{
 		DisplayName:  t1.DisplayName,
 		CustomClaims: t1.CustomClaims,
 	}
@@ -187,6 +186,7 @@ func TestGetUser(t *testing.T) {
 		}},
 		{user.DisplayName, "Test User"},
 		{user.PasswordHash, "passwordhash"},
+		{user.CustomClaims, CustomClaimsMap{"admin": true, "package": "gold"}},
 	}
 	for _, test := range tests {
 		if !reflect.DeepEqual(test.want, test.got) {
