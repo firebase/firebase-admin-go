@@ -306,12 +306,12 @@ type listUsersResponse struct {
 	NextPage    string               `json:"nextPageToken,omitempty"`
 }
 
-func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
+func makeExportedUser(rur responseUserRecord) (*ExportedUserRecord, error) {
 	cc := make(map[string]interface{})
 	if rur.CustomClaims != "" {
 		err := json.Unmarshal([]byte(rur.CustomClaims), &cc)
 		if err != nil {
-			fmt.Println("unmarshaling error")
+			return nil, err
 		}
 	}
 	resp := &ExportedUserRecord{
@@ -336,7 +336,7 @@ func makeExportedUser(rur responseUserRecord) *ExportedUserRecord {
 		PasswordHash: rur.PasswordHash,
 		PasswordSalt: rur.PasswordSalt,
 	}
-	return resp
+	return resp, nil
 }
 
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*ExportedUserRecord, error) {
@@ -356,7 +356,7 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*E
 		return nil, fmt.Errorf("cannot find user %v", params)
 	}
 
-	return makeExportedUser(gur.Users[0]), nil
+	return makeExportedUser(gur.Users[0])
 }
 
 //GetUser returns the user by UID
@@ -426,7 +426,11 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		return "", err
 	}
 	for _, u := range lur.Users {
-		it.users = append(it.users, makeExportedUser(u))
+		eu, err := makeExportedUser(u)
+		if err != nil {
+			return "", err
+		}
+		it.users = append(it.users, eu)
 	}
 	it.pageInfo.Token = lur.NextPage
 	return lur.NextPage, nil
