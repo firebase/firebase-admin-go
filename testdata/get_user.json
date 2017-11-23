@@ -25,6 +25,7 @@
     "validSince" : "1494364393",
     "disabled" : false,
     "createdAt" : "1234567890",
+    "lastLoginAt"	:"1233211232",
     "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
   } ]
 }

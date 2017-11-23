@@ -120,13 +120,18 @@ func prepareTests() bool {
 }
 func cleanupTests() bool {
 	iter := client.Users(context.Background(), "")
-	var uids []string
+	//var uids []string
 loop:
 	for {
 		user, err := iter.Next()
 		switch err {
 		case nil:
-			uids = append(uids, user.UID)
+			//uids = append(uids, user.UID)
+			err := client.DeleteUser(context.Background(), user.UID)
+			if err != nil {
+				fmt.Println("error deleting uid ", user.UID, err)
+				return false
+			}
 		case iterator.Done:
 			break loop
 		default:
@@ -134,8 +139,9 @@ loop:
 			return false
 		}
 	}
-	fmt.Println(uids)
-	for i, uid := range uids {
+	//	fmt.Println(uids)
+	// remove before submission, b/69406469
+	/*	for i, uid := range uids {
 		println("deleting ", i, uid)
 		fmt.Println(uid)
 		err := client.DeleteUser(context.Background(), uid)
@@ -143,7 +149,7 @@ loop:
 			fmt.Println("error deleting uid ", uid, err)
 			return false
 		}
-	}
+	}*/
 	return true
 
 }

@@ -186,11 +186,11 @@ func validatePhoneNumber(phone *string) *string {
 		return nil
 	}
 	if !strings.HasPrefix(*phone, "+") {
-		return ptr.String("phone # must begin with a +")
+		return ptr.String("PhoneNumber # must begin with a +")
 	}
 	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
 	if !isAlphaNum(*phone) {
-		return ptr.String("phone # must contain an alphanumeric character")
+		return ptr.String("PhoneNumber # must contain an alphanumeric character")
 	}
 	return nil
 }
@@ -200,19 +200,21 @@ func validated(up *userParams) (bool, error) {
 		validateCustomClaims(up),
 		validatePhoneNumber(up.PhoneNumber),
 
-		validateStringLenGTE(up.Password, "password", 6),
-		validateStringLenLTE(up.UID, "uid", 128),
-		validateStringLenGTE(up.UID, "uid", 0),
-		validateStringLenGTE(up.DisplayName, "displayName", 0),
-		validateStringLenGTE(up.PhotoURL, "photoURL", 0),
+		validateStringLenGTE(up.Password, "Password", 6),
+		validateStringLenLTE(up.UID, "UID", 128),
 
-		validateStringLenGTE(up.Email, "email", 0),
+		validateStringLenGTE(up.UID, "UID", 1),
+
+		validateStringLenGTE(up.DisplayName, "DisplayName", 1),
+		validateStringLenGTE(up.PhotoURL, "PhotoURL", 1),
+
+		validateStringLenGTE(up.Email, "Email", 1),
 		validateString(up.Email,
 			func(s string) bool { return strings.Count(s, "@") == 1 },
-			"email must contain exactly one '@' sign"),
+			"Email must contain exactly one '@' sign"),
 		validateString(up.Email,
 			func(s string) bool { return strings.Index(s, "@") > 0 && strings.LastIndex(s, "@") < (len(s)-1) },
-			"email must have non empty account and domain"),
+			"Email must have non empty account and domain"),
 	}
 	var res []string
 	for _, e := range errors {
@@ -289,13 +291,16 @@ type listUsersResponse struct {
 }
 
 func makeExportedUser(rur responseUserRecord) (*ExportedUserRecord, error) {
-	cc := make(map[string]interface{})
+	var ccp *map[string]interface{}
 	if rur.CustomClaims != "" {
+		var cc map[string]interface{}
 		err := json.Unmarshal([]byte(rur.CustomClaims), &cc)
 		if err != nil {
 			return nil, err
 		}
+		ccp = &cc
 	}
+
 	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -306,7 +311,7 @@ func makeExportedUser(rur responseUserRecord) (*ExportedUserRecord, error) {
 				ProviderID:  rur.ProviderID,
 				UID:         rur.UID,
 			},
-			CustomClaims:     &cc,
+			CustomClaims:     ccp,
 			Disabled:         rur.Disabled,
 			EmailVerified:    rur.EmailVerified,
 			ProviderUserInfo: rur.ProviderUserInfo,
@@ -330,7 +335,6 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*E
 	var gur getUserResponse
 	err = json.Unmarshal(resp, &gur)
 	if err != nil {
-
 		return nil, err
 	}
 
@@ -388,6 +392,12 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 	}
 	resp, err := it.client.makeUserRequest(it.ctx, "downloadAccount", params)
 	if err != nil {
+		// remove this line before submission ,see b/69406469
+		if pageToken != "" &&
+			strings.Contains(err.Error(), "\"code\": 400") &&
+			strings.Contains(err.Error(), "\"message\": \"INVALID_PAGE_SELECTION\"") {
+			return it.fetch(pageSize, "")
+		}
 		return "", err
 	}
 	var lur listUsersResponse

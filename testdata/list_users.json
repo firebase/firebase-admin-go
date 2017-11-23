@@ -27,7 +27,7 @@
             "passwordUpdatedAt": 1.511284666E12,
             "validSince": "1511284666",
             "disabled": false,
-            "createdAt": "1511284666000",
+            "createdAt": "1511284665000",
             "customAttributes": "{\"asssssdf\":true,\"asssssdfdf\":\"ffd\"}"
         },
         {
@@ -60,5 +60,6 @@
             "createdAt": "1234567890",
             "customAttributes": "{\"admin\": true, \"package\": \"gold\"}"
         }
-    ]
+    ],
+    "nextPageToken": ""
 }
