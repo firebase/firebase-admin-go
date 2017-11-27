@@ -65,11 +65,11 @@ type Token struct {
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	transportClient *internal.HTTPClient
-	ks              keySource
-	projectID       string
-	snr             signer
-	url             string
+	hc        *internal.HTTPClient
+	ks        keySource
+	projectID string
+	snr       signer
+	url       string
 }
 
 type signer interface {
@@ -77,21 +77,10 @@ type signer interface {
 	Sign(b []byte) ([]byte, error)
 }
 
-// IDToolKitURL is a getter for the toolkit URL
-func IDToolKitURL() string {
-	return idToolKitURL
-}
-
 func newHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
-	var hc *http.Client
-	if ctx != nil && len(opts) > 0 {
-		var err error
-		hc, _, err = transport.NewHTTPClient(ctx, opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		hc = http.DefaultClient
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	if err != nil {
+		return nil, err
 	}
 	return hc, nil
 }
@@ -142,20 +131,16 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	return &Client{
-		transportClient: &internal.HTTPClient{Client: hc},
-		ks:              ks,
-		projectID:       c.ProjectID,
-		snr:             snr,
-		url:             IDToolKitURL(),
+		hc:        &internal.HTTPClient{Client: hc},
+		ks:        ks,
+		projectID: c.ProjectID,
+		snr:       snr,
+		url:       idToolKitURL,
 	}, nil
 }
 
-func (c *Client) httpClient() *internal.HTTPClient {
-	return c.transportClient
-}
-
 // Passes the request struct, returns a byte array of the json
-func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}) ([]byte, error) {
+func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}, result *interface{}) error {
 
 	request := &internal.Request{
 		Method: "POST",
@@ -163,16 +148,11 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		Body:   internal.NewJSONEntity(up),
 	}
 
-	resp, err := c.httpClient().Do(ctx, request)
+	resp, err := c.hc.Do(ctx, request)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	if resp.Status != 200 {
-		return nil, fmt.Errorf("unexpected http status code: %d\n contents: %s", resp.Status, string(resp.Body))
-
-	}
-	return resp.Body, nil
+	return resp.Unmarshal(200, result)
 }
 
 func parseResponse(b []byte) (map[string]interface{}, error) {

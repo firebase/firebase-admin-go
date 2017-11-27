@@ -137,10 +137,8 @@ func isEmptyString(ps *string) bool {
 
 // DeleteUser deletes the user by the given UID
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
-
-	_, err := c.makeUserRequest(ctx, "deleteAccount",
-		map[string]interface{}{"localId": []string{uid}})
-	return err
+	var gur getUserResponse
+	return c.makeUserRequest(ctx, "deleteAccount", map[string]interface{}{"localId": []string{uid}}, &gur)
 }
 
 // ExportedUserRecord is the returned user value used when listing all the users.
@@ -223,12 +221,9 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 }
 
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*ExportedUserRecord, error) {
-	resp, err := c.makeUserRequest(ctx, "getAccountInfo", params)
-	if err != nil {
-		return nil, err
-	}
+
 	var gur getUserResponse
-	err = json.Unmarshal(resp, &gur)
+	err := c.makeUserRequest(ctx, "getAccountInfo", params, &gur)
 	if err != nil {
 		return nil, err
 	}
@@ -283,17 +278,13 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, params *us
 	if ok, err := validated(params); !ok || err != nil {
 		return nil, err
 	}
-
-	resp, err := c.makeUserRequest(ctx, action, params)
+	var responseJSON map[string]interface{}
+	err = c.makeUserRequest(ctx, action, params, &responseJSON)
 	if err != nil {
-		return nil, fmt.Errorf("bad request %s, %s", string(resp), err)
+		return nil, err
 	}
 
-	jsonMap, err := parseResponse(resp)
-	if err != nil {
-		return nil, fmt.Errorf("bad json %s, %s", string(resp), err)
-	}
-	uid := jsonMap["localId"].(string)
+	uid := responseJSON["localId"].(string)
 
 	user, err := c.GetUser(ctx, uid)
 	if err != nil {
