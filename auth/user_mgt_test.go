@@ -100,9 +100,6 @@ func TestCreateParams(t *testing.T) {
 	fmt.Println(m, e)
 
 }
-func TestExportPayload(t *testing.T) {
-
-}
 
 func TestGetUser(t *testing.T) {
 	s, closer := echoServer("get_user.json", t)
@@ -308,31 +305,22 @@ func TestBadCreateUser(t *testing.T) {
 		}, {
 			&UserParams{Email: ptr.String("a@a@a")},
 			"error in params: Email must contain exactly one '@' sign",
-		}, {
-			&UserParams{CustomClaims: &map[string]interface{}{"a": strings.Repeat("a", 993)}},
-			"error in params: stringified JSON claims must be at most 1000 chars long",
 		},
 	}
-
-	for _, res := range reservedClaims {
-		badUserParams = append(badUserParams,
-			badParamsTest{&UserParams{CustomClaims: &map[string]interface{}{res: true}},
-				fmt.Sprintf("error in params: %s is a reserved claim", res)})
-	}
-
 	for i, test := range badUserParams {
+
 		_, err := client.CreateUser(context.Background(), test.params)
 		if err == nil {
 			t.Errorf("%d) expecting error %s", i, test.expectingError)
 		}
 		if err.Error() != test.expectingError {
-			t.Errorf("got error \"%s\" expecting error \"%s\"", err.Error(), test.expectingError)
+			t.Errorf("got error: \"%s\" expecting error: \"%s\"", err.Error(), test.expectingError)
 		}
 	}
 
 }
 
-func TestGoodParams(t *testing.T) {
+func TestGoodCreateParams(t *testing.T) {
 	s, closer := echoServer([]byte(`{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
@@ -341,6 +329,7 @@ func TestGoodParams(t *testing.T) {
 	defer closer()
 	goodParams := []*UserParams{
 		nil,
+		{},
 		{Password: ptr.String("123456")},
 		{UID: ptr.String("1")},
 		{UID: ptr.String(strings.Repeat("a", 128))},
@@ -357,13 +346,122 @@ func TestGoodParams(t *testing.T) {
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
 		// with the following expected error
 		if err.Error() != "cannot find user map[localId:[expectedUserID]]" {
-			fmt.Printf("%#v\n", par)
+			t.Error(err)
+		}
+	}
+}
+func TestBadUpdateParams(t *testing.T) {
+
+	badParams := []badParamsTest{
+		{
+			&UserParams{UID: ptr.String("inparamstruct")},
+			"uid mismatch",
+		}, {
+			&UserParams{CustomClaims: &map[string]interface{}{"a": strings.Repeat("a", 993)}},
+			"error in params: stringified JSON claims must be at most 1000 chars long",
+		},
+	}
+
+	for _, res := range reservedClaims {
+		badParams = append(badParams,
+			badParamsTest{&UserParams{CustomClaims: &map[string]interface{}{res: true}},
+				fmt.Sprintf("error in params: %s is a reserved claim", res)})
+	}
+
+	for i, test := range badParams {
+		_, err := client.UpdateUser(context.Background(), "outofstruct", test.params)
+		if err == nil {
+			t.Errorf("%d) expecting error %s", i, test.expectingError)
+		}
+		if err.Error() != test.expectingError {
+			t.Errorf("got error \"%s\" expecting error \"%s\"", err.Error(), test.expectingError)
+		}
+	}
+}
+func TestGoodUpdateParams(t *testing.T) {
+	s, closer := echoServer([]byte(`{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "expectedUserID",
+		"email": "tefwfd1234eml5f@test.com",
+		"displayName": "display_name",
+		"passwordHash": "UkVEQUNURUQ=",
+		"providerUserInfo": [
+		 {
+		  "providerId": "password",
+		  "federatedId": "tefwfd1234eml5f@test.com",
+		  "displayName": "display_name"
+		 }
+		],
+		"emailVerified": false
+	   }`), t)
+	defer closer()
+
+	goodParams := []*UserParams{
+		nil,
+		{},
+		{Password: ptr.String("123456")},
+		{UID: ptr.String("expectedUserID")},
+		{PhoneNumber: ptr.String("+1")},
+		{DisplayName: ptr.String("a")},
+		{Email: ptr.String("a@a")},
+		{PhoneNumber: ptr.String("+1")},
+		{CustomClaims: &map[string]interface{}{"a": strings.Repeat("a", 992)}},
+	}
+
+	for k, par := range goodParams {
+		fmt.Println(k)
+		_, err := s.Client().UpdateUser(context.Background(), "expectedUserID", par)
+		// There are two calls to the server, the first one, on creation retunrs the above []byte
+		// that's how we know the params passed validation
+		// the second call to GetUser, tries to get the user with the returned ID above, it fails
+		// with the following expected error
+		if err.Error() != "cannot find user map[localId:[expectedUserID]]" {
 			t.Error(err)
 		}
 	}
 }
 
-// -- --
-/// test parameters on delete user,
-// test uid on update user ,
-// test get by phone, or by email
+type ccErr struct {
+	cc   *map[string]interface{}
+	estr string
+}
+
+func TestBadSetCustomClaims(t *testing.T) {
+	badUserParams := []*ccErr{{
+		&map[string]interface{}{"a": strings.Repeat("a", 993)},
+		"error in params: stringified JSON claims must be at most 1000 chars long",
+	}}
+
+	for _, res := range reservedClaims {
+		badUserParams = append(badUserParams,
+			&ccErr{
+				cc:   &map[string]interface{}{res: true},
+				estr: fmt.Sprintf("error in params: %s is a reserved claim", res),
+			})
+	}
+
+	for i, test := range badUserParams {
+		err := client.SetCustomUserClaims(context.Background(), "uid", test.cc)
+		if err == nil {
+			t.Errorf("%d) expecting error %s", i, test.estr)
+		}
+		if err.Error() != test.estr {
+			t.Errorf("got error: \"%s\" expecting error: \"%s\"", err.Error(), test.estr)
+		}
+	}
+}
+
+func TestDelete(t *testing.T) {
+	s, closer := echoServer([]byte(`{
+		"kind": "identitytoolkit#SignupNewUserResponse",
+		"email": "",
+		"localId": "expectedUserID"
+	   }`), t)
+	defer closer()
+	if err := s.Client().DeleteUser(context.Background(), ""); err != nil {
+		t.Error(err)
+		return
+	}
+	t.Errorf("NO ERROR")
+
+}

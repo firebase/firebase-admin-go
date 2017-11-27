@@ -24,6 +24,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 
 	"firebase.google.com/go/ptr"
@@ -62,65 +63,63 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if ok := prepareTests(); !ok {
-		os.Exit(11)
-	}
-
-	exitVal := m.Run()
-
-	if ok := cleanupTests(); !ok {
-		os.Exit(12)
-	}
-	os.Exit(exitVal)
+	os.Exit(m.Run())
 }
 
-func prepareTests() bool {
-	if ok := cleanupTests(); !ok {
-		fmt.Println("trouble cleaning up from previous run.")
-		return false
-	}
+func TestUserManagement(t *testing.T) {
+	t.Run("clean the slate", cleanupUsers)
+	t.Run("add some users", populateSomeUsers)
+	t.Run("get user", testGetUser)
+	t.Run("user iterator test", testUserIterator)
+	t.Run("paging iterator test", testIterPage)
+	t.Run("disable", testDisableUser)
 
+	t.Run("update user", testUpdateUser)
+	t.Run("disable", testDisableUser)
+
+	t.Run("remove Display Name", testRemoveDisplayName)
+	t.Run("remove PhotoURL", testRemovePhotoURL)
+	t.Run("remove PhoneNumber", testRemovePhone)
+
+	t.Run("Remove custom claims", testRemoveCustomClaims)
+	t.Run("add custom claims", testAddCustomClaims)
+
+	t.Run("deleting a user", testIterPage)
+	t.Run("delete all users", cleanupUsers)
+}
+
+func populateSomeUsers(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		u, err := client.CreateUser(context.Background(), &auth.UserParams{UID: ptr.String(fmt.Sprintf("user -- %d.", i))})
+		u, err := client.CreateUser(context.Background(), &auth.UserParams{UID: ptr.String(fmt.Sprintf("user--%d", i))})
 		if err != nil {
-			fmt.Println("trouble creating", i, err)
-			return false
+			t.Error("trouble creating", i, err)
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
 	u, err := client.CreateUser(context.Background(), &auth.UserParams{})
 	if err != nil {
-		fmt.Println(err)
-		return false
+		t.Error(err)
 	}
 	testFixtures.sampleUserBlank = u
 
 	uid := "tefwfd1234"
 	u, err = client.CreateUser(context.Background(), &auth.UserParams{
-		UID:         ptr.String(uid),
-		Email:       ptr.String(uid + "eml5f@test.com"),
-		DisplayName: ptr.String("display_name"),
-		Password:    ptr.String("assawd"),
-	})
-
-	if err != nil {
-		fmt.Println(err, u)
-		return false
-	}
-	u, err = client.UpdateUser(context.Background(), uid, &auth.UserParams{
+		UID:          ptr.String(uid),
+		Email:        ptr.String(uid + "eml5f@test.com"),
+		DisplayName:  ptr.String("display_name"),
+		Password:     ptr.String("assawd"),
 		CustomClaims: &map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
 	})
 
 	if err != nil {
-		fmt.Println(err, u)
-		return false
+		t.Error(err)
 	}
 	testFixtures.sampleUserWithData = u
-	return true
+	fmt.Printf("%#v \n NNNNNNNNNN\n%#v", u, u.CustomClaims)
 }
-func cleanupTests() bool {
+
+func cleanupUsers(t *testing.T) {
 	iter := client.Users(context.Background(), "")
-	//var uids []string
 loop:
 	for {
 		user, err := iter.Next()
@@ -129,32 +128,18 @@ loop:
 			//uids = append(uids, user.UID)
 			err := client.DeleteUser(context.Background(), user.UID)
 			if err != nil {
-				fmt.Println("error deleting uid ", user.UID, err)
-				return false
+				t.Errorf("error deleting uid %s, %s", user.UID, err)
 			}
 		case iterator.Done:
 			break loop
 		default:
-			fmt.Println("error ", err)
-			return false
+			t.Error(err)
 		}
 	}
-	//	fmt.Println(uids)
-	// remove before submission, b/69406469
-	/*	for i, uid := range uids {
-		println("deleting ", i, uid)
-		fmt.Println(uid)
-		err := client.DeleteUser(context.Background(), uid)
-		if err != nil {
-			fmt.Println("error deleting uid ", uid, err)
-			return false
-		}
-	}*/
-	return true
 
 }
 
-func TestUserIterator(t *testing.T) {
+func testUserIterator(t *testing.T) {
 	iter := client.Users(context.Background(), "")
 	var uids []string
 	gotCount := 0
@@ -173,7 +158,8 @@ func TestUserIterator(t *testing.T) {
 		t.Errorf("expecting 5 users got %d", gotCount)
 	}
 }
-func TestIterPage(t *testing.T) {
+
+func testIterPage(t *testing.T) {
 	iter := client.Users(context.Background(), "")
 	pager := iterator.NewPager(iter, 2, "")
 	userCount := 0
@@ -198,17 +184,260 @@ func TestIterPage(t *testing.T) {
 		t.Errorf("expecting %d pages with %d users, got %d with %d ", 3, 5, pageCount, userCount)
 	}
 }
-func TestGetUser(t *testing.T) {
-	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 
+func testGetUser(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 	if err != nil {
 		t.Errorf("error getting user %s", err)
 	}
 	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
 		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserInfo)
 	}
+	if !reflect.DeepEqual(u.UserRecord, testFixtures.sampleUserWithData) {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserRecord)
+	}
+}
+func testUpdateUser(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+
+	if err != nil || u == nil {
+		t.Errorf("error getting user %s", err)
+	}
+	refU := &auth.ExportedUserRecord{
+		UserRecord: &auth.UserRecord{
+			UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
+			UserMetadata: &auth.UserMetadata{
+				CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
+			},
+		},
+	}
+	if !reflect.DeepEqual(u, refU) {
+		t.Errorf("\ngot %s, \nexpecting %s", toString(refU), toString(u))
+	}
+	up := &auth.UserParams{
+		DisplayName:   ptr.String("name"),
+		PhoneNumber:   ptr.String("+12345678901"),
+		PhotoURL:      ptr.String("http://photo.png"),
+		Email:         ptr.String("abc@ab.ab"),
+		EmailVerified: ptr.Bool(true),
+		Password:      ptr.String("wordpass"),
+		CustomClaims:  &map[string]interface{}{"custom": "claims"},
+	}
+	_, err = client.UpdateUser(context.Background(), u.UID, up)
+	if err != nil {
+		t.Error(err)
+	}
+
+	u, err = client.GetUser(context.Background(), u.UID)
+	updateExportedFromParams(refU, up)
+	refU.PasswordHash = u.PasswordHash
+	refU.PasswordSalt = u.PasswordSalt
+
+	u, err = client.GetUser(context.Background(), u.UID)
+	testPI(u.ProviderUserInfo,
+		&auth.UserInfo{
+			DisplayName: "name",
+			Email:       "abc@ab.ab",
+			PhotoURL:    "http://photo.png",
+			ProviderID:  "password"},
+		&auth.UserInfo{
+			PhoneNumber: "+12345678901",
+			ProviderID:  "phone"},
+		t)
+	u.ProviderUserInfo = nil
+	if !reflect.DeepEqual(u, refU) {
+		t.Errorf("\ngot %s\nexpecting %s", toString(u), toString(refU))
+	}
 }
 
+func testPI(pi []*auth.UserInfo, passwordUI, phoneUI *auth.UserInfo, t *testing.T) {
+	var compareWith *auth.UserInfo
+	for _, ui := range pi {
+		switch ui.ProviderID {
+		case "password":
+			compareWith = passwordUI
+
+		case "phone":
+			compareWith = phoneUI
+		}
+		if !reflect.DeepEqual(ui, compareWith) {
+			t.Errorf("\ngot %#v, \nexpecting %#v", ui, compareWith)
+		}
+	}
+
+}
+
+func testRemoveDisplayName(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.DisplayName == "" {
+		t.Errorf("expecting non empty display name")
+	}
+
+	_, err = client.UpdateUser(context.Background(), u.UID, &auth.UserParams{DisplayName: ptr.String("")})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if u.DisplayName != "" {
+		t.Errorf("expecting non empty display name")
+	}
+}
+
+func testRemovePhotoURL(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.PhotoURL == "" {
+		t.Errorf("expecting non empty display name")
+	}
+
+	_, err = client.UpdateUser(context.Background(), u.UID, &auth.UserParams{PhotoURL: ptr.String("")})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if u.PhotoURL != "" {
+		t.Errorf("expecting non empty display name")
+	}
+}
+
+func testRemovePhone(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.PhoneNumber == "" {
+		t.Errorf("expecting non empty display name")
+	}
+	if len(u.ProviderUserInfo) != 2 {
+		t.Errorf("expecting 2 providers")
+	}
+
+	_, err = client.UpdateUser(context.Background(), u.UID,
+		&auth.UserParams{PhoneNumber: ptr.String("")})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if u.PhoneNumber != "" {
+		t.Errorf("expecting non empty display name")
+	}
+	if len(u.ProviderUserInfo) != 1 {
+		t.Errorf("expecting 1 provider")
+	}
+}
+
+func testDisableUser(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.Disabled {
+		t.Errorf("expecting user not disabled")
+	}
+
+	_, err = client.UpdateUser(context.Background(), u.UID,
+		&auth.UserParams{Disabled: ptr.Bool(true)})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if !u.Disabled {
+		t.Errorf("expecting user disabled")
+	}
+	_, err = client.UpdateUser(context.Background(), u.UID,
+		&auth.UserParams{Disabled: ptr.Bool(false)})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.Disabled {
+		t.Errorf("expecting user enabled")
+	}
+}
+
+func testRemoveCustomClaims(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(u.CustomClaims,
+		&map[string]interface{}{"custom": "claims"}) {
+		t.Errorf("expecting CustomClaims")
+	}
+
+	err = client.SetCustomUserClaims(context.Background(), u.UID, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if u.CustomClaims != nil {
+		t.Errorf("expecting empty CC, \n\n \n--%T %v-\n%s\n", u.CustomClaims, u.CustomClaims, toString(u))
+
+	}
+}
+func testAddCustomClaims(t *testing.T) {
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Error(err)
+	}
+	if u.CustomClaims != nil {
+		t.Errorf("expecting CustomClaims empty")
+	}
+
+	_, err = client.UpdateUser(context.Background(), u.UID,
+		&auth.UserParams{CustomClaims: &map[string]interface{}{"2custom": "2claims"}})
+	if err != nil {
+		t.Error(err)
+	}
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if u.CustomClaims == nil {
+		t.Errorf("expecting non  empty Email")
+	}
+}
+
+func provString(e *auth.ExportedUserRecord) string {
+	providerStr := ""
+	if e.ProviderUserInfo != nil {
+		for _, info := range e.ProviderUserInfo {
+			providerStr += fmt.Sprintf("\n            %#v", info)
+		}
+	}
+	return providerStr
+}
+
+func toString(e *auth.ExportedUserRecord) string {
+	return fmt.Sprintf("ExportedUserRecord: %#v\n"+
+		"    UserRecord: %#v\n"+
+		"        UserInfo: %#v\n"+
+		"        MetaData: %#v\n"+
+		"        CustomClaims: %#v\n"+
+		"        ProviderData: %#v %s",
+		e,
+		e.UserRecord,
+		e.UserInfo,
+		e.UserMetadata,
+		e.CustomClaims,
+		e.ProviderUserInfo,
+		provString(e))
+}
+
+func updateExportedFromParams(refU *auth.ExportedUserRecord, up *auth.UserParams) {
+	refU.DisplayName = *up.DisplayName
+	refU.PhoneNumber = *up.PhoneNumber
+	refU.PhotoURL = *up.PhotoURL
+	refU.Email = *up.Email
+	refU.EmailVerified = *up.EmailVerified
+	//	refU.Disabled = *up.Disabled
+	refU.CustomClaims = up.CustomClaims
+}
 func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken("user1")
 
@@ -297,3 +526,7 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 	return ioutil.ReadAll(resp.Body)
 }
+
+// -- --
+/// test parameters on delete user,
+// test get by phone, or by email

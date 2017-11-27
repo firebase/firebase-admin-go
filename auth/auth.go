@@ -162,6 +162,7 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(up),
 	}
+
 	resp, err := c.httpClient().Do(ctx, request)
 	if err != nil {
 		return nil, err
@@ -277,7 +278,7 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	} else if p.Issuer != issuer {
 		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if p.IssuedAt > clk.Now().Unix() {
+	} else if p.IssuedAt > clk.Now().Unix()+1 {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
 		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)
