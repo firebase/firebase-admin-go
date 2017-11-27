@@ -115,7 +115,6 @@ func populateSomeUsers(t *testing.T) {
 		t.Error(err)
 	}
 	testFixtures.sampleUserWithData = u
-	fmt.Printf("%#v \n NNNNNNNNNN\n%#v", u, u.CustomClaims)
 }
 
 func cleanupUsers(t *testing.T) {

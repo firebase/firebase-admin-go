@@ -208,16 +208,13 @@ func (it *UserIterator) Next() (*ExportedUserRecord, error) {
 
 // SetCustomUserClaims sets the user claims (received as a *map[string]:interface{})
 func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClaims *map[string]interface{}) error {
-	fmt.Printf("\n211")
 	if customClaims == nil || *customClaims == nil || len(*customClaims) == 0 {
 		customClaims = &map[string]interface{}{}
 	}
-	fmt.Printf("\n216")
 	ur, err := c.UpdateUser(ctx, uid, &UserParams{CustomClaims: customClaims})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n221")
 	if ur.UID == uid {
 		return nil
 	}
@@ -232,7 +229,6 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*E
 	}
 	var gur getUserResponse
 	err = json.Unmarshal(resp, &gur)
-	//	fmt.Printf("> >> >> \n>>\n%s > >> %#v << << << << < \n<<< << < <<<< <<< <<  ", resp, gur)
 	if err != nil {
 		return nil, err
 	}
@@ -438,12 +434,15 @@ func validatePhoneNumber(phone *string) *string {
 	if phone == nil {
 		return nil
 	}
+	if len(*phone) == 0 {
+		return ptr.String("PhoneNumber cannot be empty")
+	}
 	if !strings.HasPrefix(*phone, "+") {
-		return ptr.String("PhoneNumber # must begin with a +")
+		return ptr.String("PhoneNumber must begin with a +")
 	}
 	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
 	if !isAlphaNum(*phone) {
-		return ptr.String("PhoneNumber # must contain an alphanumeric character")
+		return ptr.String("PhoneNumber must contain an alphanumeric character")
 	}
 	return nil
 }
