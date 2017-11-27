@@ -462,6 +462,4 @@ func TestDelete(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	t.Errorf("NO ERROR")
-
 }
