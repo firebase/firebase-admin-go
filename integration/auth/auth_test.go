@@ -106,7 +106,7 @@ func populateSomeUsers(t *testing.T) {
 		Email:        ptr.String(uid + "eml5f@test.com"),
 		DisplayName:  ptr.String("display_name"),
 		Password:     ptr.String("assawd"),
-		CustomClaims: &map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
+		CustomClaims: map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
 	})
 
 	if err != nil {
@@ -190,8 +190,8 @@ func testGetUser(t *testing.T) {
 	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
 		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserInfo)
 	}
-	if !reflect.DeepEqual(u.UserRecord, testFixtures.sampleUserWithData) {
-		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserRecord)
+	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u)
 	}
 }
 func testUpdateUser(t *testing.T) {
@@ -200,25 +200,24 @@ func testUpdateUser(t *testing.T) {
 	if err != nil || u == nil {
 		t.Errorf("error getting user %s", err)
 	}
-	refU := &auth.ExportedUserRecord{
-		UserRecord: &auth.UserRecord{
-			UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
-			UserMetadata: &auth.UserMetadata{
-				CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
-			},
+	refU := &auth.UserRecord{
+		UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
+		UserMetadata: &auth.UserMetadata{
+			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
 	}
 	if !reflect.DeepEqual(u, refU) {
 		t.Errorf("\ngot %s, \nexpecting %s", toString(refU), toString(u))
 	}
 	up := &auth.UserParams{
+		Disabled:      ptr.Bool(false),
 		DisplayName:   ptr.String("name"),
 		PhoneNumber:   ptr.String("+12345678901"),
 		PhotoURL:      ptr.String("http://photo.png"),
 		Email:         ptr.String("abc@ab.ab"),
 		EmailVerified: ptr.Bool(true),
 		Password:      ptr.String("wordpass"),
-		CustomClaims:  &map[string]interface{}{"custom": "claims"},
+		CustomClaims:  map[string]interface{}{"custom": "claims"},
 	}
 	_, err = client.UpdateUser(context.Background(), u.UID, up)
 	if err != nil {
@@ -226,9 +225,7 @@ func testUpdateUser(t *testing.T) {
 	}
 
 	u, err = client.GetUser(context.Background(), u.UID)
-	updateExportedFromParams(refU, up)
-	refU.PasswordHash = u.PasswordHash
-	refU.PasswordSalt = u.PasswordSalt
+	updateUserFromParams(refU, up)
 
 	u, err = client.GetUser(context.Background(), u.UID)
 	testPI(u.ProviderUserInfo,
@@ -366,7 +363,7 @@ func testRemoveCustomClaims(t *testing.T) {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(u.CustomClaims,
-		&map[string]interface{}{"custom": "claims"}) {
+		map[string]interface{}{"custom": "claims"}) {
 		t.Errorf("expecting CustomClaims")
 	}
 
@@ -390,7 +387,7 @@ func testAddCustomClaims(t *testing.T) {
 	}
 
 	_, err = client.UpdateUser(context.Background(), u.UID,
-		&auth.UserParams{CustomClaims: &map[string]interface{}{"2custom": "2claims"}})
+		&auth.UserParams{CustomClaims: map[string]interface{}{"2custom": "2claims"}})
 	if err != nil {
 		t.Error(err)
 	}
@@ -400,7 +397,7 @@ func testAddCustomClaims(t *testing.T) {
 	}
 }
 
-func provString(e *auth.ExportedUserRecord) string {
+func provString(e *auth.UserRecord) string {
 	providerStr := ""
 	if e.ProviderUserInfo != nil {
 		for _, info := range e.ProviderUserInfo {
@@ -410,15 +407,14 @@ func provString(e *auth.ExportedUserRecord) string {
 	return providerStr
 }
 
-func toString(e *auth.ExportedUserRecord) string {
-	return fmt.Sprintf("ExportedUserRecord: %#v\n"+
+func toString(e *auth.UserRecord) string {
+	return fmt.Sprintf(
 		"    UserRecord: %#v\n"+
-		"        UserInfo: %#v\n"+
-		"        MetaData: %#v\n"+
-		"        CustomClaims: %#v\n"+
-		"        ProviderData: %#v %s",
+			"        UserInfo: %#v\n"+
+			"        MetaData: %#v\n"+
+			"        CustomClaims: %#v\n"+
+			"        ProviderData: %#v %s",
 		e,
-		e.UserRecord,
 		e.UserInfo,
 		e.UserMetadata,
 		e.CustomClaims,
@@ -426,13 +422,13 @@ func toString(e *auth.ExportedUserRecord) string {
 		provString(e))
 }
 
-func updateExportedFromParams(refU *auth.ExportedUserRecord, up *auth.UserParams) {
+func updateUserFromParams(refU *auth.UserRecord, up *auth.UserParams) {
 	refU.DisplayName = *up.DisplayName
 	refU.PhoneNumber = *up.PhoneNumber
 	refU.PhotoURL = *up.PhotoURL
 	refU.Email = *up.Email
 	refU.EmailVerified = *up.EmailVerified
-	//	refU.Disabled = *up.Disabled
+	refU.Disabled = *up.Disabled
 	refU.CustomClaims = up.CustomClaims
 }
 func TestCustomToken(t *testing.T) {
@@ -523,7 +519,3 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 	return ioutil.ReadAll(resp.Body)
 }
-
-// -- --
-/// test parameters on delete user,
-// test get by phone, or by email

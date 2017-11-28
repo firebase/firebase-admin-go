@@ -140,7 +140,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 }
 
 // Passes the request struct, returns a byte array of the json
-func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}, result *interface{}) error {
+func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}, result interface{}) error {
 
 	request := &internal.Request{
 		Method: "POST",
@@ -153,20 +153,6 @@ func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up int
 		return err
 	}
 	return resp.Unmarshal(200, result)
-}
-
-func parseResponse(b []byte) (map[string]interface{}, error) {
-	var responseJSON map[string]interface{}
-	err := json.Unmarshal(b, &responseJSON)
-
-	if err != nil {
-		return nil, err
-	}
-	return responseJSON, nil
-}
-
-type requestStruct interface {
-	Validate() (bool, error)
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
@@ -258,7 +244,7 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	} else if p.Issuer != issuer {
 		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if p.IssuedAt > clk.Now().Unix()+1 {
+	} else if p.IssuedAt > clk.Now().Unix()+1 { // adding 1 second, due to flakiness in sync.
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
 		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)

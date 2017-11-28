@@ -16,9 +16,6 @@
 package internal
 
 import (
-	"go/build"
-	"path/filepath"
-
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
@@ -34,10 +31,4 @@ type AuthConfig struct {
 type StorageConfig struct {
 	Opts   []option.ClientOption
 	Bucket string
-}
-
-// Resource returns the absolute path to the specified test resource file.
-func Resource(name string) string {
-	p := []string{build.Default.GOPATH, "src", "firebase.google.com", "go", "testdata", name}
-	return filepath.Join(p...)
 }
