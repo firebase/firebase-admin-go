@@ -102,11 +102,10 @@ func populateSomeUsers(t *testing.T) {
 
 	uid := "tefwfd1234"
 	u, err = client.CreateUser(context.Background(), &auth.UserParams{
-		UID:          ptr.String(uid),
-		Email:        ptr.String(uid + "eml5f@test.com"),
-		DisplayName:  ptr.String("display_name"),
-		Password:     ptr.String("assawd"),
-		CustomClaims: map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
+		UID:         ptr.String(uid),
+		Email:       ptr.String(uid + "eml5f@test.com"),
+		DisplayName: ptr.String("display_name"),
+		Password:    ptr.String("assawd"),
 	})
 
 	if err != nil {
