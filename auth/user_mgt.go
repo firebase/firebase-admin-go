@@ -176,7 +176,7 @@ func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
 }
 
 // GetUserByPhoneNumberNumberNumber returns the user by phone number.
-func (c *Client) GetUserByPhoneNumberNumberNumber(ctx context.Context, phone string) (*UserRecord, error) {
+func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
 	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
 }
 
