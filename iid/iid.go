@@ -71,8 +71,5 @@ func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
 	if err != nil {
 		return err
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return err
-	}
-	return nil
+	return resp.CheckStatus(http.StatusOK)
 }
