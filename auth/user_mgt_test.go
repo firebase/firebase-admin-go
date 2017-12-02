@@ -48,7 +48,7 @@ func TestGetUser(t *testing.T) {
 	s, closer := echoServer("get_user.json", t)
 	defer closer()
 
-	user, err := s.Client.User(context.Background(), "ignored_id")
+	user, err := s.Client.GetUser(context.Background(), "ignored_id")
 	if err != nil {
 		t.Error(err)
 	}

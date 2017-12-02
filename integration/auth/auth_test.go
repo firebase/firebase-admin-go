@@ -89,7 +89,6 @@ func TestUserManagement(t *testing.T) {
 func cleanupUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
 		err := client.DeleteUser(context.Background(), id)
-		fmt.Println("deleting id", id)
 		if err != nil {
 			t.Errorf("error deleting uid %s, %s", id, err)
 		}
@@ -99,7 +98,7 @@ func cleanupUsers(t *testing.T) {
 
 func createdUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
-		_, err := client.User(context.Background(), id)
+		_, err := client.GetUser(context.Background(), id)
 		if err != nil {
 			t.Errorf("can't find User uid %s, %s", id, err)
 		}
@@ -142,7 +141,7 @@ func populateSomeUsers(t *testing.T) {
 }
 
 func testGetUser(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserWithData.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 	if err != nil {
 		t.Errorf("error getting user %s", err)
 	}
@@ -183,7 +182,6 @@ func testUserIterator(t *testing.T) {
 
 		gotCount++
 		uids[u.UID] = true
-		fmt.Println(uids)
 	}
 	if gotCount < 5 {
 		t.Errorf("expecting at least 5 users got %d", gotCount)
@@ -211,7 +209,10 @@ func testIterPage(t *testing.T) {
 			t.Errorf("paging error %v", err)
 		}
 		for _, u := range users {
-			fmt.Println(u)
+			// this iterates over users in a page
+			if u.UID == "something" {
+				// do something
+			}
 		}
 		if nextPageToken == "" {
 			break
@@ -223,7 +224,7 @@ func testIterPage(t *testing.T) {
 }
 
 func testDisableUser(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -236,7 +237,7 @@ func testDisableUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if !u.Disabled {
 		t.Errorf("expecting user disabled")
 	}
@@ -245,7 +246,7 @@ func testDisableUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -255,7 +256,7 @@ func testDisableUser(t *testing.T) {
 }
 
 func testUpdateUser(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 
 	if err != nil || u == nil {
 		t.Errorf("error getting user %s", err)
@@ -299,7 +300,7 @@ func testUpdateUser(t *testing.T) {
 		EmailVerified: true,
 		CustomClaims:  map[string]interface{}{"custom": "claims"},
 	}
-	u, err = client.User(context.Background(), u.UID)
+	u, err = client.GetUser(context.Background(), u.UID)
 	testPI(u.ProviderUserInfo,
 		&auth.UserInfo{
 			DisplayName: "name",
@@ -333,7 +334,7 @@ func testPI(pi []*auth.UserInfo, passwordUI, phoneUI *auth.UserInfo, t *testing.
 }
 
 func testRemoveDisplayName(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -345,14 +346,14 @@ func testRemoveDisplayName(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.DisplayName != "" {
 		t.Errorf("expecting non empty display name")
 	}
 }
 
 func testRemovePhotoURL(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -364,14 +365,14 @@ func testRemovePhotoURL(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.PhotoURL != "" {
 		t.Errorf("expecting non empty display name")
 	}
 }
 
 func testRemovePhone(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -387,7 +388,7 @@ func testRemovePhone(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.PhoneNumber != "" {
 		t.Errorf("expecting non empty display name")
 	}
@@ -397,7 +398,7 @@ func testRemovePhone(t *testing.T) {
 }
 
 func testRemoveCustomClaims(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -410,7 +411,7 @@ func testRemoveCustomClaims(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.CustomClaims != nil {
 		t.Errorf("expecting empty CC, \n\n \n--%T %v-\n%s\n", u.CustomClaims, u.CustomClaims, toString(u))
 
@@ -418,7 +419,7 @@ func testRemoveCustomClaims(t *testing.T) {
 }
 
 func testAddCustomClaims(t *testing.T) {
-	u, err := client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -431,7 +432,7 @@ func testAddCustomClaims(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u, err = client.User(context.Background(), testFixtures.sampleUserBlank.UID)
+	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.CustomClaims == nil {
 		t.Errorf("expecting non  empty Email")
 	}

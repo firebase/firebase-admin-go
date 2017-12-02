@@ -63,7 +63,8 @@ type ExportedUserRecord struct {
 	PasswordSalt string
 }
 
-// UserIterator is  is an iterator over Users
+// UserIterator is  is an iterator over Users.
+//
 // also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
 type UserIterator struct {
 	client   *Client
@@ -78,14 +79,14 @@ type commonParams struct {
 	errors  []string
 }
 
-// UserToCreate is the parameter struct for the CreateUser function
+// UserToCreate is the parameter struct for the CreateUser function.
 //
 // UserToCreate implements exported setters.
 type UserToCreate struct {
 	commonParams
 }
 
-// UserToUpdate is the parameter struct for the UpdateUser function
+// UserToUpdate is the parameter struct for the UpdateUser function.
 //
 // UserToUpdate implements exported setters.
 type UserToUpdate struct {
@@ -136,7 +137,7 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 	if err != nil {
 		return nil, err
 	}
-	ur, err := c.User(ctx, u.UID)
+	ur, err := c.GetUser(ctx, u.UID)
 	return ur, err
 }
 
@@ -157,29 +158,27 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdat
 	params.payload["localId"] = uid
 
 	return c.updateCreateUser(ctx, "setAccountInfo", params.payload)
-
-	// check payload.
 }
 
-// DeleteUser deletes the user by the given UID
+// DeleteUser deletes the user by the given UID.
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	var gur getUserResponse
 	deleteParams := map[string]interface{}{"localId": []string{uid}}
 	return c.makeUserRequest(ctx, "deleteAccount", deleteParams, &gur)
 }
 
-// User gets the user data corresponding to the specified user ID.
-func (c *Client) User(ctx context.Context, uid string) (*UserRecord, error) {
+// GetUser gets the user data corresponding to the specified user ID.
+func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
 	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
 }
 
-// UserByPhoneNumber gets the user data corresponding to the specified user phone number.
-func (c *Client) UserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+// GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
+func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
 	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
 }
 
-// UserByEmail gets the user data corresponding to the specified email.
-func (c *Client) UserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+// GetUserByEmail gets the user data corresponding to the specified email.
+func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
 	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
 }
 
@@ -227,9 +226,9 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 // Page size can be determined by the NewPager(...) function described there.
 func (it *UserIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
 
-// Next returns the next result. Its second return value is iterator.Done if
-// there are no more results. Once Next returns iterator.Done, all subsequent
-// calls will return iterator.Done.
+// Next returns the next result. Its second return value is [iterator.Done] if
+// there are no more results. Once Next returns [iterator.Done], all subsequent
+// calls will return [iterator.Done].
 func (it *UserIterator) Next() (*ExportedUserRecord, error) {
 	if err := it.nextFunc(); err != nil {
 		return nil, err
@@ -262,7 +261,7 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 }
 
 // ------------------------------------------------------------
-// Setters and utilities for Create and Update inpput structs
+// Setters and utilities for Create and Update input structs.
 
 func (p *commonParams) appendErrString(s string, i ...interface{}) {
 	p.errors = append(p.errors, fmt.Sprintf(s, i...))
@@ -291,13 +290,13 @@ func (p *commonParams) setDisabled(d bool) {
 	p.set("disableUser", d)
 }
 
-// Disabled field setter
+// Disabled field setter.
 func (p *UserToCreate) Disabled(d bool) *UserToCreate {
 	p.setDisabled(d)
 	return p
 }
 
-// Disabled field setter
+// Disabled field setter.
 func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
 	p.setDisabled(d)
 	return p
@@ -305,7 +304,7 @@ func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
 
 // ------  DisplayName: ------------------------------
 
-// DisplayName field setter
+// DisplayName field setter.
 func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
 	if len(dn) == 0 {
 		p.appendErrString("DisplayName must not be empty")
@@ -315,7 +314,7 @@ func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
 	return p
 }
 
-// DisplayName field setter
+// DisplayName field setter.
 func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
 	if len(dn) == 0 {
 		p.addToListParam("deleteAttribute", "DISPLAY_NAME")
@@ -337,13 +336,13 @@ func (p *commonParams) setEmail(e string) {
 	}
 }
 
-// Email field setter
+// Email field setter.
 func (p *UserToCreate) Email(e string) *UserToCreate {
 	p.setEmail(e)
 	return p
 }
 
-// Email field setter
+// Email field setter.
 func (p *UserToUpdate) Email(e string) *UserToUpdate {
 	p.setEmail(e)
 	return p
@@ -355,13 +354,13 @@ func (p *commonParams) setEmailVerified(ev bool) {
 	p.set("emailVerified", ev)
 }
 
-// EmailVerified field setter
+// EmailVerified field setter.
 func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate {
 	p.setEmailVerified(ev)
 	return p
 }
 
-// EmailVerified field setter
+// EmailVerified field setter.
 func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
 	p.setEmailVerified(ev)
 	return p
@@ -377,13 +376,13 @@ func (p *commonParams) setPassword(pw string) {
 	}
 }
 
-// Password field setter
+// Password field setter.
 func (p *UserToCreate) Password(pw string) *UserToCreate {
 	p.setPassword(pw)
 	return p
 }
 
-// Password field setter
+// Password field setter.
 func (p *UserToUpdate) Password(pw string) *UserToUpdate {
 	p.setPassword(pw)
 	return p
@@ -391,7 +390,7 @@ func (p *UserToUpdate) Password(pw string) *UserToUpdate {
 
 // ------  PhoneNumber: ------------------------------
 
-// PhoneNumber field setter
+// PhoneNumber field setter.
 func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
 	if len(phone) == 0 {
 		p.appendErrString(`invalid PhoneNumber: "%s". PhoneNumber must be a non-empty string`, phone)
@@ -403,7 +402,7 @@ func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
 	return p
 }
 
-// PhoneNumber field setter
+// PhoneNumber field setter.
 func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
 	if len(phone) > 0 && !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
 		p.appendErrString(`invalid phone number: "%s". Phone number must be a valid, E.164 compliant identifier`, phone)
@@ -417,7 +416,7 @@ func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
 
 // ------  PhoneNumber: ------------------------------
 
-// PhotoURL field setter
+// PhotoURL field setter.
 func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
 	if len(url) == 0 {
 		p.appendErrString(`invalid photo URL: "%s". PhotoURL must be a non-empty string`, url)
@@ -427,7 +426,7 @@ func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
 	return p
 }
 
-// PhotoURL field setter
+// PhotoURL field setter.
 func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate {
 	if len(url) == 0 {
 		p.addToListParam("deleteAttribute", "PHOTO_URL")
@@ -497,7 +496,7 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, params map
 	if err != nil {
 		return nil, err
 	}
-	user, err := c.User(ctx, rur.UID)
+	user, err := c.GetUser(ctx, rur.UID)
 	if err != nil {
 		return nil, err
 	}
