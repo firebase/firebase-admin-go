@@ -44,7 +44,7 @@ type mockReadCloser struct {
 	closeCount int
 }
 
-func newHTTPClientMock(data []byte) (*http.Client, *mockReadCloser) {
+func newTestHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
 	rc := &mockReadCloser{
 		data:       string(data),
 		closeCount: 0,
@@ -88,7 +88,7 @@ func TestHTTPKeySource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hc, rc := newHTTPClientMock(data)
+	hc, rc := newTestHTTPClient(data)
 	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestHTTPKeySource(t *testing.T) {
 
 func TestNewHTTPClientWithOptionClient(t *testing.T) {
 
-	hc, _ := newHTTPClientMock([]byte(""))
+	hc, _ := newTestHTTPClient([]byte(""))
 	ctx := context.Background()
 	hcnew, _, err := transport.NewHTTPClient(ctx, option.WithHTTPClient(hc))
 	if err != nil {
@@ -119,7 +119,7 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hc, rc := newHTTPClientMock(data)
+	hc, rc := newTestHTTPClient(data)
 	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +131,7 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 }
 
 func TestHTTPKeySourceEmptyResponse(t *testing.T) {
-	hc, _ := newHTTPClientMock([]byte(""))
+	hc, _ := newTestHTTPClient([]byte(""))
 	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 }
 
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
-	hc, _ := newHTTPClientMock([]byte("{\"foo\": 1}"))
+	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
 	ks, err := newHTTPKeySource("http://mock.url", hc)
 	if err != nil {
 		t.Fatal(err)
