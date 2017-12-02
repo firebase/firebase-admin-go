@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -39,12 +38,6 @@ import (
 
 var client *Client
 var testIDToken string
-
-type testFixtures struct {
-	userIDList         []string
-	userWithSomeParams *UserRecord
-	blankUser          *UserRecord
-}
 
 func TestMain(m *testing.M) {
 	var (
@@ -264,6 +257,17 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
+func TestNewHTTPClientNoOpts(t *testing.T) {
+	ctx := context.Background()
+	hc, _, err := transport.NewHTTPClient(ctx)
+	if err != nil {
+		t.Error()
+	}
+	if hc == nil {
+		t.Errorf("HTTPClient = nil; want non-nil")
+	}
+}
+
 func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
 	h := &jwtHeader{}
 	p := &customToken{}
@@ -332,10 +336,6 @@ type mockKeySource struct {
 	err  error
 }
 
-func (k *mockKeySource) httpClient() *http.Client {
-	return &http.Client{}
-}
-
 func (k *mockKeySource) Keys() ([]*publicKey, error) {
 	return k.keys, k.err
 }
@@ -346,9 +346,6 @@ type fileKeySource struct {
 	CachedKeys []*publicKey
 }
 
-func (f *fileKeySource) httpClient() *http.Client {
-	return &http.Client{}
-}
 func (f *fileKeySource) Keys() ([]*publicKey, error) {
 	if f.CachedKeys == nil {
 		certs, err := ioutil.ReadFile(f.FilePath)
@@ -386,22 +383,7 @@ func newAEKeySource(ctx context.Context) (keySource, error) {
 	return aeKeySource{keys}, nil
 }
 
-func (k aeKeySource) httpClient() *http.Client {
-	return &http.Client{}
-}
-
 // Keys returns the RSA Public Keys managed by App Engine.
 func (k aeKeySource) Keys() ([]*publicKey, error) {
 	return k.keys, nil
-}
-
-func TestNewHTTPClientNoOpts(t *testing.T) {
-	ctx := context.Background()
-	hc, err := newHTTPClient(ctx)
-	if err != nil {
-		t.Error()
-	}
-	if hc == nil {
-		t.Errorf("HTTPClient = nil; want non-nil")
-	}
 }

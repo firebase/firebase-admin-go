@@ -22,10 +22,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
-	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 
 	"firebase.google.com/go/internal"
@@ -77,14 +75,6 @@ type signer interface {
 	Sign(b []byte) ([]byte, error)
 }
 
-func newHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return hc, nil
-}
-
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
@@ -120,7 +110,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	hc, err := newHTTPClient(ctx, c.Opts...)
+	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +131,11 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 
 // Passes the request struct, returns a byte array of the json
 func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}, result interface{}) error {
-
 	request := &internal.Request{
 		Method: "POST",
 		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(up),
 	}
-
 	resp, err := c.hc.Do(ctx, request)
 	if err != nil {
 		return err
@@ -197,7 +185,6 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 

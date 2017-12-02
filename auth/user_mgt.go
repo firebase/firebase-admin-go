@@ -20,13 +20,13 @@ import (
 	"regexp"
 	"strings"
 
-	"firebase.google.com/go/ptr"
 	"google.golang.org/api/iterator"
 
 	"golang.org/x/net/context"
 )
 
-const maxResults = 1000
+const maxReturnedResults = 1000
+const maxLenPayloadCC = 1000
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
@@ -56,133 +56,11 @@ type UserRecord struct {
 	UserMetadata     *UserMetadata
 }
 
-// UserParams encapsulates the named calling params for CreateUser and UpdateUser. (UpdateUser will also call a
-//   distinct UID field, the one in the struct must match or be empty.)
-type UserParams struct {
-	CustomClaims  map[string]interface{} `json:"-"`
-	Disabled      *bool                  `json:"disableUser,omitempty"`
-	DisplayName   *string                `json:"displayName,omitempty"`
-	Email         *string                `json:"email,omitempty"`
-	EmailVerified *bool                  `json:"emailVerified,omitempty"`
-	Password      *string                `json:"password,omitempty"`
-	PhoneNumber   *string                `json:"phoneNumber,omitempty"`
-	PhotoURL      *string                `json:"photoUrl,omitempty"`
-	UID           *string                `json:"localId,omitempty"`
-}
-
-// userParams, is the iternal struct that will be passed on to the create function.
-type userParams struct {
-	*UserParams
-	DeleteAttributeList []string `json:"deleteAttribute,omitempty"`
-	DeleteProviderList  []string `json:"deleteProvider,omitempty"`
-	CustomAttributes    *string  `json:"customAttributes,omitempty"`
-}
-
-// CreateUser creates a new user with the specified properties.
-func (c *Client) CreateUser(ctx context.Context, p *UserParams) (*UserRecord, error) {
-	if p == nil {
-		p = &UserParams{}
-	}
-
-	if p.CustomClaims != nil {
-		p.CustomClaims = nil
-	}
-	up := &userParams{UserParams: p}
-
-	u, err := c.updateCreateUser(ctx, "signupNewUser", up)
-	if err != nil {
-		return nil, err
-	}
-	ur, err := c.GetUser(ctx, u.UID)
-	return ur, err
-}
-
-// UpdateUser updates a user with the given params
-// DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record
-// nil pointers in the UserParams will remain unchanged.
-func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserParams) (ur *UserRecord, err error) {
-	if uid == "" {
-		return nil, fmt.Errorf("uid must not be empty")
-	}
-	if params == nil {
-		return nil, fmt.Errorf("params must not be empty")
-	}
-	if params.UID != nil && *params.UID != uid {
-		return nil, fmt.Errorf("uid mismatch")
-	}
-	params.UID = &uid
-	up := &userParams{
-		UserParams: params,
-	}
-
-	// Deleting attributes
-	var deleteProvList, deleteAttrList []string
-	if isEmptyString(up.DisplayName) {
-		deleteAttrList = append(deleteAttrList, "DISPLAY_NAME")
-		up.DisplayName = nil
-	}
-	if isEmptyString(up.PhotoURL) {
-		deleteAttrList = append(deleteAttrList, "PHOTO_URL")
-		up.PhotoURL = nil
-	}
-	if isEmptyString(up.PhoneNumber) {
-		deleteProvList = append(deleteProvList, "phone")
-		up.PhoneNumber = nil
-	}
-	if deleteAttrList != nil {
-		up.DeleteAttributeList = deleteAttrList
-	}
-	if deleteProvList != nil {
-		up.DeleteProviderList = deleteProvList
-	}
-
-	// Setting the claims
-	if up.CustomClaims != nil {
-		b, err := json.Marshal(up.CustomClaims)
-		if err != nil {
-			return nil, err
-		}
-		s := string(b)
-		if up.CustomClaims == nil || len(up.CustomClaims) == 0 {
-			s = "{}"
-			up.CustomClaims = nil
-		}
-		up.CustomAttributes = &s
-	}
-	return c.updateCreateUser(ctx, "setAccountInfo", up)
-}
-
-func isEmptyString(ps *string) bool {
-	return ps != nil && *ps == ""
-}
-
-// DeleteUser deletes the user by the given UID
-func (c *Client) DeleteUser(ctx context.Context, uid string) error {
-	var gur getUserResponse
-	deleteParams := map[string]interface{}{"localId": []string{uid}}
-	return c.makeUserRequest(ctx, "deleteAccount", deleteParams, &gur)
-}
-
 // ExportedUserRecord is the returned user value used when listing all the users.
 type ExportedUserRecord struct {
 	*UserRecord
 	PasswordHash string
 	PasswordSalt string
-}
-
-// GetUser returns the user by UID.
-func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
-	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
-}
-
-// GetUserByPhoneNumberNumberNumber returns the user by phone number.
-func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
-	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
-}
-
-// GetUserByEmail returns the user by the email.
-func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
-	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
 }
 
 // UserIterator is  is an iterator over Users
@@ -195,114 +73,23 @@ type UserIterator struct {
 	users    []*ExportedUserRecord
 }
 
-// Users returns an iterator over Users.
-// If startToken is empty, the iterator will start at the beginning.
-// If the startToken is not empty, the iterator starts after the token.
-func (c *Client) Users(ctx context.Context, startToken string) *UserIterator {
-	it := &UserIterator{
-		ctx:    ctx,
-		client: c,
-	}
-	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
-		it.fetch,
-		func() int { return len(it.users) },
-		func() interface{} { b := it.users; it.users = nil; return b })
-	it.pageInfo.MaxSize = maxResults
-	it.pageInfo.Token = startToken
-	return it
+type commonParams struct {
+	payload map[string]interface{}
+	errors  []string
 }
 
-// PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
-// Page size can be determined by the NewPager(...) function described there.
-func (it *UserIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
-
-// Next returns the next result. Its second return value is iterator.Done if
-// there are no more results. Once Next returns iterator.Done, all subsequent
-// calls will return iterator.Done.
-func (it *UserIterator) Next() (*ExportedUserRecord, error) {
-	if err := it.nextFunc(); err != nil {
-		return nil, err
-	}
-	user := it.users[0]
-	it.users = it.users[1:]
-	return user, nil
+// UserToCreate is the parameter struct for the CreateUser function
+//
+// UserToCreate implements exported setters.
+type UserToCreate struct {
+	commonParams
 }
 
-func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	params := map[string]interface{}{"maxResults": pageSize}
-	if pageToken != "" {
-		params["nextPageToken"] = pageToken
-	}
-
-	var lur listUsersResponse
-	err := it.client.makeUserRequest(it.ctx, "downloadAccount", params, &lur)
-	if err != nil {
-		// remove this line before submission ,see b/69406469
-		if pageToken != "" &&
-			strings.Contains(err.Error(), "\"code\": 400") &&
-			strings.Contains(err.Error(), "\"message\": \"INVALID_PAGE_SELECTION\"") {
-			return it.fetch(pageSize, "")
-		}
-		return "", err
-	}
-	for _, u := range lur.Users {
-		eu, err := makeExportedUser(u)
-		if err != nil {
-			return "", err
-		}
-		it.users = append(it.users, eu)
-	}
-	it.pageInfo.Token = lur.NextPage
-	return lur.NextPage, nil
-}
-
-// SetCustomUserClaims sets the user claims (received as a *map[string]:interface{})
-func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
-	if customClaims == nil || len(customClaims) == 0 {
-		customClaims = map[string]interface{}{}
-	}
-	ur, err := c.UpdateUser(ctx, uid, &UserParams{CustomClaims: customClaims})
-	if err != nil {
-		return err
-	}
-	if ur.UID == uid {
-		return nil
-	}
-
-	return fmt.Errorf("uid mismatch on returned user")
-}
-
-func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
-
-	var gur getUserResponse
-	err := c.makeUserRequest(ctx, "getAccountInfo", params, &gur)
-	if err != nil {
-		return nil, err
-	}
-	if len(gur.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user %v", params)
-	}
-	if l := len(gur.Users); l > 1 {
-		return nil, fmt.Errorf("expecting only one user, got %d, %v ", l, params)
-	}
-	eu, err := makeExportedUser(gur.Users[0])
-	return eu.UserRecord, err
-}
-
-func (c *Client) updateCreateUser(ctx context.Context, action string, params *userParams) (ur *UserRecord, err error) {
-	if ok, err := params.validated(); !ok || err != nil {
-		return nil, err
-	}
-	var rur responseUserRecord
-	err = c.makeUserRequest(ctx, action, params, &rur)
-	if err != nil {
-		return nil, err
-	}
-	user, err := c.GetUser(ctx, rur.UID)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+// UserToUpdate is the parameter struct for the UpdateUser function
+//
+// UserToUpdate implements exported setters.
+type UserToUpdate struct {
+	commonParams
 }
 
 type getUserResponse struct {
@@ -332,6 +119,386 @@ type listUsersResponse struct {
 	RequestType string               `json:"kind,omitempty"`
 	Users       []responseUserRecord `json:"users,omitempty"`
 	NextPage    string               `json:"nextPageToken,omitempty"`
+}
+
+// CreateUser creates a new user with the specified properties.
+func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRecord, error) {
+	if params == nil {
+		params = &UserToCreate{}
+	}
+	if len(params.errors) > 0 {
+		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
+	}
+	if params.payload == nil {
+		params.payload = map[string]interface{}{}
+	}
+	u, err := c.updateCreateUser(ctx, "signupNewUser", params.payload)
+	if err != nil {
+		return nil, err
+	}
+	ur, err := c.User(ctx, u.UID)
+	return ur, err
+}
+
+// UpdateUser updates an existing user account with the specified properties.
+//
+// DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record.
+func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdate) (ur *UserRecord, err error) {
+	if uid == "" {
+		return nil, fmt.Errorf("uid must not be empty")
+	}
+	if params == nil || (len(params.errors) == 0 && len(params.payload) == 0) {
+		return nil, fmt.Errorf("params must not be empty for update")
+	}
+	if len(params.errors) > 0 {
+		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
+	}
+
+	params.payload["localId"] = uid
+
+	return c.updateCreateUser(ctx, "setAccountInfo", params.payload)
+
+	// check payload.
+}
+
+// DeleteUser deletes the user by the given UID
+func (c *Client) DeleteUser(ctx context.Context, uid string) error {
+	var gur getUserResponse
+	deleteParams := map[string]interface{}{"localId": []string{uid}}
+	return c.makeUserRequest(ctx, "deleteAccount", deleteParams, &gur)
+}
+
+// User gets the user data corresponding to the specified user ID.
+func (c *Client) User(ctx context.Context, uid string) (*UserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
+}
+
+// UserByPhoneNumber gets the user data corresponding to the specified user phone number.
+func (c *Client) UserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
+}
+
+// UserByEmail gets the user data corresponding to the specified email.
+func (c *Client) UserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
+}
+
+// Users returns an iterator over Users.
+//
+// If startToken is empty, the iterator will start at the beginning.
+// If the startToken is not empty, the iterator starts after the token.
+func (c *Client) Users(ctx context.Context, startToken string) *UserIterator {
+	it := &UserIterator{
+		ctx:    ctx,
+		client: c,
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
+		it.fetch,
+		func() int { return len(it.users) },
+		func() interface{} { b := it.users; it.users = nil; return b })
+	it.pageInfo.MaxSize = maxReturnedResults
+	it.pageInfo.Token = startToken
+	return it
+}
+
+func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
+	params := map[string]interface{}{"maxResults": pageSize}
+	if pageToken != "" {
+		params["nextPageToken"] = pageToken
+	}
+
+	var lur listUsersResponse
+	err := it.client.makeUserRequest(it.ctx, "downloadAccount", params, &lur)
+	if err != nil {
+		return "", err
+	}
+	for _, u := range lur.Users {
+		eu, err := makeExportedUser(u)
+		if err != nil {
+			return "", err
+		}
+		it.users = append(it.users, eu)
+	}
+	it.pageInfo.Token = lur.NextPage
+	return lur.NextPage, nil
+}
+
+// PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
+// Page size can be determined by the NewPager(...) function described there.
+func (it *UserIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
+
+// Next returns the next result. Its second return value is iterator.Done if
+// there are no more results. Once Next returns iterator.Done, all subsequent
+// calls will return iterator.Done.
+func (it *UserIterator) Next() (*ExportedUserRecord, error) {
+	if err := it.nextFunc(); err != nil {
+		return nil, err
+	}
+	user := it.users[0]
+	it.users = it.users[1:]
+	return user, nil
+}
+
+// SetCustomUserClaims sets additional claims on an existing user account.
+//
+// Custom claims set via this function can be used to define user roles and privilege levels.
+// These claims propagate to all the devices where the user is already signed in (after token
+// expiration or when token refresh is forced), and next time the user signs in. The claims
+// can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
+// iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
+// when serialized into a JSON string.
+func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
+	if customClaims == nil || len(customClaims) == 0 {
+		customClaims = map[string]interface{}{}
+	}
+	ur, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
+	if err != nil {
+		return err
+	}
+	if ur.UID == uid {
+		return nil
+	}
+	return fmt.Errorf("uid mismatch on returned user")
+}
+
+// ------------------------------------------------------------
+// Setters and utilities for Create and Update inpput structs
+
+func (p *commonParams) appendErrString(s string, i ...interface{}) {
+	p.errors = append(p.errors, fmt.Sprintf(s, i...))
+}
+
+func (p *commonParams) set(key string, value interface{}) {
+	if p.payload == nil {
+		p.payload = make(map[string]interface{})
+	}
+	p.payload[key] = value
+}
+
+func (p *UserToUpdate) addToListParam(listname, param string) {
+	if _, ok := p.payload[listname]; ok {
+		p.payload[listname] = append(p.payload[listname].([]string), param)
+	} else {
+		p.set(listname, []string{param})
+	}
+}
+
+// ------  Disabled: ------------------------------
+func (p *commonParams) setDisabled(d bool) {
+	p.set("disableUser", d)
+}
+
+// Disabled field setter
+func (p *UserToCreate) Disabled(d bool) *UserToCreate {
+	p.setDisabled(d)
+	return p
+}
+
+// Disabled field setter
+func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
+	p.setDisabled(d)
+	return p
+}
+
+// ------  DisplayName: ------------------------------
+
+// DisplayName field setter
+func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
+	if len(dn) == 0 {
+		p.appendErrString("DisplayName must not be empty")
+	} else {
+		p.set("displayName", dn)
+	}
+	return p
+}
+
+// DisplayName field setter
+func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
+	if len(dn) == 0 {
+		p.addToListParam("deleteAttribute", "DISPLAY_NAME")
+	} else {
+		p.set("displayName", dn)
+	}
+	return p
+}
+
+// ------  Email: ------------------------------
+
+func (p *commonParams) setEmail(e string) {
+	if len(e) == 0 {
+		p.appendErrString(`invalid Email: "%s" Email must be a non-empty string`, e)
+	} else if parts := strings.Split(e, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		p.appendErrString(`malformed email address string: "%s"`, e)
+	} else {
+		p.set("email", e)
+	}
+}
+
+// Email field setter
+func (p *UserToCreate) Email(e string) *UserToCreate {
+	p.setEmail(e)
+	return p
+}
+
+// Email field setter
+func (p *UserToUpdate) Email(e string) *UserToUpdate {
+	p.setEmail(e)
+	return p
+}
+
+// ------  EmailVerified: ------------------------------
+
+func (p *commonParams) setEmailVerified(ev bool) {
+	p.set("emailVerified", ev)
+}
+
+// EmailVerified field setter
+func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate {
+	p.setEmailVerified(ev)
+	return p
+}
+
+// EmailVerified field setter
+func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
+	p.setEmailVerified(ev)
+	return p
+}
+
+// ------  Password: ------------------------------
+
+func (p *commonParams) setPassword(pw string) {
+	if len(pw) < 6 {
+		p.appendErrString("invalid Password string. Password must be a string at least 6 characters long")
+	} else {
+		p.set("password", pw)
+	}
+}
+
+// Password field setter
+func (p *UserToCreate) Password(pw string) *UserToCreate {
+	p.setPassword(pw)
+	return p
+}
+
+// Password field setter
+func (p *UserToUpdate) Password(pw string) *UserToUpdate {
+	p.setPassword(pw)
+	return p
+}
+
+// ------  PhoneNumber: ------------------------------
+
+// PhoneNumber field setter
+func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
+	if len(phone) == 0 {
+		p.appendErrString(`invalid PhoneNumber: "%s". PhoneNumber must be a non-empty string`, phone)
+	} else if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
+		p.appendErrString(`invalid phone number: "%s". Phone number must be a valid, E.164 compliant identifier`, phone)
+	} else {
+		p.set("phoneNumber", phone)
+	}
+	return p
+}
+
+// PhoneNumber field setter
+func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
+	if len(phone) > 0 && !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
+		p.appendErrString(`invalid phone number: "%s". Phone number must be a valid, E.164 compliant identifier`, phone)
+	} else if len(phone) == 0 {
+		p.addToListParam("deleteProvider", "phone")
+	} else {
+		p.set("phoneNumber", phone)
+	}
+	return p
+}
+
+// ------  PhoneNumber: ------------------------------
+
+// PhotoURL field setter
+func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
+	if len(url) == 0 {
+		p.appendErrString(`invalid photo URL: "%s". PhotoURL must be a non-empty string`, url)
+	} else {
+		p.set("photoUrl", url)
+	}
+	return p
+}
+
+// PhotoURL field setter
+func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate {
+	if len(url) == 0 {
+		p.addToListParam("deleteAttribute", "PHOTO_URL")
+	} else {
+		p.set("photoUrl", url)
+	}
+	return p
+}
+
+// UID field setter ------------------------------
+func (p *UserToCreate) UID(uid string) *UserToCreate {
+	if len(uid) == 0 || len(uid) > 128 {
+		p.appendErrString(`invalid uid: "%s". The uid must be a non-empty string with no more than 128 characters`, uid)
+	}
+	p.set("localId", uid)
+	return p
+}
+
+// CustomClaims setter: ------------------------------
+func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
+	if cc == nil {
+		cc = make(map[string]interface{})
+	}
+	for _, key := range reservedClaims {
+		if _, ok := cc[key]; ok {
+			p.appendErrString(`claim "%s" is reserved, and must not be set`, key)
+		}
+	}
+	b, err := json.Marshal(cc)
+	if err != nil {
+		p.appendErrString("invalid custom claims Marshaling error: %v", err)
+	} else if len(b) > maxLenPayloadCC {
+		p.appendErrString(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC)
+	} else {
+		s := string(b)
+		if cc == nil || len(cc) == 0 {
+			s = "{}"
+		}
+		p.set("customAttributes", s)
+	}
+	return p
+}
+
+// ------------------------------------------------------------
+// ------------------------------------------------------------ End of setters
+
+func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
+
+	var gur getUserResponse
+	err := c.makeUserRequest(ctx, "getAccountInfo", params, &gur)
+	if err != nil {
+		return nil, err
+	}
+	if len(gur.Users) == 0 {
+		return nil, fmt.Errorf("cannot find user %v", params)
+	}
+	if l := len(gur.Users); l > 1 {
+		return nil, fmt.Errorf("expecting only one user, got %d, %v ", l, params)
+	}
+	eu, err := makeExportedUser(gur.Users[0])
+	return eu.UserRecord, err
+}
+
+func (c *Client) updateCreateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
+	var rur responseUserRecord
+	err := c.makeUserRequest(ctx, action, params, &rur)
+	if err != nil {
+		return nil, err
+	}
+	user, err := c.User(ctx, rur.UID)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {
@@ -369,92 +536,4 @@ func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {
 		PasswordSalt: r.PasswordSalt,
 	}
 	return resp, nil
-}
-
-func validateString(s *string, condition func(string) bool, message string) *string {
-	if s == nil || condition(*s) {
-		return nil
-	}
-	return &message
-}
-
-func validateCustomClaims(up *userParams) *string {
-	if up.CustomClaims == nil {
-		return nil
-	}
-	cc := up.CustomClaims
-	for _, key := range reservedClaims {
-		if _, ok := cc[key]; ok {
-			return ptr.String(key + " is a reserved claim")
-		}
-	}
-	return validateString(up.CustomAttributes,
-		func(st string) bool { return len(st) <= 1000 },
-		"stringified JSON claims must be at most 1000 chars long")
-}
-func validatePhoneNumber(phone *string) *string {
-	if phone == nil {
-		return nil
-	}
-	if len(*phone) == 0 {
-		return ptr.String("PhoneNumber cannot be empty")
-	}
-	if !strings.HasPrefix(*phone, "+") {
-		return ptr.String("PhoneNumber must begin with a +")
-	}
-	isAlphaNum := regexp.MustCompile(`[0-9A-Za-z]`).MatchString
-	if !isAlphaNum(*phone) {
-		return ptr.String("PhoneNumber must contain an alphanumeric character")
-	}
-	return nil
-}
-
-func validateEmail(email *string) *string {
-	if empty := validateString(email,
-		func(st string) bool { return len(st) > 0 },
-		"Email must not be empty"); empty != nil {
-		return empty
-	}
-	if noAt := validateString(email,
-		func(s string) bool { return strings.Count(s, "@") == 1 },
-		"Email must contain exactly one '@' sign"); noAt != nil {
-		return noAt
-	}
-	return validateString(email,
-		func(s string) bool { return strings.Index(s, "@") > 0 && strings.LastIndex(s, "@") < (len(s)-1) },
-		"Email must have non empty account and domain")
-}
-
-func validateUID(uid *string) *string {
-	if tooLong := validateString(uid,
-		func(st string) bool { return len(st) <= 128 },
-		"UID must be at most 128 chars long"); tooLong != nil {
-		return tooLong
-	}
-	tooShort := validateString(uid,
-		func(st string) bool { return len(st) > 0 },
-		"UID must not be empty")
-	return tooShort
-}
-
-func (up *userParams) validated() (bool, error) {
-	errors := []*string{
-		validateCustomClaims(up),
-		validatePhoneNumber(up.PhoneNumber),
-		validateEmail(up.Email),
-		validateUID(up.UID),
-		validateString(up.Password, func(st string) bool { return len(st) >= 6 }, "Password must be at least 6 chars long"),
-		validateString(up.DisplayName, func(st string) bool { return len(st) > 0 }, "DisplayName must not be empty"),
-		validateString(up.PhotoURL, func(st string) bool { return len(st) > 0 }, "PhotoURL must not be empty"),
-	}
-	var res []string
-	for _, e := range errors {
-		if e != nil {
-			res = append(res, *e)
-		}
-	}
-	if res == nil {
-		return true, nil
-	}
-	return false, fmt.Errorf("error in params: %s", strings.Join(res, ", "))
 }

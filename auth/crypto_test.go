@@ -26,6 +26,7 @@ import (
 	"golang.org/x/net/context"
 
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 type mockHTTPResponse struct {
@@ -97,11 +98,12 @@ func TestHTTPKeySource(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
 func TestNewHTTPClientWithOptionClient(t *testing.T) {
 
 	hc, _ := newHTTPClientMock([]byte(""))
 	ctx := context.Background()
-	hcnew, err := newHTTPClient(ctx, option.WithHTTPClient(hc))
+	hcnew, _, err := transport.NewHTTPClient(ctx, option.WithHTTPClient(hc))
 	if err != nil {
 		t.Error()
 	}

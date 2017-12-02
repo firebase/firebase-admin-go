@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
-	"firebase.google.com/go/ptr"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -23,21 +22,25 @@ type mockAuthServer struct {
 	Resp   []byte
 	Header map[string]string
 	Status int
-	Req    *http.Request
+	Req    []*http.Request
+	rbody  []byte
 	srv    *httptest.Server
 	client *Client
 }
 
 // echoServer takes either a []byte or a string filename, or an object
-// it returns a server whose client will echo either
-//   the []byte it got
-//   the contents of the file named by the string in []byte form
-//   the marshalled object, in []byte form
+// it returns a server whose client will echo one of the following (depending on ther input)
+//   []byte: the []byte it got
+//   string: the contents of the file named by the string in []byte form
+//   object: the marshalled object, in []byte form
+//   nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
 // it also returns a closing functions that has to be defer closed
 func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	var b []byte
 	var err error
 	switch v := resp.(type) {
+	case nil:
+		b = []byte("")
 	case []byte:
 		b = v
 	case string:
@@ -56,8 +59,14 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	s := mockAuthServer{Resp: b}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 
-		s.Req = r
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		s.Req = append(s.Req, r)
+		s.rbody = reqBody
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}
@@ -85,115 +94,28 @@ func (s *mockAuthServer) Client() *Client {
 	return s.client
 }
 
-/*func TestSetClaimsField(t *testing.T) {
-	tests := []struct {
-		p          UserParams
-		attributes string
-	}{
-		{
-			UserParams{
-				CustomClaims: map[string]interface{}{
-					"asdf":  "ff",
-					"asdff": true,
-				},
-			},
-			"{\"asdf\":\"ff\",\"asdff\":true}",
-		}, {
-			UserParams{
-				CustomClaims: map[string]interface{}{},
-			},
-			"{}",
-		}, {
-			UserParams{
-				CustomClaims: map[string]interface{}{
-					"integer": 12,
-					"number":  12.3,
-				},
-			},
-			"{\"integer\":12,\"number\":12.3}",
-		},
-	}
-	for _, test := range tests {
-		up := userParams{UserParams: &test.p}
-
-		up.setClaimsField()
-		if *up.CustomAttributes != test.attributes {
-			t.Errorf("wrong custom attribute string got %s expecting %s", *up.CustomAttributes, test.attributes)
-
-		}
-	}
-}
-
-func TestDeleteParams(t *testing.T) {
-	tests := []struct {
-		params UserParams
-		up     userParams
-	}{
-		{
-			UserParams{
-				DisplayName: ptr.String(""),
-			},
-			userParams{
-				UserParams:          &UserParams{},
-				DeleteAttributeList: []string{"DISPLAY_NAME"},
-			},
-		},
-		{
-			UserParams{
-				PhotoURL: ptr.String(""),
-			},
-			userParams{
-				UserParams:          &UserParams{},
-				DeleteAttributeList: []string{"PHOTO_URL"},
-			},
-		}, {
-			UserParams{
-				DisplayName: ptr.String(""),
-				PhotoURL:    ptr.String(""),
-			},
-			userParams{
-				UserParams:          &UserParams{},
-				DeleteAttributeList: []string{"DISPLAY_NAME", "PHOTO_URL"},
-			},
-		},
-		{
-			UserParams{
-				PhoneNumber: ptr.String(""),
-			},
-			userParams{
-				UserParams:         &UserParams{},
-				DeleteProviderList: []string{"phone"},
-			},
-		},
-	}
-	for i, test := range tests {
-		up := userParams{UserParams: &test.params}
-		up.setDeleteFields()
-		if !reflect.DeepEqual(up, test.up) {
-			t.Errorf("test %d: got %#v expecting %#v", i, up, test.up)
-		}
-	}
-}
-*/
 func TestGetUser(t *testing.T) {
 	s, closer := echoServer("get_user.json", t)
 	defer closer()
 
-	user, err := s.Client().GetUser(context.Background(), "ignored_id")
+	user, err := s.Client().User(context.Background(), "ignored_id")
 	if err != nil {
 		t.Error(err)
 	}
 	tests := []struct {
+		name string
 		got  interface{}
 		want interface{}
 	}{
-		{user.UID, "testuser"},
-		{user.UserMetadata, &UserMetadata{CreationTimestamp: 1234567890, LastLogInTimestamp: 1233211232}},
-		{user.Email, "testuser@example.com"},
-		{user.EmailVerified, true},
-		{user.PhotoURL, "http://www.example.com/testuser/photo.png"},
-		{user.Disabled, false},
-		{user.ProviderUserInfo, []*UserInfo{
+		{"user.UID", user.UID, "testuser"},
+		{"user.UserMetadata", user.UserMetadata, &UserMetadata{
+			CreationTimestamp:  1234567890,
+			LastLogInTimestamp: 1233211232}},
+		{"user.Email", user.Email, "testuser@example.com"},
+		{"user.EmailVerified", user.EmailVerified, true},
+		{"user.PhotoURL", user.PhotoURL, "http://www.example.com/testuser/photo.png"},
+		{"user.Disabled", user.Disabled, false},
+		{"user.ProviderUserInfo", user.ProviderUserInfo, []*UserInfo{
 			{
 				ProviderID:  "password",
 				DisplayName: "Test User",
@@ -204,16 +126,17 @@ func TestGetUser(t *testing.T) {
 				PhoneNumber: "+1234567890",
 			},
 		}},
-		{user.DisplayName, "Test User"},
-		//		{user.PasswordHash, "passwordhash"},
-		//		{user.PasswordSalt, "salt==="},
-		{user.CustomClaims, map[string]interface{}{"admin": true, "package": "gold"}},
+		{"user.DisplayName", user.DisplayName, "Test User"},
+		//		{"user.PasswordHash", user.PasswordHash, "passwordhash"},
+		//		{"user.PasswordSalt", user.PasswordSalt, "salt==="},
+		{"user.CustomClaims", user.CustomClaims, map[string]interface{}{"admin": true, "package": "gold"}},
 	}
 	for _, test := range tests {
 		if !reflect.DeepEqual(test.want, test.got) {
-			t.Errorf("got %#v wanted %#v", test.got, test.want)
+			t.Errorf("%s = %#v; want %#v", test.name, test.got, test.want)
 		}
 	}
+
 }
 
 var listUsers []*ExportedUserRecord
@@ -293,6 +216,7 @@ func setListUsers() {
 }
 
 type basicCompare struct {
+	name string
 	got  interface{}
 	want interface{}
 }
@@ -313,21 +237,21 @@ func TestGetUsers(t *testing.T) {
 
 		}
 		tests := []basicCompare{
-			{user, listUsers[i]},
-			{user.CustomClaims, listUsers[i].CustomClaims},
-			{user.UserInfo, listUsers[i].UserInfo},
-			{user.UserRecord, listUsers[i].UserRecord},
-			{user.ProviderUserInfo, listUsers[i].ProviderUserInfo},
-			{user.UserMetadata, listUsers[i].UserMetadata},
-			{user.PasswordHash, listUsers[i].PasswordHash},
-			{user.PasswordSalt, listUsers[i].PasswordSalt},
+			{"user", user, listUsers[i]},
+			{"user.CustomClaims", user.CustomClaims, listUsers[i].CustomClaims},
+			{"user.UserInfo", user.UserInfo, listUsers[i].UserInfo},
+			{"user.UserRecord", user.UserRecord, listUsers[i].UserRecord},
+			{"user.ProviderUserInfo", user.ProviderUserInfo, listUsers[i].ProviderUserInfo},
+			{"user.UserMetadata", user.UserMetadata, listUsers[i].UserMetadata},
+			{"user.PasswordHash", user.PasswordHash, listUsers[i].PasswordHash},
+			{"user.PasswordSalt", user.PasswordSalt, listUsers[i].PasswordSalt},
 		}
 		for k, pui := range user.ProviderUserInfo {
-			tests = append(tests, basicCompare{pui, listUsers[i].ProviderUserInfo[k]})
+			tests = append(tests, basicCompare{fmt.Sprintf("Provider %d", k), pui, listUsers[i].ProviderUserInfo[k]})
 		}
 		for j, test := range tests {
 			if !reflect.DeepEqual(test.got, test.want) {
-				t.Errorf("item %d %d \ngot:    %T %#v \nwanted: %T %#v", i, j,
+				t.Errorf("item %d, test %d \n %s =  (%T) %#v \nwanted: (%T) %#v", i, j, test.name,
 					test.got, test.got, test.want, test.want)
 			}
 		}
@@ -336,59 +260,64 @@ func TestGetUsers(t *testing.T) {
 
 }
 
-type badParamsTest struct {
-	params         *UserParams
+type badTestCreateParams struct {
+	params         *UserToCreate
+	expectingError string
+}
+
+type badTestUpdateParams struct {
+	params         *UserToUpdate
 	expectingError string
 }
 
 func TestBadCreateUser(t *testing.T) {
-	badUserParams := []badParamsTest{
+	badUserParams := []badTestCreateParams{
 		{
-			&UserParams{Password: ptr.String("short")},
-			"error in params: Password must be at least 6 chars long",
+			(&UserToCreate{}).Password("short"),
+			`invalid Password string. Password must be a string at least 6 characters long`,
 		}, {
-			&UserParams{PhoneNumber: ptr.String("1234")},
-			"error in params: PhoneNumber must begin with a +",
+			(&UserToCreate{}).PhoneNumber("1234"),
+			`invalid phone number: "1234". Phone number must be a valid, E.164 compliant identifier`,
 		}, {
-			&UserParams{PhoneNumber: ptr.String("+_!@#$")},
-			"error in params: PhoneNumber must contain an alphanumeric character",
+			(&UserToCreate{}).PhoneNumber("+_!@#$"),
+			`invalid phone number: "+_!@#$". Phone number must be a valid, E.164 compliant identifier`,
 		}, {
-			&UserParams{UID: ptr.String("")},
-			"error in params: UID must not be empty",
+			(&UserToCreate{}).UID(""),
+			`invalid uid: "". The uid must be a non-empty string with no more than 128 characters`,
 		}, {
-			&UserParams{UID: ptr.String(strings.Repeat("a", 129))},
-			"error in params: UID must be at most 128 chars long",
+			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
+			`invalid uid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa". The uid must be a non-empty string with no more than 128 characters`,
 		}, {
-			&UserParams{DisplayName: ptr.String("")},
-			"error in params: DisplayName must not be empty",
+			(&UserToCreate{}).DisplayName(""),
+			`DisplayName must not be empty`,
 		}, {
-			&UserParams{PhotoURL: ptr.String("")},
-			"error in params: PhotoURL must not be empty",
+			(&UserToCreate{}).PhotoURL(""),
+			`invalid photo URL: "". PhotoURL must be a non-empty string`,
 		}, {
-			&UserParams{Email: ptr.String("")},
-			"error in params: Email must not be empty",
+			(&UserToCreate{}).Email(""),
+			`invalid Email: "" Email must be a non-empty string`,
 		}, {
-			&UserParams{Email: ptr.String("a")},
-			"error in params: Email must contain exactly one '@' sign",
+			(&UserToCreate{}).Email("a"),
+			`malformed email address string: "a"`,
 		}, {
-			&UserParams{Email: ptr.String("a@")},
-			"error in params: Email must have non empty account and domain",
+			(&UserToCreate{}).Email("a@"),
+			`malformed email address string: "a@"`,
 		}, {
-			&UserParams{Email: ptr.String("@a")},
-			"error in params: Email must have non empty account and domain",
+			(&UserToCreate{}).Email("@a"),
+			`malformed email address string: "@a"`,
 		}, {
-			&UserParams{Email: ptr.String("a@a@a")},
-			"error in params: Email must contain exactly one '@' sign",
+			(&UserToCreate{}).Email("a@a@a"),
+			`malformed email address string: "a@a@a"`,
 		},
 	}
 	for i, test := range badUserParams {
 
 		_, err := client.CreateUser(context.Background(), test.params)
 		if err == nil {
-			t.Errorf("%d) expecting error %s", i, test.expectingError)
+			t.Errorf("%d) got no error, wanted error %s", i, test.expectingError)
 		}
 		if err.Error() != test.expectingError {
-			t.Errorf("got error: \"%s\" expecting error: \"%s\"", err.Error(), test.expectingError)
+			t.Errorf(`got error: "%s" wanted error: "%s"`, err.Error(), test.expectingError)
 		}
 	}
 
@@ -401,17 +330,16 @@ func TestGoodCreateParams(t *testing.T) {
 		"localId": "expectedUserID"
 	   }`), t)
 	defer closer()
-	goodParams := []*UserParams{
+	goodParams := []*UserToCreate{
 		nil,
 		{},
-		{Password: ptr.String("123456")},
-		{UID: ptr.String("1")},
-		{UID: ptr.String(strings.Repeat("a", 128))},
-		{PhoneNumber: ptr.String("+1")},
-		{DisplayName: ptr.String("a")},
-		{Email: ptr.String("a@a")},
-		{PhoneNumber: ptr.String("+1")},
-		{CustomClaims: map[string]interface{}{"a": strings.Repeat("a", 992)}},
+		(&UserToCreate{}).Password("123456"),
+		(&UserToCreate{}).UID("1"),
+		(&UserToCreate{}).UID(strings.Repeat("a", 128)),
+		(&UserToCreate{}).PhoneNumber("+1"),
+		(&UserToCreate{}).DisplayName("a"),
+		(&UserToCreate{}).Email("a@a"),
+		(&UserToCreate{}).PhoneNumber("+1"),
 	}
 	for _, par := range goodParams {
 		_, err := s.Client().CreateUser(context.Background(), par)
@@ -424,38 +352,40 @@ func TestGoodCreateParams(t *testing.T) {
 		}
 	}
 }
+
 func TestBadUpdateParams(t *testing.T) {
 
-	badParams := []badParamsTest{
+	badParams := []badTestUpdateParams{
 		{
 			nil,
-			"params must not be empty",
-		},
-		{
-			&UserParams{UID: ptr.String("inparamstruct")},
-			"uid mismatch",
+			"params must not be empty for update",
 		}, {
-			&UserParams{CustomClaims: map[string]interface{}{"a": strings.Repeat("a", 993)}},
-			"error in params: stringified JSON claims must be at most 1000 chars long",
+			&UserToUpdate{},
+			"params must not be empty for update",
+		}, {
+			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
+			fmt.Sprintf(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC),
 		},
 	}
 
 	for _, res := range reservedClaims {
 		badParams = append(badParams,
-			badParamsTest{&UserParams{CustomClaims: map[string]interface{}{res: true}},
-				fmt.Sprintf("error in params: %s is a reserved claim", res)})
+			badTestUpdateParams{
+				(&UserToUpdate{}).CustomClaims(map[string]interface{}{res: true}),
+				fmt.Sprintf(`claim "%s" is reserved, and must not be set`, res)})
 	}
 
 	for i, test := range badParams {
 		_, err := client.UpdateUser(context.Background(), "outofstruct", test.params)
 		if err == nil {
-			t.Errorf("%d) expecting error %s", i, test.expectingError)
+			t.Errorf("%d) got no error wanted error %s", i, test.expectingError)
 		}
 		if err.Error() != test.expectingError {
-			t.Errorf("got error \"%s\" expecting error \"%s\"", err.Error(), test.expectingError)
+			t.Errorf(`%d) got error "%s" wanted error "%s"`, i, err.Error(), test.expectingError)
 		}
 	}
 }
+
 func TestGoodUpdateParams(t *testing.T) {
 	s, closer := echoServer([]byte(`{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
@@ -474,15 +404,14 @@ func TestGoodUpdateParams(t *testing.T) {
 	   }`), t)
 	defer closer()
 
-	goodParams := []*UserParams{
-		{},
-		{Password: ptr.String("123456")},
-		{UID: ptr.String("expectedUserID")},
-		{PhoneNumber: ptr.String("+1")},
-		{DisplayName: ptr.String("a")},
-		{Email: ptr.String("a@a")},
-		{PhoneNumber: ptr.String("+1")},
-		{CustomClaims: map[string]interface{}{"a": strings.Repeat("a", 992)}},
+	goodParams := []*UserToUpdate{
+
+		(&UserToUpdate{}).Password("123456"),
+		(&UserToUpdate{}).PhoneNumber("+1"),
+		(&UserToUpdate{}).DisplayName("a"),
+		(&UserToUpdate{}).Email("a@a"),
+		(&UserToUpdate{}).PhoneNumber("+1"),
+		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
 	}
 
 	for _, par := range goodParams {
@@ -505,14 +434,14 @@ type ccErr struct {
 func TestBadSetCustomClaims(t *testing.T) {
 	badUserParams := []*ccErr{{
 		map[string]interface{}{"a": strings.Repeat("a", 993)},
-		"error in params: stringified JSON claims must be at most 1000 chars long",
+		fmt.Sprintf("Custom Claims payload must not exceed %d characters", maxLenPayloadCC),
 	}}
 
 	for _, res := range reservedClaims {
 		badUserParams = append(badUserParams,
 			&ccErr{
 				cc:   map[string]interface{}{res: true},
-				estr: fmt.Sprintf("error in params: %s is a reserved claim", res),
+				estr: fmt.Sprintf(`claim "%s" is reserved, and must not be set`, res),
 			})
 	}
 
@@ -522,7 +451,7 @@ func TestBadSetCustomClaims(t *testing.T) {
 			t.Errorf("%d) expecting error %s", i, test.estr)
 		}
 		if err.Error() != test.estr {
-			t.Errorf("got error: \"%s\" expecting error: \"%s\"", err.Error(), test.estr)
+			t.Errorf(`got error: "%s" expecting error: "%s"`, err.Error(), test.estr)
 		}
 	}
 }
@@ -565,7 +494,7 @@ func TestMakeExportedUser(t *testing.T) {
 		Disabled:           false,
 		CreationTimestamp:  1234567890,
 		LastLogInTimestamp: 1233211232,
-		CustomClaims:       "{\"admin\": true, \"package\": \"gold\"}",
+		CustomClaims:       `{"admin": true, "package": "gold"}`,
 	}
 	eur := &ExportedUserRecord{
 		UserRecord: &UserRecord{
@@ -605,23 +534,24 @@ func TestMakeExportedUser(t *testing.T) {
 	if !reflect.DeepEqual(exported, eur) {
 		// zero in
 		tests := []struct {
-			i1 interface{}
-			i2 interface{}
+			name string
+			i1   interface{}
+			i2   interface{}
 		}{
-			{exported.UserInfo, eur.UserInfo},
-			{exported.CustomClaims, eur.CustomClaims},
-			{exported.Disabled, eur.Disabled},
-			{exported.EmailVerified, eur.EmailVerified},
-			{exported.UserMetadata, eur.UserMetadata},
-			{exported.ProviderUserInfo, eur.ProviderUserInfo},
-			{exported.PasswordHash, eur.PasswordHash},
-			{exported.PasswordSalt, eur.PasswordSalt},
-			{exported.UserRecord, eur.UserRecord},
-			{exported, eur},
+			{"exported.UserInfo", exported.UserInfo, eur.UserInfo},
+			{"exported.CustomClaims", exported.CustomClaims, eur.CustomClaims},
+			{"exported.Disabled", exported.Disabled, eur.Disabled},
+			{"exported.EmailVerified", exported.EmailVerified, eur.EmailVerified},
+			{"exported.UserMetadata", exported.UserMetadata, eur.UserMetadata},
+			{"exported.ProviderUserInfo", exported.ProviderUserInfo, eur.ProviderUserInfo},
+			{"exported.PasswordHash", exported.PasswordHash, eur.PasswordHash},
+			{"exported.PasswordSalt", exported.PasswordSalt, eur.PasswordSalt},
+			{"exported.UserRecord", exported.UserRecord, eur.UserRecord},
+			{"exported", exported, eur},
 		}
-		for i, t1 := range tests {
+		for _, t1 := range tests {
 			if !reflect.DeepEqual(t1.i1, t1.i2) {
-				t.Errorf("comparison %d: got %#v \nexpecting %#v", i, t1.i1, t1.i2)
+				t.Errorf("got %s = %#v \nwanted %#v", t1.name, t1.i1, t1.i2)
 			}
 		}
 	}
@@ -654,51 +584,134 @@ func toString(e *ExportedUserRecord) string {
 		provString(e))
 }
 
-func TestValidateString(t *testing.T) {
-	strq := "1"
-	expected := "expectedError"
-	tests := []struct {
-		strp        *string
-		testFun     func(string) bool
-		expectedErr *string
-	}{
-		{nil, func(stp string) bool { return true }, nil},
-		{nil, func(stp string) bool { return false }, nil},
-		{nil, func(stp string) bool { return stp == strq }, nil},
-		{&strq, func(stp string) bool { return true }, nil},
-		{&strq, func(stp string) bool { return false }, &expected},
-		{&strq, func(stp string) bool { return stp == strq }, nil},
-		{&strq, func(stp string) bool { return stp != strq }, &expected},
-	}
-	for _, test := range tests {
-		if errstr := validateString(test.strp, test.testFun, expected); errstr != test.expectedErr {
-			testErrorOnStrPointers(errstr, test.expectedErr, t)
-		}
-	}
-}
-func TestValidatePhoneNumber(t *testing.T) {
-	tests := []struct {
-		phone       string
-		expectedErr *string
-	}{
-		{"", ptr.String("PhoneNumber cannot be empty")},
-		{"123", ptr.String("PhoneNumber must begin with a +")},
-		{"+_!@#$", ptr.String("PhoneNumber must contain an alphanumeric character")},
-		{"+1", nil},
-	}
-	for _, test := range tests {
-		if errstr := validatePhoneNumber(&test.phone); errstr != test.expectedErr {
-			testErrorOnStrPointers(errstr, test.expectedErr, t)
-		}
+func testErrorOnStrPointers(got, expected *string, t *testing.T) {
+	if got == nil {
+		t.Errorf("got error = nil, wanted %s", *expected)
+	} else if expected == nil {
+		t.Errorf("got error = %s, wanted nil", *got)
+	} else if *got != *expected {
+		t.Errorf("got err = %v, wanted %v", *got, *expected)
 	}
 }
 
-func testErrorOnStrPointers(got, expected *string, t *testing.T) {
-	if got == nil {
-		t.Errorf("got nil error string, expecting %s", *expected)
-	} else if expected == nil {
-		t.Errorf("got error string %s, expecting nil", *got)
-	} else if *got != *expected {
-		t.Errorf("got err: %v, expecting %v", *got, *expected)
+func TestCreateRequest(t *testing.T) {
+	tests := []struct {
+		up        *UserToCreate
+		expecting string
+	}{
+		{
+			nil,
+			`{}`,
+		}, {
+			(&UserToCreate{}),
+			`{}`,
+		}, {
+			(&UserToCreate{}).Disabled(true),
+			`{"disableUser":true}`,
+		}, {
+			(&UserToCreate{}).DisplayName("a"),
+			`{"displayName":"a"}`,
+		}, {
+			(&UserToCreate{}).Email("a@a.a"),
+			`{"email":"a@a.a"}`,
+		}, {
+			(&UserToCreate{}).EmailVerified(true),
+			`{"emailVerified":true}`,
+		}, {
+			(&UserToCreate{}).Password("654321"),
+			`{"password":"654321"}`,
+		}, {
+			(&UserToCreate{}).PhoneNumber("+1"),
+			`{"phoneNumber":"+1"}`,
+		}, {
+			(&UserToCreate{}).UID("1"),
+			`{"localId":"1"}`,
+		}, {
+			(&UserToCreate{}).PhotoURL("http://some.url"),
+			`{"photoUrl":"http://some.url"}`,
+		}, {
+			(&UserToCreate{}).UID(strings.Repeat("a", 128)),
+			`{"localId":"` + strings.Repeat("aaaa", 32) + `"}`,
+		},
 	}
+
+	for i, test := range tests {
+		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
+		defer closer()
+		s.Client().CreateUser(context.Background(), test.up)
+
+		if string(s.rbody) != test.expecting {
+			t.Errorf("%d)request body = `%s` want: `%s`", i, s.rbody, test.expecting)
+
+		}
+	}
+
+}
+
+func TestUpdateRequest(t *testing.T) {
+	tests := []struct {
+		up        *UserToUpdate
+		expecting string
+	}{
+		{
+			(&UserToUpdate{}).Disabled(true),
+			`{"disableUser":true,"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).DisplayName("a"),
+			`{"displayName":"a","localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).DisplayName(""),
+			`{"deleteAttribute":["DISPLAY_NAME"],"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).Email("a@a.a"),
+			`{"email":"a@a.a","localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).EmailVerified(true),
+			`{"emailVerified":true,"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).Password("654321"),
+			`{"localId":"uid","password":"654321"}`,
+		}, {
+			(&UserToUpdate{}).PhoneNumber("+1"),
+			`{"localId":"uid","phoneNumber":"+1"}`,
+		}, {
+			(&UserToUpdate{}).PhoneNumber(""),
+			`{"deleteProvider":["phone"],"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).PhotoURL("http://some.url"),
+			`{"localId":"uid","photoUrl":"http://some.url"}`,
+		}, {
+			(&UserToUpdate{}).PhotoURL(""),
+			`{"deleteAttribute":["PHOTO_URL"],"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).PhotoURL("").PhoneNumber("").DisplayName(""),
+			`{"deleteAttribute":["PHOTO_URL","DISPLAY_NAME"],"deleteProvider":["phone"],"localId":"uid"}`,
+		},
+	}
+
+	for _, test := range tests {
+		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
+		defer closer()
+
+		s.Client().UpdateUser(context.Background(), "uid", test.up)
+		var got, want map[string]interface{}
+		err := json.Unmarshal(s.rbody, &got)
+		if err != nil {
+			t.Error(err)
+		}
+		err = json.Unmarshal([]byte(test.expecting), &want)
+		if err != nil {
+			t.Error(err)
+		}
+		// Test params regqrdless of order
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("request body = `%s` want: `%s`", s.rbody, test.expecting)
+		}
+		// json should have sorted keys.
+		if string(s.rbody) != test.expecting {
+			t.Errorf("request body = `%s` want: `%s`", s.rbody, test.expecting)
+
+		}
+	}
+
 }
