@@ -21,8 +21,8 @@
                     "rawId": "tefwfd1234eml5f@test.com"
                 }
             ],
-            "passwordHash": "V4X0yt9qGyp6cfw6BNwRHdS4SDwgTKtUSZcW2LEBFRuadpYJePqOsHyNtEszBaO3veC_6eA24PF06gH61Ghq8w==",
-            "salt": "BxzGq0di67rcTw==",
+            "passwordHash": "pwhash==",
+            "salt": "pwsalt==",
             "version": 0,
             "passwordUpdatedAt": 1.511284666E12,
             "validSince": "1511284666",

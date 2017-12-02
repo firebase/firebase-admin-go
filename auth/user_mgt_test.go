@@ -1,3 +1,17 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package auth
 
 import (
@@ -25,97 +39,31 @@ type mockAuthServer struct {
 	Req    []*http.Request
 	rbody  []byte
 	srv    *httptest.Server
-	client *Client
+	Client *Client
 }
 
-// echoServer takes either a []byte or a string filename, or an object
-// it returns a server whose client will echo one of the following (depending on ther input)
-//   []byte: the []byte it got
-//   string: the contents of the file named by the string in []byte form
-//   object: the marshalled object, in []byte form
-//   nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
-// it also returns a closing functions that has to be defer closed
-func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
-	var b []byte
-	var err error
-	switch v := resp.(type) {
-	case nil:
-		b = []byte("")
-	case []byte:
-		b = v
-	case string:
-		fp := filepath.Join([]string{build.Default.GOPATH, "src", "firebase.google.com", "go", "testdata", v}...)
-		b, err = ioutil.ReadFile(fp)
-		if err != nil {
-			t.Fatal(err)
-		}
-	default:
-		b, err = json.Marshal(resp)
-		if err != nil {
-			t.Fatal("marshaling error")
-		}
-	}
-
-	s := mockAuthServer{Resp: b}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		reqBody, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			t.Error(err)
-		}
-		s.Req = append(s.Req, r)
-		s.rbody = reqBody
-		for k, v := range s.Header {
-			w.Header().Set(k, v)
-		}
-		if s.Status != 0 {
-			w.WriteHeader(s.Status)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(s.Resp)
-
-	})
-	s.srv = httptest.NewServer(handler)
-	authClient, err := NewClient(context.Background(),
-		&internal.AuthConfig{
-			Opts: []option.ClientOption{option.WithHTTPClient(s.srv.Client())},
-		})
-	if err != nil {
-		t.Error()
-	}
-	authClient.url = s.srv.URL + "/"
-	s.client = authClient
-	return &s, s.srv.Close
-}
-
-func (s *mockAuthServer) Client() *Client {
-	return s.client
-}
+var listUsers []*ExportedUserRecord
 
 func TestGetUser(t *testing.T) {
 	s, closer := echoServer("get_user.json", t)
 	defer closer()
 
-	user, err := s.Client().User(context.Background(), "ignored_id")
+	user, err := s.Client.User(context.Background(), "ignored_id")
 	if err != nil {
 		t.Error(err)
 	}
-	tests := []struct {
-		name string
-		got  interface{}
-		want interface{}
-	}{
-		{"user.UID", user.UID, "testuser"},
-		{"user.UserMetadata", user.UserMetadata, &UserMetadata{
-			CreationTimestamp:  1234567890,
-			LastLogInTimestamp: 1233211232}},
-		{"user.Email", user.Email, "testuser@example.com"},
-		{"user.EmailVerified", user.EmailVerified, true},
-		{"user.PhotoURL", user.PhotoURL, "http://www.example.com/testuser/photo.png"},
-		{"user.Disabled", user.Disabled, false},
-		{"user.ProviderUserInfo", user.ProviderUserInfo, []*UserInfo{
+	want := &UserRecord{
+		UserInfo: &UserInfo{
+			UID:         "testuser",
+			Email:       "testuser@example.com",
+			PhoneNumber: "+1234567890",
+			DisplayName: "Test User",
+			PhotoURL:    "http://www.example.com/testuser/photo.png",
+		},
+		Disabled: false,
+
+		EmailVerified: true,
+		ProviderUserInfo: []*UserInfo{
 			{
 				ProviderID:  "password",
 				DisplayName: "Test User",
@@ -125,153 +73,53 @@ func TestGetUser(t *testing.T) {
 				ProviderID:  "phone",
 				PhoneNumber: "+1234567890",
 			},
-		}},
-		{"user.DisplayName", user.DisplayName, "Test User"},
-		//		{"user.PasswordHash", user.PasswordHash, "passwordhash"},
-		//		{"user.PasswordSalt", user.PasswordSalt, "salt==="},
-		{"user.CustomClaims", user.CustomClaims, map[string]interface{}{"admin": true, "package": "gold"}},
-	}
-	for _, test := range tests {
-		if !reflect.DeepEqual(test.want, test.got) {
-			t.Errorf("%s = %#v; want %#v", test.name, test.got, test.want)
-		}
-	}
-
-}
-
-var listUsers []*ExportedUserRecord
-
-func setListUsers() {
-	listUsers = []*ExportedUserRecord{
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					UID: "VHHROt3NAjPoc1hanwMRcTdCESz2",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1511284665000,
-				},
-				Disabled: false,
-			},
 		},
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					UID:         "tefwfd1234",
-					DisplayName: "display_name",
-					Email:       "tefwfd1234eml5f@test.com",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1511284665000,
-				},
-				Disabled:      false,
-				EmailVerified: false,
-				ProviderUserInfo: []*UserInfo{
-					{
-						ProviderID:  "password",
-						DisplayName: "display_name",
-						Email:       "tefwfd1234eml5f@test.com",
-					},
-				},
-				CustomClaims: map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
-			},
-			PasswordHash: "V4X0yt9qGyp6cfw6BNwRHdS4SDwgTKtUSZcW2LEBFRuadpYJePqOsHyNtEszBaO3veC_6eA24PF06gH61Ghq8w==",
-			PasswordSalt: "BxzGq0di67rcTw==",
+		UserMetadata: &UserMetadata{
+			CreationTimestamp:  1234567890,
+			LastLogInTimestamp: 1233211232,
 		},
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					DisplayName: "Test User",
-					Email:       "testuser@example.com",
-					UID:         "testuser0",
-					PhoneNumber: "+1234567890",
-					PhotoURL:    "http://www.example.com/testuser/photo.png",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1234567890,
-				},
-				Disabled:      false,
-				EmailVerified: true,
-				ProviderUserInfo: []*UserInfo{
-					{
-						ProviderID:  "password",
-						DisplayName: "Test User",
-						Email:       "testuser@example.com",
-						PhotoURL:    "http://www.example.com/testuser/photo.png",
-					},
-					{
-						ProviderID:  "phone",
-						PhoneNumber: "+1234567890",
-					},
-				},
-				CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
-			},
-			PasswordHash: "passwordHash",
-			PasswordSalt: "passwordSalt",
-		},
+		CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	}
-}
-
-type basicCompare struct {
-	name string
-	got  interface{}
-	want interface{}
+	if !reflect.DeepEqual(user, want) {
+		t.Errorf("got %#v, wanted %#v", user, want)
+		testCompareUserRecords(user, want, t)
+	}
 }
 
 func TestGetUsers(t *testing.T) {
 	setListUsers()
 	s, closer := echoServer("list_users.json", t)
 	defer closer()
-	iter := s.Client().Users(context.Background(), "")
-	i := 0
-	for {
+	iter := s.Client.Users(context.Background(), "")
+
+	for i := 0; i < len(listUsers); i++ {
 		user, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
 			t.Error(err)
-
 		}
-		tests := []basicCompare{
-			{"user", user, listUsers[i]},
-			{"user.CustomClaims", user.CustomClaims, listUsers[i].CustomClaims},
-			{"user.UserInfo", user.UserInfo, listUsers[i].UserInfo},
-			{"user.UserRecord", user.UserRecord, listUsers[i].UserRecord},
-			{"user.ProviderUserInfo", user.ProviderUserInfo, listUsers[i].ProviderUserInfo},
-			{"user.UserMetadata", user.UserMetadata, listUsers[i].UserMetadata},
-			{"user.PasswordHash", user.PasswordHash, listUsers[i].PasswordHash},
-			{"user.PasswordSalt", user.PasswordSalt, listUsers[i].PasswordSalt},
+		if i >= len(listUsers) {
+			t.Errorf("got %d users, wanted %d", i+1, len(listUsers))
 		}
-		for k, pui := range user.ProviderUserInfo {
-			tests = append(tests, basicCompare{fmt.Sprintf("Provider %d", k), pui, listUsers[i].ProviderUserInfo[k]})
+		if !reflect.DeepEqual(user, listUsers[i]) {
+			t.Errorf("got %#v, wanted %#v", user, listUsers[i])
+			testCompareUserRecords(user.UserRecord, listUsers[i].UserRecord, t)
 		}
-		for j, test := range tests {
-			if !reflect.DeepEqual(test.got, test.want) {
-				t.Errorf("item %d, test %d \n %s =  (%T) %#v \nwanted: (%T) %#v", i, j, test.name,
-					test.got, test.got, test.want, test.want)
-			}
-		}
-		i++
+	}
+	_, err := iter.Next()
+	if err != iterator.Done {
+		t.Errorf("got more than %d users, wanted %d", len(listUsers), len(listUsers))
 	}
 
 }
 
-type badTestCreateParams struct {
-	params         *UserToCreate
-	expectingError string
-}
-
-type badTestUpdateParams struct {
-	params         *UserToUpdate
-	expectingError string
-}
-
 func TestBadCreateUser(t *testing.T) {
-	badUserParams := []badTestCreateParams{
+	badUserParams := []struct {
+		params         *UserToCreate
+		expectingError string
+	}{
 		{
 			(&UserToCreate{}).Password("short"),
 			`invalid Password string. Password must be a string at least 6 characters long`,
@@ -308,6 +156,9 @@ func TestBadCreateUser(t *testing.T) {
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
 			`malformed email address string: "a@a@a"`,
+		}, {
+			(&UserToCreate{}).UID("uid").UID("uid"),
+			"`localId` attribute set more than once (`uid`, `uid`)",
 		},
 	}
 	for i, test := range badUserParams {
@@ -323,7 +174,7 @@ func TestBadCreateUser(t *testing.T) {
 
 }
 
-func TestGoodCreateParams(t *testing.T) {
+func TestCreateUser(t *testing.T) {
 	s, closer := echoServer([]byte(`{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
@@ -342,7 +193,7 @@ func TestGoodCreateParams(t *testing.T) {
 		(&UserToCreate{}).PhoneNumber("+1"),
 	}
 	for _, par := range goodParams {
-		_, err := s.Client().CreateUser(context.Background(), par)
+		_, err := s.Client.CreateUser(context.Background(), par)
 		// There are two calls to the server, the first one, on creation retunrs the above []byte
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
@@ -354,8 +205,10 @@ func TestGoodCreateParams(t *testing.T) {
 }
 
 func TestBadUpdateParams(t *testing.T) {
-
-	badParams := []badTestUpdateParams{
+	badParams := []struct {
+		params         *UserToUpdate
+		expectingError string
+	}{
 		{
 			nil,
 			"params must not be empty for update",
@@ -370,7 +223,10 @@ func TestBadUpdateParams(t *testing.T) {
 
 	for _, res := range reservedClaims {
 		badParams = append(badParams,
-			badTestUpdateParams{
+			struct {
+				params         *UserToUpdate
+				expectingError string
+			}{
 				(&UserToUpdate{}).CustomClaims(map[string]interface{}{res: true}),
 				fmt.Sprintf(`claim "%s" is reserved, and must not be set`, res)})
 	}
@@ -386,7 +242,7 @@ func TestBadUpdateParams(t *testing.T) {
 	}
 }
 
-func TestGoodUpdateParams(t *testing.T) {
+func TestUpdateUser(t *testing.T) {
 	s, closer := echoServer([]byte(`{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "expectedUserID",
@@ -405,7 +261,6 @@ func TestGoodUpdateParams(t *testing.T) {
 	defer closer()
 
 	goodParams := []*UserToUpdate{
-
 		(&UserToUpdate{}).Password("123456"),
 		(&UserToUpdate{}).PhoneNumber("+1"),
 		(&UserToUpdate{}).DisplayName("a"),
@@ -415,7 +270,7 @@ func TestGoodUpdateParams(t *testing.T) {
 	}
 
 	for _, par := range goodParams {
-		_, err := s.Client().UpdateUser(context.Background(), "expectedUserID", par)
+		_, err := s.Client.UpdateUser(context.Background(), "expectedUserID", par)
 		// There are two calls to the server, the first one, on creation retunrs the above []byte
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
@@ -426,20 +281,21 @@ func TestGoodUpdateParams(t *testing.T) {
 	}
 }
 
-type ccErr struct {
-	cc   map[string]interface{}
-	estr string
-}
-
 func TestBadSetCustomClaims(t *testing.T) {
-	badUserParams := []*ccErr{{
+	badUserParams := []struct {
+		cc   map[string]interface{}
+		estr string
+	}{{
 		map[string]interface{}{"a": strings.Repeat("a", 993)},
 		fmt.Sprintf("Custom Claims payload must not exceed %d characters", maxLenPayloadCC),
 	}}
 
 	for _, res := range reservedClaims {
 		badUserParams = append(badUserParams,
-			&ccErr{
+			struct {
+				cc   map[string]interface{}
+				estr string
+			}{
 				cc:   map[string]interface{}{res: true},
 				estr: fmt.Sprintf(`claim "%s" is reserved, and must not be set`, res),
 			})
@@ -463,7 +319,7 @@ func TestDelete(t *testing.T) {
 		"localId": "expectedUserID"
 	   }`), t)
 	defer closer()
-	if err := s.Client().DeleteUser(context.Background(), ""); err != nil {
+	if err := s.Client.DeleteUser(context.Background(), ""); err != nil {
 		t.Error(err)
 		return
 	}
@@ -496,7 +352,7 @@ func TestMakeExportedUser(t *testing.T) {
 		LastLogInTimestamp: 1233211232,
 		CustomClaims:       `{"admin": true, "package": "gold"}`,
 	}
-	eur := &ExportedUserRecord{
+	want := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
 				UID:         "testuser",
@@ -531,66 +387,10 @@ func TestMakeExportedUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !reflect.DeepEqual(exported, eur) {
+	if !reflect.DeepEqual(exported, want) {
 		// zero in
-		tests := []struct {
-			name string
-			i1   interface{}
-			i2   interface{}
-		}{
-			{"exported.UserInfo", exported.UserInfo, eur.UserInfo},
-			{"exported.CustomClaims", exported.CustomClaims, eur.CustomClaims},
-			{"exported.Disabled", exported.Disabled, eur.Disabled},
-			{"exported.EmailVerified", exported.EmailVerified, eur.EmailVerified},
-			{"exported.UserMetadata", exported.UserMetadata, eur.UserMetadata},
-			{"exported.ProviderUserInfo", exported.ProviderUserInfo, eur.ProviderUserInfo},
-			{"exported.PasswordHash", exported.PasswordHash, eur.PasswordHash},
-			{"exported.PasswordSalt", exported.PasswordSalt, eur.PasswordSalt},
-			{"exported.UserRecord", exported.UserRecord, eur.UserRecord},
-			{"exported", exported, eur},
-		}
-		for _, t1 := range tests {
-			if !reflect.DeepEqual(t1.i1, t1.i2) {
-				t.Errorf("got %s = %#v \nwanted %#v", t1.name, t1.i1, t1.i2)
-			}
-		}
-	}
-
-}
-
-func provString(e *ExportedUserRecord) string {
-	providerStr := ""
-	if e.ProviderUserInfo != nil {
-		for _, info := range e.ProviderUserInfo {
-			providerStr += fmt.Sprintf("\n            %#v", info)
-		}
-	}
-	return providerStr
-}
-
-func toString(e *ExportedUserRecord) string {
-	return fmt.Sprintf("ExportedUserRecord: %#v\n"+
-		"    UserRecord: %#v\n"+
-		"        UserInfo: %#v\n"+
-		"        MetaData: %#v\n"+
-		"        CustomClaims: %#v\n"+
-		"        ProviderData: %#v %s",
-		e,
-		e.UserRecord,
-		e.UserInfo,
-		e.UserMetadata,
-		e.CustomClaims,
-		e.ProviderUserInfo,
-		provString(e))
-}
-
-func testErrorOnStrPointers(got, expected *string, t *testing.T) {
-	if got == nil {
-		t.Errorf("got error = nil, wanted %s", *expected)
-	} else if expected == nil {
-		t.Errorf("got error = %s, wanted nil", *got)
-	} else if *got != *expected {
-		t.Errorf("got err = %v, wanted %v", *got, *expected)
+		t.Errorf("got %#v, wanted %#v", exported, want)
+		testCompareUserRecords(exported.UserRecord, want.UserRecord, t)
 	}
 }
 
@@ -638,7 +438,7 @@ func TestCreateRequest(t *testing.T) {
 	for i, test := range tests {
 		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer closer()
-		s.Client().CreateUser(context.Background(), test.up)
+		s.Client.CreateUser(context.Background(), test.up)
 
 		if string(s.rbody) != test.expecting {
 			t.Errorf("%d)request body = `%s` want: `%s`", i, s.rbody, test.expecting)
@@ -686,6 +486,9 @@ func TestUpdateRequest(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).PhotoURL("").PhoneNumber("").DisplayName(""),
 			`{"deleteAttribute":["PHOTO_URL","DISPLAY_NAME"],"deleteProvider":["phone"],"localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": "b", "b": true, "c": 1}),
+			`{"customAttributes":"{\"a\":\"b\",\"b\":true,\"c\":1}","localId":"uid"}`,
 		},
 	}
 
@@ -693,7 +496,7 @@ func TestUpdateRequest(t *testing.T) {
 		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer closer()
 
-		s.Client().UpdateUser(context.Background(), "uid", test.up)
+		s.Client.UpdateUser(context.Background(), "uid", test.up)
 		var got, want map[string]interface{}
 		err := json.Unmarshal(s.rbody, &got)
 		if err != nil {
@@ -714,4 +517,203 @@ func TestUpdateRequest(t *testing.T) {
 		}
 	}
 
+}
+
+//---------------------------------------
+
+// for pretty printing
+func toString(e *ExportedUserRecord) string {
+	return fmt.Sprintf("ExportedUserRecord: %#v\n"+
+		"    UserRecord: %#v\n"+
+		"        UserInfo: %#v\n"+
+		"        MetaData: %#v\n"+
+		"        CustomClaims: %#v\n"+
+		"        ProviderData: %#v %s",
+		e,
+		e.UserRecord,
+		e.UserInfo,
+		e.UserMetadata,
+		e.CustomClaims,
+		e.ProviderUserInfo,
+		provString(e))
+}
+
+// for pretty printing
+func provString(e *ExportedUserRecord) string {
+	providerStr := ""
+	if e.ProviderUserInfo != nil {
+		for _, info := range e.ProviderUserInfo {
+			providerStr += fmt.Sprintf("\n            %#v", info)
+		}
+	}
+	return providerStr
+}
+
+// used as a referece for the wanted results given by the list_users.json data file
+func setListUsers() {
+	listUsers = []*ExportedUserRecord{
+		{
+			UserRecord: &UserRecord{
+				UserInfo: &UserInfo{
+					UID: "VHHROt3NAjPoc1hanwMRcTdCESz2",
+				},
+				UserMetadata: &UserMetadata{
+					LastLogInTimestamp: 0,
+					CreationTimestamp:  1511284665000,
+				},
+				Disabled: false,
+			},
+		},
+		{
+			UserRecord: &UserRecord{
+				UserInfo: &UserInfo{
+					UID:         "tefwfd1234",
+					DisplayName: "display_name",
+					Email:       "tefwfd1234eml5f@test.com",
+				},
+				UserMetadata: &UserMetadata{
+					LastLogInTimestamp: 0,
+					CreationTimestamp:  1511284665000,
+				},
+				Disabled:      false,
+				EmailVerified: false,
+				ProviderUserInfo: []*UserInfo{
+					{
+						ProviderID:  "password",
+						DisplayName: "display_name",
+						Email:       "tefwfd1234eml5f@test.com",
+					},
+				},
+				CustomClaims: map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
+			},
+			PasswordHash: "pwhash==",
+			PasswordSalt: "pwsalt==",
+		},
+		{
+			UserRecord: &UserRecord{
+				UserInfo: &UserInfo{
+					DisplayName: "Test User",
+					Email:       "testuser@example.com",
+					UID:         "testuser0",
+					PhoneNumber: "+1234567890",
+					PhotoURL:    "http://www.example.com/testuser/photo.png",
+				},
+				UserMetadata: &UserMetadata{
+					LastLogInTimestamp: 0,
+					CreationTimestamp:  1234567890,
+				},
+				Disabled:      false,
+				EmailVerified: true,
+				ProviderUserInfo: []*UserInfo{
+					{
+						ProviderID:  "password",
+						DisplayName: "Test User",
+						Email:       "testuser@example.com",
+						PhotoURL:    "http://www.example.com/testuser/photo.png",
+					},
+					{
+						ProviderID:  "phone",
+						PhoneNumber: "+1234567890",
+					},
+				},
+				CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+			},
+			PasswordHash: "passwordHash",
+			PasswordSalt: "passwordSalt",
+		},
+	}
+}
+
+func testCompareUserRecords(u1, u2 *UserRecord, t *testing.T) {
+	tests := []struct {
+		name string
+		got  interface{}
+		want interface{}
+	}{
+		{"user", u1, u2},
+		{"user.UID", u1.UID, u2.UID},
+		{"user.UserInfo", u1.UserInfo, u2.UserInfo},
+		{"user.ProviderUserInfo", u1.ProviderUserInfo, u2.ProviderUserInfo},
+		{"user.UserMetadata", u1.UserMetadata, u2.UserMetadata},
+	}
+	for k, pui := range u1.ProviderUserInfo {
+		tests = append(tests, struct {
+			name string
+			got  interface{}
+			want interface{}
+		}{fmt.Sprintf("Provider %d", k), pui, u2.ProviderUserInfo[k]})
+	}
+	for j, test := range tests {
+		if !reflect.DeepEqual(test.got, test.want) {
+			t.Errorf("test %d \n %s =  (%T) %#v \nwanted: (%T) %#v", j, test.name,
+				test.got, test.got, test.want, test.want)
+		}
+	}
+
+}
+
+// echoServer takes either a []byte or a string filename, or an object.
+//
+// echoServer returns a server whose client will reply with depending on the input type:
+//   * []byte: the []byte it got
+//   * string: the contents of the file named by the string in []byte form
+//   * object: the marshalled object, in []byte form
+//   * nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
+// The marshalled request is available through s.rbody, s being the retuned server.
+// It also returns a closing functions that has to be defer closed.
+func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
+	var b []byte
+	var err error
+	switch v := resp.(type) {
+	case nil:
+		b = []byte("")
+	case []byte:
+		b = v
+	case string:
+		fp := filepath.Join([]string{build.Default.GOPATH, "src", "firebase.google.com", "go", "testdata", v}...)
+		b, err = ioutil.ReadFile(fp)
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+		b, err = json.Marshal(resp)
+		if err != nil {
+			t.Fatal("marshaling error")
+		}
+	}
+
+	s := mockAuthServer{Resp: b}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		s.Req = append(s.Req, r)
+		s.rbody = reqBody
+		for k, v := range s.Header {
+			w.Header().Set(k, v)
+		}
+		if s.Status != 0 {
+			w.WriteHeader(s.Status)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(s.Resp)
+
+	})
+	s.srv = httptest.NewServer(handler)
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(s.srv.Client()),
+		},
+	}
+	authClient, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Error()
+	}
+	authClient.url = s.srv.URL + "/"
+	s.Client = authClient
+	return &s, s.srv.Close
 }
