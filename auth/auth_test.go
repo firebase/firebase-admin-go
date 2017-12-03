@@ -38,6 +38,7 @@ import (
 
 var client *Client
 var testIDToken string
+var testCreds *google.DefaultCredentials
 
 func TestMain(m *testing.M) {
 	var (
@@ -68,7 +69,6 @@ func TestMain(m *testing.M) {
 
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
-
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		ProjectID: "mock-project-id",
@@ -79,6 +79,7 @@ func TestMain(m *testing.M) {
 	client.ks = ks
 
 	testIDToken = getIDToken(nil)
+	testCreds = creds
 	os.Exit(m.Run())
 }
 

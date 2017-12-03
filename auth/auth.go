@@ -113,16 +113,20 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	var hc *http.Client
-
-	if ctx != nil && len(c.Opts) > 0 {
-		var err error
-		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		hc = http.DefaultClient
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>> %v %v %v \n", ctx == nil, len(c.Opts), c.Opts)
+	//	if ctx != nil && len(c.Opts) > 0 {
+	//		var err error
+	if len(c.Opts) > 0 {
+		fmt.Printf("%#v\n", c.Opts[0])
 	}
+	hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+	if err != nil {
+		fmt.Printf(">>><><><>>>>> %v\n", err)
+		return nil, err
+	}
+	//	} else {
+	//	hc = http.DefaultClient
+	//}
 
 	ks, err := newHTTPKeySource(googleCertURL, hc)
 	if err != nil {

@@ -127,13 +127,20 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 	if params == nil {
 		params = &UserToCreate{}
 	}
+	fmt.Println(11)
 	if len(params.errors) > 0 {
 		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
 	}
+	fmt.Println(12)
+
 	if params.payload == nil {
 		params.payload = map[string]interface{}{}
 	}
+	fmt.Println(13, params.payload, params.errors)
+
 	u, err := c.updateCreateUser(ctx, "signupNewUser", params.payload)
+	fmt.Println(14)
+
 	if err != nil {
 		return nil, err
 	}

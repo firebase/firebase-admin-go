@@ -156,13 +156,9 @@ func TestBadCreateUser(t *testing.T) {
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
 			`malformed email address string: "a@a@a"`,
-		}, {
-			(&UserToCreate{}).UID("uid").UID("uid"),
-			"`localId` attribute set more than once (`uid`, `uid`)",
 		},
 	}
 	for i, test := range badUserParams {
-
 		_, err := client.CreateUser(context.Background(), test.params)
 		if err == nil {
 			t.Errorf("%d) got no error, wanted error %s", i, test.expectingError)
@@ -705,6 +701,7 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	})
 	s.srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
+		Creds: testCreds,
 		Opts: []option.ClientOption{
 			option.WithHTTPClient(s.srv.Client()),
 		},
