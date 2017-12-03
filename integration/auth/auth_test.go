@@ -65,7 +65,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestUserManagement(t *testing.T) {
-	//	t.Run("clean the slate", cleanupUsers)
 	t.Run("add some users", populateSomeUsers)
 	t.Run("created users", createdUsers)
 	t.Run("get user", testGetUser)
@@ -84,16 +83,6 @@ func TestUserManagement(t *testing.T) {
 	t.Run("add custom claims", testAddCustomClaims)
 
 	t.Run("delete all users", cleanupUsers)
-}
-
-func cleanupUsers(t *testing.T) {
-	for _, id := range testFixtures.uidList {
-		err := client.DeleteUser(context.Background(), id)
-		if err != nil {
-			t.Errorf("error deleting uid %s, %s", id, err)
-		}
-	}
-
 }
 
 func createdUsers(t *testing.T) {
@@ -448,6 +437,16 @@ func provString(e *auth.UserRecord) string {
 	return providerStr
 }
 
+func cleanupUsers(t *testing.T) {
+	for _, id := range testFixtures.uidList {
+		err := client.DeleteUser(context.Background(), id)
+		if err != nil {
+			t.Errorf("error deleting uid %s, %s", id, err)
+		}
+	}
+
+}
+
 func toString(e *auth.UserRecord) string {
 	return fmt.Sprintf(
 		"    UserRecord: %#v\n"+
@@ -462,6 +461,8 @@ func toString(e *auth.UserRecord) string {
 		e.ProviderUserInfo,
 		provString(e))
 }
+
+// Tokens
 
 func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken("user1")
