@@ -113,7 +113,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	var hc *http.Client
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>> %v %v %v \n", ctx == nil, len(c.Opts), c.Opts)
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>> %v %v %v \n", ctx == nil, len(c.Opts), c)
 	//	if ctx != nil && len(c.Opts) > 0 {
 	//		var err error
 	if len(c.Opts) > 0 {
