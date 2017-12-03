@@ -69,12 +69,10 @@ func TestMain(m *testing.M) {
 
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
-	fmt.Println("$$$$$$ ")
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
-	fmt.Println("$$$$d$$ ")
 	if err != nil {
 		log.Fatalln(err)
 	}
