@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"google.golang.org/api/transport"
@@ -110,9 +111,17 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
-	if err != nil {
-		return nil, err
+
+	var hc *http.Client
+
+	if ctx != nil && len(c.Opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hc = http.DefaultClient
 	}
 
 	ks, err := newHTTPKeySource(googleCertURL, hc)

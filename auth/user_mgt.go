@@ -271,9 +271,7 @@ func (p *commonParams) set(key string, value interface{}) {
 	if p.payload == nil {
 		p.payload = make(map[string]interface{})
 	}
-	if val, ok := p.payload[key]; ok {
-		p.appendErrString("`%s` attribute set more than once (`%s`, `%s`)", key, val, value)
-	}
+
 	p.payload[key] = value
 }
 
