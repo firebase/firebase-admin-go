@@ -69,10 +69,12 @@ func TestMain(m *testing.M) {
 
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
+	fmt.Println("$$$$$$ ")
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		ProjectID: "mock-project-id",
 	})
+	fmt.Println("$$$$d$$ ")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -258,7 +260,7 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
-func TestNewHTTPClientNoOpts(t *testing.T) {
+func testNewHTTPClientNoOpts(t *testing.T) {
 	ctx := context.Background()
 	hc, _, err := transport.NewHTTPClient(ctx)
 	if err != nil {
