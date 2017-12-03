@@ -121,7 +121,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 	hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
-		fmt.Printf(">>><><><>>>>> %v\n", err)
+		fmt.Printf(">>><><><>>>>> \n%v\n%#v\n%#v\n", err, ctx, c.Opts)
 		return nil, err
 	}
 	//	} else {

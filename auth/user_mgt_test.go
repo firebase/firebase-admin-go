@@ -706,6 +706,7 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 			option.WithHTTPClient(s.srv.Client()),
 		},
 	}
+	fmt.Println("AUTH CLIENT")
 	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Error()
