@@ -85,16 +85,6 @@ func TestUserManagement(t *testing.T) {
 	t.Run("delete all users", cleanupUsers)
 }
 
-func createdUsers(t *testing.T) {
-	for _, id := range testFixtures.uidList {
-		_, err := client.GetUser(context.Background(), id)
-		if err != nil {
-			t.Errorf("can't find User uid %s, %s", id, err)
-		}
-	}
-
-}
-
 func populateSomeUsers(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(fmt.Sprintf("userid-%d", i)))
@@ -129,6 +119,16 @@ func populateSomeUsers(t *testing.T) {
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 }
 
+func createdUsers(t *testing.T) {
+	for _, id := range testFixtures.uidList {
+		_, err := client.GetUser(context.Background(), id)
+		if err != nil {
+			t.Errorf("can't find User uid %s, %s", id, err)
+		}
+	}
+
+}
+
 func testGetUser(t *testing.T) {
 	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
 	if err != nil {
@@ -139,19 +139,6 @@ func testGetUser(t *testing.T) {
 	}
 	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
 		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u)
-	}
-}
-func TestClean(t *testing.T) {
-	iter := client.Users(context.Background(), "")
-	for {
-		u, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		client.DeleteUser(context.Background(), u.UID)
 	}
 }
 

@@ -253,14 +253,11 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 	if customClaims == nil || len(customClaims) == 0 {
 		customClaims = map[string]interface{}{}
 	}
-	ur, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
+	_, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 	if err != nil {
 		return err
 	}
-	if ur.UID == uid {
-		return nil
-	}
-	return fmt.Errorf("uid mismatch on returned user")
+	return err
 }
 
 // ------------------------------------------------------------
@@ -497,11 +494,7 @@ func (c *Client) updateCreateUser(ctx context.Context, action string, params map
 	if err != nil {
 		return nil, err
 	}
-	user, err := c.GetUser(ctx, rur.UID)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	return c.GetUser(ctx, rur.UID)
 }
 
 func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {

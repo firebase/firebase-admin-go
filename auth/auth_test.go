@@ -38,7 +38,6 @@ import (
 
 var client *Client
 var testIDToken string
-var testCreds *google.DefaultCredentials
 
 func TestMain(m *testing.M) {
 	var (
@@ -79,7 +78,6 @@ func TestMain(m *testing.M) {
 	client.ks = ks
 
 	testIDToken = getIDToken(nil)
-	testCreds = creds
 	os.Exit(m.Run())
 }
 

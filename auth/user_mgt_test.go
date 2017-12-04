@@ -115,6 +115,42 @@ func TestGetUsers(t *testing.T) {
 
 }
 
+func TestGetUserBy(t *testing.T) {
+
+	s, closer := echoServer(nil, t)
+	defer closer()
+
+	tests := []struct {
+		getfun func(context.Context, string) (*UserRecord, error)
+		param  string
+		want   string
+	}{
+		{
+			s.Client.GetUser,
+			"uid",
+			`{"localId":["uid"]}`,
+		},
+		{
+			s.Client.GetUserByEmail,
+			"email@email.com",
+			`{"email":["email@email.com"]}`,
+		},
+		{
+			s.Client.GetUserByPhoneNumber,
+			"+12341234123",
+			`{"phoneNumber":["+12341234123"]}`,
+		},
+	}
+
+	for _, test := range tests {
+		test.getfun(context.Background(), test.param)
+		if string(s.rbody) != test.want {
+			t.Errorf("request body = `%s` want: `%s`", s.rbody, test.want)
+		}
+	}
+
+}
+
 func TestBadCreateUser(t *testing.T) {
 	badUserParams := []struct {
 		params         *UserToCreate
@@ -123,6 +159,9 @@ func TestBadCreateUser(t *testing.T) {
 		{
 			(&UserToCreate{}).Password("short"),
 			`invalid Password string. Password must be a string at least 6 characters long`,
+		}, {
+			(&UserToCreate{}).PhoneNumber(""),
+			`invalid PhoneNumber: "". PhoneNumber must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
 			`invalid phone number: "1234". Phone number must be a valid, E.164 compliant identifier`,
@@ -164,7 +203,7 @@ func TestBadCreateUser(t *testing.T) {
 			t.Errorf("%d) got no error, wanted error %s", i, test.expectingError)
 		}
 		if err.Error() != test.expectingError {
-			t.Errorf(`got error: "%s" wanted error: "%s"`, err.Error(), test.expectingError)
+			t.Errorf("got error: `%s` wanted error: `%s`", err.Error(), test.expectingError)
 		}
 	}
 
@@ -208,6 +247,9 @@ func TestBadUpdateParams(t *testing.T) {
 		{
 			nil,
 			"params must not be empty for update",
+		}, {
+			(&UserToUpdate{}).PhoneNumber("1"),
+			`invalid phone number: "1". Phone number must be a valid, E.164 compliant identifier`,
 		}, {
 			&UserToUpdate{},
 			"params must not be empty for update",
@@ -485,6 +527,12 @@ func TestUpdateRequest(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": "b", "b": true, "c": 1}),
 			`{"customAttributes":"{\"a\":\"b\",\"b\":true,\"c\":1}","localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).CustomClaims(map[string]interface{}{}),
+			`{"customAttributes":"{}","localId":"uid"}`,
+		}, {
+			(&UserToUpdate{}).CustomClaims(map[string]interface{}(nil)),
+			`{"customAttributes":"{}","localId":"uid"}`,
 		},
 	}
 
@@ -701,7 +749,7 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	})
 	s.srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
-		Creds: testCreds,
+		//	Creds: testCreds,
 		Opts: []option.ClientOption{
 			option.WithHTTPClient(s.srv.Client()),
 		},
