@@ -22,11 +22,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
-
-	"google.golang.org/api/option"
-	"google.golang.org/api/transport"
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
@@ -113,24 +109,13 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 	}
 
-	var hc *http.Client
-	if ctx != nil && len(c.Opts) > 0 {
-		var err error
-		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		hc = http.DefaultClient
-	}
-
-	ks, err := newHTTPKeySource(ctx, googleCertURL, append(c.Opts, option.WithHTTPClient(hc))...)
+	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		hc:        &internal.HTTPClient{Client: hc},
+		hc:        &internal.HTTPClient{Client: ks.HTTPClient},
 		ks:        ks,
 		projectID: c.ProjectID,
 		snr:       snr,
