@@ -258,7 +258,7 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
-func testNewHTTPClientNoOpts(t *testing.T) {
+func TestNewHTTPClientNoOpts(t *testing.T) {
 	ctx := context.Background()
 	hc, _, err := transport.NewHTTPClient(ctx)
 	if err != nil {
