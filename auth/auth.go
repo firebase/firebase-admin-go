@@ -114,15 +114,15 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	var hc *http.Client
-	//	if ctx != nil && len(c.Opts) > 0 {
-	//		var err error
-	hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
-	if err != nil {
-		return nil, err
+	if ctx != nil && len(c.Opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hc = http.DefaultClient
 	}
-	//	} else {
-	//		hc = http.DefaultClient
-	//	}
 
 	ks, err := newHTTPKeySource(ctx, googleCertURL, append(c.Opts, option.WithHTTPClient(hc))...)
 	if err != nil {
