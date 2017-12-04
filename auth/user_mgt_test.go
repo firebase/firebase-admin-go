@@ -112,11 +112,9 @@ func TestGetUsers(t *testing.T) {
 	if err != iterator.Done {
 		t.Errorf("got more than %d users, wanted %d", len(listUsers), len(listUsers))
 	}
-
 }
 
 func TestGetUserBy(t *testing.T) {
-
 	s, closer := echoServer(nil, t)
 	defer closer()
 
@@ -148,7 +146,6 @@ func TestGetUserBy(t *testing.T) {
 			t.Errorf("request body = `%s` want: `%s`", s.rbody, test.want)
 		}
 	}
-
 }
 
 func TestBadCreateUser(t *testing.T) {
@@ -206,7 +203,6 @@ func TestBadCreateUser(t *testing.T) {
 			t.Errorf("got error: `%s` wanted error: `%s`", err.Error(), test.expectingError)
 		}
 	}
-
 }
 
 func TestCreateUser(t *testing.T) {
@@ -483,7 +479,6 @@ func TestCreateRequest(t *testing.T) {
 
 		}
 	}
-
 }
 
 func TestUpdateRequest(t *testing.T) {
@@ -560,7 +555,6 @@ func TestUpdateRequest(t *testing.T) {
 
 		}
 	}
-
 }
 
 //---------------------------------------
@@ -693,7 +687,6 @@ func testCompareUserRecords(u1, u2 *UserRecord, t *testing.T) {
 				test.got, test.got, test.want, test.want)
 		}
 	}
-
 }
 
 // echoServer takes either a []byte or a string filename, or an object.
@@ -749,7 +742,6 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	})
 	s.srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
-		//	Creds: testCreds,
 		Opts: []option.ClientOption{
 			option.WithHTTPClient(s.srv.Client()),
 		},

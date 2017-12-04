@@ -63,9 +63,9 @@ type ExportedUserRecord struct {
 	PasswordSalt string
 }
 
-// UserIterator is  is an iterator over Users.
+// UserIterator is an iterator over Users.
 //
-// also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
+// Also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
 type UserIterator struct {
 	client   *Client
 	ctx      context.Context
@@ -167,7 +167,7 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdat
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	var gur getUserResponse
 	deleteParams := map[string]interface{}{"localId": []string{uid}}
-	return c.makeUserRequest(ctx, "deleteAccount", deleteParams, &gur)
+	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &gur)
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -210,7 +210,7 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 	}
 
 	var lur listUsersResponse
-	err := it.client.makeUserRequest(it.ctx, "downloadAccount", params, &lur)
+	err := it.client.makeHTTPCall(it.ctx, "downloadAccount", params, &lur)
 	if err != nil {
 		return "", err
 	}
@@ -472,9 +472,8 @@ func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
 // ------------------------------------------------------------ End of setters
 
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
-
 	var gur getUserResponse
-	err := c.makeUserRequest(ctx, "getAccountInfo", params, &gur)
+	err := c.makeHTTPCall(ctx, "getAccountInfo", params, &gur)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +489,7 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 
 func (c *Client) updateCreateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
 	var rur responseUserRecord
-	err := c.makeUserRequest(ctx, action, params, &rur)
+	err := c.makeHTTPCall(ctx, action, params, &rur)
 	if err != nil {
 		return nil, err
 	}

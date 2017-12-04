@@ -104,7 +104,6 @@ func TestHTTPKeySource(t *testing.T) {
 }
 
 func TestNewHTTPClientWithOptionClient(t *testing.T) {
-
 	hc, _ := newTestHTTPClient([]byte(""))
 	ctx := context.Background()
 	hcnew, _, err := transport.NewHTTPClient(ctx, option.WithHTTPClient(hc))
@@ -114,7 +113,6 @@ func TestNewHTTPClientWithOptionClient(t *testing.T) {
 	if hcnew != hc {
 		t.Errorf("HTTPClient = %v; want %v", hcnew, hc)
 	}
-
 }
 
 func TestHTTPKeySourceWithClient(t *testing.T) {

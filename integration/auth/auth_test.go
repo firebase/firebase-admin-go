@@ -126,7 +126,6 @@ func createdUsers(t *testing.T) {
 			t.Errorf("can't find User uid %s, %s", id, err)
 		}
 	}
-
 }
 
 func testGetUser(t *testing.T) {
@@ -306,7 +305,6 @@ func testPI(pi []*auth.UserInfo, passwordUI, phoneUI *auth.UserInfo, t *testing.
 			t.Errorf("\ngot %#v, \nexpecting %#v", ui, compareWith)
 		}
 	}
-
 }
 
 func testRemoveDisplayName(t *testing.T) {
@@ -431,7 +429,6 @@ func cleanupUsers(t *testing.T) {
 			t.Errorf("error deleting uid %s, %s", id, err)
 		}
 	}
-
 }
 
 func toString(e *auth.UserRecord) string {
