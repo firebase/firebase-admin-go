@@ -258,17 +258,6 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
-func TestNewHTTPClientNoOpts(t *testing.T) {
-	ctx := context.Background()
-	hc, _, err := transport.NewHTTPClient(ctx)
-	if err != nil {
-		t.Error()
-	}
-	if hc == nil {
-		t.Errorf("HTTPClient = nil; want non-nil")
-	}
-}
-
 func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
 	h := &jwtHeader{}
 	p := &customToken{}

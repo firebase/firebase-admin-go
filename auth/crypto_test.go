@@ -88,12 +88,16 @@ func TestHTTPKeySource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hc, rc := newTestHTTPClient(data)
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
+	ks, err := newHTTPKeySource(context.Background(), "http://mock.url")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	if ks.HTTPClient == nil {
+		t.Errorf("HTTPClient = nil; want non-nil")
+	}
+	hc, rc := newTestHTTPClient(data)
+	ks.HTTPClient = hc
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +129,9 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if ks.HTTPClient != hc {
+		t.Errorf("HTTPClient = %v; want %v", ks.HTTPClient, hc)
+	}
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
 	}
