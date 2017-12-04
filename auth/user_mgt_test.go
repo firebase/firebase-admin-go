@@ -392,7 +392,7 @@ func TestMakeExportedUser(t *testing.T) {
 
 func TestCreateRequest(t *testing.T) {
 	tests := []struct {
-		up        *UserToCreate
+		utc       *UserToCreate
 		expecting string
 	}{
 		{
@@ -434,7 +434,7 @@ func TestCreateRequest(t *testing.T) {
 	for i, test := range tests {
 		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer closer()
-		s.Client.CreateUser(context.Background(), test.up)
+		s.Client.CreateUser(context.Background(), test.utc)
 
 		if string(s.rbody) != test.expecting {
 			t.Errorf("%d)request body = `%s` want: `%s`", i, s.rbody, test.expecting)
@@ -446,7 +446,7 @@ func TestCreateRequest(t *testing.T) {
 
 func TestUpdateRequest(t *testing.T) {
 	tests := []struct {
-		up        *UserToUpdate
+		utup      *UserToUpdate
 		expecting string
 	}{
 		{
@@ -492,7 +492,7 @@ func TestUpdateRequest(t *testing.T) {
 		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer closer()
 
-		s.Client.UpdateUser(context.Background(), "uid", test.up)
+		s.Client.UpdateUser(context.Background(), "uid", test.utup)
 		var got, want map[string]interface{}
 		err := json.Unmarshal(s.rbody, &got)
 		if err != nil {

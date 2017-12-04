@@ -259,7 +259,7 @@ func testUpdateUser(t *testing.T) {
 	if !reflect.DeepEqual(u, refU) {
 		t.Errorf("\ngot %s, \nexpecting %s", toString(refU), toString(u))
 	}
-	up := (&auth.UserToUpdate{}).
+	utup := (&auth.UserToUpdate{}).
 		Disabled(false).
 		DisplayName("name").
 		PhoneNumber("+12345678901").
@@ -269,7 +269,7 @@ func testUpdateUser(t *testing.T) {
 		Password("wordpass").
 		CustomClaims(map[string]interface{}{"custom": "claims"})
 
-	_, err = client.UpdateUser(context.Background(), u.UID, up)
+	_, err = client.UpdateUser(context.Background(), u.UID, utup)
 	if err != nil {
 		t.Error(err)
 	}

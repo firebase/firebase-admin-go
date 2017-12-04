@@ -138,11 +138,11 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 }
 
 // Passes the request struct, returns a byte array of the json
-func (c *Client) makeUserRequest(ctx context.Context, serviceName string, up interface{}, result interface{}) error {
+func (c *Client) makeUserRequest(ctx context.Context, serviceName string, payload interface{}, result interface{}) error {
 	request := &internal.Request{
 		Method: "POST",
 		URL:    c.url + serviceName,
-		Body:   internal.NewJSONEntity(up),
+		Body:   internal.NewJSONEntity(payload),
 	}
 	resp, err := c.hc.Do(ctx, request)
 	if err != nil {
