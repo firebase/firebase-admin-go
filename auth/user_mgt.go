@@ -480,90 +480,72 @@ func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 }
 
 // ------  Disabled: ------------------------------
-func (p *commonParams) setDisabled(d bool) {
-	p.set("disableUser", d)
-}
 
 // Disabled field setter.
 func (p *UserToCreate) Disabled(d bool) *UserToCreate {
-	p.setDisabled(d)
+	p.set("disableUser", d)
 	return p
 }
 
 // Disabled field setter.
 func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
-	p.setDisabled(d)
+	p.set("disableUser", d)
 	return p
 }
 
 // ------  DisplayName: ------------------------------
-func (p *commonParams) setDisplayName(dn string) {
-	p.set("displayName", dn)
-}
 
 // DisplayName field setter.
 func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
-	p.setDisplayName(dn)
+	p.set("displayName", dn)
 	return p
 }
 
 // DisplayName field setter.
 func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
-	p.setDisplayName(dn)
+	p.set("displayName", dn)
 	return p
 }
 
 // ------  Email: ------------------------------
 
-func (p *commonParams) setEmail(e string) {
-	p.set("email", e)
-}
-
 // Email field setter.
 func (p *UserToCreate) Email(e string) *UserToCreate {
-	p.setEmail(e)
+	p.set("email", e)
 	return p
 }
 
 // Email field setter.
 func (p *UserToUpdate) Email(e string) *UserToUpdate {
-	p.setEmail(e)
+	p.set("email", e)
 	return p
 }
 
 // ------  EmailVerified: ------------------------------
 
-func (p *commonParams) setEmailVerified(ev bool) {
-	p.set("emailVerified", ev)
-}
-
 // EmailVerified field setter.
 func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate {
-	p.setEmailVerified(ev)
+	p.set("emailVerified", ev)
 	return p
 }
 
 // EmailVerified field setter.
 func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
-	p.setEmailVerified(ev)
+	p.set("emailVerified", ev)
 	return p
 }
 
 // ------  Password: ------------------------------
 
-func (p *commonParams) setPassword(pw string) {
-	p.set("password", pw)
-}
-
 // Password field setter.
 func (p *UserToCreate) Password(pw string) *UserToCreate {
-	p.setPassword(pw)
+	p.set("password", pw)
 	return p
 }
 
 // Password field setter.
 func (p *UserToUpdate) Password(pw string) *UserToUpdate {
-	p.setPassword(pw)
+	p.set("password", pw)
 	return p
 }
 
