@@ -503,37 +503,20 @@ func (p *commonParams) setDisplayName(dn string) {
 
 // DisplayName field setter.
 func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
-	/*	if len(dn) == 0 {
-
-		} else {*/
 	p.setDisplayName(dn)
-	//}
 	return p
 }
 
 // DisplayName field setter.
 func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
 	p.setDisplayName(dn)
-	/*
-		if len(dn) == 0 {
-			p.addToListParam("deleteAttribute", "DISPLAY_NAME")
-		} else {
-			p.set("displayName", dn)
-		}*/
 	return p
 }
 
 // ------  Email: ------------------------------
 
 func (p *commonParams) setEmail(e string) {
-	/*if len(e) == 0 {
-		p.appendErrString(`invalid Email: %q Email must be a non-empty string`, e)
-	} else if parts := strings.Split(e, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-		p.appendErrString(`malformed email address string: %q`, e)
-	} else {
-	*/
 	p.set("email", e)
-	//}
 }
 
 // Email field setter.
@@ -569,12 +552,7 @@ func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
 // ------  Password: ------------------------------
 
 func (p *commonParams) setPassword(pw string) {
-	/*if len(pw) < 6 {
-		p.appendErrString("invalid Password string. Password must be a string at least 6 characters long")
-	} else {
-	/*/
 	p.set("password", pw)
-	//}
 }
 
 // Password field setter.
@@ -590,93 +568,42 @@ func (p *UserToUpdate) Password(pw string) *UserToUpdate {
 }
 
 // ------  PhoneNumber: ------------------------------
-func (p *commonParams) setPhoneNumber(pn string) {
-	p.set("phoneNumber", pn)
-}
 
 // PhoneNumber field setter.
 func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
-	/*	if len(phone) == 0 {
-			p.appendErrString(`invalid PhoneNumber: %q. PhoneNumber must be a non-empty string`, phone)
-		} else if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
-			p.appendErrString(`invalid phone number: %q. Phone number must be a valid, E.164 compliant identifier`, phone)
-		} else {*/
-	p.setPhoneNumber(phone)
-	//}
+	p.set("phoneNumber", phone)
 	return p
 }
 
 // PhoneNumber field setter.
 func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
-	/*if len(phone) > 0 && !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
-		p.appendErrString(`invalid phone number: %q. Phone number must be a valid, E.164 compliant identifier`, phone)
-	} else if len(phone) == 0 {
-		p.addToListParam("deleteProvider", "phone")
-	} else {
-		p.set("phoneNumber", phone)
-	}*/
-	p.setPhoneNumber(phone)
-
+	p.set("phoneNumber", phone)
 	return p
 }
 
-// ------  PhoneNumber: ------------------------------
-func (p *commonParams) setPhotoURL(pu string) {
-	p.set("photoUrl", pu)
-}
+// ------  PhotoURL: ------------------------------
 
 // PhotoURL field setter.
 func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
-	/*	if len(url) == 0 {
-		p.appendErrString(`invalid photo URL: %q. PhotoURL must be a non-empty string`, url)
-	} else {*/
-	p.setPhotoURL(url)
-
-	//	p.set("photoUrl", url)
+	p.set("photoUrl", url)
 	return p
 }
 
 // PhotoURL field setter.
 func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate {
-	/*if len(url) == 0 {
-		p.addToListParam("deleteAttribute", "PHOTO_URL")
-	} else {
-	}*/
-	p.setPhotoURL(url)
+	p.set("photoUrl", url)
 	return p
 }
 
 // UID field setter ------------------------------
 func (p *UserToCreate) UID(uid string) *UserToCreate {
-	/*	if len(uid) == 0 || len(uid) > 128 {
-		p.appendErrString(`invalid uid: %q. The uid must be a non-empty string with no more than 128 characters`, uid)
-	}*/
 	p.set("localId", uid)
 	return p
 }
 
 // CustomClaims setter: ------------------------------
 func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
-	/*	if cc == nil {
-			cc = make(map[string]interface{})
-		}
-		for _, key := range reservedClaims {
-			if _, ok := cc[key]; ok {
-				p.appendErrString(`claim %q is reserved, and must not be set`, key)
-			}
-		}
-		b, err := json.Marshal(cc)
-		if err != nil {
-			p.appendErrString("invalid custom claims Marshaling error: %v", err)
-		} else if len(b) > maxLenPayloadCC {
-			p.appendErrString(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC)
-		} else {
-			s := string(b)
-			if cc == nil || len(cc) == 0 {
-				s = "{}"
-			}*/
 	p.set("customClaims", cc)
-	//}
 	return p
 }
 

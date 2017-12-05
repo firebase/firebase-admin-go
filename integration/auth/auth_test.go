@@ -87,7 +87,7 @@ func TestUserManagement(t *testing.T) {
 
 func populateSomeUsers(t *testing.T) {
 	for i := 0; i < 2; i++ {
-		u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(fmt.Sprintf("userid-%d", i)))
+		u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i)))
 		if err != nil {
 			t.Fatal("trouble creating", i, err)
 		}
@@ -97,18 +97,19 @@ func populateSomeUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	testFixtures.sampleUserNil = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
-	u, err = client.CreateUser(context.Background(), &auth.UserToCreate{})
+	u, err = client.CreateUser(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
-	uid := "tefwfd1234"
+	uid := "tempUserId1234"
 	u, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}).
 		UID(uid).
-		Email(uid+"eml5f@test.com").
+		Email(uid+"email@test.com").
 		DisplayName("display_name").
 		Password("passawd"))
 
