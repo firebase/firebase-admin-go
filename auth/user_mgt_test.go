@@ -81,12 +81,12 @@ func TestGetUser(t *testing.T) {
 		CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	}
 	if !reflect.DeepEqual(user, want) {
-		t.Errorf("got %#v, wanted %#v", user, want)
-		testCompareUserRecords(user, want, t)
+		t.Errorf("GetUser() = %#v, want %#v", user, want)
+		testCompareUserRecords("GetUser()", user, want, t)
 	}
 }
 
-func TestGetUsers(t *testing.T) {
+func TestListUsers(t *testing.T) {
 	setListUsers()
 	s, closer := echoServer("list_users.json", t)
 	defer closer()
@@ -101,16 +101,15 @@ func TestGetUsers(t *testing.T) {
 			t.Error(err)
 		}
 		if i >= len(listUsers) {
-			t.Errorf("got %d users, wanted %d", i+1, len(listUsers))
+			t.Errorf("Users() got %d users, want at least %d", i+1, len(listUsers))
 		}
 		if !reflect.DeepEqual(user, listUsers[i]) {
-			t.Errorf("got %#v, wanted %#v", user, listUsers[i])
-			testCompareUserRecords(user.UserRecord, listUsers[i].UserRecord, t)
+			t.Errorf("Users() iteration, got %#v, want %#v", user, listUsers[i])
+			testCompareUserRecords("Users(), Next()", user.UserRecord, listUsers[i].UserRecord, t)
 		}
 	}
-	_, err := iter.Next()
-	if err != iterator.Done {
-		t.Errorf("got more than %d users, wanted %d", len(listUsers), len(listUsers))
+	if _, err := iter.Next(); err != iterator.Done {
+		t.Errorf("Users() got more than %d users, want %d", len(listUsers), len(listUsers))
 	}
 }
 
@@ -119,21 +118,22 @@ func TestGetUserBy(t *testing.T) {
 	defer closer()
 
 	tests := []struct {
+		name   string
 		getfun func(context.Context, string) (*UserRecord, error)
 		param  string
 		want   string
 	}{
-		{
+		{"GetUser()",
 			s.Client.GetUser,
 			"uid",
 			`{"localId":["uid"]}`,
 		},
-		{
+		{"GetUserByEmail()",
 			s.Client.GetUserByEmail,
 			"email@email.com",
 			`{"email":["email@email.com"]}`,
 		},
-		{
+		{"GetUserByPhoneNumber",
 			s.Client.GetUserByPhoneNumber,
 			"+12341234123",
 			`{"phoneNumber":["+12341234123"]}`,
@@ -143,19 +143,19 @@ func TestGetUserBy(t *testing.T) {
 	for _, test := range tests {
 		test.getfun(context.Background(), test.param)
 		if string(s.rbody) != test.want {
-			t.Errorf("request body = %q want: %q", s.rbody, test.want)
+			t.Errorf("%s got request body = %q want: %q", test.name, s.rbody, test.want)
 		}
 	}
 }
 
 func TestBadCreateUser(t *testing.T) {
 	badUserParams := []struct {
-		params         *UserToCreate
-		expectingError string
+		params *UserToCreate
+		want   string
 	}{
 		{
 			(&UserToCreate{}).Password("short"),
-			`invalid Password string. Password must be a string at least 6 characters long`,
+			`Password must be a string at least 6 characters long`,
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
 			"PhoneNumber must be a non-empty string",
@@ -197,10 +197,10 @@ func TestBadCreateUser(t *testing.T) {
 	for i, test := range badUserParams {
 		_, err := client.CreateUser(context.Background(), test.params)
 		if err == nil {
-			t.Errorf("%d) got no error, wanted error %q", i, test.expectingError)
+			t.Errorf("%d) got no error, wanted error %q", i, test.want)
 		}
-		if err.Error() != test.expectingError {
-			t.Errorf("%d) got error: %q wanted error: %q", i, err.Error(), test.expectingError)
+		if err.Error() != test.want {
+			t.Errorf("%d) got error: %q wanted error: %q", i, err.Error(), test.want)
 		}
 	}
 }
@@ -237,8 +237,8 @@ func TestCreateUser(t *testing.T) {
 
 func TestBadUpdateParams(t *testing.T) {
 	badParams := []struct {
-		params         *UserToUpdate
-		expectingError string
+		params *UserToUpdate
+		want   string
 	}{
 		{
 			nil,
@@ -256,10 +256,11 @@ func TestBadUpdateParams(t *testing.T) {
 	}
 
 	for _, res := range reservedClaims {
-		badParams = append(badParams,
+		badParams = append(
+			badParams,
 			struct {
-				params         *UserToUpdate
-				expectingError string
+				params *UserToUpdate
+				want   string
 			}{
 				(&UserToUpdate{}).CustomClaims(map[string]interface{}{res: true}),
 				fmt.Sprintf(`CustomClaims, claim %q is reserved, and must not be set`, res)})
@@ -268,10 +269,10 @@ func TestBadUpdateParams(t *testing.T) {
 	for i, test := range badParams {
 		_, err := client.UpdateUser(context.Background(), "uid", test.params)
 		if err == nil {
-			t.Errorf("%d) got no error wanted error %s", i, test.expectingError)
+			t.Errorf("[%d] UpdateUser() got err == nil, want error = %s", i, test.want)
 		}
-		if err.Error() != test.expectingError {
-			t.Errorf(`%d) got error %q wanted error %q`, i, err.Error(), test.expectingError)
+		if err.Error() != test.want {
+			t.Errorf(`[%d] UpdateUser() got error = %q wanted error = %q`, i, err.Error(), test.want)
 		}
 	}
 }
@@ -335,13 +336,13 @@ func TestBadSetCustomClaims(t *testing.T) {
 			})
 	}
 
-	for i, test := range badUserParams {
+	for _, test := range badUserParams {
 		err := client.SetCustomUserClaims(context.Background(), "uid", test.cc)
 		if err == nil {
-			t.Errorf("%d) expecting error %s", i, test.estr)
+			t.Errorf("SetCustomUserClaims() got err=nil, want error = %s", test.estr)
 		}
 		if err.Error() != test.estr {
-			t.Errorf(`got error: %q expecting error: %q`, err.Error(), test.estr)
+			t.Errorf(`SetCustomUserClaims() got error: %q expecting error: %q`, err.Error(), test.estr)
 		}
 	}
 }
@@ -423,8 +424,8 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exported, want) {
 		// zero in
-		t.Errorf("got %#v, wanted %#v", exported, want)
-		testCompareUserRecords(exported.UserRecord, want.UserRecord, t)
+		t.Errorf("makeExportedUser() got %#v, want %#v", exported, want)
+		testCompareUserRecords("makeExportedUser()", exported.UserRecord, want.UserRecord, t)
 	}
 }
 
@@ -469,13 +470,13 @@ func TestCreateRequest(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
 		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer closer()
 		s.Client.CreateUser(context.Background(), test.utc)
 
 		if string(s.rbody) != test.expecting {
-			t.Errorf("%d)request body = %q want: %q", i, s.rbody, test.expecting)
+			t.Errorf("CreateUser())request body = %q; want: %q", s.rbody, test.expecting)
 
 		}
 	}
@@ -547,11 +548,11 @@ func TestUpdateRequest(t *testing.T) {
 		}
 		// Test params regqrdless of order
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("request body = %q want: %q", s.rbody, test.expecting)
+			t.Errorf("UpdateUser(), request body = %q want: %q", s.rbody, test.expecting)
 		}
 		// json should have sorted keys.
 		if string(s.rbody) != test.expecting {
-			t.Errorf("request body = %q want: %q", s.rbody, test.expecting)
+			t.Errorf("UpdateUser() request body = %q want: %q", s.rbody, test.expecting)
 
 		}
 	}
@@ -662,7 +663,7 @@ func setListUsers() {
 	}
 }
 
-func testCompareUserRecords(u1, u2 *UserRecord, t *testing.T) {
+func testCompareUserRecords(testName string, u1, u2 *UserRecord, t *testing.T) {
 	tests := []struct {
 		name string
 		got  interface{}
@@ -681,9 +682,9 @@ func testCompareUserRecords(u1, u2 *UserRecord, t *testing.T) {
 			want interface{}
 		}{fmt.Sprintf("Provider %d", k), pui, u2.ProviderUserInfo[k]})
 	}
-	for j, test := range tests {
+	for _, test := range tests {
 		if !reflect.DeepEqual(test.got, test.want) {
-			t.Errorf("test %d \n %s =  (%T) %#v \nwanted: (%T) %#v", j, test.name,
+			t.Errorf("%s = (%T) %#v \nwanted: (%T) %#v", testName,
 				test.got, test.got, test.want, test.want)
 		}
 	}

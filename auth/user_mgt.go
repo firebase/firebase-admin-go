@@ -64,7 +64,7 @@ var (
 		{"password", "Password", validPassword},
 		{"photoUrl", "PhotoURL", nonEmpty},
 		{"localId", "UID", nonEmpty},
-		{"localId", "UID", strlenLTE(128)},
+		{"localId", "UID", validUID},
 	}
 
 	updateValidators = []struct {
@@ -72,7 +72,7 @@ var (
 		errorName string
 		testFun   func(*commonParams, string, string) error
 	}{
-		{"customAttributes", "CustomClaims", strlenLTE(maxLenPayloadCC)},
+		{"customAttributes", "CustomClaims", validAttr},
 	}
 )
 
@@ -122,12 +122,8 @@ type UserIterator struct {
 	users    []*ExportedUserRecord
 }
 
-type userParams interface {
-	preparePayload()
-}
 type commonParams struct {
 	payload map[string]interface{}
-	errors  map[string]string
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -138,35 +134,6 @@ type UserToCreate struct {
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
 	commonParams
-}
-
-type getUserResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
-}
-
-type responseUserRecord struct {
-	UID                string      `json:"localId,omitempty"`
-	DisplayName        string      `json:"displayName,omitempty"`
-	Email              string      `json:"email,omitempty"`
-	PhoneNumber        string      `json:"phoneNumber,omitempty"`
-	PhotoURL           string      `json:"photoUrl,omitempty"`
-	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
-	ProviderID         string      `json:"providerId,omitempty"`
-	CustomClaims       string      `json:"customAttributes,omitempty"`
-	Disabled           bool        `json:"disabled,omitempty"`
-	EmailVerified      bool        `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
-	PasswordHash       string      `json:"passwordHash,omitempty"`
-	PasswordSalt       string      `json:"salt,omitempty"`
-	ValidSince         int64       `json:"validSince,string,omitempty"`
-}
-
-type listUsersResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
-	NextPage    string               `json:"nextPageToken,omitempty"`
 }
 
 // CreateUser creates a new user with the specified properties.
@@ -186,9 +153,6 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 //
 // DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record.
 func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdate) (ur *UserRecord, err error) {
-	if uid == "" {
-		return nil, fmt.Errorf("uid must not be empty")
-	}
 	if params == nil || params.payload == nil {
 		return nil, fmt.Errorf("params must not be empty for update")
 	}
@@ -301,26 +265,6 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 // ------------------------------------------------------------
 // Setters and utilities for Create and Update input structs.
 
-func (p *commonParams) appendErrString(field, s string, i ...interface{}) {
-	if p.errors == nil {
-		p.errors = map[string]string{}
-	}
-	if _, ok := p.errors[field]; !ok {
-		p.errors[field] = fmt.Sprintf(s, i...)
-	}
-}
-
-func (p *commonParams) getErrors() error {
-	if p.errors == nil || len(p.errors) == 0 {
-		return nil
-	}
-	var errs []string
-	for _, v := range p.errors {
-		errs = append(errs, v)
-	}
-	return fmt.Errorf(strings.Join(errs, ", "))
-}
-
 func (p *commonParams) payloadInitialized() {
 	if p.payload == nil {
 		p.payload = make(map[string]interface{})
@@ -389,91 +333,7 @@ func (p *commonParams) addToListParam(listname, param string) {
 	}
 }
 
-// Validators.
-
-// No validation needed. used for bool fields
-func allowed(p *commonParams, _, _ string) error {
-	return nil
-}
-
-func nonEmpty(p *commonParams, fieldName, errorName string) error {
-	if val, ok := p.payload[fieldName]; ok {
-		if len(val.(string)) == 0 {
-			return fmt.Errorf("%s must be a non-empty string", errorName)
-		}
-	}
-	return nil
-}
-
-func validEmail(p *commonParams, fieldName, errorName string) error {
-	if val, ok := p.payload[fieldName]; ok {
-		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			return fmt.Errorf("malformed %s string: %q", errorName, val)
-		}
-	}
-	return nil
-}
-
-func validPassword(p *commonParams, fieldName, errorName string) error {
-	wantLength := 6
-	if val, ok := p.payload[fieldName]; ok {
-		if len(val.(string)) < wantLength {
-			return fmt.Errorf("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, wantLength)
-		}
-	}
-	return nil
-}
-
-func strlenLTE(i int) func(*commonParams, string, string) error {
-	return func(p *commonParams, fieldName, errorName string) error {
-		if val, ok := p.payload[fieldName]; ok {
-			if len(val.(string)) > i {
-				return fmt.Errorf("%s must be a string at most %d characters long", errorName, i)
-			}
-		}
-		return nil
-	}
-}
-
-func validPhone(p *commonParams, fieldName, errorName string) error {
-	if val, ok := p.payload[fieldName]; ok {
-		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
-			return fmt.Errorf(
-				"invalid %s: %q. %s must be a valid, E.164 compliant identifier",
-				errorName, val, errorName)
-		}
-	}
-	return nil
-}
-
-func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
-	if p.payload == nil {
-		p.payload = map[string]interface{}{}
-	}
-
-	for _, test := range commonValidators {
-		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
-			return nil, err
-		}
-	}
-	return p.payload, nil
-}
-
-func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
-	if p.payload == nil {
-		p.payload = map[string]interface{}{}
-	}
-	procs := append(updatePreProcess, commonValidators...)
-	procs = append(procs, updateValidators...)
-
-	for _, test := range procs {
-		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
-			return nil, err
-		}
-	}
-	return p.payload, nil
-}
-
+// Setters
 // ------  Disabled: ------------------------------
 
 // Disabled field setter.
@@ -586,6 +446,135 @@ func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
 
 // ------------------------------------------------------------
 // ------------------------------------------------------------ End of setters
+
+// Validators.
+
+// No validation needed. used for bool fields
+func allowed(p *commonParams, _, _ string) error {
+	return nil
+}
+
+func nonEmpty(p *commonParams, fieldName, errorName string) error {
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) == 0 {
+			return fmt.Errorf("%s must be a non-empty string", errorName)
+		}
+	}
+	return nil
+}
+
+func validEmail(p *commonParams, fieldName, errorName string) error {
+	if val, ok := p.payload[fieldName]; ok {
+		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+			return fmt.Errorf("malformed %s string: %q", errorName, val)
+		}
+	}
+	return nil
+}
+
+func validPassword(p *commonParams, fieldName, errorName string) error {
+	wantLength := 6
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) < wantLength {
+			return fmt.Errorf("%s must be a string at least %d characters long", errorName, wantLength)
+		}
+	}
+	return nil
+}
+
+func validUID(p *commonParams, fieldName, errorName string) error {
+	wantLength := 128
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) > wantLength {
+			return fmt.Errorf("%s must be a string at most %d characters long", errorName, wantLength)
+		}
+	}
+	return nil
+}
+
+func validAttr(p *commonParams, fieldName, errorName string) error {
+	wantLength := maxLenPayloadCC
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) > wantLength {
+			return fmt.Errorf("%s must be a string at most %d characters long", errorName, wantLength)
+		}
+	}
+	return nil
+}
+
+func validPhone(p *commonParams, fieldName, errorName string) error {
+	if val, ok := p.payload[fieldName]; ok {
+		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
+			return fmt.Errorf(
+				"invalid %s: %q. %s must be a valid, E.164 compliant identifier",
+				errorName, val, errorName)
+		}
+	}
+	return nil
+}
+
+func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
+	if p.payload == nil {
+		p.payload = map[string]interface{}{}
+	}
+
+	for _, test := range commonValidators {
+		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+			return nil, err
+		}
+	}
+	return p.payload, nil
+}
+
+func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
+	if p.payload == nil {
+		p.payload = map[string]interface{}{}
+	}
+	procs := append(updatePreProcess, commonValidators...)
+	procs = append(procs, updateValidators...)
+
+	for _, test := range procs {
+		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+			return nil, err
+		}
+	}
+	return p.payload, nil
+}
+
+// End of validators
+
+// Respose Types -------------------------------
+
+type getUserResponse struct {
+	RequestType string               `json:"kind,omitempty"`
+	Users       []responseUserRecord `json:"users,omitempty"`
+}
+
+type responseUserRecord struct {
+	UID                string      `json:"localId,omitempty"`
+	DisplayName        string      `json:"displayName,omitempty"`
+	Email              string      `json:"email,omitempty"`
+	PhoneNumber        string      `json:"phoneNumber,omitempty"`
+	PhotoURL           string      `json:"photoUrl,omitempty"`
+	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
+	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
+	ProviderID         string      `json:"providerId,omitempty"`
+	CustomClaims       string      `json:"customAttributes,omitempty"`
+	Disabled           bool        `json:"disabled,omitempty"`
+	EmailVerified      bool        `json:"emailVerified,omitempty"`
+	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
+	PasswordHash       string      `json:"passwordHash,omitempty"`
+	PasswordSalt       string      `json:"salt,omitempty"`
+	ValidSince         int64       `json:"validSince,string,omitempty"`
+}
+
+type listUsersResponse struct {
+	RequestType string               `json:"kind,omitempty"`
+	Users       []responseUserRecord `json:"users,omitempty"`
+	NextPage    string               `json:"nextPageToken,omitempty"`
+}
+
+// Helper functions for retrieval and HTTP calls.
 
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
 	var gur getUserResponse
