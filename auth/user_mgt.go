@@ -61,7 +61,7 @@ var (
 		{"emailVerified", "EmailVerified", allowed},
 		{"phoneNumber", "PhoneNumber", nonEmpty},
 		{"phoneNumber", "PhoneNumber", validPhone},
-		{"password", "Password", strlenGTE(6)},
+		{"password", "Password", validPassword},
 		{"photoUrl", "PhotoURL", nonEmpty},
 		{"localId", "UID", nonEmpty},
 		{"localId", "UID", strlenLTE(128)},
@@ -179,11 +179,7 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 	if err != nil {
 		return nil, err
 	}
-	u, err := c.createOrUpdateUser(ctx, "signupNewUser", payload)
-	if err != nil {
-		return nil, err
-	}
-	return c.GetUser(ctx, u.UID)
+	return c.createOrUpdateUser(ctx, "signupNewUser", payload)
 }
 
 // UpdateUser updates an existing user account with the specified properties.
@@ -418,15 +414,14 @@ func validEmail(p *commonParams, fieldName, errorName string) error {
 	return nil
 }
 
-func strlenGTE(i int) func(*commonParams, string, string) error {
-	return func(p *commonParams, fieldName, errorName string) error {
-		if val, ok := p.payload[fieldName]; ok {
-			if len(val.(string)) < i {
-				return fmt.Errorf("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, i)
-			}
+func validPassword(p *commonParams, fieldName, errorName string) error {
+	wantLength := 6
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) < wantLength {
+			return fmt.Errorf("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, wantLength)
 		}
-		return nil
 	}
+	return nil
 }
 
 func strlenLTE(i int) func(*commonParams, string, string) error {
