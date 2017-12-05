@@ -95,13 +95,13 @@ func populateSomeUsers(t *testing.T) {
 	}
 	u, err := client.CreateUser(context.Background(), nil)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	testFixtures.sampleUserNil = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	u, err = client.CreateUser(context.Background(), &auth.UserToCreate{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
@@ -113,7 +113,7 @@ func populateSomeUsers(t *testing.T) {
 		Password("passawd"))
 
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	testFixtures.sampleUserWithData = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)

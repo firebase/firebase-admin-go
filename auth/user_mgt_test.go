@@ -158,42 +158,41 @@ func TestBadCreateUser(t *testing.T) {
 			`invalid Password string. Password must be a string at least 6 characters long`,
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
-			`invalid PhoneNumber: "". PhoneNumber must be a non-empty string`,
+			"PhoneNumber must be a non-empty string",
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
 			`invalid PhoneNumber: "1234". PhoneNumber must be a valid, E.164 compliant identifier`,
-		}, /*{
+		}, {
 			(&UserToCreate{}).PhoneNumber("+_!@#$"),
 			`invalid PhoneNumber: "+_!@#$". PhoneNumber must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToCreate{}).UID(""),
-			`invalid uid: "". The uid must be a non-empty string with no more than 128 characters`,
+			`UID must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
-			fmt.Sprintf(`invalid uid: %q. The uid must be a non-empty string with no more than 128 characters`,
-				strings.Repeat("a", 129)),
+			"UID must be a string at most 128 characters long",
 		}, {
 			(&UserToCreate{}).DisplayName(""),
-			`DisplayName must not be empty`,
+			`DisplayName must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).PhotoURL(""),
-			`invalid photo URL: "". PhotoURL must be a non-empty string`,
+			"PhotoURL must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email(""),
-			`invalid Email: "" Email must be a non-empty string`,
+			`Email must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).Email("a"),
-			`malformed email address string: "a"`,
+			`malformed Email string: "a"`,
 		}, {
 			(&UserToCreate{}).Email("a@"),
-			`malformed email address string: "a@"`,
+			`malformed Email string: "a@"`,
 		}, {
 			(&UserToCreate{}).Email("@a"),
-			`malformed email address string: "@a"`,
+			`malformed Email string: "@a"`,
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
-			`malformed email address string: "a@a@a"`,
-		},*/
+			`malformed Email string: "a@a@a"`,
+		},
 	}
 	for i, test := range badUserParams {
 		_, err := client.CreateUser(context.Background(), test.params)
@@ -245,14 +244,14 @@ func TestBadUpdateParams(t *testing.T) {
 			nil,
 			"params must not be empty for update",
 		}, {
-			(&UserToUpdate{}).PhoneNumber("1"),
-			`invalid phone number: "1". Phone number must be a valid, E.164 compliant identifier`,
-		}, {
 			&UserToUpdate{},
 			"params must not be empty for update",
 		}, {
+			(&UserToUpdate{}).PhoneNumber("1"),
+			`invalid PhoneNumber: "1". PhoneNumber must be a valid, E.164 compliant identifier`,
+		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
-			fmt.Sprintf(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC),
+			fmt.Sprintf("CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
 		},
 	}
 
@@ -263,11 +262,11 @@ func TestBadUpdateParams(t *testing.T) {
 				expectingError string
 			}{
 				(&UserToUpdate{}).CustomClaims(map[string]interface{}{res: true}),
-				fmt.Sprintf(`claim %q is reserved, and must not be set`, res)})
+				fmt.Sprintf(`CustomClaims, claim %q is reserved, and must not be set`, res)})
 	}
 
 	for i, test := range badParams {
-		_, err := client.UpdateUser(context.Background(), "outofstruct", test.params)
+		_, err := client.UpdateUser(context.Background(), "uid", test.params)
 		if err == nil {
 			t.Errorf("%d) got no error wanted error %s", i, test.expectingError)
 		}
@@ -322,7 +321,7 @@ func TestBadSetCustomClaims(t *testing.T) {
 		estr string
 	}{{
 		map[string]interface{}{"a": strings.Repeat("a", 993)},
-		fmt.Sprintf("Custom Claims payload must not exceed %d characters", maxLenPayloadCC),
+		fmt.Sprintf("CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
 	}}
 
 	for _, res := range reservedClaims {
@@ -332,7 +331,7 @@ func TestBadSetCustomClaims(t *testing.T) {
 				estr string
 			}{
 				cc:   map[string]interface{}{res: true},
-				estr: fmt.Sprintf(`claim %q is reserved, and must not be set`, res),
+				estr: fmt.Sprintf(`CustomClaims, claim %q is reserved, and must not be set`, res),
 			})
 	}
 
@@ -519,7 +518,7 @@ func TestUpdateRequest(t *testing.T) {
 			`{"deleteAttribute":["PHOTO_URL"],"localId":"uid"}`,
 		}, {
 			(&UserToUpdate{}).PhotoURL("").PhoneNumber("").DisplayName(""),
-			`{"deleteAttribute":["PHOTO_URL","DISPLAY_NAME"],"deleteProvider":["phone"],"localId":"uid"}`,
+			`{"deleteAttribute":["DISPLAY_NAME","PHOTO_URL"],"deleteProvider":["phone"],"localId":"uid"}`,
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": "b", "b": true, "c": 1}),
 			`{"customAttributes":"{\"a\":\"b\",\"b\":true,\"c\":1}","localId":"uid"}`,

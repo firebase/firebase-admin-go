@@ -32,7 +32,7 @@ var (
 	updatePreProcess = []struct {
 		fieldName string
 		errorName string
-		testFun   func(*commonParams, string, string)
+		testFun   func(*commonParams, string, string) error
 	}{
 		{"displayName", "DisplayName", processDeletion},
 		{"phoneNumber", "PhoneNumber", processDeletion},
@@ -48,36 +48,32 @@ var (
 		"photoUrl":    {"deleteAttribute", "PHOTO_URL"},
 	}
 
+	// Order matters only first error per field is reported.
 	commonValidators = []struct {
 		fieldName string
 		errorName string
-		testFun   func(*commonParams, string, string)
+		testFun   func(*commonParams, string, string) error
 	}{
 		{"disableUser", "Disabled", allowed},
 		{"displayName", "DisplayName", nonEmpty},
 		{"email", "Email", nonEmpty},
 		{"email", "Email", validEmail},
 		{"emailVerified", "EmailVerified", allowed},
-		{"password", "Password", strlenGTE(6)},
-		{"phoneNumber", "PhoneNumber", validPhone},
 		{"phoneNumber", "PhoneNumber", nonEmpty},
-		{"photoUrl", "PhotoUrl", nonEmpty},
-		{"localId ", "UID", strlenLTE(128)},
-		{"localId ", "UID", nonEmpty},
+		{"phoneNumber", "PhoneNumber", validPhone},
+		{"password", "Password", strlenGTE(6)},
+		{"photoUrl", "PhotoURL", nonEmpty},
+		{"localId", "UID", nonEmpty},
+		{"localId", "UID", strlenLTE(128)},
 	}
 
 	updateValidators = []struct {
 		fieldName string
 		errorName string
-		testFun   func(*commonParams, string, string)
+		testFun   func(*commonParams, string, string) error
 	}{
 		{"customAttributes", "CustomClaims", strlenLTE(maxLenPayloadCC)},
 	}
-	createValidators = []struct {
-		fieldName string
-		errorName string
-		testFun   func(*commonParams, string, string)
-	}{}
 )
 
 // UserInfo is a collection of standard profile information for a user.
@@ -131,7 +127,7 @@ type userParams interface {
 }
 type commonParams struct {
 	payload map[string]interface{}
-	errors  []string
+	errors  map[string]string
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -178,11 +174,12 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 	if params == nil {
 		params = &UserToCreate{}
 	}
-	params.preparePayload()
-	if len(params.errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
+
+	payload, err := params.preparePayload()
+	if err != nil {
+		return nil, err
 	}
-	u, err := c.createOrUpdateUser(ctx, "signupNewUser", params.payload)
+	u, err := c.createOrUpdateUser(ctx, "signupNewUser", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -196,16 +193,16 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdat
 	if uid == "" {
 		return nil, fmt.Errorf("uid must not be empty")
 	}
-	if params == nil {
+	if params == nil || params.payload == nil {
 		return nil, fmt.Errorf("params must not be empty for update")
 	}
 	params.payload["localId"] = uid
-	params.preparePayload()
 
-	if len(params.errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
+	payload, err := params.preparePayload()
+	if err != nil {
+		return nil, err
 	}
-	return c.createOrUpdateUser(ctx, "setAccountInfo", params.payload)
+	return c.createOrUpdateUser(ctx, "setAccountInfo", payload)
 }
 
 // DeleteUser deletes the user by the given UID.
@@ -308,8 +305,24 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 // ------------------------------------------------------------
 // Setters and utilities for Create and Update input structs.
 
-func (p *commonParams) appendErrString(s string, i ...interface{}) {
-	p.errors = append(p.errors, fmt.Sprintf(s, i...))
+func (p *commonParams) appendErrString(field, s string, i ...interface{}) {
+	if p.errors == nil {
+		p.errors = map[string]string{}
+	}
+	if _, ok := p.errors[field]; !ok {
+		p.errors[field] = fmt.Sprintf(s, i...)
+	}
+}
+
+func (p *commonParams) getErrors() error {
+	if p.errors == nil || len(p.errors) == 0 {
+		return nil
+	}
+	var errs []string
+	for _, v := range p.errors {
+		errs = append(errs, v)
+	}
+	return fmt.Errorf(strings.Join(errs, ", "))
 }
 
 func (p *commonParams) payloadInitialized() {
@@ -324,45 +337,52 @@ func (p *commonParams) set(key string, value interface{}) {
 }
 
 // assumes that payloadName is a string field in p.payload
-func processDeletion(p *commonParams, payloadName, errorName string) {
+func processDeletion(p *commonParams, payloadName, errorName string) error {
 	if dn, ok := p.payload[payloadName]; ok && len(dn.(string)) == 0 {
 		p.addToListParam(deletionSpecs[payloadName].deleteListName, deletionSpecs[payloadName].deleteFieldName)
 		delete(p.payload, payloadName)
 	}
+	return nil
 }
 
-func processClaims(p *commonParams, payloadName, errorName string) {
+func processClaims(p *commonParams, payloadName, errorName string) error {
 	if _, ok := p.payload[payloadName]; !ok {
-		return
+		return nil
 	}
-	p.checkReservedClaims()
-	p.setCustomAttributes()
+	if err := p.checkReservedClaims(); err != nil {
+		return err
+	}
+	return p.setCustomAttributes()
 }
-func (p *commonParams) checkReservedClaims() {
+
+func (p *commonParams) checkReservedClaims() error {
 	cc := p.payload["customClaims"]
 	switch claims := cc.(type) {
 	case map[string]interface{}:
 		for _, key := range reservedClaims {
 			if _, ok := claims[key]; ok {
-				p.appendErrString("claim %q is reserved, and must not be set", key)
+				return fmt.Errorf("CustomClaims, claim %q is reserved, and must not be set", key)
 			}
 		}
+	default:
+		return fmt.Errorf("CustomClaims: unexpected type")
 	}
+	return nil
 }
 
-func (p *commonParams) setCustomAttributes() {
+func (p *commonParams) setCustomAttributes() error {
 	cc := p.payload["customClaims"]
 	b, err := json.Marshal(cc)
 	if err != nil {
-		p.appendErrString("invalid custom claims Marshaling error: %v wanted %v", err, cc)
-		return
-	} //else if len(b) > maxLenPayloadCC {
-	//		p.appendErrString("Custom Claims payload must not exceed %d characters", maxLenPayloadCC)
-	//	} else {
+		return fmt.Errorf("CustomClaims Marshaling error: %v", err)
+	}
 	s := string(b)
 	if s == "null" {
 		s = "{}"
 	}
+	p.payload["customAttributes"] = s
+	delete(p.payload, "customClaims")
+	return nil
 }
 
 func (p *commonParams) addToListParam(listname, param string) {
@@ -376,72 +396,87 @@ func (p *commonParams) addToListParam(listname, param string) {
 // Validators.
 
 // No validation needed. used for bool fields
-func allowed(p *commonParams, _, _ string) {
-	return
+func allowed(p *commonParams, _, _ string) error {
+	return nil
 }
 
-func nonEmpty(p *commonParams, fieldName, errorName string) {
+func nonEmpty(p *commonParams, fieldName, errorName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) == 0 {
-			p.appendErrString("invalid %s:: %q. The %s must be a non-empty string", errorName, val)
+			return fmt.Errorf("%s must be a non-empty string", errorName)
 		}
 	}
+	return nil
 }
 
-func validEmail(p *commonParams, fieldName, errorName string) {
+func validEmail(p *commonParams, fieldName, errorName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			p.appendErrString("malformed %s string: %q", val, errorName)
+			return fmt.Errorf("malformed %s string: %q", errorName, val)
 		}
 	}
+	return nil
 }
 
-func strlenGTE(i int) func(*commonParams, string, string) {
-	return func(p *commonParams, fieldName, errorName string) {
+func strlenGTE(i int) func(*commonParams, string, string) error {
+	return func(p *commonParams, fieldName, errorName string) error {
 		if val, ok := p.payload[fieldName]; ok {
 			if len(val.(string)) < i {
-				p.appendErrString("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, i)
+				return fmt.Errorf("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, i)
 			}
 		}
+		return nil
 	}
 }
 
-func strlenLTE(i int) func(*commonParams, string, string) {
-	return func(p *commonParams, fieldName, errorName string) {
+func strlenLTE(i int) func(*commonParams, string, string) error {
+	return func(p *commonParams, fieldName, errorName string) error {
 		if val, ok := p.payload[fieldName]; ok {
 			if len(val.(string)) > i {
-				p.appendErrString("%s must be a string at most %d characters long", errorName, i)
+				return fmt.Errorf("%s must be a string at most %d characters long", errorName, i)
 			}
 		}
+		return nil
 	}
 }
-func validPhone(p *commonParams, fieldName, errorName string) {
+
+func validPhone(p *commonParams, fieldName, errorName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
-			p.appendErrString("invalid %s: %q. %s must be a valid, E.164 compliant identifier", errorName, val, errorName)
+			return fmt.Errorf(
+				"invalid %s: %q. %s must be a valid, E.164 compliant identifier",
+				errorName, val, errorName)
 		}
 	}
+	return nil
 }
 
-func (p *UserToCreate) preparePayload() {
+func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	if p.payload == nil {
 		p.payload = map[string]interface{}{}
 	}
-	for _, test := range append(commonValidators, createValidators...) {
-		test.testFun(&p.commonParams, test.fieldName, test.errorName)
+
+	for _, test := range commonValidators {
+		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+			return nil, err
+		}
 	}
+	return p.payload, nil
 }
 
-func (p *UserToUpdate) preparePayload() {
+func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	if p.payload == nil {
 		p.payload = map[string]interface{}{}
 	}
-	for _, proc := range updatePreProcess {
-		proc.testFun(&p.commonParams, proc.fieldName, proc.errorName)
+	procs := append(updatePreProcess, commonValidators...)
+	procs = append(procs, updateValidators...)
+
+	for _, test := range procs {
+		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+			return nil, err
+		}
 	}
-	for _, test := range append(commonValidators, updateValidators...) {
-		test.testFun(&p.commonParams, test.fieldName, test.errorName)
-	}
+	return p.payload, nil
 }
 
 // ------  Disabled: ------------------------------
@@ -587,7 +622,7 @@ func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
 
 // ------  PhoneNumber: ------------------------------
 func (p *commonParams) setPhotoURL(pu string) {
-
+	p.set("photoUrl", pu)
 }
 
 // PhotoURL field setter.
