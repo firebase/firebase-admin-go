@@ -18,9 +18,9 @@ package iid
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"firebase.google.com/go/iid"
@@ -51,9 +51,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestNonExisting(t *testing.T) {
-	if err := client.DeleteInstanceID(context.Background(), "non-existing"); err == nil {
+	err := client.DeleteInstanceID(context.Background(), "non-existing")
+	if err == nil {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
-	} else {
-		fmt.Println(err)
+	}
+	if !strings.HasPrefix(err.Error(), "http error status: 404") {
+		t.Errorf("DeleteInstanceID(non-existing) = %v; want = 404", err)
 	}
 }
