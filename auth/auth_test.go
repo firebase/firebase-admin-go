@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 		ctx   context.Context
 		creds *google.DefaultCredentials
 	)
-
+	opt := option.WithCredentialsFile("../testdata/service_account.json")
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {
@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 		}
 	} else {
 		ctx = context.Background()
-		creds, err = transport.Creds(ctx, option.WithCredentialsFile("../testdata/service_account.json"))
+		creds, err = transport.Creds(ctx, opt)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -70,6 +70,7 @@ func TestMain(m *testing.M) {
 	}
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
+		Opts:      []option.ClientOption{option.WithCredentialsFile("../testdata/service_account.json")},
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {

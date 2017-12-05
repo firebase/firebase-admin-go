@@ -141,6 +141,32 @@ func testGetUser(t *testing.T) {
 	}
 }
 
+func testGetUserByPhoneNumber(t *testing.T) {
+	u, err := client.GetUserByPhoneNumber(context.Background(), testFixtures.sampleUserWithData.PhoneNumber)
+	if err != nil {
+		t.Errorf("error getting user %s", err)
+	}
+	if u.UID != testFixtures.sampleUserWithData.UID || u.PhoneNumber != testFixtures.sampleUserWithData.PhoneNumber {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserInfo)
+	}
+	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u)
+	}
+}
+
+func testGetUserByEmail(t *testing.T) {
+	u, err := client.GetUserByEmail(context.Background(), testFixtures.sampleUserWithData.Email)
+	if err != nil {
+		t.Errorf("error getting user %s", err)
+	}
+	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u.UserInfo)
+	}
+	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
+		t.Errorf("expecting %#v got %#v", testFixtures.sampleUserWithData, u)
+	}
+}
+
 func testUserIterator(t *testing.T) {
 	iter := client.Users(context.Background(), "")
 	uids := map[string]bool{}

@@ -28,6 +28,58 @@ import (
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
+var (
+	updatePreProcess = []struct {
+		fieldName string
+		errorName string
+		testFun   func(*commonParams, string, string)
+	}{
+		{"displayName", "DisplayName", processDeletion},
+		{"phoneNumber", "PhoneNumber", processDeletion},
+		{"photoUrl", "PhotoURL", processDeletion},
+		{"customClaims", "CustomClaims", processClaims},
+	}
+	deletionSpecs = map[string]struct {
+		deleteListName  string
+		deleteFieldName string
+	}{
+		"displayName": {"deleteAttribute", "DISPLAY_NAME"},
+		"phoneNumber": {"deleteProvider", "phone"},
+		"photoUrl":    {"deleteAttribute", "PHOTO_URL"},
+	}
+
+	commonValidators = []struct {
+		fieldName string
+		errorName string
+		testFun   func(*commonParams, string, string)
+	}{
+		{"disableUser", "Disabled", allowed},
+		{"displayName", "DisplayName", nonEmpty},
+		{"email", "Email", nonEmpty},
+		{"email", "Email", validEmail},
+		{"emailVerified", "EmailVerified", allowed},
+		{"password", "Password", strlenGTE(6)},
+		{"phoneNumber", "PhoneNumber", validPhone},
+		{"phoneNumber", "PhoneNumber", nonEmpty},
+		{"photoUrl", "PhotoUrl", nonEmpty},
+		{"localId ", "UID", strlenLTE(128)},
+		{"localId ", "UID", nonEmpty},
+	}
+
+	updateValidators = []struct {
+		fieldName string
+		errorName string
+		testFun   func(*commonParams, string, string)
+	}{
+		{"customAttributes", "CustomClaims", strlenLTE(maxLenPayloadCC)},
+	}
+	createValidators = []struct {
+		fieldName string
+		errorName string
+		testFun   func(*commonParams, string, string)
+	}{}
+)
+
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
 	DisplayName string `json:"displayName,omitempty"`
@@ -74,21 +126,20 @@ type UserIterator struct {
 	users    []*ExportedUserRecord
 }
 
+type userParams interface {
+	preparePayload()
+}
 type commonParams struct {
 	payload map[string]interface{}
 	errors  []string
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
-//
-// UserToCreate implements exported setters.
 type UserToCreate struct {
 	commonParams
 }
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
-//
-// UserToUpdate implements exported setters.
 type UserToUpdate struct {
 	commonParams
 }
@@ -127,21 +178,15 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 	if params == nil {
 		params = &UserToCreate{}
 	}
+	params.preparePayload()
 	if len(params.errors) > 0 {
 		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
 	}
-
-	if params.payload == nil {
-		params.payload = map[string]interface{}{}
-	}
-
-	u, err := c.updateCreateUser(ctx, "signupNewUser", params.payload)
-
+	u, err := c.createOrUpdateUser(ctx, "signupNewUser", params.payload)
 	if err != nil {
 		return nil, err
 	}
-	ur, err := c.GetUser(ctx, u.UID)
-	return ur, err
+	return c.GetUser(ctx, u.UID)
 }
 
 // UpdateUser updates an existing user account with the specified properties.
@@ -151,16 +196,16 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdat
 	if uid == "" {
 		return nil, fmt.Errorf("uid must not be empty")
 	}
-	if params == nil || (len(params.errors) == 0 && len(params.payload) == 0) {
+	if params == nil {
 		return nil, fmt.Errorf("params must not be empty for update")
 	}
+	params.payload["localId"] = uid
+	params.preparePayload()
+
 	if len(params.errors) > 0 {
 		return nil, fmt.Errorf(strings.Join(params.errors, ", "))
 	}
-
-	params.payload["localId"] = uid
-
-	return c.updateCreateUser(ctx, "setAccountInfo", params.payload)
+	return c.createOrUpdateUser(ctx, "setAccountInfo", params.payload)
 }
 
 // DeleteUser deletes the user by the given UID.
@@ -267,19 +312,135 @@ func (p *commonParams) appendErrString(s string, i ...interface{}) {
 	p.errors = append(p.errors, fmt.Sprintf(s, i...))
 }
 
-func (p *commonParams) set(key string, value interface{}) {
+func (p *commonParams) payloadInitialized() {
 	if p.payload == nil {
 		p.payload = make(map[string]interface{})
 	}
+}
 
+func (p *commonParams) set(key string, value interface{}) {
+	p.payloadInitialized()
 	p.payload[key] = value
 }
 
-func (p *UserToUpdate) addToListParam(listname, param string) {
+// assumes that payloadName is a string field in p.payload
+func processDeletion(p *commonParams, payloadName, errorName string) {
+	if dn, ok := p.payload[payloadName]; ok && len(dn.(string)) == 0 {
+		p.addToListParam(deletionSpecs[payloadName].deleteListName, deletionSpecs[payloadName].deleteFieldName)
+		delete(p.payload, payloadName)
+	}
+}
+
+func processClaims(p *commonParams, payloadName, errorName string) {
+	if _, ok := p.payload[payloadName]; !ok {
+		return
+	}
+	p.checkReservedClaims()
+	p.setCustomAttributes()
+}
+func (p *commonParams) checkReservedClaims() {
+	cc := p.payload["customClaims"]
+	switch claims := cc.(type) {
+	case map[string]interface{}:
+		for _, key := range reservedClaims {
+			if _, ok := claims[key]; ok {
+				p.appendErrString("claim %q is reserved, and must not be set", key)
+			}
+		}
+	}
+}
+
+func (p *commonParams) setCustomAttributes() {
+	cc := p.payload["customClaims"]
+	b, err := json.Marshal(cc)
+	if err != nil {
+		p.appendErrString("invalid custom claims Marshaling error: %v wanted %v", err, cc)
+		return
+	} //else if len(b) > maxLenPayloadCC {
+	//		p.appendErrString("Custom Claims payload must not exceed %d characters", maxLenPayloadCC)
+	//	} else {
+	s := string(b)
+	if s == "null" {
+		s = "{}"
+	}
+}
+
+func (p *commonParams) addToListParam(listname, param string) {
 	if _, ok := p.payload[listname]; ok {
 		p.payload[listname] = append(p.payload[listname].([]string), param)
 	} else {
 		p.set(listname, []string{param})
+	}
+}
+
+// Validators.
+
+// No validation needed. used for bool fields
+func allowed(p *commonParams, _, _ string) {
+	return
+}
+
+func nonEmpty(p *commonParams, fieldName, errorName string) {
+	if val, ok := p.payload[fieldName]; ok {
+		if len(val.(string)) == 0 {
+			p.appendErrString("invalid %s:: %q. The %s must be a non-empty string", errorName, val)
+		}
+	}
+}
+
+func validEmail(p *commonParams, fieldName, errorName string) {
+	if val, ok := p.payload[fieldName]; ok {
+		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+			p.appendErrString("malformed %s string: %q", val, errorName)
+		}
+	}
+}
+
+func strlenGTE(i int) func(*commonParams, string, string) {
+	return func(p *commonParams, fieldName, errorName string) {
+		if val, ok := p.payload[fieldName]; ok {
+			if len(val.(string)) < i {
+				p.appendErrString("invalid %s string. %s must be a string at least %d characters long", errorName, errorName, i)
+			}
+		}
+	}
+}
+
+func strlenLTE(i int) func(*commonParams, string, string) {
+	return func(p *commonParams, fieldName, errorName string) {
+		if val, ok := p.payload[fieldName]; ok {
+			if len(val.(string)) > i {
+				p.appendErrString("%s must be a string at most %d characters long", errorName, i)
+			}
+		}
+	}
+}
+func validPhone(p *commonParams, fieldName, errorName string) {
+	if val, ok := p.payload[fieldName]; ok {
+		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
+			p.appendErrString("invalid %s: %q. %s must be a valid, E.164 compliant identifier", errorName, val, errorName)
+		}
+	}
+}
+
+func (p *UserToCreate) preparePayload() {
+	if p.payload == nil {
+		p.payload = map[string]interface{}{}
+	}
+	for _, test := range append(commonValidators, createValidators...) {
+		test.testFun(&p.commonParams, test.fieldName, test.errorName)
+	}
+}
+
+func (p *UserToUpdate) preparePayload() {
+	if p.payload == nil {
+		p.payload = map[string]interface{}{}
+	}
+	for _, proc := range updatePreProcess {
+		proc.testFun(&p.commonParams, proc.fieldName, proc.errorName)
+	}
+	for _, test := range append(commonValidators, updateValidators...) {
+		test.testFun(&p.commonParams, test.fieldName, test.errorName)
 	}
 }
 
@@ -301,37 +462,43 @@ func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
 }
 
 // ------  DisplayName: ------------------------------
+func (p *commonParams) setDisplayName(dn string) {
+	p.set("displayName", dn)
+}
 
 // DisplayName field setter.
 func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
-	if len(dn) == 0 {
-		p.appendErrString("DisplayName must not be empty")
-	} else {
-		p.set("displayName", dn)
-	}
+	/*	if len(dn) == 0 {
+
+		} else {*/
+	p.setDisplayName(dn)
+	//}
 	return p
 }
 
 // DisplayName field setter.
 func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
-	if len(dn) == 0 {
-		p.addToListParam("deleteAttribute", "DISPLAY_NAME")
-	} else {
-		p.set("displayName", dn)
-	}
+	p.setDisplayName(dn)
+	/*
+		if len(dn) == 0 {
+			p.addToListParam("deleteAttribute", "DISPLAY_NAME")
+		} else {
+			p.set("displayName", dn)
+		}*/
 	return p
 }
 
 // ------  Email: ------------------------------
 
 func (p *commonParams) setEmail(e string) {
-	if len(e) == 0 {
-		p.appendErrString(`invalid Email: "%s" Email must be a non-empty string`, e)
+	/*if len(e) == 0 {
+		p.appendErrString(`invalid Email: %q Email must be a non-empty string`, e)
 	} else if parts := strings.Split(e, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-		p.appendErrString(`malformed email address string: "%s"`, e)
+		p.appendErrString(`malformed email address string: %q`, e)
 	} else {
-		p.set("email", e)
-	}
+	*/
+	p.set("email", e)
+	//}
 }
 
 // Email field setter.
@@ -367,11 +534,12 @@ func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
 // ------  Password: ------------------------------
 
 func (p *commonParams) setPassword(pw string) {
-	if len(pw) < 6 {
+	/*if len(pw) < 6 {
 		p.appendErrString("invalid Password string. Password must be a string at least 6 characters long")
 	} else {
-		p.set("password", pw)
-	}
+	/*/
+	p.set("password", pw)
+	//}
 }
 
 // Password field setter.
@@ -387,84 +555,93 @@ func (p *UserToUpdate) Password(pw string) *UserToUpdate {
 }
 
 // ------  PhoneNumber: ------------------------------
+func (p *commonParams) setPhoneNumber(pn string) {
+	p.set("phoneNumber", pn)
+}
 
 // PhoneNumber field setter.
 func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
-	if len(phone) == 0 {
-		p.appendErrString(`invalid PhoneNumber: "%s". PhoneNumber must be a non-empty string`, phone)
-	} else if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
-		p.appendErrString(`invalid phone number: "%s". Phone number must be a valid, E.164 compliant identifier`, phone)
-	} else {
-		p.set("phoneNumber", phone)
-	}
+	/*	if len(phone) == 0 {
+			p.appendErrString(`invalid PhoneNumber: %q. PhoneNumber must be a non-empty string`, phone)
+		} else if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
+			p.appendErrString(`invalid phone number: %q. Phone number must be a valid, E.164 compliant identifier`, phone)
+		} else {*/
+	p.setPhoneNumber(phone)
+	//}
 	return p
 }
 
 // PhoneNumber field setter.
 func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
-	if len(phone) > 0 && !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
-		p.appendErrString(`invalid phone number: "%s". Phone number must be a valid, E.164 compliant identifier`, phone)
+	/*if len(phone) > 0 && !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
+		p.appendErrString(`invalid phone number: %q. Phone number must be a valid, E.164 compliant identifier`, phone)
 	} else if len(phone) == 0 {
 		p.addToListParam("deleteProvider", "phone")
 	} else {
 		p.set("phoneNumber", phone)
-	}
+	}*/
+	p.setPhoneNumber(phone)
+
 	return p
 }
 
 // ------  PhoneNumber: ------------------------------
+func (p *commonParams) setPhotoURL(pu string) {
+
+}
 
 // PhotoURL field setter.
 func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
-	if len(url) == 0 {
-		p.appendErrString(`invalid photo URL: "%s". PhotoURL must be a non-empty string`, url)
-	} else {
-		p.set("photoUrl", url)
-	}
+	/*	if len(url) == 0 {
+		p.appendErrString(`invalid photo URL: %q. PhotoURL must be a non-empty string`, url)
+	} else {*/
+	p.setPhotoURL(url)
+
+	//	p.set("photoUrl", url)
 	return p
 }
 
 // PhotoURL field setter.
 func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate {
-	if len(url) == 0 {
+	/*if len(url) == 0 {
 		p.addToListParam("deleteAttribute", "PHOTO_URL")
 	} else {
-		p.set("photoUrl", url)
-	}
+	}*/
+	p.setPhotoURL(url)
 	return p
 }
 
 // UID field setter ------------------------------
 func (p *UserToCreate) UID(uid string) *UserToCreate {
-	if len(uid) == 0 || len(uid) > 128 {
-		p.appendErrString(`invalid uid: "%s". The uid must be a non-empty string with no more than 128 characters`, uid)
-	}
+	/*	if len(uid) == 0 || len(uid) > 128 {
+		p.appendErrString(`invalid uid: %q. The uid must be a non-empty string with no more than 128 characters`, uid)
+	}*/
 	p.set("localId", uid)
 	return p
 }
 
 // CustomClaims setter: ------------------------------
 func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
-	if cc == nil {
-		cc = make(map[string]interface{})
-	}
-	for _, key := range reservedClaims {
-		if _, ok := cc[key]; ok {
-			p.appendErrString(`claim "%s" is reserved, and must not be set`, key)
+	/*	if cc == nil {
+			cc = make(map[string]interface{})
 		}
-	}
-	b, err := json.Marshal(cc)
-	if err != nil {
-		p.appendErrString("invalid custom claims Marshaling error: %v", err)
-	} else if len(b) > maxLenPayloadCC {
-		p.appendErrString(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC)
-	} else {
-		s := string(b)
-		if cc == nil || len(cc) == 0 {
-			s = "{}"
+		for _, key := range reservedClaims {
+			if _, ok := cc[key]; ok {
+				p.appendErrString(`claim %q is reserved, and must not be set`, key)
+			}
 		}
-		p.set("customAttributes", s)
-	}
+		b, err := json.Marshal(cc)
+		if err != nil {
+			p.appendErrString("invalid custom claims Marshaling error: %v", err)
+		} else if len(b) > maxLenPayloadCC {
+			p.appendErrString(`Custom Claims payload must not exceed %d characters`, maxLenPayloadCC)
+		} else {
+			s := string(b)
+			if cc == nil || len(cc) == 0 {
+				s = "{}"
+			}*/
+	p.set("customClaims", cc)
+	//}
 	return p
 }
 
@@ -487,7 +664,7 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 	return eu.UserRecord, err
 }
 
-func (c *Client) updateCreateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
+func (c *Client) createOrUpdateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
 	var rur responseUserRecord
 	err := c.makeHTTPCall(ctx, action, params, &rur)
 	if err != nil {
