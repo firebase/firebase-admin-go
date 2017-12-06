@@ -45,8 +45,8 @@ type mockAuthServer struct {
 var listUsers []*ExportedUserRecord
 
 func TestGetUser(t *testing.T) {
-	s, closer := echoServer("get_user.json", t)
-	defer closer()
+	s := echoServer("get_user.json", t)
+	defer s.Close()
 
 	user, err := s.Client.GetUser(context.Background(), "ignored_id")
 	if err != nil {
@@ -88,8 +88,8 @@ func TestGetUser(t *testing.T) {
 
 func TestListUsers(t *testing.T) {
 	setListUsers()
-	s, closer := echoServer("list_users.json", t)
-	defer closer()
+	s := echoServer("list_users.json", t)
+	defer s.Close()
 	iter := s.Client.Users(context.Background(), "")
 
 	for i := 0; i < len(listUsers); i++ {
@@ -114,8 +114,8 @@ func TestListUsers(t *testing.T) {
 }
 
 func TestGetUserBy(t *testing.T) {
-	s, closer := echoServer(nil, t)
-	defer closer()
+	s := echoServer(nil, t)
+	defer s.Close()
 
 	tests := []struct {
 		name   string
@@ -206,12 +206,12 @@ func TestBadCreateUser(t *testing.T) {
 }
 
 func TestCreateUser(t *testing.T) {
-	s, closer := echoServer([]byte(`{
+	s := echoServer([]byte(`{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
 		"localId": "expectedUserID"
 	   }`), t)
-	defer closer()
+	defer s.Close()
 	goodParams := []*UserToCreate{
 		nil,
 		{},
@@ -278,7 +278,7 @@ func TestBadUpdateParams(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	s, closer := echoServer([]byte(`{
+	s := echoServer([]byte(`{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "expectedUserID",
 		"email": "tefwfd1234eml5f@test.com",
@@ -293,7 +293,7 @@ func TestUpdateUser(t *testing.T) {
 		],
 		"emailVerified": false
 	   }`), t)
-	defer closer()
+	defer s.Close()
 
 	goodParams := []*UserToUpdate{
 		(&UserToUpdate{}).Password("123456"),
@@ -348,12 +348,12 @@ func TestBadSetCustomClaims(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	s, closer := echoServer([]byte(`{
+	s := echoServer([]byte(`{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
 		"localId": "expectedUserID"
 	   }`), t)
-	defer closer()
+	defer s.Close()
 	if err := s.Client.DeleteUser(context.Background(), ""); err != nil {
 		t.Error(err)
 		return
@@ -471,8 +471,8 @@ func TestCreateRequest(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
-		defer closer()
+		s := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
+		defer s.Close()
 		s.Client.CreateUser(context.Background(), test.utc)
 
 		if string(s.rbody) != test.expecting {
@@ -533,8 +533,8 @@ func TestUpdateRequest(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		s, closer := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
-		defer closer()
+		s := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
+		defer s.Close()
 
 		s.Client.UpdateUser(context.Background(), "uid", test.utup)
 		var got, want map[string]interface{}
@@ -699,7 +699,7 @@ func testCompareUserRecords(testName string, u1, u2 *UserRecord, t *testing.T) {
 //   * nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
 // The marshalled request is available through s.rbody, s being the retuned server.
 // It also returns a closing functions that has to be defer closed.
-func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
+func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	var b []byte
 	var err error
 	switch v := resp.(type) {
@@ -753,5 +753,9 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	}
 	authClient.url = s.srv.URL + "/"
 	s.Client = authClient
-	return &s, s.srv.Close
+	return &s
+}
+
+func (s *mockAuthServer) Close() {
+	s.srv.Close()
 }
