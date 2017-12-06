@@ -342,16 +342,16 @@ func processClaims(p *commonParams, payloadName string) error {
 	cc := p.payload["customClaims"]
 	claims, ok := cc.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("CustomClaims: unexpected type")
+		return fmt.Errorf("CustomClaims(): unexpected type")
 	}
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
-			return fmt.Errorf("CustomClaims, claim %q is reserved, and must not be set", key)
+			return fmt.Errorf("CustomClaims(%q: ...): claim %q is reserved, and must not be set", key, key)
 		}
 	}
 	b, err := json.Marshal(claims)
 	if err != nil {
-		return fmt.Errorf("CustomClaims Marshaling error: %v", err)
+		return fmt.Errorf("CustomClaims() Marshaling error: %v", err)
 	}
 	s := string(b)
 	if s == "null" {
@@ -411,7 +411,7 @@ func validateCustomAttributes(p *commonParams, fieldName string) error {
 	wantLength := maxLenPayloadCC
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) > wantLength {
-			return fmt.Errorf("CustomClaims must be a string at most %d characters long", wantLength)
+			return fmt.Errorf("stringified JSON of CustomClaims must be a string at most %d characters long", wantLength)
 		}
 	}
 	return nil
@@ -500,7 +500,7 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 		return nil, fmt.Errorf("cannot find user %v", params)
 	}
 	if l := len(gur.Users); l > 1 {
-		return nil, fmt.Errorf("expecting only one user, got %d, %v ", l, params)
+		return nil, fmt.Errorf("getUser(%v) got %d users; want: one user, ", params, l)
 	}
 	eu, err := makeExportedUser(gur.Users[0])
 	return eu.UserRecord, err
