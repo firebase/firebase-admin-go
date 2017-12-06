@@ -50,7 +50,7 @@ func TestGetUser(t *testing.T) {
 
 	user, err := s.Client.GetUser(context.Background(), "ignored_id")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	want := &UserRecord{
 		UserInfo: &UserInfo{
@@ -98,7 +98,7 @@ func TestListUsers(t *testing.T) {
 			break
 		}
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		if i >= len(listUsers) {
 			t.Errorf("Users() got %d users, want at least %d", i+1, len(listUsers))
@@ -158,28 +158,28 @@ func TestBadCreateUser(t *testing.T) {
 			`Password must be a string at least 6 characters long`,
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
-			"PhoneNumber must be a non-empty string",
+			"phoneNumber must be a non-empty string",
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
-			`invalid PhoneNumber: "1234". PhoneNumber must be a valid, E.164 compliant identifier`,
+			`invalid PhoneNumber "1234". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToCreate{}).PhoneNumber("+_!@#$"),
-			`invalid PhoneNumber: "+_!@#$". PhoneNumber must be a valid, E.164 compliant identifier`,
+			`invalid PhoneNumber "+_!@#$". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToCreate{}).UID(""),
-			`UID must be a non-empty string`,
+			`localId must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
-			"UID must be a string at most 128 characters long",
+			"localId must be a string at most 128 characters long",
 		}, {
 			(&UserToCreate{}).DisplayName(""),
-			`DisplayName must be a non-empty string`,
+			`displayName must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).PhotoURL(""),
-			"PhotoURL must be a non-empty string",
+			"photoUrl must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email(""),
-			`Email must be a non-empty string`,
+			`email must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).Email("a"),
 			`malformed Email string: "a"`,
@@ -248,7 +248,7 @@ func TestBadUpdateParams(t *testing.T) {
 			"params must not be empty for update",
 		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
-			`invalid PhoneNumber: "1". PhoneNumber must be a valid, E.164 compliant identifier`,
+			`invalid PhoneNumber "1". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
 			fmt.Sprintf("CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
@@ -420,7 +420,7 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	exported, err := makeExportedUser(rur)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(exported, want) {
 		// zero in
@@ -540,11 +540,11 @@ func TestUpdateRequest(t *testing.T) {
 		var got, want map[string]interface{}
 		err := json.Unmarshal(s.rbody, &got)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		err = json.Unmarshal([]byte(test.expecting), &want)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		// Test params regqrdless of order
 		if !reflect.DeepEqual(got, want) {
@@ -727,7 +727,7 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 
 		reqBody, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		s.Req = append(s.Req, r)
 		s.rbody = reqBody
@@ -749,7 +749,7 @@ func echoServer(resp interface{}, t *testing.T) (*mockAuthServer, func()) {
 	}
 	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Error()
+		t.Fatal()
 	}
 	authClient.url = s.srv.URL + "/"
 	s.Client = authClient

@@ -32,6 +32,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
+
 var client *auth.Client
 
 func TestMain(m *testing.M) {
@@ -117,7 +119,7 @@ func signInWithCustomToken(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := postRequest(fmt.Sprintf("https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s", apiKey), req)
+	resp, err := postRequest(fmt.Sprintf(apiURL, apiKey), req)
 	if err != nil {
 		return "", err
 	}

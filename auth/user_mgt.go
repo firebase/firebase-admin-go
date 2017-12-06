@@ -31,13 +31,12 @@ const maxLenPayloadCC = 1000
 var (
 	updatePreProcess = []struct {
 		fieldName string
-		errorName string
-		testFun   func(*commonParams, string, string) error
+		testFun   func(*commonParams, string) error
 	}{
-		{"displayName", "DisplayName", processDeletion},
-		{"phoneNumber", "PhoneNumber", processDeletion},
-		{"photoUrl", "PhotoURL", processDeletion},
-		{"customClaims", "CustomClaims", processClaims},
+		{"displayName", processDeletion},
+		{"phoneNumber", processDeletion},
+		{"photoUrl", processDeletion},
+		{"customClaims", processClaims},
 	}
 	deletionSpecs = map[string]struct {
 		deleteListName  string
@@ -51,28 +50,26 @@ var (
 	// Order matters only first error per field is reported.
 	commonValidators = []struct {
 		fieldName string
-		errorName string
-		testFun   func(*commonParams, string, string) error
+		testFun   func(*commonParams, string) error
 	}{
-		{"disableUser", "Disabled", allowed},
-		{"displayName", "DisplayName", nonEmpty},
-		{"email", "Email", nonEmpty},
-		{"email", "Email", validEmail},
-		{"emailVerified", "EmailVerified", allowed},
-		{"phoneNumber", "PhoneNumber", nonEmpty},
-		{"phoneNumber", "PhoneNumber", validPhone},
-		{"password", "Password", validPassword},
-		{"photoUrl", "PhotoURL", nonEmpty},
-		{"localId", "UID", nonEmpty},
-		{"localId", "UID", validUID},
+		{"disableUser", validateTrue},
+		{"displayName", validateNonEmpty},
+		{"email", validateNonEmpty},
+		{"email", validateEmail},
+		{"emailVerified", validateTrue},
+		{"phoneNumber", validateNonEmpty},
+		{"phoneNumber", validatePhone},
+		{"password", validatePassword},
+		{"photoUrl", validateNonEmpty},
+		{"localId", validateNonEmpty},
+		{"localId", validateUID},
 	}
 
 	updateValidators = []struct {
 		fieldName string
-		errorName string
-		testFun   func(*commonParams, string, string) error
+		testFun   func(*commonParams, string) error
 	}{
-		{"customAttributes", "CustomClaims", validAttr},
+		{"customAttributes", validateCustomAttributes},
 	}
 )
 
@@ -131,10 +128,61 @@ type UserToCreate struct {
 	commonParams
 }
 
+// Disabled setter.
+func (p *UserToCreate) Disabled(d bool) *UserToCreate { p.set("disableUser", d); return p }
+
+// DisplayName setter.
+func (p *UserToCreate) DisplayName(dn string) *UserToCreate { p.set("displayName", dn); return p }
+
+// Email setter.
+func (p *UserToCreate) Email(e string) *UserToCreate { p.set("email", e); return p }
+
+// EmailVerified setter.
+func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate { p.set("emailVerified", ev); return p }
+
+// Password setter.
+func (p *UserToCreate) Password(pw string) *UserToCreate { p.set("password", pw); return p }
+
+// PhoneNumber setter.
+func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate { p.set("phoneNumber", phone); return p }
+
+// PhotoURL setter.
+func (p *UserToCreate) PhotoURL(url string) *UserToCreate { p.set("photoUrl", url); return p }
+
+// UID setter.
+func (p *UserToCreate) UID(uid string) *UserToCreate { p.set("localId", uid); return p }
+
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
 	commonParams
 }
+
+// CustomClaims setter.
+func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
+	p.set("customClaims", cc)
+	return p
+}
+
+// Disabled setter.
+func (p *UserToUpdate) Disabled(d bool) *UserToUpdate { p.set("disableUser", d); return p }
+
+// DisplayName setter.
+func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate { p.set("displayName", dn); return p }
+
+// Email setter.
+func (p *UserToUpdate) Email(e string) *UserToUpdate { p.set("email", e); return p }
+
+// EmailVerified setter.
+func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate { p.set("emailVerified", ev); return p }
+
+// Password setter.
+func (p *UserToUpdate) Password(pw string) *UserToUpdate { p.set("password", pw); return p }
+
+// PhoneNumber setter.
+func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { p.set("phoneNumber", phone); return p }
+
+// PhotoURL setter.
+func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate { p.set("photoUrl", url); return p }
 
 // CreateUser creates a new user with the specified properties.
 func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRecord, error) {
@@ -256,63 +304,52 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 		customClaims = map[string]interface{}{}
 	}
 	_, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
-	if err != nil {
-		return err
-	}
 	return err
 }
 
 // ------------------------------------------------------------
-// Setters and utilities for Create and Update input structs.
+// Utilities for Create and Update input structs.
 
-func (p *commonParams) payloadInitialized() {
+func (p *commonParams) set(key string, value interface{}) {
 	if p.payload == nil {
 		p.payload = make(map[string]interface{})
 	}
-}
-
-func (p *commonParams) set(key string, value interface{}) {
-	p.payloadInitialized()
 	p.payload[key] = value
 }
 
 // assumes that payloadName is a string field in p.payload
-func processDeletion(p *commonParams, payloadName, errorName string) error {
+func processDeletion(p *commonParams, payloadName string) error {
 	if dn, ok := p.payload[payloadName]; ok && len(dn.(string)) == 0 {
-		p.addToListParam(deletionSpecs[payloadName].deleteListName, deletionSpecs[payloadName].deleteFieldName)
+		delSpec := deletionSpecs[payloadName]
+		p.addToListParam(delSpec.deleteListName, delSpec.deleteFieldName)
 		delete(p.payload, payloadName)
 	}
 	return nil
 }
 
-func processClaims(p *commonParams, payloadName, errorName string) error {
-	if _, ok := p.payload[payloadName]; !ok {
+func (p *commonParams) addToListParam(listname, param string) {
+	if _, ok := p.payload[listname]; ok {
+		p.payload[listname] = append(p.payload[listname].([]string), param)
+	} else {
+		p.set(listname, []string{param})
+	}
+}
+
+func processClaims(p *commonParams, payloadName string) error {
+	if _, ok := p.payload["customClaims"]; !ok {
 		return nil
 	}
-	if err := p.checkReservedClaims(); err != nil {
-		return err
-	}
-	return p.setCustomAttributes()
-}
-
-func (p *commonParams) checkReservedClaims() error {
 	cc := p.payload["customClaims"]
-	switch claims := cc.(type) {
-	case map[string]interface{}:
-		for _, key := range reservedClaims {
-			if _, ok := claims[key]; ok {
-				return fmt.Errorf("CustomClaims, claim %q is reserved, and must not be set", key)
-			}
-		}
-	default:
+	claims, ok := cc.(map[string]interface{})
+	if !ok {
 		return fmt.Errorf("CustomClaims: unexpected type")
 	}
-	return nil
-}
-
-func (p *commonParams) setCustomAttributes() error {
-	cc := p.payload["customClaims"]
-	b, err := json.Marshal(cc)
+	for _, key := range reservedClaims {
+		if _, ok := claims[key]; ok {
+			return fmt.Errorf("CustomClaims, claim %q is reserved, and must not be set", key)
+		}
+	}
+	b, err := json.Marshal(claims)
 	if err != nil {
 		return fmt.Errorf("CustomClaims Marshaling error: %v", err)
 	}
@@ -325,189 +362,66 @@ func (p *commonParams) setCustomAttributes() error {
 	return nil
 }
 
-func (p *commonParams) addToListParam(listname, param string) {
-	if _, ok := p.payload[listname]; ok {
-		p.payload[listname] = append(p.payload[listname].([]string), param)
-	} else {
-		p.set(listname, []string{param})
-	}
-}
-
-// Setters
-// ------  Disabled: ------------------------------
-
-// Disabled field setter.
-func (p *UserToCreate) Disabled(d bool) *UserToCreate {
-	p.set("disableUser", d)
-	return p
-}
-
-// Disabled field setter.
-func (p *UserToUpdate) Disabled(d bool) *UserToUpdate {
-	p.set("disableUser", d)
-	return p
-}
-
-// ------  DisplayName: ------------------------------
-
-// DisplayName field setter.
-func (p *UserToCreate) DisplayName(dn string) *UserToCreate {
-	p.set("displayName", dn)
-	return p
-}
-
-// DisplayName field setter.
-func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate {
-	p.set("displayName", dn)
-	return p
-}
-
-// ------  Email: ------------------------------
-
-// Email field setter.
-func (p *UserToCreate) Email(e string) *UserToCreate {
-	p.set("email", e)
-	return p
-}
-
-// Email field setter.
-func (p *UserToUpdate) Email(e string) *UserToUpdate {
-	p.set("email", e)
-	return p
-}
-
-// ------  EmailVerified: ------------------------------
-
-// EmailVerified field setter.
-func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate {
-	p.set("emailVerified", ev)
-	return p
-}
-
-// EmailVerified field setter.
-func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate {
-	p.set("emailVerified", ev)
-	return p
-}
-
-// ------  Password: ------------------------------
-
-// Password field setter.
-func (p *UserToCreate) Password(pw string) *UserToCreate {
-	p.set("password", pw)
-	return p
-}
-
-// Password field setter.
-func (p *UserToUpdate) Password(pw string) *UserToUpdate {
-	p.set("password", pw)
-	return p
-}
-
-// ------  PhoneNumber: ------------------------------
-
-// PhoneNumber field setter.
-func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate {
-	p.set("phoneNumber", phone)
-	return p
-}
-
-// PhoneNumber field setter.
-func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
-	p.set("phoneNumber", phone)
-	return p
-}
-
-// ------  PhotoURL: ------------------------------
-
-// PhotoURL field setter.
-func (p *UserToCreate) PhotoURL(url string) *UserToCreate {
-	p.set("photoUrl", url)
-	return p
-}
-
-// PhotoURL field setter.
-func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate {
-	p.set("photoUrl", url)
-	return p
-}
-
-// UID field setter ------------------------------
-func (p *UserToCreate) UID(uid string) *UserToCreate {
-	p.set("localId", uid)
-	return p
-}
-
-// CustomClaims setter: ------------------------------
-func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
-	p.set("customClaims", cc)
-	return p
-}
-
-// ------------------------------------------------------------
-// ------------------------------------------------------------ End of setters
-
 // Validators.
 
-// No validation needed. used for bool fields
-func allowed(p *commonParams, _, _ string) error {
+// No validation needed. Used for bool fields.
+func validateTrue(p *commonParams, _ string) error {
 	return nil
 }
 
-func nonEmpty(p *commonParams, fieldName, errorName string) error {
+func validateNonEmpty(p *commonParams, fieldName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) == 0 {
-			return fmt.Errorf("%s must be a non-empty string", errorName)
+			return fmt.Errorf("%s must be a non-empty string", fieldName)
 		}
 	}
 	return nil
 }
 
-func validEmail(p *commonParams, fieldName, errorName string) error {
+func validateEmail(p *commonParams, fieldName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			return fmt.Errorf("malformed %s string: %q", errorName, val)
+			return fmt.Errorf("malformed Email string: %q", val)
 		}
 	}
 	return nil
 }
 
-func validPassword(p *commonParams, fieldName, errorName string) error {
+func validatePassword(p *commonParams, fieldName string) error {
 	wantLength := 6
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) < wantLength {
-			return fmt.Errorf("%s must be a string at least %d characters long", errorName, wantLength)
+			return fmt.Errorf("Password must be a string at least %d characters long", wantLength)
 		}
 	}
 	return nil
 }
 
-func validUID(p *commonParams, fieldName, errorName string) error {
+func validateUID(p *commonParams, fieldName string) error {
 	wantLength := 128
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) > wantLength {
-			return fmt.Errorf("%s must be a string at most %d characters long", errorName, wantLength)
+			return fmt.Errorf("localId must be a string at most %d characters long", wantLength)
 		}
 	}
 	return nil
 }
 
-func validAttr(p *commonParams, fieldName, errorName string) error {
+func validateCustomAttributes(p *commonParams, fieldName string) error {
 	wantLength := maxLenPayloadCC
 	if val, ok := p.payload[fieldName]; ok {
 		if len(val.(string)) > wantLength {
-			return fmt.Errorf("%s must be a string at most %d characters long", errorName, wantLength)
+			return fmt.Errorf("CustomClaims must be a string at most %d characters long", wantLength)
 		}
 	}
 	return nil
 }
 
-func validPhone(p *commonParams, fieldName, errorName string) error {
+func validatePhone(p *commonParams, fieldName string) error {
 	if val, ok := p.payload[fieldName]; ok {
 		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
 			return fmt.Errorf(
-				"invalid %s: %q. %s must be a valid, E.164 compliant identifier",
-				errorName, val, errorName)
+				"invalid PhoneNumber %q. Must be a valid, E.164 compliant identifier", val)
 		}
 	}
 	return nil
@@ -519,7 +433,7 @@ func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	}
 
 	for _, test := range commonValidators {
-		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+		if err := test.testFun(&p.commonParams, test.fieldName); err != nil {
 			return nil, err
 		}
 	}
@@ -528,13 +442,13 @@ func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
 
 func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	if p.payload == nil {
-		p.payload = map[string]interface{}{}
+		return nil, fmt.Errorf("update with no params") // This is caught in the caller.
 	}
 	procs := append(updatePreProcess, commonValidators...)
 	procs = append(procs, updateValidators...)
 
 	for _, test := range procs {
-		if err := test.testFun(&p.commonParams, test.fieldName, test.errorName); err != nil {
+		if err := test.testFun(&p.commonParams, test.fieldName); err != nil {
 			return nil, err
 		}
 	}
