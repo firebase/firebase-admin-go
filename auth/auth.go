@@ -22,10 +22,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
+	"google.golang.org/api/transport"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
@@ -108,8 +110,15 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-
-	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
+	var hc *http.Client
+	if ctx != nil && len(c.Opts) > 0 {
+		var err error
+		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+		if err != nil {
+			return nil, err
+		}
+	}
+	ks, err := newHTTPKeySource(ctx, googleCertURL, hc)
 	if err != nil {
 		return nil, err
 	}
