@@ -558,6 +558,16 @@ func TestUpdateRequest(t *testing.T) {
 	}
 }
 
+func TestBadServer(t *testing.T) {
+	s := badServer(t)
+	defer s.Close()
+	want := "http error status: 500; reason: {}"
+	_, err := s.Client.GetUser(context.Background(), "some uid")
+	if err == nil || err.Error() != want {
+		t.Errorf("got error: %v, want: `%v`", err, want)
+	}
+}
+
 //---------------------------------------
 
 // for pretty printing
@@ -663,6 +673,7 @@ func setListUsers() {
 	}
 }
 
+// for drilling down comparison.
 func testCompareUserRecords(testName string, u1, u2 *UserRecord, t *testing.T) {
 	tests := []struct {
 		name string
@@ -758,4 +769,25 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.srv.Close()
+}
+func badServer(t *testing.T) *mockAuthServer {
+	s := mockAuthServer{}
+	s.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.Req = append(s.Req, r)
+		w.WriteHeader(500)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	}))
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(s.srv.Client()),
+		},
+	}
+	authClient, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal()
+	}
+	authClient.url = s.srv.URL + "/"
+	s.Client = authClient
+	return &s
 }

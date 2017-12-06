@@ -124,7 +124,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	return &Client{
-		hc:        &internal.HTTPClient{Client: ks.HTTPClient},
+		hc:        &internal.HTTPClient{Client: hc},
 		ks:        ks,
 		projectID: c.ProjectID,
 		snr:       snr,

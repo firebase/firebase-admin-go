@@ -88,6 +88,7 @@ func TestHTTPKeySource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +104,7 @@ func TestHTTPKeySource(t *testing.T) {
 	}
 }
 
-func TestNewHTTPClientWithOptionClient(t *testing.T) {
+func TestNewHTTPClientAssignment(t *testing.T) {
 	hc, _ := newTestHTTPClient([]byte(""))
 	ctx := context.Background()
 	hcnew, _, err := transport.NewHTTPClient(ctx, option.WithHTTPClient(hc))
