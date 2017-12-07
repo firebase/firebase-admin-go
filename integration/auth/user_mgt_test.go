@@ -36,7 +36,7 @@ var testFixtures = struct {
 
 func TestUserManagement(t *testing.T) {
 	t.Run("add some users", createTestUsers)
-	t.Run("created users", createdUsers)
+	t.Run("created users", testCreatedAllUsers)
 	t.Run("get user", testGetUser)
 	t.Run("user iterator test", testUserIterator)
 	t.Run("paging iterator test", testPager)
@@ -55,7 +55,9 @@ func TestUserManagement(t *testing.T) {
 
 func createTestUsers(t *testing.T) {
 	for i := 0; i < 2; i++ {
-		u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i)))
+		u, err := client.CreateUser(context.Background(),
+			(&auth.UserToCreate{}).
+				UID(fmt.Sprintf("tempTestUserID-%d", i)))
 		if err != nil {
 			t.Fatal("failed to create user", i, err)
 		}
@@ -65,16 +67,17 @@ func createTestUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	testFixtures.sampleUserNil = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
-	u, err = client.CreateUser(context.Background(), nil)
+
+	u, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	uid := "tempUserId1234"
+
 	u, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}).
 		UID(uid).
 		Email(uid+"email@test.com").
@@ -87,7 +90,7 @@ func createTestUsers(t *testing.T) {
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 }
 
-func createdUsers(t *testing.T) {
+func testCreatedAllUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
 		_, err := client.GetUser(context.Background(), id)
 		if err != nil {

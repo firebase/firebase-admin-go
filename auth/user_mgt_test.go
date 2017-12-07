@@ -37,8 +37,8 @@ type mockAuthServer struct {
 	Header map[string]string
 	Status int
 	Req    []*http.Request
-	rbody  []byte
-	srv    *httptest.Server
+	Rbody  []byte
+	Srv    *httptest.Server
 	Client *Client
 }
 
@@ -142,8 +142,8 @@ func TestGetUserBy(t *testing.T) {
 
 	for _, test := range tests {
 		test.getfun(context.Background(), test.param)
-		if string(s.rbody) != test.want {
-			t.Errorf("%s [request body] =  %q; want: %q", test.name, s.rbody, test.want)
+		if string(s.Rbody) != test.want {
+			t.Errorf("%s [request body] =  %q; want: %q", test.name, s.Rbody, test.want)
 		}
 	}
 }
@@ -155,16 +155,16 @@ func TestCreateUserValidatorsFail(t *testing.T) {
 	}{
 		{
 			(&UserToCreate{}).Password("short"),
-			`Password must be a string at least 6 characters long`,
+			`password must be a string at least 6 characters long`,
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
 			"phoneNumber must be a non-empty string",
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
-			`invalid PhoneNumber "1234". Must be a valid, E.164 compliant identifier`,
+			`invalid phoneNumber "1234". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToCreate{}).PhoneNumber("+_!@#$"),
-			`invalid PhoneNumber "+_!@#$". Must be a valid, E.164 compliant identifier`,
+			`invalid phoneNumber "+_!@#$". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToCreate{}).UID(""),
 			`localId must be a non-empty string`,
@@ -182,16 +182,16 @@ func TestCreateUserValidatorsFail(t *testing.T) {
 			`email must be a non-empty string`,
 		}, {
 			(&UserToCreate{}).Email("a"),
-			`malformed Email string: "a"`,
+			`malformed email string: "a"`,
 		}, {
 			(&UserToCreate{}).Email("a@"),
-			`malformed Email string: "a@"`,
+			`malformed email string: "a@"`,
 		}, {
 			(&UserToCreate{}).Email("@a"),
-			`malformed Email string: "@a"`,
+			`malformed email string: "@a"`,
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
-			`malformed Email string: "a@a@a"`,
+			`malformed email string: "a@a@a"`,
 		},
 	}
 	for i, test := range badUserParams {
@@ -248,7 +248,7 @@ func TestUpdateParamsValidatorsFail(t *testing.T) {
 			"params must not be empty for update",
 		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
-			`invalid PhoneNumber "1". Must be a valid, E.164 compliant identifier`,
+			`invalid phoneNumber "1". Must be a valid, E.164 compliant identifier`,
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
 			fmt.Sprintf("stringified JSON of CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
@@ -474,8 +474,8 @@ func TestCreateRequest(t *testing.T) {
 		s := echoServer(nil, t) // the returned json is of no importance, we just need the request body.
 		defer s.Close()
 		s.Client.CreateUser(context.Background(), test.utc)
-		if string(s.rbody) != test.want {
-			t.Errorf("CreateUser() request body = %q; want: %q", s.rbody, test.want)
+		if string(s.Rbody) != test.want {
+			t.Errorf("CreateUser() request body = %q; want: %q", s.Rbody, test.want)
 		}
 	}
 }
@@ -536,7 +536,7 @@ func TestUpdateRequest(t *testing.T) {
 
 		s.Client.UpdateUser(context.Background(), "uid", test.utup)
 		var got, want map[string]interface{}
-		err := json.Unmarshal(s.rbody, &got)
+		err := json.Unmarshal(s.Rbody, &got)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -546,11 +546,11 @@ func TestUpdateRequest(t *testing.T) {
 		}
 		// Test params regqrdless of order
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("UpdateUser() request body = %q; want: %q", s.rbody, test.want)
+			t.Errorf("UpdateUser() request body = %q; want: %q", s.Rbody, test.want)
 		}
 		// json should have sorted keys.
-		if string(s.rbody) != test.want {
-			t.Errorf("UpdateUser() request body = %q; want: %q", s.rbody, test.want)
+		if string(s.Rbody) != test.want {
+			t.Errorf("UpdateUser() request body = %q; want: %q", s.Rbody, test.want)
 		}
 	}
 }
@@ -738,7 +738,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 			t.Fatal(err)
 		}
 		s.Req = append(s.Req, r)
-		s.rbody = reqBody
+		s.Rbody = reqBody
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}
@@ -749,27 +749,28 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		w.Write(s.Resp)
 
 	})
-	s.srv = httptest.NewServer(handler)
+	s.Srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithHTTPClient(s.srv.Client()),
+			option.WithHTTPClient(s.Srv.Client()),
 		},
 	}
 	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal()
 	}
-	authClient.url = s.srv.URL + "/"
+	authClient.url = s.Srv.URL + "/"
 	s.Client = authClient
 	return &s
 }
 
 func (s *mockAuthServer) Close() {
-	s.srv.Close()
+	s.Srv.Close()
 }
+
 func badServer(t *testing.T) *mockAuthServer {
 	s := mockAuthServer{}
-	s.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.Srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.Req = append(s.Req, r)
 		w.WriteHeader(500)
 		w.Header().Set("Content-Type", "application/json")
@@ -777,14 +778,14 @@ func badServer(t *testing.T) *mockAuthServer {
 	}))
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithHTTPClient(s.srv.Client()),
+			option.WithHTTPClient(s.Srv.Client()),
 		},
 	}
 	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal()
 	}
-	authClient.url = s.srv.URL + "/"
+	authClient.url = s.Srv.URL + "/"
 	s.Client = authClient
 	return &s
 }

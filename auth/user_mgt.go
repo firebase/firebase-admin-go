@@ -29,47 +29,22 @@ const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
 var (
-	updatePreProcess = []struct {
-		fieldName string
-		testFun   func(*commonParams, string) error
-	}{
-		{"displayName", processDeletion},
-		{"phoneNumber", processDeletion},
-		{"photoUrl", processDeletion},
-		{"customClaims", processClaims},
-	}
-	deletionSpecs = map[string]struct {
-		deleteListName  string
-		deleteFieldName string
-	}{
-		"displayName": {"deleteAttribute", "DISPLAY_NAME"},
-		"phoneNumber": {"deleteProvider", "phone"},
-		"photoUrl":    {"deleteAttribute", "PHOTO_URL"},
-	}
-
 	// Order matters only first error per field is reported.
 	commonValidators = []struct {
 		fieldName string
-		testFun   func(*commonParams, string) error
+		testFun   func(map[string]interface{}) error
 	}{
 		{"disableUser", validateTrue},
-		{"displayName", validateNonEmpty},
-		{"email", validateNonEmpty},
+		{"displayName", validateNonEmptyDisplayName},
+		{"email", validateNonEmptyEmail},
 		{"email", validateEmail},
 		{"emailVerified", validateTrue},
-		{"phoneNumber", validateNonEmpty},
+		{"phoneNumber", validateNonEmptyPhoneNumber},
 		{"phoneNumber", validatePhone},
 		{"password", validatePassword},
-		{"photoUrl", validateNonEmpty},
-		{"localId", validateNonEmpty},
+		{"photoUrl", validateNonEmptyPhotoURL},
+		{"localId", validateNonEmptyUID},
 		{"localId", validateUID},
-	}
-
-	updateValidators = []struct {
-		fieldName string
-		testFun   func(*commonParams, string) error
-	}{
-		{"customAttributes", validateCustomAttributes},
 	}
 )
 
@@ -318,28 +293,36 @@ func (p *commonParams) set(key string, value interface{}) {
 }
 
 // assumes that payloadName is a string field in p.payload
-func processDeletion(p *commonParams, payloadName string) error {
-	if dn, ok := p.payload[payloadName]; ok && len(dn.(string)) == 0 {
+func processDeletion(p map[string]interface{}, payloadName string) {
+	deletionSpecs := map[string]struct {
+		deleteListName  string
+		deleteFieldName string
+	}{
+		"displayName": {"deleteAttribute", "DISPLAY_NAME"},
+		"phoneNumber": {"deleteProvider", "phone"},
+		"photoUrl":    {"deleteAttribute", "PHOTO_URL"},
+	}
+
+	if dn, ok := p[payloadName]; ok && len(dn.(string)) == 0 {
 		delSpec := deletionSpecs[payloadName]
-		p.addToListParam(delSpec.deleteListName, delSpec.deleteFieldName)
-		delete(p.payload, payloadName)
+		addToListParam(p, delSpec.deleteListName, delSpec.deleteFieldName)
+		delete(p, payloadName)
 	}
-	return nil
 }
 
-func (p *commonParams) addToListParam(listname, param string) {
-	if _, ok := p.payload[listname]; ok {
-		p.payload[listname] = append(p.payload[listname].([]string), param)
+func addToListParam(p map[string]interface{}, listname, param string) {
+	if _, ok := p[listname]; ok {
+		p[listname] = append(p[listname].([]string), param)
 	} else {
-		p.set(listname, []string{param})
+		p[listname] = []string{param}
 	}
 }
 
-func processClaims(p *commonParams, payloadName string) error {
-	if _, ok := p.payload["customClaims"]; !ok {
+func processClaims(p map[string]interface{}) error {
+	if _, ok := p["customClaims"]; !ok {
 		return nil
 	}
-	cc := p.payload["customClaims"]
+	cc := p["customClaims"]
 	claims, ok := cc.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("CustomClaims(): unexpected type")
@@ -357,59 +340,10 @@ func processClaims(p *commonParams, payloadName string) error {
 	if s == "null" {
 		s = "{}"
 	}
-	p.payload["customAttributes"] = s
-	delete(p.payload, "customClaims")
-	return nil
-}
-
-// Validators.
-
-// No validation needed. Used for bool fields.
-func validateTrue(p *commonParams, _ string) error {
-	return nil
-}
-
-func validateNonEmpty(p *commonParams, fieldName string) error {
-	if val, ok := p.payload[fieldName]; ok {
-		if len(val.(string)) == 0 {
-			return fmt.Errorf("%s must be a non-empty string", fieldName)
-		}
-	}
-	return nil
-}
-
-func validateEmail(p *commonParams, fieldName string) error {
-	if val, ok := p.payload[fieldName]; ok {
-		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			return fmt.Errorf("malformed Email string: %q", val)
-		}
-	}
-	return nil
-}
-
-func validatePassword(p *commonParams, fieldName string) error {
-	wantLength := 6
-	if val, ok := p.payload[fieldName]; ok {
-		if len(val.(string)) < wantLength {
-			return fmt.Errorf("Password must be a string at least %d characters long", wantLength)
-		}
-	}
-	return nil
-}
-
-func validateUID(p *commonParams, fieldName string) error {
-	wantLength := 128
-	if val, ok := p.payload[fieldName]; ok {
-		if len(val.(string)) > wantLength {
-			return fmt.Errorf("localId must be a string at most %d characters long", wantLength)
-		}
-	}
-	return nil
-}
-
-func validateCustomAttributes(p *commonParams, fieldName string) error {
+	p["customAttributes"] = s
+	delete(p, "customClaims")
 	wantLength := maxLenPayloadCC
-	if val, ok := p.payload[fieldName]; ok {
+	if val, ok := p["customAttributes"]; ok {
 		if len(val.(string)) > wantLength {
 			return fmt.Errorf("stringified JSON of CustomClaims must be a string at most %d characters long", wantLength)
 		}
@@ -417,11 +351,75 @@ func validateCustomAttributes(p *commonParams, fieldName string) error {
 	return nil
 }
 
-func validatePhone(p *commonParams, fieldName string) error {
-	if val, ok := p.payload[fieldName]; ok {
+// Validators.
+
+// No validation needed. Used for bool fields.
+func validateTrue(p map[string]interface{}) error {
+	return nil
+}
+
+func validateNonEmptyDisplayName(p map[string]interface{}) error {
+	return validateNonEmpty(p, "displayName")
+}
+func validateNonEmptyEmail(p map[string]interface{}) error { return validateNonEmpty(p, "email") }
+func validateNonEmptyPhoneNumber(p map[string]interface{}) error {
+	return validateNonEmpty(p, "phoneNumber")
+}
+func validateNonEmptyPhotoURL(p map[string]interface{}) error { return validateNonEmpty(p, "photoUrl") }
+func validateNonEmptyUID(p map[string]interface{}) error      { return validateNonEmpty(p, "localId") }
+
+func validateNonEmpty(p map[string]interface{}, fieldName string) error {
+	if val, ok := p[fieldName]; ok {
+		if len(val.(string)) == 0 {
+			return fmt.Errorf("%s must be a non-empty string", fieldName)
+		}
+	}
+	return nil
+}
+
+func validateEmail(p map[string]interface{}) error {
+	fieldName := "email"
+	if val, ok := p[fieldName]; ok {
+		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+			return fmt.Errorf("malformed %s string: %q", fieldName, val)
+		}
+	}
+	return nil
+}
+
+func validatePassword(p map[string]interface{}) error {
+	wantLength := 6
+	fieldName := "password"
+	if val, ok := p[fieldName]; ok {
+		if len(val.(string)) < wantLength {
+			return fmt.Errorf("%s must be a string at least %d characters long", fieldName, wantLength)
+		}
+	}
+	return nil
+}
+
+func validateUID(p map[string]interface{}) error {
+	fieldName := "localId"
+	wantLength := 128
+	if val, ok := p[fieldName]; ok {
+		if len(val.(string)) > wantLength {
+			return fmt.Errorf("%s must be a string at most %d characters long", fieldName, wantLength)
+		}
+	}
+	return nil
+}
+
+/*
+func validateCustomAttributes(p map[string]interface{}) error {
+
+}
+*/
+func validatePhone(p map[string]interface{}) error {
+	fieldName := "phoneNumber"
+	if val, ok := p[fieldName]; ok {
 		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
 			return fmt.Errorf(
-				"invalid PhoneNumber %q. Must be a valid, E.164 compliant identifier", val)
+				"invalid %s %q. Must be a valid, E.164 compliant identifier", fieldName, val)
 		}
 	}
 	return nil
@@ -429,30 +427,41 @@ func validatePhone(p *commonParams, fieldName string) error {
 
 func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	if p.payload == nil {
-		p.payload = map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
-
+	params := map[string]interface{}{}
+	for k, v := range p.payload {
+		params[k] = v
+	}
 	for _, test := range commonValidators {
-		if err := test.testFun(&p.commonParams, test.fieldName); err != nil {
+		if err := test.testFun(params); err != nil {
 			return nil, err
 		}
 	}
-	return p.payload, nil
+	return params, nil
 }
 
 func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	if p.payload == nil {
-		return nil, fmt.Errorf("update with no params") // This is caught in the caller.
+		return nil, fmt.Errorf("update with no params") // This was caught in the caller not here.
 	}
-	procs := append(updatePreProcess, commonValidators...)
-	procs = append(procs, updateValidators...)
+	params := map[string]interface{}{}
+	for k, v := range p.payload {
+		params[k] = v
+	}
+	processDeletion(params, "displayName")
+	processDeletion(params, "phoneNumber")
+	processDeletion(params, "photoUrl")
+	if err := processClaims(params); err != nil {
+		return nil, err
+	}
 
-	for _, test := range procs {
-		if err := test.testFun(&p.commonParams, test.fieldName); err != nil {
+	for _, test := range commonValidators {
+		if err := test.testFun(params); err != nil {
 			return nil, err
 		}
 	}
-	return p.payload, nil
+	return params, nil
 }
 
 // End of validators
