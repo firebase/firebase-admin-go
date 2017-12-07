@@ -38,6 +38,8 @@ import (
 
 var client *Client
 var testIDToken string
+var testGetUserResponse []byte
+var testListUsersResponse []byte
 
 func TestMain(m *testing.M) {
 	var (
@@ -77,6 +79,16 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	client.ks = ks
+
+	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	testListUsersResponse, err = ioutil.ReadFile("../testdata/list_users.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())

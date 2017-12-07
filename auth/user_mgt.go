@@ -28,22 +28,14 @@ import (
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
-var (
-	// Order matters only first error per field is reported.
-	commonValidators = []struct {
-		fieldName string
-		apply     func(map[string]interface{}) error
-	}{
-		{"disableUser", validateTrue},
-		{"displayName", validateDisplayName},
-		{"email", validateEmail},
-		{"emailVerified", validateTrue},
-		{"phoneNumber", validatePhone},
-		{"password", validatePassword},
-		{"photoUrl", validatePhotoURL},
-		{"localId", validateUID},
-	}
-)
+var commonValidators = map[string]func(interface{}) error{
+	"displayName": validateDisplayName,
+	"email":       validateEmail,
+	"phoneNumber": validatePhone,
+	"password":    validatePassword,
+	"photoUrl":    validatePhotoURL,
+	"localId":     validateUID,
+}
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
@@ -91,17 +83,20 @@ type UserIterator struct {
 	users    []*ExportedUserRecord
 }
 
-type commonParams struct {
-	payload map[string]interface{}
-}
-
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
-	commonParams
+	params map[string]interface{}
+}
+
+func (u *UserToCreate) set(key string, value interface{}) {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 }
 
 // Disabled setter.
-func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disableUser", d); return u }
+func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disabled", d); return u }
 
 // DisplayName setter.
 func (u *UserToCreate) DisplayName(dn string) *UserToCreate { u.set("displayName", dn); return u }
@@ -126,7 +121,14 @@ func (u *UserToCreate) UID(uid string) *UserToCreate { u.set("localId", uid); re
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
-	commonParams
+	params map[string]interface{}
+}
+
+func (u *UserToUpdate) set(key string, value interface{}) {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 }
 
 // CustomClaims setter.
@@ -157,36 +159,29 @@ func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNum
 func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
 
 // CreateUser creates a new user with the specified properties.
-func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRecord, error) {
-	if params == nil {
-		params = &UserToCreate{}
-	}
-
-	payload, err := params.preparePayload()
+func (c *Client) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
+	uid, err := c.createUser(ctx, user)
 	if err != nil {
 		return nil, err
 	}
-	return c.createOrUpdateUser(ctx, "signupNewUser", payload)
+	return c.GetUser(ctx, uid)
 }
 
 // UpdateUser updates an existing user account with the specified properties.
 //
 // DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record.
-func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdate) (ur *UserRecord, err error) {
-	if params == nil || params.payload == nil {
-		return nil, fmt.Errorf("params must not be empty for update")
-	}
-	params.payload["localId"] = uid
-
-	payload, err := params.preparePayload()
-	if err != nil {
+func (c *Client) UpdateUser(ctx context.Context, uid string, user *UserToUpdate) (ur *UserRecord, err error) {
+	if err := c.updateUser(ctx, uid, user); err != nil {
 		return nil, err
 	}
-	return c.createOrUpdateUser(ctx, "setAccountInfo", payload)
+	return c.GetUser(ctx, uid)
 }
 
 // DeleteUser deletes the user by the given UID.
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
+	if err := validateUID(uid); err != nil {
+		return err
+	}
 	var resp map[string]interface{}
 	deleteParams := map[string]interface{}{"localId": []string{uid}}
 	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &resp)
@@ -194,16 +189,25 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	if err := validateUID(uid); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
 }
 
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
 func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+	if err := validatePhone(phone); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
 }
 
 // GetUserByEmail gets the user data corresponding to the specified email.
 func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
 }
 
@@ -275,18 +279,7 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 	if customClaims == nil || len(customClaims) == 0 {
 		customClaims = map[string]interface{}{}
 	}
-	_, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
-	return err
-}
-
-// ------------------------------------------------------------
-// Utilities for Create and Update input structs.
-
-func (p *commonParams) set(key string, value interface{}) {
-	if p.payload == nil {
-		p.payload = make(map[string]interface{})
-	}
-	p.payload[key] = value
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 }
 
 func processDeletion(p map[string]interface{}, field, listKey, listVal string) {
@@ -316,7 +309,7 @@ func processClaims(p map[string]interface{}) error {
 	}
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
-			return fmt.Errorf("CustomClaims(%q: ...): claim %q is reserved, and must not be set", key, key)
+			return fmt.Errorf("claim %q is reserved and must not be set", key)
 		}
 	}
 
@@ -339,32 +332,21 @@ func processClaims(p map[string]interface{}) error {
 
 // Validators.
 
-// No validation needed. Used for bool fields.
-func validateTrue(p map[string]interface{}) error {
-	return nil
-}
-
-func validateDisplayName(p map[string]interface{}) error {
-	val, ok := p["displayName"]
-	if ok && len(val.(string)) == 0 {
+func validateDisplayName(val interface{}) error {
+	if len(val.(string)) == 0 {
 		return fmt.Errorf("display name must be a non-empty string")
 	}
 	return nil
 }
 
-func validatePhotoURL(p map[string]interface{}) error {
-	val, ok := p["photoUrl"]
-	if ok && len(val.(string)) == 0 {
+func validatePhotoURL(val interface{}) error {
+	if len(val.(string)) == 0 {
 		return fmt.Errorf("photo url must be a non-empty string")
 	}
 	return nil
 }
 
-func validateEmail(p map[string]interface{}) error {
-	val, ok := p["email"]
-	if !ok {
-		return nil
-	}
+func validateEmail(val interface{}) error {
 	email := val.(string)
 	if email == "" {
 		return fmt.Errorf("email must not be empty")
@@ -375,34 +357,25 @@ func validateEmail(p map[string]interface{}) error {
 	return nil
 }
 
-func validatePassword(p map[string]interface{}) error {
-	val, ok := p["password"]
-	if ok && len(val.(string)) < 6 {
+func validatePassword(val interface{}) error {
+	if len(val.(string)) < 6 {
 		return fmt.Errorf("password must be a string at least 6 characters long")
 	}
 	return nil
 }
 
-func validateUID(p map[string]interface{}) error {
-	val, ok := p["localId"]
-	if !ok {
-		return nil
-	}
+func validateUID(val interface{}) error {
 	uid := val.(string)
 	if uid == "" {
 		return fmt.Errorf("uid must not be empty")
 	}
 	if len(val.(string)) > 128 {
-		return fmt.Errorf("uid must be a string at most 128 characters long")
+		return fmt.Errorf("uid string must not be longer than 128 characters")
 	}
 	return nil
 }
 
-func validatePhone(p map[string]interface{}) error {
-	val, ok := p["phoneNumber"]
-	if !ok {
-		return nil
-	}
+func validatePhone(val interface{}) error {
 	phone := val.(string)
 	if phone == "" {
 		return fmt.Errorf("phone number must not be empty")
@@ -415,16 +388,18 @@ func validatePhone(p map[string]interface{}) error {
 
 func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	params := map[string]interface{}{}
-	if u.payload == nil {
+	if u.params == nil {
 		return params, nil
 	}
 
-	for k, v := range u.payload {
+	for k, v := range u.params {
 		params[k] = v
 	}
-	for _, validator := range commonValidators {
-		if err := validator.apply(params); err != nil {
-			return nil, err
+	for key, validate := range commonValidators {
+		if v, ok := params[key]; ok {
+			if err := validate(v); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return params, nil
@@ -432,11 +407,7 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 
 func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	params := map[string]interface{}{}
-	if u.payload == nil {
-		return params, nil
-	}
-
-	for k, v := range u.payload {
+	for k, v := range u.params {
 		params[k] = v
 	}
 	processDeletion(params, "displayName", "deleteAttribute", "DISPLAY_NAME")
@@ -447,9 +418,11 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	for _, validator := range commonValidators {
-		if err := validator.apply(params); err != nil {
-			return nil, err
+	for key, validate := range commonValidators {
+		if v, ok := params[key]; ok {
+			if err := validate(v); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return params, nil
@@ -457,7 +430,7 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 
 // End of validators
 
-// Respose Types -------------------------------
+// Response Types -------------------------------
 
 type getUserResponse struct {
 	RequestType string               `json:"kind,omitempty"`
@@ -490,6 +463,40 @@ type listUsersResponse struct {
 
 // Helper functions for retrieval and HTTP calls.
 
+func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, error) {
+	if user == nil {
+		user = &UserToCreate{}
+	}
+
+	payload, err := user.preparePayload()
+	if err != nil {
+		return "", err
+	}
+	var rur responseUserRecord
+	if err := c.makeHTTPCall(ctx, "signupNewUser", payload, &rur); err != nil {
+		return "", err
+	}
+	return rur.UID, nil
+}
+
+func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
+	if err := validateUID(uid); err != nil {
+		return err
+	}
+	if user == nil || user.params == nil {
+		return fmt.Errorf("update parameters must not be nil or empty")
+	}
+	user.params["localId"] = uid
+
+	payload, err := user.preparePayload()
+	if err != nil {
+		return err
+	}
+
+	var rur responseUserRecord
+	return c.makeHTTPCall(ctx, "setAccountInfo", payload, &rur)
+}
+
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
 	var gur getUserResponse
 	err := c.makeHTTPCall(ctx, "getAccountInfo", params, &gur)
@@ -499,20 +506,11 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 	if len(gur.Users) == 0 {
 		return nil, fmt.Errorf("cannot find user from params: %v", params)
 	}
-	if l := len(gur.Users); l > 1 {
-		return nil, fmt.Errorf("getUser(%v) = %d users; want = 1 user, ", params, l)
-	}
 	eu, err := makeExportedUser(gur.Users[0])
-	return eu.UserRecord, err
-}
-
-func (c *Client) createOrUpdateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
-	var rur responseUserRecord
-	err := c.makeHTTPCall(ctx, action, params, &rur)
 	if err != nil {
 		return nil, err
 	}
-	return c.GetUser(ctx, rur.UID)
+	return eu.UserRecord, nil
 }
 
 func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {
