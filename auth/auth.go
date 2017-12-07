@@ -22,7 +22,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
@@ -110,15 +109,11 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	var hc *http.Client
-	if ctx != nil && len(c.Opts) > 0 {
-		var err error
-		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
-		if err != nil {
-			return nil, err
-		}
+	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	if err != nil {
+		return nil, err
 	}
-	ks, err := newHTTPKeySource(ctx, googleCertURL, hc)
+	ks, err := newHTTPKeySource(googleCertURL, hc)
 	if err != nil {
 		return nil, err
 	}

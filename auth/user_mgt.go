@@ -104,28 +104,28 @@ type UserToCreate struct {
 }
 
 // Disabled setter.
-func (p *UserToCreate) Disabled(d bool) *UserToCreate { p.set("disableUser", d); return p }
+func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disableUser", d); return u }
 
 // DisplayName setter.
-func (p *UserToCreate) DisplayName(dn string) *UserToCreate { p.set("displayName", dn); return p }
+func (u *UserToCreate) DisplayName(dn string) *UserToCreate { u.set("displayName", dn); return u }
 
 // Email setter.
-func (p *UserToCreate) Email(e string) *UserToCreate { p.set("email", e); return p }
+func (u *UserToCreate) Email(e string) *UserToCreate { u.set("email", e); return u }
 
 // EmailVerified setter.
-func (p *UserToCreate) EmailVerified(ev bool) *UserToCreate { p.set("emailVerified", ev); return p }
+func (u *UserToCreate) EmailVerified(ev bool) *UserToCreate { u.set("emailVerified", ev); return u }
 
 // Password setter.
-func (p *UserToCreate) Password(pw string) *UserToCreate { p.set("password", pw); return p }
+func (u *UserToCreate) Password(pw string) *UserToCreate { u.set("password", pw); return u }
 
 // PhoneNumber setter.
-func (p *UserToCreate) PhoneNumber(phone string) *UserToCreate { p.set("phoneNumber", phone); return p }
+func (u *UserToCreate) PhoneNumber(phone string) *UserToCreate { u.set("phoneNumber", phone); return u }
 
 // PhotoURL setter.
-func (p *UserToCreate) PhotoURL(url string) *UserToCreate { p.set("photoUrl", url); return p }
+func (u *UserToCreate) PhotoURL(url string) *UserToCreate { u.set("photoUrl", url); return u }
 
 // UID setter.
-func (p *UserToCreate) UID(uid string) *UserToCreate { p.set("localId", uid); return p }
+func (u *UserToCreate) UID(uid string) *UserToCreate { u.set("localId", uid); return u }
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
@@ -133,31 +133,31 @@ type UserToUpdate struct {
 }
 
 // CustomClaims setter.
-func (p *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
-	p.set("customClaims", cc)
-	return p
+func (u *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
+	u.set("customClaims", cc)
+	return u
 }
 
 // Disabled setter.
-func (p *UserToUpdate) Disabled(d bool) *UserToUpdate { p.set("disableUser", d); return p }
+func (u *UserToUpdate) Disabled(d bool) *UserToUpdate { u.set("disableUser", d); return u }
 
 // DisplayName setter.
-func (p *UserToUpdate) DisplayName(dn string) *UserToUpdate { p.set("displayName", dn); return p }
+func (u *UserToUpdate) DisplayName(dn string) *UserToUpdate { u.set("displayName", dn); return u }
 
 // Email setter.
-func (p *UserToUpdate) Email(e string) *UserToUpdate { p.set("email", e); return p }
+func (u *UserToUpdate) Email(e string) *UserToUpdate { u.set("email", e); return u }
 
 // EmailVerified setter.
-func (p *UserToUpdate) EmailVerified(ev bool) *UserToUpdate { p.set("emailVerified", ev); return p }
+func (u *UserToUpdate) EmailVerified(ev bool) *UserToUpdate { u.set("emailVerified", ev); return u }
 
 // Password setter.
-func (p *UserToUpdate) Password(pw string) *UserToUpdate { p.set("password", pw); return p }
+func (u *UserToUpdate) Password(pw string) *UserToUpdate { u.set("password", pw); return u }
 
 // PhoneNumber setter.
-func (p *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { p.set("phoneNumber", phone); return p }
+func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNumber", phone); return u }
 
 // PhotoURL setter.
-func (p *UserToUpdate) PhotoURL(url string) *UserToUpdate { p.set("photoUrl", url); return p }
+func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
 
 // CreateUser creates a new user with the specified properties.
 func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRecord, error) {
@@ -190,9 +190,9 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdat
 
 // DeleteUser deletes the user by the given UID.
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
-	var gur getUserResponse
+	var resp map[string]interface{}
 	deleteParams := map[string]interface{}{"localId": []string{uid}}
-	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &gur)
+	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &resp)
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -212,9 +212,9 @@ func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord,
 
 // Users returns an iterator over Users.
 //
-// If startToken is empty, the iterator will start at the beginning.
-// If the startToken is not empty, the iterator starts after the token.
-func (c *Client) Users(ctx context.Context, startToken string) *UserIterator {
+// If nextPageToken is empty, the iterator will start at the beginning.
+// If the nextPageToken is not empty, the iterator starts after the token.
+func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator {
 	it := &UserIterator{
 		ctx:    ctx,
 		client: c,
@@ -224,7 +224,7 @@ func (c *Client) Users(ctx context.Context, startToken string) *UserIterator {
 		func() int { return len(it.users) },
 		func() interface{} { b := it.users; it.users = nil; return b })
 	it.pageInfo.MaxSize = maxReturnedResults
-	it.pageInfo.Token = startToken
+	it.pageInfo.Token = nextPageToken
 	return it
 }
 
@@ -425,12 +425,12 @@ func validatePhone(p map[string]interface{}) error {
 	return nil
 }
 
-func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
-	if p.payload == nil {
+func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
+	if u.payload == nil {
 		return map[string]interface{}{}, nil
 	}
 	params := map[string]interface{}{}
-	for k, v := range p.payload {
+	for k, v := range u.payload {
 		params[k] = v
 	}
 	for _, test := range commonValidators {
@@ -441,12 +441,12 @@ func (p *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	return params, nil
 }
 
-func (p *UserToUpdate) preparePayload() (map[string]interface{}, error) {
-	if p.payload == nil {
+func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
+	if u.payload == nil {
 		return nil, fmt.Errorf("update with no params") // This was caught in the caller not here.
 	}
 	params := map[string]interface{}{}
-	for k, v := range p.payload {
+	for k, v := range u.payload {
 		params[k] = v
 	}
 	processDeletion(params, "displayName")
