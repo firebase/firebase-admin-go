@@ -409,11 +409,6 @@ func validateUID(p map[string]interface{}) error {
 	return nil
 }
 
-/*
-func validateCustomAttributes(p map[string]interface{}) error {
-
-}
-*/
 func validatePhone(p map[string]interface{}) error {
 	fieldName := "phoneNumber"
 	if val, ok := p[fieldName]; ok {
