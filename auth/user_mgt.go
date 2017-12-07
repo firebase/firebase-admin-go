@@ -32,18 +32,15 @@ var (
 	// Order matters only first error per field is reported.
 	commonValidators = []struct {
 		fieldName string
-		testFun   func(map[string]interface{}) error
+		apply     func(map[string]interface{}) error
 	}{
 		{"disableUser", validateTrue},
-		{"displayName", validateNonEmptyDisplayName},
-		{"email", validateNonEmptyEmail},
+		{"displayName", validateDisplayName},
 		{"email", validateEmail},
 		{"emailVerified", validateTrue},
-		{"phoneNumber", validateNonEmptyPhoneNumber},
 		{"phoneNumber", validatePhone},
 		{"password", validatePassword},
-		{"photoUrl", validateNonEmptyPhotoURL},
-		{"localId", validateNonEmptyUID},
+		{"photoUrl", validatePhotoURL},
 		{"localId", validateUID},
 	}
 )
@@ -292,21 +289,10 @@ func (p *commonParams) set(key string, value interface{}) {
 	p.payload[key] = value
 }
 
-// assumes that payloadName is a string field in p.payload
-func processDeletion(p map[string]interface{}, payloadName string) {
-	deletionSpecs := map[string]struct {
-		deleteListName  string
-		deleteFieldName string
-	}{
-		"displayName": {"deleteAttribute", "DISPLAY_NAME"},
-		"phoneNumber": {"deleteProvider", "phone"},
-		"photoUrl":    {"deleteAttribute", "PHOTO_URL"},
-	}
-
-	if dn, ok := p[payloadName]; ok && len(dn.(string)) == 0 {
-		delSpec := deletionSpecs[payloadName]
-		addToListParam(p, delSpec.deleteListName, delSpec.deleteFieldName)
-		delete(p, payloadName)
+func processDeletion(p map[string]interface{}, field, listKey, listVal string) {
+	if dn, ok := p[field]; ok && len(dn.(string)) == 0 {
+		addToListParam(p, listKey, listVal)
+		delete(p, field)
 	}
 }
 
@@ -319,35 +305,35 @@ func addToListParam(p map[string]interface{}, listname, param string) {
 }
 
 func processClaims(p map[string]interface{}) error {
-	if _, ok := p["customClaims"]; !ok {
+	cc, ok := p["customClaims"]
+	if !ok {
 		return nil
 	}
-	cc := p["customClaims"]
+
 	claims, ok := cc.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("CustomClaims(): unexpected type")
+		return fmt.Errorf("unexpected type for custom claims")
 	}
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
 			return fmt.Errorf("CustomClaims(%q: ...): claim %q is reserved, and must not be set", key, key)
 		}
 	}
+
 	b, err := json.Marshal(claims)
 	if err != nil {
-		return fmt.Errorf("CustomClaims() Marshaling error: %v", err)
+		return fmt.Errorf("custom claims marshaling error: %v", err)
 	}
 	s := string(b)
 	if s == "null" {
 		s = "{}"
 	}
+	if len(s) > maxLenPayloadCC {
+		return fmt.Errorf("serialized custom claims must not exceed %d characters", maxLenPayloadCC)
+	}
+
 	p["customAttributes"] = s
 	delete(p, "customClaims")
-	wantLength := maxLenPayloadCC
-	if val, ok := p["customAttributes"]; ok {
-		if len(val.(string)) > wantLength {
-			return fmt.Errorf("stringified JSON of CustomClaims must be a string at most %d characters long", wantLength)
-		}
-	}
 	return nil
 }
 
@@ -358,78 +344,86 @@ func validateTrue(p map[string]interface{}) error {
 	return nil
 }
 
-func validateNonEmptyDisplayName(p map[string]interface{}) error {
-	return validateNonEmpty(p, "displayName")
+func validateDisplayName(p map[string]interface{}) error {
+	val, ok := p["displayName"]
+	if ok && len(val.(string)) == 0 {
+		return fmt.Errorf("display name must be a non-empty string")
+	}
+	return nil
 }
-func validateNonEmptyEmail(p map[string]interface{}) error { return validateNonEmpty(p, "email") }
-func validateNonEmptyPhoneNumber(p map[string]interface{}) error {
-	return validateNonEmpty(p, "phoneNumber")
-}
-func validateNonEmptyPhotoURL(p map[string]interface{}) error { return validateNonEmpty(p, "photoUrl") }
-func validateNonEmptyUID(p map[string]interface{}) error      { return validateNonEmpty(p, "localId") }
 
-func validateNonEmpty(p map[string]interface{}, fieldName string) error {
-	if val, ok := p[fieldName]; ok {
-		if len(val.(string)) == 0 {
-			return fmt.Errorf("%s must be a non-empty string", fieldName)
-		}
+func validatePhotoURL(p map[string]interface{}) error {
+	val, ok := p["photoUrl"]
+	if ok && len(val.(string)) == 0 {
+		return fmt.Errorf("photo url must be a non-empty string")
 	}
 	return nil
 }
 
 func validateEmail(p map[string]interface{}) error {
-	fieldName := "email"
-	if val, ok := p[fieldName]; ok {
-		if parts := strings.Split(val.(string), "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			return fmt.Errorf("malformed %s string: %q", fieldName, val)
-		}
+	val, ok := p["email"]
+	if !ok {
+		return nil
+	}
+	email := val.(string)
+	if email == "" {
+		return fmt.Errorf("email must not be empty")
+	}
+	if parts := strings.Split(email, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return fmt.Errorf("malformed email string: %q", email)
 	}
 	return nil
 }
 
 func validatePassword(p map[string]interface{}) error {
-	wantLength := 6
-	fieldName := "password"
-	if val, ok := p[fieldName]; ok {
-		if len(val.(string)) < wantLength {
-			return fmt.Errorf("%s must be a string at least %d characters long", fieldName, wantLength)
-		}
+	val, ok := p["password"]
+	if ok && len(val.(string)) < 6 {
+		return fmt.Errorf("password must be a string at least 6 characters long")
 	}
 	return nil
 }
 
 func validateUID(p map[string]interface{}) error {
-	fieldName := "localId"
-	wantLength := 128
-	if val, ok := p[fieldName]; ok {
-		if len(val.(string)) > wantLength {
-			return fmt.Errorf("%s must be a string at most %d characters long", fieldName, wantLength)
-		}
+	val, ok := p["localId"]
+	if !ok {
+		return nil
+	}
+	uid := val.(string)
+	if uid == "" {
+		return fmt.Errorf("uid must not be empty")
+	}
+	if len(val.(string)) > 128 {
+		return fmt.Errorf("uid must be a string at most 128 characters long")
 	}
 	return nil
 }
 
 func validatePhone(p map[string]interface{}) error {
-	fieldName := "phoneNumber"
-	if val, ok := p[fieldName]; ok {
-		if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(val.(string)) {
-			return fmt.Errorf(
-				"invalid %s %q. Must be a valid, E.164 compliant identifier", fieldName, val)
-		}
+	val, ok := p["phoneNumber"]
+	if !ok {
+		return nil
+	}
+	phone := val.(string)
+	if phone == "" {
+		return fmt.Errorf("phone number must not be empty")
+	}
+	if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
+		return fmt.Errorf("phone number must be a valid, E.164 compliant identifier")
 	}
 	return nil
 }
 
 func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
-	if u.payload == nil {
-		return map[string]interface{}{}, nil
-	}
 	params := map[string]interface{}{}
+	if u.payload == nil {
+		return params, nil
+	}
+
 	for k, v := range u.payload {
 		params[k] = v
 	}
-	for _, test := range commonValidators {
-		if err := test.testFun(params); err != nil {
+	for _, validator := range commonValidators {
+		if err := validator.apply(params); err != nil {
 			return nil, err
 		}
 	}
@@ -437,22 +431,24 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 }
 
 func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
-	if u.payload == nil {
-		return nil, fmt.Errorf("update with no params") // This was caught in the caller not here.
-	}
 	params := map[string]interface{}{}
+	if u.payload == nil {
+		return params, nil
+	}
+
 	for k, v := range u.payload {
 		params[k] = v
 	}
-	processDeletion(params, "displayName")
-	processDeletion(params, "phoneNumber")
-	processDeletion(params, "photoUrl")
+	processDeletion(params, "displayName", "deleteAttribute", "DISPLAY_NAME")
+	processDeletion(params, "photoUrl", "deleteAttribute", "PHOTO_URL")
+	processDeletion(params, "phoneNumber", "deleteProvider", "phone")
+
 	if err := processClaims(params); err != nil {
 		return nil, err
 	}
 
-	for _, test := range commonValidators {
-		if err := test.testFun(params); err != nil {
+	for _, validator := range commonValidators {
+		if err := validator.apply(params); err != nil {
 			return nil, err
 		}
 	}
@@ -501,10 +497,10 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 		return nil, err
 	}
 	if len(gur.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user %v", params)
+		return nil, fmt.Errorf("cannot find user from params: %v", params)
 	}
 	if l := len(gur.Users); l > 1 {
-		return nil, fmt.Errorf("getUser(%v) got %d users; want: one user, ", params, l)
+		return nil, fmt.Errorf("getUser(%v) = %d users; want = 1 user, ", params, l)
 	}
 	eu, err := makeExportedUser(gur.Users[0])
 	return eu.UserRecord, err

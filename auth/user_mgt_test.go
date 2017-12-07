@@ -29,7 +29,6 @@ import (
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 type mockAuthServer struct {
@@ -81,8 +80,7 @@ func TestGetUser(t *testing.T) {
 		CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	}
 	if !reflect.DeepEqual(user, want) {
-		t.Errorf("GetUser(UID) = %#v, want: %#v", user, want)
-		testCompareUserRecords("GetUser(UID)", user, want, t)
+		t.Errorf("GetUser() = %#v; want = %#v", user, want)
 	}
 }
 
@@ -155,31 +153,31 @@ func TestCreateUserValidatorsFail(t *testing.T) {
 	}{
 		{
 			(&UserToCreate{}).Password("short"),
-			`password must be a string at least 6 characters long`,
+			"password must be a string at least 6 characters long",
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
-			"phoneNumber must be a non-empty string",
+			"phone number must not be empty",
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
-			`invalid phoneNumber "1234". Must be a valid, E.164 compliant identifier`,
+			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToCreate{}).PhoneNumber("+_!@#$"),
-			`invalid phoneNumber "+_!@#$". Must be a valid, E.164 compliant identifier`,
+			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToCreate{}).UID(""),
-			`localId must be a non-empty string`,
+			"uid must not be empty",
 		}, {
 			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
-			"localId must be a string at most 128 characters long",
+			"uid must be a string at most 128 characters long",
 		}, {
 			(&UserToCreate{}).DisplayName(""),
-			`displayName must be a non-empty string`,
+			"display name must be a non-empty string",
 		}, {
 			(&UserToCreate{}).PhotoURL(""),
-			"photoUrl must be a non-empty string",
+			"photo url must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email(""),
-			`email must be a non-empty string`,
+			"email must not be empty",
 		}, {
 			(&UserToCreate{}).Email("a"),
 			`malformed email string: "a"`,
@@ -229,7 +227,7 @@ func TestCreateUserValidatorsPass(t *testing.T) {
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
 		// with the following expected error
-		if err.Error() != "cannot find user map[localId:[expectedUserID]]" {
+		if err.Error() != "cannot find user from params: map[localId:[expectedUserID]]" {
 			t.Error(err)
 		}
 	}
@@ -248,10 +246,10 @@ func TestUpdateParamsValidatorsFail(t *testing.T) {
 			"params must not be empty for update",
 		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
-			`invalid phoneNumber "1". Must be a valid, E.164 compliant identifier`,
+			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
-			fmt.Sprintf("stringified JSON of CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
+			"serialized custom claims must not exceed 1000 characters",
 		},
 	}
 
@@ -310,7 +308,7 @@ func TestUpdateUserValidatorsPass(t *testing.T) {
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
 		// with the following expected error
-		if err.Error() != "cannot find user map[localId:[expectedUserID]]" {
+		if err.Error() != "cannot find user from params: map[localId:[expectedUserID]]" {
 			t.Error(err)
 		}
 	}
@@ -322,7 +320,7 @@ func TestBadSetCustomClaims(t *testing.T) {
 		want string
 	}{{
 		map[string]interface{}{"a": strings.Repeat("a", 993)},
-		fmt.Sprintf("stringified JSON of CustomClaims must be a string at most %d characters long", maxLenPayloadCC),
+		"serialized custom claims must not exceed 1000 characters",
 	}}
 
 	for _, res := range reservedClaims {
@@ -750,12 +748,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	})
 	s.Srv = httptest.NewServer(handler)
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithHTTPClient(s.Srv.Client()),
-		},
-	}
-	authClient, err := NewClient(context.Background(), conf)
+	authClient, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal()
 	}
@@ -776,12 +769,7 @@ func badServer(t *testing.T) *mockAuthServer {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	}))
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithHTTPClient(s.Srv.Client()),
-		},
-	}
-	authClient, err := NewClient(context.Background(), conf)
+	authClient, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal()
 	}
