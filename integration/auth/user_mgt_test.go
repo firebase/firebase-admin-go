@@ -30,59 +30,49 @@ import (
 var testFixtures = struct {
 	uidList            []string
 	sampleUserBlank    *auth.UserRecord
-	sampleUserNil      *auth.UserRecord
 	sampleUserWithData *auth.UserRecord
 }{}
 
 func TestUserManagement(t *testing.T) {
-	t.Run("add some users", createTestUsers)
-	t.Run("created users", testCreatedAllUsers)
-	t.Run("get user", testGetUser)
-	t.Run("user iterator test", testUserIterator)
-	t.Run("paging iterator test", testPager)
-	t.Run("disable", testDisableUser)
-
-	t.Run("update user", testUpdateUser)
-	t.Run("disable", testDisableUser)
-
-	t.Run("remove PhoneNumber, PhotoURL and DisplaName", testRemovePhonePhotoName)
-
+	t.Run("Create test users", testCreateUsers)
+	t.Run("Get user", testGetUser)
+	t.Run("Iterate users", testUserIterator)
+	t.Run("Paged iteration", testPager)
+	t.Run("Disable user account", testDisableUser)
+	t.Run("Update user", testUpdateUser)
+	t.Run("Remove user attributes", testRemovePhonePhotoName)
 	t.Run("Remove custom claims", testRemoveCustomClaims)
-	t.Run("add custom claims", testAddCustomClaims)
-
-	t.Run("delete all users", cleanupUsers)
+	t.Run("Add custom claims", testAddCustomClaims)
+	t.Run("Delete test users", testDeleteUsers)
 }
 
-func createTestUsers(t *testing.T) {
+func testCreateUsers(t *testing.T) {
+	// Create users with uid
 	for i := 0; i < 2; i++ {
-		u, err := client.CreateUser(context.Background(),
-			(&auth.UserToCreate{}).
-				UID(fmt.Sprintf("tempTestUserID-%d", i)))
+		params := (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i))
+		u, err := client.CreateUser(context.Background(), params)
 		if err != nil {
 			t.Fatal("failed to create user", i, err)
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-	u, err := client.CreateUser(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testFixtures.sampleUserNil = u
-	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 
-	u, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}))
+	// Create user with no parameters (zero-value)
+	u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
-	uid := "tempUserId1234"
 
-	u, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}).
+	// Create user with parameters
+	uid := "tempUserId1234"
+	params := (&auth.UserToCreate{}).
 		UID(uid).
-		Email(uid+"email@test.com").
+		Email(uid + "email@test.com").
 		DisplayName("display_name").
-		Password("passawd"))
+		Password("password")
+	u, err = client.CreateUser(context.Background(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,62 +80,43 @@ func createTestUsers(t *testing.T) {
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 }
 
-func testCreatedAllUsers(t *testing.T) {
-	for _, id := range testFixtures.uidList {
-		_, err := client.GetUser(context.Background(), id)
-		if err != nil {
-			t.Errorf("GetUser(%q) user not found. %s", id, err)
-		}
-	}
-}
-
 func testGetUser(t *testing.T) {
-	u, err := client.GetUser(context.Background(), testFixtures.sampleUserWithData.UID)
+	want := testFixtures.sampleUserWithData
+	u, err := client.GetUser(context.Background(), want.UID)
 	if err != nil {
 		t.Fatalf("error getting user %s", err)
 	}
-	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
-		t.Errorf("GetUser() = %#v; want: %#v", testFixtures.sampleUserWithData, u.UserInfo)
-	}
-	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
-		t.Errorf("GetUser(UID) = %#v; want: %#v", u, testFixtures.sampleUserWithData)
+	if !reflect.DeepEqual(u, want) {
+		t.Errorf("GetUser(UID) = %#v; want = %#v", u, want)
 	}
 }
 
 func testGetUserByPhoneNumber(t *testing.T) {
-	u, err := client.GetUserByPhoneNumber(context.Background(), testFixtures.sampleUserWithData.PhoneNumber)
+	want := testFixtures.sampleUserWithData
+	u, err := client.GetUserByPhoneNumber(context.Background(), want.PhoneNumber)
 	if err != nil {
 		t.Fatalf("error getting user %s", err)
 	}
-	if u.UID != testFixtures.sampleUserWithData.UID || u.PhoneNumber != testFixtures.sampleUserWithData.PhoneNumber {
-		t.Errorf("GetUserByPhoneNumber(%q) = %#v; want: %#v",
-			testFixtures.sampleUserWithData.PhoneNumber, u, testFixtures.sampleUserWithData)
-	}
-	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
-		t.Errorf("GetUserByPhoneNumber(%q) = %#v; want: %#v",
-			testFixtures.sampleUserWithData.PhoneNumber, u, testFixtures.sampleUserWithData)
+	if !reflect.DeepEqual(u, want) {
+		t.Errorf("GetUserByPhoneNumber(%q) = %#v; want = %#v", want.PhoneNumber, u, want)
 	}
 }
 
 func testGetUserByEmail(t *testing.T) {
-	u, err := client.GetUserByEmail(context.Background(), testFixtures.sampleUserWithData.Email)
+	want := testFixtures.sampleUserWithData
+	u, err := client.GetUserByEmail(context.Background(), want.Email)
 	if err != nil {
 		t.Fatalf("error getting user %s", err)
 	}
-	if u.UID != testFixtures.sampleUserWithData.UID || u.Email != testFixtures.sampleUserWithData.Email {
-		t.Errorf("GetUserByEmail(%q) = %#v; want: %#v",
-			testFixtures.sampleUserWithData.Email, u, testFixtures.sampleUserWithData)
-	}
-	if !reflect.DeepEqual(u, testFixtures.sampleUserWithData) {
-		t.Errorf("GetUserByEmail(%q) = %#v; want: %#v",
-			testFixtures.sampleUserWithData.Email, u, testFixtures.sampleUserWithData)
+	if !reflect.DeepEqual(u, want) {
+		t.Errorf("GetUserByEmail(%q) = %#v; want = %#v", want.Email, u, want)
 	}
 }
 
 func testUserIterator(t *testing.T) {
 	iter := client.Users(context.Background(), "")
 	uids := map[string]bool{}
-	gotCount := 0
+	count := 0
 
 	for {
 		u, err := iter.Next()
@@ -156,16 +127,16 @@ func testUserIterator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		gotCount++
+		count++
 		uids[u.UID] = true
 	}
-	if gotCount < 5 {
-		t.Errorf("Users() got %d users; want: at least 5 users", gotCount)
+	if count < 5 {
+		t.Errorf("Users() count = %d; want >= 5", count)
 	}
 	// verify that all the expected users are present
 	for _, uid := range testFixtures.uidList {
 		if _, ok := uids[uid]; !ok {
-			t.Errorf("Users() missing UID %s; want: UID %s", uid, uid)
+			t.Errorf("Users() missing uid: %s", uid)
 		}
 	}
 }
@@ -194,59 +165,60 @@ func testPager(t *testing.T) {
 			break
 		}
 	}
-	if userCount < 5 || pageCount < 3 {
-		t.Errorf("Users(), NewPager() got %d pages with %d users;  want at least %d pages with at least %d users,", pageCount, userCount, 3, 5)
+	if userCount < 5 {
+		t.Errorf("Users() count = %d;  want >= 5", userCount)
+	}
+	if pageCount < 3 {
+		t.Errorf("NewPager() count = %d;  want >= 3", pageCount)
 	}
 }
 
 func testDisableUser(t *testing.T) {
-	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	want := testFixtures.sampleUserBlank
+	u, err := client.GetUser(context.Background(), want.UID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if u.Disabled {
-		t.Errorf("GetUser() user is disabled; want: user not disabled")
+		t.Errorf("GetUser().Disabled = true; want = false")
 	}
 
-	_, err = client.UpdateUser(context.Background(), u.UID,
-		(&auth.UserToUpdate{}).Disabled(true))
+	params := (&auth.UserToUpdate{}).Disabled(true)
+	u, err = client.UpdateUser(context.Background(), u.UID, params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if !u.Disabled {
-		t.Errorf("Disabled() user is not disabled; want: user disabled")
+		t.Errorf("UpdateUser(disable).Disabled = false; want = true")
 	}
-	_, err = client.UpdateUser(context.Background(), u.UID,
-		(&auth.UserToUpdate{}).Disabled(false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+
+	params = (&auth.UserToUpdate{}).Disabled(false)
+	u, err = client.UpdateUser(context.Background(), u.UID, params)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if u.Disabled {
-		t.Errorf("Disabled() user is disabled; want: user not disabled")
+		t.Errorf("UpdateUser(disable).Disabled = true; want = false")
 	}
 }
 
 func testUpdateUser(t *testing.T) {
 	u, err := client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
-
-	if err != nil || u == nil {
-		t.Fatalf("error getting user %s", err)
+	if u == nil || err != nil {
+		t.Fatalf("GetUser() = (%v, %v); want = (user, nil)", u, err)
 	}
-	refU := &auth.UserRecord{
+
+	want := &auth.UserRecord{
 		UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
 	}
-	if !reflect.DeepEqual(u, refU) {
-		t.Errorf("GetUser() got = %s; \nwant: %s", toString(refU), toString(u))
+	if !reflect.DeepEqual(u, want) {
+		t.Errorf("GetUser() = %v; want = %v", u, want)
 	}
-	utup := (&auth.UserToUpdate{}).
+
+	params := (&auth.UserToUpdate{}).
 		Disabled(false).
 		DisplayName("name").
 		PhoneNumber("+12345678901").
@@ -255,13 +227,12 @@ func testUpdateUser(t *testing.T) {
 		EmailVerified(true).
 		Password("wordpass").
 		CustomClaims(map[string]interface{}{"custom": "claims"})
-
-	u, err = client.UpdateUser(context.Background(), u.UID, utup)
+	u, err = client.UpdateUser(context.Background(), u.UID, params)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	refU = &auth.UserRecord{
+	want = &auth.UserRecord{
 		UserInfo: &auth.UserInfo{
 			UID:         testFixtures.sampleUserBlank.UID,
 			DisplayName: "name",
@@ -276,36 +247,40 @@ func testUpdateUser(t *testing.T) {
 		EmailVerified: true,
 		CustomClaims:  map[string]interface{}{"custom": "claims"},
 	}
-	// compare provider info seperatley since the order of the providers isn't guaranteed.
-	testProviderInfo(u.ProviderUserInfo,
-		&auth.UserInfo{
+
+	testProviderInfo := func(pi []*auth.UserInfo, t *testing.T) {
+		passwordUI := &auth.UserInfo{
 			DisplayName: "name",
 			Email:       "abc@ab.ab",
 			PhotoURL:    "http://photo.png",
-			ProviderID:  "password"},
-		&auth.UserInfo{
+			ProviderID:  "password",
+		}
+		phoneUI := &auth.UserInfo{
 			PhoneNumber: "+12345678901",
-			ProviderID:  "phone"},
-		t)
+			ProviderID:  "phone",
+		}
+
+		var compareWith *auth.UserInfo
+		for _, ui := range pi {
+			switch ui.ProviderID {
+			case "password":
+				compareWith = passwordUI
+			case "phone":
+				compareWith = phoneUI
+			}
+			if !reflect.DeepEqual(ui, compareWith) {
+				t.Errorf("UpdateUser()got: %#v; \nwant: %#v", ui, compareWith)
+			}
+		}
+	}
+
+	// compare provider info seperatley since the order of the providers isn't guaranteed.
+	testProviderInfo(u.ProviderUserInfo, t)
+
 	// now compare the rest of the record, without the ProviderInfo
 	u.ProviderUserInfo = nil
-	if !reflect.DeepEqual(u, refU) {
-		t.Errorf("UpdateUser() got = %s\nexpecting: %s", toString(u), toString(refU))
-	}
-}
-
-func testProviderInfo(pi []*auth.UserInfo, passwordUI, phoneUI *auth.UserInfo, t *testing.T) {
-	var compareWith *auth.UserInfo
-	for _, ui := range pi {
-		switch ui.ProviderID {
-		case "password":
-			compareWith = passwordUI
-		case "phone":
-			compareWith = phoneUI
-		}
-		if !reflect.DeepEqual(ui, compareWith) {
-			t.Errorf("UpdateUser()got: %#v; \nwant: %#v", ui, compareWith)
-		}
+	if !reflect.DeepEqual(u, want) {
+		t.Errorf("UpdateUser() = %v; want = %v", u, want)
 	}
 }
 
@@ -315,36 +290,34 @@ func testRemovePhonePhotoName(t *testing.T) {
 		t.Fatal(err)
 	}
 	if u.PhoneNumber == "" {
-		t.Errorf("GetUser() expecting non empty PhoneNumber")
+		t.Errorf("GetUser().PhoneNumber = empty; want = non-empty")
 	}
 	if len(u.ProviderUserInfo) != 2 {
-		t.Errorf("GetUser() expecting 2 providers")
+		t.Errorf("GetUser().ProviderUserInfo = %d; want = 2", len(u.ProviderUserInfo))
 	}
 	if u.PhotoURL == "" {
-		t.Errorf("GetUser() expecting non empty PhotoURL")
+		t.Errorf("GetUser().PhotoURL = empty; want = non-empty")
 	}
 	if u.DisplayName == "" {
-		t.Errorf("GetUser() expecting non empty DisplayName")
+		t.Errorf("GetUser().DisplayName = empty; want = non-empty")
 	}
 
-	_, err = client.UpdateUser(context.Background(), u.UID,
-		(&auth.UserToUpdate{}).PhoneNumber("").PhotoURL("").DisplayName(""))
+	params := (&auth.UserToUpdate{}).PhoneNumber("").PhotoURL("").DisplayName("")
+	u, err = client.UpdateUser(context.Background(), u.UID, params)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.PhoneNumber != "" {
-		t.Errorf("UpdateUser() [remove PhoneNumber] PhoneNumber = %q; want: PhoneNumber=%q", u.PhoneNumber, "")
+		t.Errorf("UpdateUser().PhoneNumber = %q; want: %q", u.PhoneNumber, "")
 	}
 	if len(u.ProviderUserInfo) != 1 {
-		t.Errorf("UpdateUser() [remove PhoneNumber] got %d ProviderUserInfo records, want:want 1 provider", len(u.ProviderUserInfo))
+		t.Errorf("UpdateUser().ProviderUserInfo = %d, want = 1", len(u.ProviderUserInfo))
 	}
 	if u.DisplayName != "" {
-		t.Errorf("UpdateUser() [remove DisplayName] DisplayName = %q; want: DisplayName=%q", u.DisplayName, "")
+		t.Errorf("UpdateUser().DisplayName = %q; want =%q", u.DisplayName, "")
 	}
 	if u.PhotoURL != "" {
-		t.Errorf("UpdateUser() [remove PhotoURL] PhotoURL = %q; want: PhotoURL=%q", u.PhotoURL, "")
+		t.Errorf("UpdateUser().PhotoURL = %q; want = %q", u.PhotoURL, "")
 	}
 }
 
@@ -353,9 +326,9 @@ func testRemoveCustomClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(u.CustomClaims,
-		map[string]interface{}{"custom": "claims"}) {
-		t.Errorf("expecting CustomClaims")
+	want := map[string]interface{}{"custom": "claims"}
+	if !reflect.DeepEqual(u.CustomClaims, want) {
+		t.Errorf("CustomClaims = %v; want = %v", u.CustomClaims, want)
 	}
 
 	err = client.SetCustomUserClaims(context.Background(), u.UID, nil)
@@ -364,8 +337,7 @@ func testRemoveCustomClaims(t *testing.T) {
 	}
 	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
 	if u.CustomClaims != nil {
-		t.Errorf("CustomClaims() = %#v; want {}", u.CustomClaims)
-
+		t.Errorf("CustomClaims() = %#v; want = nil", u.CustomClaims)
 	}
 }
 
@@ -375,50 +347,30 @@ func testAddCustomClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 	if u.CustomClaims != nil {
-		t.Errorf("GetUser(), CustomClaims = %q; want <nil>", u.CustomClaims)
+		t.Errorf("GetUser().CustomClaims = %v; want = nil", u.CustomClaims)
 	}
 
-	_, err = client.UpdateUser(context.Background(), u.UID,
-		(&auth.UserToUpdate{}).CustomClaims(map[string]interface{}{"2custom": "2claims"}))
+	want := map[string]interface{}{"2custom": "2claims"}
+	params := (&auth.UserToUpdate{}).CustomClaims(want)
+	u, err = client.UpdateUser(context.Background(), u.UID, params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
-	if u.CustomClaims == nil {
-		t.Errorf("CustomClaims = <nil>; want: {\"2custom\": \"2claims\"}")
+	if !reflect.DeepEqual(u.CustomClaims, want) {
+		t.Errorf("CustomClaims = %v; want = %v", u.CustomClaims, want)
 	}
 }
 
-func provString(e *auth.UserRecord) string {
-	providerStr := ""
-	if e.ProviderUserInfo != nil {
-		for _, info := range e.ProviderUserInfo {
-			providerStr += fmt.Sprintf("\n            %#v", info)
-		}
-	}
-	return providerStr
-}
-
-func cleanupUsers(t *testing.T) {
+func testDeleteUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
 		err := client.DeleteUser(context.Background(), id)
 		if err != nil {
-			t.Errorf("DeleteUser(%s) error deleting user, %s", id, err)
+			t.Errorf("DeleteUser(%q) = %v; want = nil", id, err)
+		}
+
+		u, err := client.GetUser(context.Background(), id)
+		if u != nil || err == nil {
+			t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", u, err)
 		}
 	}
-}
-
-func toString(e *auth.UserRecord) string {
-	return fmt.Sprintf(
-		"    UserRecord: %#v\n"+
-			"        UserInfo: %#v\n"+
-			"        MetaData: %#v\n"+
-			"        CustomClaims: %#v\n"+
-			"        ProviderData: %#v %s",
-		e,
-		e.UserInfo,
-		e.UserMetadata,
-		e.CustomClaims,
-		e.ProviderUserInfo,
-		provString(e))
 }
