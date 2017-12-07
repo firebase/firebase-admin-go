@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
@@ -84,6 +85,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		email string
 		pk    *rsa.PrivateKey
 	)
+	fmt.Println("======================= 1")
 	if c.Creds != nil && len(c.Creds.JSON) > 0 {
 		var svcAcct struct {
 			ClientEmail string `json:"client_email"`
@@ -100,6 +102,8 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 		email = svcAcct.ClientEmail
 	}
+	fmt.Println("======================= 2")
+
 	var snr signer
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}
@@ -109,10 +113,16 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
-	if err != nil {
-		return nil, err
+	fmt.Println("======================= 3")
+	hc := http.DefaultClient
+	if len(c.Opts) > 0 {
+		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
+	fmt.Println("======================= 4")
+
 	ks, err := newHTTPKeySource(googleCertURL, hc)
 	if err != nil {
 		return nil, err
