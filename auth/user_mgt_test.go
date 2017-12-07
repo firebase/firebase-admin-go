@@ -207,7 +207,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			"uid must not be empty",
 		}, {
 			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
-			"uid must be a string at most 128 characters long",
+			"uid string must not be longer than 128 characters",
 		}, {
 			(&UserToCreate{}).DisplayName(""),
 			"display name must be a non-empty string",
@@ -437,8 +437,14 @@ func TestDeleteUser(t *testing.T) {
 	}`
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
-	if err := s.Client.DeleteUser(context.Background(), ""); err != nil {
-		t.Error(err)
+	if err := s.Client.DeleteUser(context.Background(), "uid"); err != nil {
+		t.Errorf("DeleteUser() = %v; want = nil", err)
+	}
+}
+
+func TestInvalidDeleteUser(t *testing.T) {
+	if err := client.DeleteUser(context.Background(), ""); err == nil {
+		t.Errorf("DeleteUser('') = nil; want = error")
 	}
 }
 
@@ -461,7 +467,7 @@ func TestMakeExportedUser(t *testing.T) {
 			}},
 		PhotoURL:     "http://www.example.com/testuser/photo.png",
 		PasswordHash: "passwordhash",
-		PasswordSalt: "salt===",
+		PasswordSalt: "salt",
 
 		ValidSince:         1494364393,
 		Disabled:           false,
@@ -472,7 +478,7 @@ func TestMakeExportedUser(t *testing.T) {
 	want := &ExportedUserRecord{
 		UserRecord:   testUser,
 		PasswordHash: "passwordhash",
-		PasswordSalt: "salt===",
+		PasswordSalt: "salt",
 	}
 	exported, err := makeExportedUser(rur)
 	if err != nil {
@@ -633,9 +639,8 @@ func TestHTTPError(t *testing.T) {
 	client.url = s.Srv.URL + "/"
 
 	want := `http error status: 500; reason: {"error":"test"}`
-	_, err = client.GetUser(context.Background(), "some uid")
-	if err == nil || err.Error() != want {
-		t.Errorf("got error = %v; want: `%v`", err, want)
+	if _, err = client.GetUser(context.Background(), "some uid"); err == nil || err.Error() != want {
+		t.Errorf("GetUser() = %v; want: `%v`", err, want)
 	}
 }
 

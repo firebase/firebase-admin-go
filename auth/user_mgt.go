@@ -28,22 +28,14 @@ import (
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
-var (
-	// Order matters only first error per field is reported.
-	commonValidators = []struct {
-		fieldName string
-		apply     func(map[string]interface{}) error
-	}{
-		{"disableUser", validateTrue},
-		{"displayName", validateDisplayName},
-		{"email", validateEmail},
-		{"emailVerified", validateTrue},
-		{"phoneNumber", validatePhone},
-		{"password", validatePassword},
-		{"photoUrl", validatePhotoURL},
-		{"localId", validateUID},
-	}
-)
+var commonValidators = map[string]func(interface{}) error{
+	"displayName": validateDisplayName,
+	"email":       validateEmail,
+	"phoneNumber": validatePhone,
+	"password":    validatePassword,
+	"photoUrl":    validatePhotoURL,
+	"localId":     validateUID,
+}
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
@@ -187,6 +179,9 @@ func (c *Client) UpdateUser(ctx context.Context, uid string, user *UserToUpdate)
 
 // DeleteUser deletes the user by the given UID.
 func (c *Client) DeleteUser(ctx context.Context, uid string) error {
+	if err := validateUID(uid); err != nil {
+		return err
+	}
 	var resp map[string]interface{}
 	deleteParams := map[string]interface{}{"localId": []string{uid}}
 	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &resp)
@@ -194,16 +189,25 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	if err := validateUID(uid); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
 }
 
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
 func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+	if err := validatePhone(phone); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
 }
 
 // GetUserByEmail gets the user data corresponding to the specified email.
 func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
 }
 
@@ -328,32 +332,21 @@ func processClaims(p map[string]interface{}) error {
 
 // Validators.
 
-// No validation needed. Used for bool fields.
-func validateTrue(p map[string]interface{}) error {
-	return nil
-}
-
-func validateDisplayName(p map[string]interface{}) error {
-	val, ok := p["displayName"]
-	if ok && len(val.(string)) == 0 {
+func validateDisplayName(val interface{}) error {
+	if len(val.(string)) == 0 {
 		return fmt.Errorf("display name must be a non-empty string")
 	}
 	return nil
 }
 
-func validatePhotoURL(p map[string]interface{}) error {
-	val, ok := p["photoUrl"]
-	if ok && len(val.(string)) == 0 {
+func validatePhotoURL(val interface{}) error {
+	if len(val.(string)) == 0 {
 		return fmt.Errorf("photo url must be a non-empty string")
 	}
 	return nil
 }
 
-func validateEmail(p map[string]interface{}) error {
-	val, ok := p["email"]
-	if !ok {
-		return nil
-	}
+func validateEmail(val interface{}) error {
 	email := val.(string)
 	if email == "" {
 		return fmt.Errorf("email must not be empty")
@@ -364,34 +357,25 @@ func validateEmail(p map[string]interface{}) error {
 	return nil
 }
 
-func validatePassword(p map[string]interface{}) error {
-	val, ok := p["password"]
-	if ok && len(val.(string)) < 6 {
+func validatePassword(val interface{}) error {
+	if len(val.(string)) < 6 {
 		return fmt.Errorf("password must be a string at least 6 characters long")
 	}
 	return nil
 }
 
-func validateUID(p map[string]interface{}) error {
-	val, ok := p["localId"]
-	if !ok {
-		return nil
-	}
+func validateUID(val interface{}) error {
 	uid := val.(string)
 	if uid == "" {
 		return fmt.Errorf("uid must not be empty")
 	}
 	if len(val.(string)) > 128 {
-		return fmt.Errorf("uid must be a string at most 128 characters long")
+		return fmt.Errorf("uid string must not be longer than 128 characters")
 	}
 	return nil
 }
 
-func validatePhone(p map[string]interface{}) error {
-	val, ok := p["phoneNumber"]
-	if !ok {
-		return nil
-	}
+func validatePhone(val interface{}) error {
 	phone := val.(string)
 	if phone == "" {
 		return fmt.Errorf("phone number must not be empty")
@@ -411,9 +395,11 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	for k, v := range u.params {
 		params[k] = v
 	}
-	for _, validator := range commonValidators {
-		if err := validator.apply(params); err != nil {
-			return nil, err
+	for key, validate := range commonValidators {
+		if v, ok := params[key]; ok {
+			if err := validate(v); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return params, nil
@@ -432,9 +418,11 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	for _, validator := range commonValidators {
-		if err := validator.apply(params); err != nil {
-			return nil, err
+	for key, validate := range commonValidators {
+		if v, ok := params[key]; ok {
+			if err := validate(v); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return params, nil
@@ -442,7 +430,7 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 
 // End of validators
 
-// Respose Types -------------------------------
+// Response Types -------------------------------
 
 type getUserResponse struct {
 	RequestType string               `json:"kind,omitempty"`
@@ -492,6 +480,9 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 }
 
 func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
+	if err := validateUID(uid); err != nil {
+		return err
+	}
 	if user == nil || user.params == nil {
 		return fmt.Errorf("user must not be nil or empty for update")
 	}
