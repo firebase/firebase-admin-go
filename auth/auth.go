@@ -234,7 +234,7 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	} else if p.Issuer != issuer {
 		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if p.IssuedAt > clk.Now().Unix()+1 {
+	} else if p.IssuedAt > clk.Now().Unix() {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
 		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)
