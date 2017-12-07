@@ -41,7 +41,34 @@ type mockAuthServer struct {
 	Client *Client
 }
 
-var listUsers []*ExportedUserRecord
+var testUser = &UserRecord{
+	UserInfo: &UserInfo{
+		UID:         "testuser",
+		Email:       "testuser@example.com",
+		PhoneNumber: "+1234567890",
+		DisplayName: "Test User",
+		PhotoURL:    "http://www.example.com/testuser/photo.png",
+	},
+	Disabled: false,
+
+	EmailVerified: true,
+	ProviderUserInfo: []*UserInfo{
+		{
+			ProviderID:  "password",
+			DisplayName: "Test User",
+			PhotoURL:    "http://www.example.com/testuser/photo.png",
+			Email:       "testuser@example.com",
+		}, {
+			ProviderID:  "phone",
+			PhoneNumber: "+1234567890",
+		},
+	},
+	UserMetadata: &UserMetadata{
+		CreationTimestamp:  1234567890,
+		LastLogInTimestamp: 1233211232,
+	},
+	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+}
 
 func TestGetUser(t *testing.T) {
 	s := echoServer("get_user.json", t)
@@ -51,46 +78,67 @@ func TestGetUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &UserRecord{
-		UserInfo: &UserInfo{
-			UID:         "testuser",
-			Email:       "testuser@example.com",
-			PhoneNumber: "+1234567890",
-			DisplayName: "Test User",
-			PhotoURL:    "http://www.example.com/testuser/photo.png",
-		},
-		Disabled: false,
-
-		EmailVerified: true,
-		ProviderUserInfo: []*UserInfo{
-			{
-				ProviderID:  "password",
-				DisplayName: "Test User",
-				PhotoURL:    "http://www.example.com/testuser/photo.png",
-				Email:       "testuser@example.com",
-			}, {
-				ProviderID:  "phone",
-				PhoneNumber: "+1234567890",
-			},
-		},
-		UserMetadata: &UserMetadata{
-			CreationTimestamp:  1234567890,
-			LastLogInTimestamp: 1233211232,
-		},
-		CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+	if !reflect.DeepEqual(user, testUser) {
+		t.Errorf("GetUser() = %#v; want = %#v", user, testUser)
 	}
-	if !reflect.DeepEqual(user, want) {
-		t.Errorf("GetUser() = %#v; want = %#v", user, want)
+
+	want := `{"localId":["ignored_id"]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUser() Req = %v; want = %v", got, want)
+	}
+}
+
+func TestGetUserByEmail(t *testing.T) {
+	s := echoServer("get_user.json", t)
+	defer s.Close()
+
+	user, err := s.Client.GetUserByEmail(context.Background(), "test@email.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(user, testUser) {
+		t.Errorf("GetUserByEmail() = %#v; want = %#v", user, testUser)
+	}
+
+	want := `{"email":["test@email.com"]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUserByEmail() Req = %v; want = %v", got, want)
+	}
+}
+
+func TestGetUserByPhoneNumber(t *testing.T) {
+	s := echoServer("get_user.json", t)
+	defer s.Close()
+
+	user, err := s.Client.GetUserByPhoneNumber(context.Background(), "+1234567890")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(user, testUser) {
+		t.Errorf("GetUserByPhoneNumber() = %#v; want = %#v", user, testUser)
+	}
+
+	want := `{"phoneNumber":["+1234567890"]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUserByPhoneNumber() Req = %v; want = %v", got, want)
 	}
 }
 
 func TestListUsers(t *testing.T) {
-	setListUsers()
 	s := echoServer("list_users.json", t)
 	defer s.Close()
 	iter := s.Client.Users(context.Background(), "")
 
-	for i := 0; i < len(listUsers); i++ {
+	want := []*ExportedUserRecord{
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
+	}
+	count := 0
+	for i := 0; i < len(want); i++ {
 		user, err := iter.Next()
 		if err == iterator.Done {
 			break
@@ -98,56 +146,27 @@ func TestListUsers(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if i >= len(listUsers) {
-			t.Errorf("Users() got %d users, want at least %d users", i+1, len(listUsers))
+		if !reflect.DeepEqual(user.UserRecord, want[i].UserRecord) {
+			t.Errorf("Users() iterator [%d] = %#v; want = %#v", i, user, want[i])
 		}
-		if !reflect.DeepEqual(user, listUsers[i]) {
-			t.Errorf("Users() iterator [%d], got: %#v, want: %#v", i, user, listUsers[i])
-			testCompareUserRecords("Users() iterator - Next()", user.UserRecord, listUsers[i].UserRecord, t)
+		if user.PasswordHash != want[i].PasswordHash {
+			t.Errorf("Users() PasswordHash = %q; want = %q", user.PasswordHash, want[i].PasswordHash)
 		}
+		if user.PasswordSalt != want[i].PasswordSalt {
+			t.Errorf("Users() PasswordSalt = %q; want = %q", user.PasswordSalt, want[i].PasswordSalt)
+		}
+		count++
+	}
+	if count != len(want) {
+		t.Errorf("Users() = %d; want = %d", count, len(want))
 	}
 	if _, err := iter.Next(); err != iterator.Done {
-		t.Errorf("Users() itereator got more than %d users, want %d", len(listUsers), len(listUsers))
+		t.Errorf("Users() = %v, want %v", err, iterator.Done)
 	}
 }
 
-func TestGetUserBy(t *testing.T) {
-	s := echoServer(nil, t)
-	defer s.Close()
-
-	tests := []struct {
-		name   string
-		getfun func(context.Context, string) (*UserRecord, error)
-		param  string
-		want   string
-	}{
-		{"GetUser()",
-			s.Client.GetUser,
-			"uid",
-			`{"localId":["uid"]}`,
-		},
-		{"GetUserByEmail()",
-			s.Client.GetUserByEmail,
-			"email@email.com",
-			`{"email":["email@email.com"]}`,
-		},
-		{"GetUserByPhoneNumber",
-			s.Client.GetUserByPhoneNumber,
-			"+12341234123",
-			`{"phoneNumber":["+12341234123"]}`,
-		},
-	}
-
-	for _, test := range tests {
-		test.getfun(context.Background(), test.param)
-		if string(s.Rbody) != test.want {
-			t.Errorf("%s [request body] =  %q; want: %q", test.name, s.Rbody, test.want)
-		}
-	}
-}
-
-func TestCreateUserValidatorsFail(t *testing.T) {
-	badUserParams := []struct {
+func TestInvalidCreateUser(t *testing.T) {
+	cases := []struct {
 		params *UserToCreate
 		want   string
 	}{
@@ -192,25 +211,27 @@ func TestCreateUserValidatorsFail(t *testing.T) {
 			`malformed email string: "a@a@a"`,
 		},
 	}
-	for i, test := range badUserParams {
-		_, err := client.CreateUser(context.Background(), test.params)
-		if err == nil {
-			t.Errorf("[%d] error = nil; want: error %q", i, test.want)
+	for i, tc := range cases {
+		user, err := client.CreateUser(context.Background(), tc.params)
+		if user != nil || err == nil {
+			t.Errorf("[%d] CreateUser() = (%v, %v); want = (nil, error)", i, user, err)
 		}
-		if err.Error() != test.want {
-			t.Errorf("[%d] error = %q; want error: %q", i, err.Error(), test.want)
+		if err.Error() != tc.want {
+			t.Errorf("[%d] CreateUser() = %v; want = %v", i, err.Error(), tc.want)
 		}
 	}
 }
 
-func TestCreateUserValidatorsPass(t *testing.T) {
-	s := echoServer([]byte(`{
+func TestCreateUser(t *testing.T) {
+	resp := `{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
 		"localId": "expectedUserID"
-	   }`), t)
+	}`
+	s := echoServer([]byte(resp), t)
 	defer s.Close()
-	goodParams := []*UserToCreate{
+
+	cases := []*UserToCreate{
 		nil,
 		{},
 		(&UserToCreate{}).Password("123456"),
@@ -221,8 +242,8 @@ func TestCreateUserValidatorsPass(t *testing.T) {
 		(&UserToCreate{}).Email("a@a"),
 		(&UserToCreate{}).PhoneNumber("+1"),
 	}
-	for _, par := range goodParams {
-		_, err := s.Client.CreateUser(context.Background(), par)
+	for _, tc := range cases {
+		_, err := s.Client.CreateUser(context.Background(), tc)
 		// There are two calls to the server, the first one, on creation retunrs the above []byte
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
@@ -591,81 +612,6 @@ func provString(e *ExportedUserRecord) string {
 		}
 	}
 	return providerStr
-}
-
-// used as a referece for the wanted results given by the list_users.json data file
-func setListUsers() {
-	listUsers = []*ExportedUserRecord{
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					UID: "VHHROt3NAjPoc1hanwMRcTdCESz2",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1511284665000,
-				},
-				Disabled: false,
-			},
-		},
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					UID:         "tefwfd1234",
-					DisplayName: "display_name",
-					Email:       "tefwfd1234eml5f@test.com",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1511284665000,
-				},
-				Disabled:      false,
-				EmailVerified: false,
-				ProviderUserInfo: []*UserInfo{
-					{
-						ProviderID:  "password",
-						DisplayName: "display_name",
-						Email:       "tefwfd1234eml5f@test.com",
-					},
-				},
-				CustomClaims: map[string]interface{}{"asssssdf": true, "asssssdfdf": "ffd"},
-			},
-			PasswordHash: "pwhash==",
-			PasswordSalt: "pwsalt==",
-		},
-		{
-			UserRecord: &UserRecord{
-				UserInfo: &UserInfo{
-					DisplayName: "Test User",
-					Email:       "testuser@example.com",
-					UID:         "testuser0",
-					PhoneNumber: "+1234567890",
-					PhotoURL:    "http://www.example.com/testuser/photo.png",
-				},
-				UserMetadata: &UserMetadata{
-					LastLogInTimestamp: 0,
-					CreationTimestamp:  1234567890,
-				},
-				Disabled:      false,
-				EmailVerified: true,
-				ProviderUserInfo: []*UserInfo{
-					{
-						ProviderID:  "password",
-						DisplayName: "Test User",
-						Email:       "testuser@example.com",
-						PhotoURL:    "http://www.example.com/testuser/photo.png",
-					},
-					{
-						ProviderID:  "phone",
-						PhoneNumber: "+1234567890",
-					},
-				},
-				CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
-			},
-			PasswordHash: "passwordHash",
-			PasswordSalt: "passwordSalt",
-		},
-	}
 }
 
 // for drilling down comparison.
