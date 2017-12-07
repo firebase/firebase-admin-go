@@ -15,7 +15,7 @@ We get lots of those and we love helping you, but GitHub is not the best place f
 which just ask about usage will be closed. Here are some resources to get help:
 
 - Go through the [guides](https://firebase.google.com/docs/admin/setup/)
-- Read the full [API reference](https://firebase.google.com/docs/reference/admin/go/)
+- Read the full [API reference](https://godoc.org/firebase.google.com/go)
 
 If the official documentation doesn't help, try asking a question on the
 [Firebase Google Group](https://groups.google.com/forum/#!forum/firebase-talk/) or one of our
