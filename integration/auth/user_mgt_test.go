@@ -37,7 +37,7 @@ func TestUserManagement(t *testing.T) {
 	t.Run("Create test users", testCreateUsers)
 	t.Run("Get user", testGetUser)
 	t.Run("Iterate users", testUserIterator)
-	t.Run("Iterate paged iteration", testPager)
+	t.Run("Paged iteration", testPager)
 	t.Run("Disable user account", testDisableUser)
 	t.Run("Update user", testUpdateUser)
 	t.Run("Remove user attributes", testRemovePhonePhotoName)
@@ -248,7 +248,18 @@ func testUpdateUser(t *testing.T) {
 		CustomClaims:  map[string]interface{}{"custom": "claims"},
 	}
 
-	testProviderInfo := func(pi []*auth.UserInfo, passwordUI, phoneUI *auth.UserInfo, t *testing.T) {
+	testProviderInfo := func(pi []*auth.UserInfo, t *testing.T) {
+		passwordUI := &auth.UserInfo{
+			DisplayName: "name",
+			Email:       "abc@ab.ab",
+			PhotoURL:    "http://photo.png",
+			ProviderID:  "password",
+		}
+		phoneUI := &auth.UserInfo{
+			PhoneNumber: "+12345678901",
+			ProviderID:  "phone",
+		}
+
 		var compareWith *auth.UserInfo
 		for _, ui := range pi {
 			switch ui.ProviderID {
@@ -264,16 +275,8 @@ func testUpdateUser(t *testing.T) {
 	}
 
 	// compare provider info seperatley since the order of the providers isn't guaranteed.
-	testProviderInfo(u.ProviderUserInfo,
-		&auth.UserInfo{
-			DisplayName: "name",
-			Email:       "abc@ab.ab",
-			PhotoURL:    "http://photo.png",
-			ProviderID:  "password"},
-		&auth.UserInfo{
-			PhoneNumber: "+12345678901",
-			ProviderID:  "phone"},
-		t)
+	testProviderInfo(u.ProviderUserInfo, t)
+
 	// now compare the rest of the record, without the ProviderInfo
 	u.ProviderUserInfo = nil
 	if !reflect.DeepEqual(u, want) {
