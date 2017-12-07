@@ -91,13 +91,16 @@ type UserIterator struct {
 	users    []*ExportedUserRecord
 }
 
-type commonParams struct {
-	payload map[string]interface{}
-}
-
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
-	commonParams
+	params map[string]interface{}
+}
+
+func (u *UserToCreate) set(key string, value interface{}) {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 }
 
 // Disabled setter.
@@ -126,7 +129,14 @@ func (u *UserToCreate) UID(uid string) *UserToCreate { u.set("localId", uid); re
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
-	commonParams
+	params map[string]interface{}
+}
+
+func (u *UserToUpdate) set(key string, value interface{}) {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 }
 
 // CustomClaims setter.
@@ -157,12 +167,12 @@ func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNum
 func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
 
 // CreateUser creates a new user with the specified properties.
-func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRecord, error) {
-	if params == nil {
-		params = &UserToCreate{}
+func (c *Client) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
+	if user == nil {
+		user = &UserToCreate{}
 	}
 
-	payload, err := params.preparePayload()
+	payload, err := user.preparePayload()
 	if err != nil {
 		return nil, err
 	}
@@ -172,13 +182,13 @@ func (c *Client) CreateUser(ctx context.Context, params *UserToCreate) (*UserRec
 // UpdateUser updates an existing user account with the specified properties.
 //
 // DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record.
-func (c *Client) UpdateUser(ctx context.Context, uid string, params *UserToUpdate) (ur *UserRecord, err error) {
-	if params == nil || params.payload == nil {
-		return nil, fmt.Errorf("params must not be empty for update")
+func (c *Client) UpdateUser(ctx context.Context, uid string, user *UserToUpdate) (ur *UserRecord, err error) {
+	if user == nil || user.params == nil {
+		return nil, fmt.Errorf("user must not be nil or empty for update")
 	}
-	params.payload["localId"] = uid
+	user.params["localId"] = uid
 
-	payload, err := params.preparePayload()
+	payload, err := user.preparePayload()
 	if err != nil {
 		return nil, err
 	}
@@ -279,16 +289,6 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 	return err
 }
 
-// ------------------------------------------------------------
-// Utilities for Create and Update input structs.
-
-func (p *commonParams) set(key string, value interface{}) {
-	if p.payload == nil {
-		p.payload = make(map[string]interface{})
-	}
-	p.payload[key] = value
-}
-
 func processDeletion(p map[string]interface{}, field, listKey, listVal string) {
 	if dn, ok := p[field]; ok && len(dn.(string)) == 0 {
 		addToListParam(p, listKey, listVal)
@@ -316,7 +316,7 @@ func processClaims(p map[string]interface{}) error {
 	}
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
-			return fmt.Errorf("CustomClaims(%q: ...): claim %q is reserved, and must not be set", key, key)
+			return fmt.Errorf("claim %q is reserved and must not be set", key)
 		}
 	}
 
@@ -415,11 +415,11 @@ func validatePhone(p map[string]interface{}) error {
 
 func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	params := map[string]interface{}{}
-	if u.payload == nil {
+	if u.params == nil {
 		return params, nil
 	}
 
-	for k, v := range u.payload {
+	for k, v := range u.params {
 		params[k] = v
 	}
 	for _, validator := range commonValidators {
@@ -432,11 +432,11 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 
 func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	params := map[string]interface{}{}
-	if u.payload == nil {
+	if u.params == nil {
 		return params, nil
 	}
 
-	for k, v := range u.payload {
+	for k, v := range u.params {
 		params[k] = v
 	}
 	processDeletion(params, "displayName", "deleteAttribute", "DISPLAY_NAME")
@@ -499,11 +499,11 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 	if len(gur.Users) == 0 {
 		return nil, fmt.Errorf("cannot find user from params: %v", params)
 	}
-	if l := len(gur.Users); l > 1 {
-		return nil, fmt.Errorf("getUser(%v) = %d users; want = 1 user, ", params, l)
-	}
 	eu, err := makeExportedUser(gur.Users[0])
-	return eu.UserRecord, err
+	if err != nil {
+		return nil, err
+	}
+	return eu.UserRecord, nil
 }
 
 func (c *Client) createOrUpdateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {

@@ -31,16 +31,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type mockAuthServer struct {
-	Resp   []byte
-	Header map[string]string
-	Status int
-	Req    []*http.Request
-	Rbody  []byte
-	Srv    *httptest.Server
-	Client *Client
-}
-
 var testUser = &UserRecord{
 	UserInfo: &UserInfo{
 		UID:         "testuser",
@@ -130,7 +120,6 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 func TestListUsers(t *testing.T) {
 	s := echoServer("list_users.json", t)
 	defer s.Close()
-	iter := s.Client.Users(context.Background(), "")
 
 	want := []*ExportedUserRecord{
 		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
@@ -138,6 +127,8 @@ func TestListUsers(t *testing.T) {
 		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
 	}
 	count := 0
+
+	iter := s.Client.Users(context.Background(), "")
 	for i := 0; i < len(want); i++ {
 		user, err := iter.Next()
 		if err == iterator.Done {
@@ -254,17 +245,17 @@ func TestCreateUser(t *testing.T) {
 	}
 }
 
-func TestUpdateParamsValidatorsFail(t *testing.T) {
-	badParams := []struct {
+func TestInvalidUpdateUser(t *testing.T) {
+	cases := []struct {
 		params *UserToUpdate
 		want   string
 	}{
 		{
 			nil,
-			"params must not be empty for update",
+			"user must not be nil or empty for update",
 		}, {
 			&UserToUpdate{},
-			"params must not be empty for update",
+			"user must not be nil or empty for update",
 		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
 			"phone number must be a valid, E.164 compliant identifier",
@@ -274,30 +265,38 @@ func TestUpdateParamsValidatorsFail(t *testing.T) {
 		},
 	}
 
-	for _, res := range reservedClaims {
-		badParams = append(
-			badParams,
-			struct {
-				params *UserToUpdate
-				want   string
-			}{
-				(&UserToUpdate{}).CustomClaims(map[string]interface{}{res: true}),
-				fmt.Sprintf(`CustomClaims(%q: ...): claim %q is reserved, and must not be set`, res, res)})
+	for _, claim := range reservedClaims {
+		s := struct {
+			params *UserToUpdate
+			want   string
+		}{
+			(&UserToUpdate{}).CustomClaims(map[string]interface{}{claim: true}),
+			fmt.Sprintf("claim %q is reserved and must not be set", claim),
+		}
+		cases = append(cases, s)
 	}
 
-	for i, test := range badParams {
-		_, err := client.UpdateUser(context.Background(), "uid", test.params)
-		if err == nil {
-			t.Errorf("[%d] UpdateUser() error = <nil>; want error: %s", i, test.want)
+	for i, tc := range cases {
+		user, err := client.UpdateUser(context.Background(), "uid", tc.params)
+		if user != nil || err == nil {
+			t.Errorf("[%d] UpdateUser() = (%v, %v); want = (nil, error)", i, user, err)
 		}
-		if err.Error() != test.want {
-			t.Errorf(`[%d] UpdateUser() error = %q; want error: %q`, i, err.Error(), test.want)
+		if err.Error() != tc.want {
+			t.Errorf("[%d] UpdateUser() = %v; want = %v", i, err.Error(), tc.want)
 		}
 	}
 }
 
-func TestUpdateUserValidatorsPass(t *testing.T) {
-	s := echoServer([]byte(`{
+func TestUpdateUserEmptyUID(t *testing.T) {
+	params := (&UserToUpdate{}).DisplayName("test")
+	user, err := client.UpdateUser(context.Background(), "", params)
+	if user != nil || err == nil {
+		t.Errorf("UpdateUser('') = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestUpdateUser(t *testing.T) {
+	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "expectedUserID",
 		"email": "tefwfd1234eml5f@test.com",
@@ -311,10 +310,11 @@ func TestUpdateUserValidatorsPass(t *testing.T) {
 		 }
 		],
 		"emailVerified": false
-	   }`), t)
+	}`
+	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	goodParams := []*UserToUpdate{
+	cases := []*UserToUpdate{
 		(&UserToUpdate{}).Password("123456"),
 		(&UserToUpdate{}).PhoneNumber("+1"),
 		(&UserToUpdate{}).DisplayName("a"),
@@ -323,8 +323,8 @@ func TestUpdateUserValidatorsPass(t *testing.T) {
 		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
 	}
 
-	for _, par := range goodParams {
-		_, err := s.Client.UpdateUser(context.Background(), "expectedUserID", par)
+	for _, tc := range cases {
+		_, err := s.Client.UpdateUser(context.Background(), "expectedUserID", tc)
 		// There are two calls to the server, the first one, on creation retunrs the above []byte
 		// that's how we know the params passed validation
 		// the second call to GetUser, tries to get the user with the returned ID above, it fails
@@ -335,8 +335,8 @@ func TestUpdateUserValidatorsPass(t *testing.T) {
 	}
 }
 
-func TestBadSetCustomClaims(t *testing.T) {
-	badUserParams := []struct {
+func TestInvalidSetCustomClaims(t *testing.T) {
+	cases := []struct {
 		cc   map[string]interface{}
 		want string
 	}{{
@@ -345,37 +345,37 @@ func TestBadSetCustomClaims(t *testing.T) {
 	}}
 
 	for _, res := range reservedClaims {
-		badUserParams = append(badUserParams,
-			struct {
-				cc   map[string]interface{}
-				want string
-			}{
-				map[string]interface{}{res: true},
-				fmt.Sprintf("CustomClaims(%q: ...): claim %q is reserved, and must not be set", res, res),
-			})
+		s := struct {
+			cc   map[string]interface{}
+			want string
+		}{
+			map[string]interface{}{res: true},
+			fmt.Sprintf("claim %q is reserved and must not be set", res),
+		}
+		cases = append(cases, s)
 	}
 
-	for _, test := range badUserParams {
-		err := client.SetCustomUserClaims(context.Background(), "uid", test.cc)
+	for _, tc := range cases {
+		err := client.SetCustomUserClaims(context.Background(), "uid", tc.cc)
 		if err == nil {
-			t.Errorf("SetCustomUserClaims() error = <nil>; want error: %s", test.want)
+			t.Errorf("SetCustomUserClaims() = nil; want = error: %s", tc.want)
 		}
-		if err.Error() != test.want {
-			t.Errorf("SetCustomUserClaims() error = %q; want error: %q", err.Error(), test.want)
+		if err.Error() != tc.want {
+			t.Errorf("SetCustomUserClaims() = %q; want = %q", err.Error(), tc.want)
 		}
 	}
 }
 
-func TestDelete(t *testing.T) {
-	s := echoServer([]byte(`{
+func TestDeleteUser(t *testing.T) {
+	resp := `{
 		"kind": "identitytoolkit#SignupNewUserResponse",
 		"email": "",
 		"localId": "expectedUserID"
-	   }`), t)
+	}`
+	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	if err := s.Client.DeleteUser(context.Background(), ""); err != nil {
 		t.Error(err)
-		return
 	}
 }
 
@@ -407,33 +407,7 @@ func TestMakeExportedUser(t *testing.T) {
 		CustomClaims:       `{"admin": true, "package": "gold"}`,
 	}
 	want := &ExportedUserRecord{
-		UserRecord: &UserRecord{
-			UserInfo: &UserInfo{
-				UID:         "testuser",
-				Email:       "testuser@example.com",
-				PhoneNumber: "+1234567890",
-				PhotoURL:    "http://www.example.com/testuser/photo.png",
-				DisplayName: "Test User",
-			},
-			CustomClaims:  map[string]interface{}{"admin": true, "package": "gold"},
-			Disabled:      false,
-			EmailVerified: true,
-			UserMetadata: &UserMetadata{
-				CreationTimestamp:  1234567890,
-				LastLogInTimestamp: 1233211232,
-			},
-			ProviderUserInfo: []*UserInfo{
-				{
-					ProviderID:  "password",
-					DisplayName: "Test User",
-					PhotoURL:    "http://www.example.com/testuser/photo.png",
-					Email:       "testuser@example.com",
-				}, {
-					ProviderID:  "phone",
-					PhoneNumber: "+1234567890",
-				},
-			},
-		},
+		UserRecord:   testUser,
 		PasswordHash: "passwordhash",
 		PasswordSalt: "salt===",
 	}
@@ -441,10 +415,15 @@ func TestMakeExportedUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(exported, want) {
+	if !reflect.DeepEqual(exported.UserRecord, want.UserRecord) {
 		// zero in
-		t.Errorf("makeExportedUser() = %#v; want: %#v", exported, want)
-		testCompareUserRecords("makeExportedUser()", exported.UserRecord, want.UserRecord, t)
+		t.Errorf("makeExportedUser() = %#v; want: %#v", exported.UserRecord, want.UserRecord)
+	}
+	if exported.PasswordHash != want.PasswordHash {
+		t.Errorf("PasswordHash = %q; want = %q", exported.PasswordHash, want.PasswordHash)
+	}
+	if exported.PasswordSalt != want.PasswordSalt {
+		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
 	}
 }
 
@@ -574,72 +553,37 @@ func TestUpdateRequest(t *testing.T) {
 	}
 }
 
-func TestBadServer(t *testing.T) {
-	s := badServer(t)
+func TestHTTPError(t *testing.T) {
+	s := mockAuthServer{}
+	s.Srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.Req = append(s.Req, r)
+		w.WriteHeader(500)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"error":"test"}`))
+	}))
 	defer s.Close()
-	want := "http error status: 500; reason: {}"
-	_, err := s.Client.GetUser(context.Background(), "some uid")
+
+	client, err := NewClient(context.Background(), &internal.AuthConfig{})
+	if err != nil {
+		t.Fatal()
+	}
+	client.url = s.Srv.URL + "/"
+
+	want := `http error status: 500; reason: {"error":"test"}`
+	_, err = client.GetUser(context.Background(), "some uid")
 	if err == nil || err.Error() != want {
 		t.Errorf("got error = %v; want: `%v`", err, want)
 	}
 }
 
-//---------------------------------------
-
-// for pretty printing
-func toString(e *ExportedUserRecord) string {
-	return fmt.Sprintf("ExportedUserRecord: %#v\n"+
-		"    UserRecord: %#v\n"+
-		"        UserInfo: %#v\n"+
-		"        MetaData: %#v\n"+
-		"        CustomClaims: %#v\n"+
-		"        ProviderData: %#v %s",
-		e,
-		e.UserRecord,
-		e.UserInfo,
-		e.UserMetadata,
-		e.CustomClaims,
-		e.ProviderUserInfo,
-		provString(e))
-}
-
-// for pretty printing
-func provString(e *ExportedUserRecord) string {
-	providerStr := ""
-	if e.ProviderUserInfo != nil {
-		for _, info := range e.ProviderUserInfo {
-			providerStr += fmt.Sprintf("\n            %#v", info)
-		}
-	}
-	return providerStr
-}
-
-// for drilling down comparison.
-func testCompareUserRecords(testName string, u1, u2 *UserRecord, t *testing.T) {
-	tests := []struct {
-		name string
-		got  interface{}
-		want interface{}
-	}{
-		{"user", u1, u2},
-		{"user.UID", u1.UID, u2.UID},
-		{"user.UserInfo", u1.UserInfo, u2.UserInfo},
-		{"user.ProviderUserInfo", u1.ProviderUserInfo, u2.ProviderUserInfo},
-		{"user.UserMetadata", u1.UserMetadata, u2.UserMetadata},
-	}
-	for k, pui := range u1.ProviderUserInfo {
-		tests = append(tests, struct {
-			name string
-			got  interface{}
-			want interface{}
-		}{fmt.Sprintf("Provider %d", k), pui, u2.ProviderUserInfo[k]})
-	}
-	for _, test := range tests {
-		if !reflect.DeepEqual(test.got, test.want) {
-			t.Errorf("%s = (%T) %#v;\nwant: (%T) %#v", testName,
-				test.got, test.got, test.want, test.want)
-		}
-	}
+type mockAuthServer struct {
+	Resp   []byte
+	Header map[string]string
+	Status int
+	Req    []*http.Request
+	Rbody  []byte
+	Srv    *httptest.Server
+	Client *Client
 }
 
 // echoServer takes either a []byte or a string filename, or an object.
@@ -705,21 +649,4 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.Srv.Close()
-}
-
-func badServer(t *testing.T) *mockAuthServer {
-	s := mockAuthServer{}
-	s.Srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.Req = append(s.Req, r)
-		w.WriteHeader(500)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{}"))
-	}))
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{})
-	if err != nil {
-		t.Fatal()
-	}
-	authClient.url = s.Srv.URL + "/"
-	s.Client = authClient
-	return &s
 }
