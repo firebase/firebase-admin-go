@@ -96,7 +96,7 @@ func (u *UserToCreate) set(key string, value interface{}) {
 }
 
 // Disabled setter.
-func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disableUser", d); return u }
+func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disabled", d); return u }
 
 // DisplayName setter.
 func (u *UserToCreate) DisplayName(dn string) *UserToCreate { u.set("displayName", dn); return u }
@@ -484,7 +484,7 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 		return err
 	}
 	if user == nil || user.params == nil {
-		return fmt.Errorf("user must not be nil or empty for update")
+		return fmt.Errorf("update parameters must not be nil or empty")
 	}
 	user.params["localId"] = uid
 
