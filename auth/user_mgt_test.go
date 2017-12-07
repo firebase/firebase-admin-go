@@ -79,6 +79,20 @@ func TestGetUser(t *testing.T) {
 	}
 }
 
+func TestGetNonExistingUser(t *testing.T) {
+	resp := `{
+		"kind" : "identitytoolkit#GetAccountInfoResponse",
+		"users" : []
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	user, err := s.Client.GetUser(context.Background(), "ignored_id")
+	if user != nil || err == nil {
+		t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
 func TestGetUserByEmail(t *testing.T) {
 	s := echoServer("get_user.json", t)
 	defer s.Close()
@@ -122,38 +136,53 @@ func TestListUsers(t *testing.T) {
 	defer s.Close()
 
 	want := []*ExportedUserRecord{
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash", PasswordSalt: "salt==="},
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
+		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
-	count := 0
 
-	iter := s.Client.Users(context.Background(), "")
-	for i := 0; i < len(want); i++ {
-		user, err := iter.Next()
-		if err == iterator.Done {
-			break
+	testIterator := func(iter *UserIterator, token string, req map[string]interface{}) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			user, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(user.UserRecord, want[i].UserRecord) {
+				t.Errorf("Users(%q) = %#v; want = %#v", token, user, want[i])
+			}
+			if user.PasswordHash != want[i].PasswordHash {
+				t.Errorf("Users(%q) PasswordHash = %q; want = %q", token, user.PasswordHash, want[i].PasswordHash)
+			}
+			if user.PasswordSalt != want[i].PasswordSalt {
+				t.Errorf("Users(%q) PasswordSalt = %q; want = %q", token, user.PasswordSalt, want[i].PasswordSalt)
+			}
+			count++
 		}
+		if count != len(want) {
+			t.Errorf("Users(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("Users(%q) = %v, want = %v", token, err, iterator.Done)
+		}
+
+		b, err := json.Marshal(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(user.UserRecord, want[i].UserRecord) {
-			t.Errorf("Users() iterator [%d] = %#v; want = %#v", i, user, want[i])
+		if string(s.Rbody) != string(b) {
+			t.Errorf("Users(%q) = %v, want = %v", token, string(s.Rbody), string(b))
 		}
-		if user.PasswordHash != want[i].PasswordHash {
-			t.Errorf("Users() PasswordHash = %q; want = %q", user.PasswordHash, want[i].PasswordHash)
-		}
-		if user.PasswordSalt != want[i].PasswordSalt {
-			t.Errorf("Users() PasswordSalt = %q; want = %q", user.PasswordSalt, want[i].PasswordSalt)
-		}
-		count++
 	}
-	if count != len(want) {
-		t.Errorf("Users() = %d; want = %d", count, len(want))
-	}
-	if _, err := iter.Next(); err != iterator.Done {
-		t.Errorf("Users() = %v, want %v", err, iterator.Done)
-	}
+	testIterator(
+		s.Client.Users(context.Background(), ""),
+		"", map[string]interface{}{"maxResults": 1000})
+	testIterator(
+		s.Client.Users(context.Background(), "pageToken"),
+		"pageToken", map[string]interface{}{"maxResults": 1000, "nextPageToken": "pageToken"})
 }
 
 func TestInvalidCreateUser(t *testing.T) {
@@ -234,13 +263,9 @@ func TestCreateUser(t *testing.T) {
 		(&UserToCreate{}).PhoneNumber("+1"),
 	}
 	for _, tc := range cases {
-		_, err := s.Client.CreateUser(context.Background(), tc)
-		// There are two calls to the server, the first one, on creation retunrs the above []byte
-		// that's how we know the params passed validation
-		// the second call to GetUser, tries to get the user with the returned ID above, it fails
-		// with the following expected error
-		if err.Error() != "cannot find user from params: map[localId:[expectedUserID]]" {
-			t.Error(err)
+		uid, err := s.Client.createUser(context.Background(), tc)
+		if uid != "expectedUserID" || err != nil {
+			t.Errorf("createUser(%v) = (%q, %v); want = (%q, nil)", tc, uid, err, "expectedUserID")
 		}
 	}
 }
@@ -324,13 +349,9 @@ func TestUpdateUser(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		_, err := s.Client.UpdateUser(context.Background(), "expectedUserID", tc)
-		// There are two calls to the server, the first one, on creation retunrs the above []byte
-		// that's how we know the params passed validation
-		// the second call to GetUser, tries to get the user with the returned ID above, it fails
-		// with the following expected error
-		if err.Error() != "cannot find user from params: map[localId:[expectedUserID]]" {
-			t.Error(err)
+		err := s.Client.updateUser(context.Background(), "expectedUserID", tc)
+		if err != nil {
+			t.Errorf("updateUser(%v) = %v; want = nil", tc, err)
 		}
 	}
 }
@@ -362,6 +383,48 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 		}
 		if err.Error() != tc.want {
 			t.Errorf("SetCustomUserClaims() = %q; want = %q", err.Error(), tc.want)
+		}
+	}
+}
+
+func TestSetCustomClaims(t *testing.T) {
+	cases := []map[string]interface{}{
+		nil,
+		map[string]interface{}{},
+		map[string]interface{}{"admin": true},
+	}
+
+	resp := `{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "uid"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	for _, tc := range cases {
+		err := s.Client.SetCustomUserClaims(context.Background(), "uid", tc)
+		if err != nil {
+			t.Errorf("SetCustomUserClaims(%v) = %v; want = nil", tc, err)
+		}
+
+		input := tc
+		if input == nil {
+			input = map[string]interface{}{}
+		}
+		b, err := json.Marshal(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		m := map[string]interface{}{
+			"localId":          "uid",
+			"customAttributes": string(b),
+		}
+		want, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(s.Rbody, want) {
+			t.Errorf("SetCustomUserClaims() = %v; want = %v", string(s.Rbody), string(want))
 		}
 	}
 }

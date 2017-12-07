@@ -168,31 +168,21 @@ func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", ur
 
 // CreateUser creates a new user with the specified properties.
 func (c *Client) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
-	if user == nil {
-		user = &UserToCreate{}
-	}
-
-	payload, err := user.preparePayload()
+	uid, err := c.createUser(ctx, user)
 	if err != nil {
 		return nil, err
 	}
-	return c.createOrUpdateUser(ctx, "signupNewUser", payload)
+	return c.GetUser(ctx, uid)
 }
 
 // UpdateUser updates an existing user account with the specified properties.
 //
 // DisplayName, PhotoURL and PhoneNumber will be set to "" to signify deleting them from the record.
 func (c *Client) UpdateUser(ctx context.Context, uid string, user *UserToUpdate) (ur *UserRecord, err error) {
-	if user == nil || user.params == nil {
-		return nil, fmt.Errorf("user must not be nil or empty for update")
-	}
-	user.params["localId"] = uid
-
-	payload, err := user.preparePayload()
-	if err != nil {
+	if err := c.updateUser(ctx, uid, user); err != nil {
 		return nil, err
 	}
-	return c.createOrUpdateUser(ctx, "setAccountInfo", payload)
+	return c.GetUser(ctx, uid)
 }
 
 // DeleteUser deletes the user by the given UID.
@@ -285,8 +275,7 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 	if customClaims == nil || len(customClaims) == 0 {
 		customClaims = map[string]interface{}{}
 	}
-	_, err := c.UpdateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
-	return err
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 }
 
 func processDeletion(p map[string]interface{}, field, listKey, listVal string) {
@@ -432,10 +421,6 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 
 func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	params := map[string]interface{}{}
-	if u.params == nil {
-		return params, nil
-	}
-
 	for k, v := range u.params {
 		params[k] = v
 	}
@@ -490,6 +475,37 @@ type listUsersResponse struct {
 
 // Helper functions for retrieval and HTTP calls.
 
+func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, error) {
+	if user == nil {
+		user = &UserToCreate{}
+	}
+
+	payload, err := user.preparePayload()
+	if err != nil {
+		return "", err
+	}
+	var rur responseUserRecord
+	if err := c.makeHTTPCall(ctx, "signupNewUser", payload, &rur); err != nil {
+		return "", err
+	}
+	return rur.UID, nil
+}
+
+func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
+	if user == nil || user.params == nil {
+		return fmt.Errorf("user must not be nil or empty for update")
+	}
+	user.params["localId"] = uid
+
+	payload, err := user.preparePayload()
+	if err != nil {
+		return err
+	}
+
+	var rur responseUserRecord
+	return c.makeHTTPCall(ctx, "setAccountInfo", payload, &rur)
+}
+
 func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
 	var gur getUserResponse
 	err := c.makeHTTPCall(ctx, "getAccountInfo", params, &gur)
@@ -504,15 +520,6 @@ func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*U
 		return nil, err
 	}
 	return eu.UserRecord, nil
-}
-
-func (c *Client) createOrUpdateUser(ctx context.Context, action string, params map[string]interface{}) (*UserRecord, error) {
-	var rur responseUserRecord
-	err := c.makeHTTPCall(ctx, action, params, &rur)
-	if err != nil {
-		return nil, err
-	}
-	return c.GetUser(ctx, rur.UID)
 }
 
 func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {

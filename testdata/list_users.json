@@ -20,8 +20,8 @@
                 "rawId" : "+1234567890"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
-            "passwordHash" : "passwordhash",
-            "salt" : "salt===",
+            "passwordHash" : "passwordhash1",
+            "salt" : "salt1",
             "passwordUpdatedAt" : 1.494364393E+12,
             "validSince" : "1494364393",
             "disabled" : false,
@@ -48,8 +48,8 @@
                 "rawId" : "+1234567890"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
-            "passwordHash" : "passwordhash",
-            "salt" : "salt===",
+            "passwordHash" : "passwordhash2",
+            "salt" : "salt2",
             "passwordUpdatedAt" : 1.494364393E+12,
             "validSince" : "1494364393",
             "disabled" : false,
@@ -76,8 +76,8 @@
                 "rawId" : "+1234567890"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
-            "passwordHash" : "passwordhash",
-            "salt" : "salt===",
+            "passwordHash" : "passwordhash3",
+            "salt" : "salt3",
             "passwordUpdatedAt" : 1.494364393E+12,
             "validSince" : "1494364393",
             "disabled" : false,
