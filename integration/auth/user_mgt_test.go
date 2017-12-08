@@ -48,7 +48,7 @@ func TestUserManagement(t *testing.T) {
 
 func testCreateUsers(t *testing.T) {
 	// Create users with uid
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		params := (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i))
 		u, err := client.CreateUser(context.Background(), params)
 		if err != nil {
