@@ -29,8 +29,9 @@ import (
 
 const iidEndpoint = "https://console.firebase.google.com/v1"
 
-// Client is the interface for the Firebase instance ID service.
+// Client is the interface for the Firebase Instance ID service.
 type Client struct {
+	// To enable testing against arbitrary endpoints.
 	endpoint string
 	client   *internal.HTTPClient
 	project  string
