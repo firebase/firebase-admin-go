@@ -66,6 +66,7 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 		Creds:     a.creds,
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return auth.NewClient(ctx, conf)
 }
