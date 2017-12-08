@@ -38,6 +38,8 @@ import (
 
 var client *Client
 var testIDToken string
+var testGetUserResponse []byte
+var testListUsersResponse []byte
 
 func TestMain(m *testing.M) {
 	var (
@@ -46,7 +48,6 @@ func TestMain(m *testing.M) {
 		ctx   context.Context
 		creds *google.DefaultCredentials
 	)
-
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {
@@ -61,22 +62,33 @@ func TestMain(m *testing.M) {
 		}
 	} else {
 		ctx = context.Background()
-		creds, err = transport.Creds(ctx, option.WithCredentialsFile("../testdata/service_account.json"))
+		opt := option.WithCredentialsFile("../testdata/service_account.json")
+		creds, err = transport.Creds(ctx, opt)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
-
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
+		Opts:      []option.ClientOption{option.WithCredentialsFile("../testdata/service_account.json")},
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
 	client.ks = ks
+
+	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	testListUsersResponse, err = ioutil.ReadFile("../testdata/list_users.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
@@ -88,7 +100,7 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 	}
 	conf := &internal.AuthConfig{Creds: creds}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
-		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
 
@@ -104,7 +116,7 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 	creds := &google.DefaultCredentials{JSON: b}
 	conf := &internal.AuthConfig{Creds: creds}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
-		t.Errorf("NewCient() = (%v,%v); want = (nil, error)", c, err)
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
 
@@ -325,8 +337,8 @@ type mockKeySource struct {
 	err  error
 }
 
-func (t *mockKeySource) Keys() ([]*publicKey, error) {
-	return t.keys, t.err
+func (k *mockKeySource) Keys() ([]*publicKey, error) {
+	return k.keys, k.err
 }
 
 // fileKeySource loads a set of public keys from the local file system.

@@ -22,14 +22,17 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
+	"google.golang.org/api/transport"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
 const issuerPrefix = "https://securetoken.google.com/"
 const tokenExpSeconds = 3600
 
@@ -60,9 +63,11 @@ type Token struct {
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
+	hc        *internal.HTTPClient
 	ks        keySource
 	projectID string
 	snr       signer
+	url       string
 }
 
 type signer interface {
@@ -105,17 +110,39 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-
-	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
+	hc := http.DefaultClient
+	if len(c.Opts) > 0 { // TODO: fix the default when len = 0
+		hc, _, err = transport.NewHTTPClient(ctx, c.Opts...)
+		if err != nil {
+			return nil, err
+		}
+	}
+	ks, err := newHTTPKeySource(googleCertURL, hc)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
+		hc:        &internal.HTTPClient{Client: hc},
 		ks:        ks,
 		projectID: c.ProjectID,
 		snr:       snr,
+		url:       idToolKitURL,
 	}, nil
+}
+
+// Passes the request struct, returns a byte array of the json
+func (c *Client) makeHTTPCall(ctx context.Context, serviceName string, payload interface{}, result interface{}) error {
+	request := &internal.Request{
+		Method: "POST",
+		URL:    c.url + serviceName,
+		Body:   internal.NewJSONEntity(payload),
+	}
+	resp, err := c.hc.Do(ctx, request)
+	if err != nil {
+		return err
+	}
+	return resp.Unmarshal(200, result)
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
