@@ -39,11 +39,12 @@ var firebaseScopes = []string{
 	"https://www.googleapis.com/auth/datastore",
 	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
+	"https://www.googleapis.com/auth/identitytoolkit",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.1.0"
+const Version = "2.2.0"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {

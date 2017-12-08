@@ -75,7 +75,6 @@ func TestDefaultBucket(t *testing.T) {
 	if bucket == nil || err != nil {
 		t.Errorf("DefaultBucket() = (%v, %v); want: (bucket, nil)", bucket, err)
 	}
-
 }
 
 func TestBucket(t *testing.T) {

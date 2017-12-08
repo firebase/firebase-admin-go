@@ -15,7 +15,7 @@ We get lots of those and we love helping you, but GitHub is not the best place f
 which just ask about usage will be closed. Here are some resources to get help:
 
 - Go through the [guides](https://firebase.google.com/docs/admin/setup/)
-- Read the full [API reference](https://firebase.google.com/docs/reference/admin/go/)
+- Read the full [API reference](https://godoc.org/firebase.google.com/go)
 
 If the official documentation doesn't help, try asking a question on the
 [Firebase Google Group](https://groups.google.com/forum/#!forum/firebase-talk/) or one of our
@@ -122,8 +122,8 @@ do not already have one suitable for running the tests against. Then obtain the
 following credentials from the project:
 
 1. *Service account certificate*: This can be downloaded as a JSON file from
-   the "Settings > Service Accounts" tab of the Firebase console. Copy the
-   file into your Go workspace as
+   the "Settings > Service Accounts" tab of the Firebase console. Click 
+   "GENERATE NEW PRIVATE KEY" and copy the file into your Go workspace as
    `src/firebase.google.com/go/testdata/integration_cert.json`.
 2. *Web API key*: This is displayed in the "Settings > General" tab of the
    console. Copy it and save to a new text file. Copy this text file into

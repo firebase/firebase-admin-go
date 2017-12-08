@@ -30,11 +30,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
-
-	"google.golang.org/api/option"
-	"google.golang.org/api/transport"
 )
 
 // publicKey represents a parsed RSA public key along with its unique key ID.
@@ -80,18 +75,7 @@ type httpKeySource struct {
 	Mutex      *sync.Mutex
 }
 
-func newHTTPKeySource(ctx context.Context, uri string, opts ...option.ClientOption) (*httpKeySource, error) {
-	var hc *http.Client
-	if ctx != nil && len(opts) > 0 {
-		var err error
-		hc, _, err = transport.NewHTTPClient(ctx, opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		hc = http.DefaultClient
-	}
-
+func newHTTPKeySource(uri string, hc *http.Client) (*httpKeySource, error) {
 	return &httpKeySource{
 		KeyURI:     uri,
 		HTTPClient: hc,
