@@ -643,29 +643,21 @@ func TestHTTPError(t *testing.T) {
 	}
 }
 
-func TestVersionHeader(t *testing.T) {
-	ver := "testV1.2.2"
-	s := buildVersionTestServer(ver, t)
-	defer s.Close()
-	s.Client.GetUser(context.Background(), "someuid")
-reqs:
-	for i, r := range s.Req {
-		if r.Header == nil {
-			t.Fatalf("No header for trequest %#v", r)
-		}
-
-		for k, v := range r.Header { //.Get("X-Client-Version")
-			if k == "X-Client-Version" {
-				for _, version := range v {
-					if version == "Go/Admin/"+ver {
-						continue reqs
-					}
-				}
-				t.Errorf("version %s not found in header # %d:  `%#v`", ver, i, v)
-			}
-		}
-		t.Errorf("X-Client-Version not found in header %v", r.Header)
+func checkRequestsForVersionHeader(r *http.Request, headerStr string) error {
+	if r.Header == nil {
+		return fmt.Errorf("No header for trequest %#v", r)
 	}
+	for k, v := range r.Header {
+		if k == "X-Client-Version" {
+			for _, version := range v {
+				if version == headerStr {
+					return nil
+				}
+			}
+			return fmt.Errorf("version %s not found in headers:  `%#v`", headerStr, v)
+		}
+	}
+	return fmt.Errorf("X-Client-Version not found in header %v", r.Header)
 }
 
 type mockAuthServer struct {
@@ -705,12 +697,14 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-
 		reqBody, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
 		s.Req = append(s.Req, r)
+		if err := checkRequestsForVersionHeader(r, "Go/Admin/test.version"); err != nil {
+			t.Error(err)
+		}
 		s.Rbody = reqBody
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
@@ -723,31 +717,13 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	})
 	s.Srv = httptest.NewServer(handler)
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{})
+	authClient, err := NewClient(context.Background(), &internal.AuthConfig{Version: "test.version"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	authClient.url = s.Srv.URL + "/"
 	s.Client = authClient
 	return &s
-}
-
-func buildVersionTestServer(version string, t *testing.T) *mockAuthServer {
-	s := mockAuthServer{}
-
-	s.Srv = httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				s.Req = append(s.Req, r)
-			}))
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{Version: version})
-	if err != nil {
-		t.Fatal(err)
-	}
-	authClient.url = s.Srv.URL + "/"
-	s.Client = authClient
-	return &s
-
 }
 
 func (s *mockAuthServer) Close() {

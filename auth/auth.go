@@ -129,18 +129,18 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		projectID: c.ProjectID,
 		snr:       snr,
 		url:       idToolKitURL,
-		version:   c.Version,
+		version:   "Go/Admin/" + c.Version,
 	}, nil
 }
 
 // Passes the request struct, returns a byte array of the json
 func (c *Client) makeHTTPCall(ctx context.Context, serviceName string, payload interface{}, result interface{}) error {
-	statsHeader := internal.WithHeader("X-Client-Version", "Go/Admin/"+c.version)
+	versionHeader := internal.WithHeader("X-Client-Version", c.version)
 	request := &internal.Request{
 		Method: "POST",
 		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(payload),
-		Opts:   []internal.HTTPOption{statsHeader},
+		Opts:   []internal.HTTPOption{versionHeader},
 	}
 	resp, err := c.hc.Do(ctx, request)
 	if err != nil {

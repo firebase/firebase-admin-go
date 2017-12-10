@@ -43,7 +43,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	//
+
 	resp, err := c.Client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
