@@ -643,23 +643,6 @@ func TestHTTPError(t *testing.T) {
 	}
 }
 
-func checkRequestsForVersionHeader(r *http.Request, headerStr string) error {
-	if r.Header == nil {
-		return fmt.Errorf("No header for trequest %#v", r)
-	}
-	for k, v := range r.Header {
-		if k == "X-Client-Version" {
-			for _, version := range v {
-				if version == headerStr {
-					return nil
-				}
-			}
-			return fmt.Errorf("version %s not found in headers:  `%#v`", headerStr, v)
-		}
-	}
-	return fmt.Errorf("X-Client-Version not found in header %v", r.Header)
-}
-
 type mockAuthServer struct {
 	Resp   []byte
 	Header map[string]string
@@ -681,6 +664,7 @@ type mockAuthServer struct {
 func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	var b []byte
 	var err error
+	testVersion := "test.version"
 	switch v := resp.(type) {
 	case nil:
 		b = []byte("")
@@ -692,7 +676,6 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 			t.Fatal("marshaling error")
 		}
 	}
-
 	s := mockAuthServer{Resp: b}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -702,8 +685,10 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 			t.Fatal(err)
 		}
 		s.Req = append(s.Req, r)
-		if err := checkRequestsForVersionHeader(r, "Go/Admin/test.version"); err != nil {
-			t.Error(err)
+		vh := r.Header.Get("X-Client-Version")
+		wantvh := "Go/Admin/" + testVersion
+		if vh != wantvh {
+			t.Errorf("version header = %s; want: %s", vh, wantvh)
 		}
 		s.Rbody = reqBody
 		for k, v := range s.Header {
@@ -717,7 +702,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	})
 	s.Srv = httptest.NewServer(handler)
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{Version: "test.version"})
+	authClient, err := NewClient(context.Background(), &internal.AuthConfig{Version: testVersion})
 	if err != nil {
 		t.Fatal(err)
 	}
