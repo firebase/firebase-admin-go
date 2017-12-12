@@ -44,7 +44,7 @@ var firebaseScopes = []string{
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.2.0"
+const Version = "2.2.1"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
@@ -66,6 +66,7 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 		Creds:     a.creds,
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return auth.NewClient(ctx, conf)
 }
