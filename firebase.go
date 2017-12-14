@@ -109,7 +109,6 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		return nil, err
 	}
 	firebaseEnvVarConfig := os.Getenv(FirebaseEnvName)
-	fmt.Printf("%s\n---\n", firebaseEnvVarConfig)
 	fbc := Config{}
 	if len(firebaseEnvVarConfig) > 0 {
 		err = json.Unmarshal([]byte(firebaseEnvVarConfig), &fbc)
