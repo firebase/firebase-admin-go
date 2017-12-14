@@ -54,7 +54,7 @@ func TestNonExisting(t *testing.T) {
 	if err == nil {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
-	want := `Failed to find the instance ID: "non-existing".`
+	want := `instance id "non-existing": failed to find the instance id`
 	if err.Error() != want {
 		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}

@@ -111,7 +111,7 @@ func TestDeleteInstanceIDError(t *testing.T) {
 			t.Fatal("DeleteInstanceID() = nil; want = error")
 		}
 
-		want := fmt.Sprintf(v, "test-iid")
+		want := fmt.Sprintf("instance id %q: %s", "test-iid", v)
 		if err.Error() != want {
 			t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
 		}
