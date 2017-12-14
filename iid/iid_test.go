@@ -15,6 +15,7 @@
 package iid
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -86,10 +87,11 @@ func TestDeleteInstanceID(t *testing.T) {
 }
 
 func TestDeleteInstanceIDError(t *testing.T) {
+	status := 200
 	var tr *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		w.WriteHeader(500)
+		w.WriteHeader(status)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	}))
@@ -101,9 +103,60 @@ func TestDeleteInstanceIDError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.endpoint = ts.URL
-	if err := client.DeleteInstanceID(ctx, "test-iid"); err == nil {
-		t.Errorf("DeleteInstanceID() = nil; want = error")
-		return
+
+	for k, v := range errorCodes {
+		status = k
+		err := client.DeleteInstanceID(ctx, "test-iid")
+		if err == nil {
+			t.Fatal("DeleteInstanceID() = nil; want = error")
+		}
+
+		want := fmt.Sprintf(v, "test-iid")
+		if err.Error() != want {
+			t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
+		}
+
+		if tr == nil {
+			t.Fatalf("Request = nil; want non-nil")
+		}
+		if tr.Method != "DELETE" {
+			t.Errorf("Method = %q; want = %q", tr.Method, "DELETE")
+		}
+		if tr.URL.Path != "/project/test-project/instanceId/test-iid" {
+			t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/instanceId/test-iid")
+		}
+		if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
+			t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+		}
+		tr = nil
+	}
+}
+
+func TestDeleteInstanceIDUnexpectedError(t *testing.T) {
+	var tr *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		w.WriteHeader(511)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testIIDConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.endpoint = ts.URL
+
+	err = client.DeleteInstanceID(ctx, "test-iid")
+	if err == nil {
+		t.Fatal("DeleteInstanceID() = nil; want = error")
+	}
+
+	want := "http error status: 511; reason: {}"
+	if err.Error() != want {
+		t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
 	}
 
 	if tr == nil {

@@ -29,6 +29,17 @@ import (
 
 const iidEndpoint = "https://console.firebase.google.com/v1"
 
+var errorCodes = map[int]string{
+	400: "Invalid argument. Instance ID %q is malformed.",
+	401: "Request not authorized.",
+	403: "Permission denied. Project does not match instance ID or the client does not have sufficient privileges.",
+	404: "Failed to find the instance ID: %q.",
+	409: "Instance ID %q is already deleted.",
+	429: "Request throttled out by the backend server.",
+	500: "Internal server error.",
+	503: "Backend servers are over capacity. Try again later.",
+}
+
 // Client is the interface for the Firebase Instance ID service.
 type Client struct {
 	// To enable testing against arbitrary endpoints.
@@ -71,6 +82,10 @@ func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
 	resp, err := c.client.Do(ctx, &internal.Request{Method: "DELETE", URL: url})
 	if err != nil {
 		return err
+	}
+
+	if msg, ok := errorCodes[resp.Status]; ok {
+		return fmt.Errorf(msg, iid)
 	}
 	return resp.CheckStatus(http.StatusOK)
 }

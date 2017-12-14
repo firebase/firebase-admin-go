@@ -20,7 +20,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"strings"
 	"testing"
 
 	"firebase.google.com/go/iid"
@@ -55,7 +54,8 @@ func TestNonExisting(t *testing.T) {
 	if err == nil {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
-	if !strings.HasPrefix(err.Error(), "http error status: 404") {
-		t.Errorf("DeleteInstanceID(non-existing) = %v; want = 404", err)
+	want := `Failed to find the instance ID: "non-existing".`
+	if err.Error() != want {
+		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}
 }
