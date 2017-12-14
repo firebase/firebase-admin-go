@@ -75,13 +75,13 @@ type httpKeySource struct {
 	Mutex      *sync.Mutex
 }
 
-func newHTTPKeySource(uri string, hc *http.Client) (*httpKeySource, error) {
+func newHTTPKeySource(uri string, hc *http.Client) *httpKeySource {
 	return &httpKeySource{
 		KeyURI:     uri,
 		HTTPClient: hc,
 		Clock:      systemClock{},
 		Mutex:      &sync.Mutex{},
-	}, nil
+	}
 }
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
