@@ -26,6 +26,7 @@ type AuthConfig struct {
 	Opts      []option.ClientOption
 	Creds     *google.DefaultCredentials
 	ProjectID string
+	Version   string
 }
 
 // InstanceIDConfig represents the configuration of Firebase Instance ID service.

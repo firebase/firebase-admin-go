@@ -46,6 +46,9 @@ func TestUserManagement(t *testing.T) {
 	t.Run("Delete test users", testDeleteUsers)
 }
 
+// N.B if the tests are failing due to inability to create existing users, manual
+// cleanup of the previus test run might be required, delete the unwanted users via:
+// https://console.firebase.google.com/u/0/project/<project-id>/authentication/users
 func testCreateUsers(t *testing.T) {
 	// Create users with uid
 	for i := 0; i < 3; i++ {
