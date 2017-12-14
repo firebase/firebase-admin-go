@@ -1,5 +1,5 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
 //
+// Copyright 2017 Google Inc. All Rights Reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,15 +18,16 @@
 package firebase
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 
 	"cloud.google.com/go/firestore"
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/storage"
-
-	"os"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -46,9 +47,13 @@ var firebaseScopes = []string{
 // Version of the Firebase Go Admin SDK.
 const Version = "2.2.1"
 
+// FirebaseEnvName is the name of the enviornment variable with the Config.
+var FirebaseEnvName = "FIREBASE_CONFIG"
+
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
 	creds         *google.DefaultCredentials
+	databaseURL   string
 	projectID     string
 	storageBucket string
 	opts          []option.ClientOption
@@ -56,8 +61,9 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	ProjectID     string
-	StorageBucket string
+	DatabaseURL   string `json:"databaseURL"`
+	ProjectID     string `json:"projectId"`
+	StorageBucket string `json:"storageBucket"`
 }
 
 // Auth returns an instance of auth.Client.
@@ -102,9 +108,27 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-
+	firebaseEnvVarConfig := os.Getenv(FirebaseEnvName)
+	fmt.Printf("%s\n---\n", firebaseEnvVarConfig)
+	fbc := Config{}
+	if len(firebaseEnvVarConfig) > 0 {
+		err = json.Unmarshal([]byte(firebaseEnvVarConfig), &fbc)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if config == nil {
-		config = &Config{}
+		config = &fbc
+	} else {
+		if config.DatabaseURL == "" {
+			config.DatabaseURL = fbc.DatabaseURL
+		}
+		if config.ProjectID == "" {
+			config.ProjectID = fbc.ProjectID
+		}
+		if config.StorageBucket == "" {
+			config.StorageBucket = fbc.StorageBucket
+		}
 	}
 
 	var pid string
@@ -118,6 +142,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 
 	return &App{
 		creds:         creds,
+		databaseURL:   config.DatabaseURL,
 		projectID:     pid,
 		storageBucket: config.StorageBucket,
 		opts:          o,
