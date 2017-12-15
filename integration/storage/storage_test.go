@@ -32,7 +32,6 @@ var ctx context.Context
 var client *storage.Client
 
 func TestMain(m *testing.M) {
-	fmt.Println("STODRAGE_TST")
 	flag.Parse()
 	if testing.Short() {
 		log.Println("skipping storage integration tests in short mode.")

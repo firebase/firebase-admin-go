@@ -53,7 +53,6 @@ func TestMain(m *testing.M) {
 		creds *google.DefaultCredentials
 		opts  []option.ClientOption
 	)
-	fmt.Println("AUTH_TEST1")
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {
