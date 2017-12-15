@@ -20,7 +20,6 @@ package firebase
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 
 	"cloud.google.com/go/firestore"
@@ -108,8 +107,9 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-	firebaseEnvVarConfig := os.Getenv(FirebaseEnvName)
 	fbc := Config{}
+
+	confFileName := os.Getenv(FirebaseEnvName)
 	if len(firebaseEnvVarConfig) > 0 {
 		err = json.Unmarshal([]byte(firebaseEnvVarConfig), &fbc)
 		if err != nil {
