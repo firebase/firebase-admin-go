@@ -32,6 +32,7 @@ var ctx context.Context
 var client *storage.Client
 
 func TestMain(m *testing.M) {
+	fmt.Println("STODRAGE_TST")
 	flag.Parse()
 	if testing.Short() {
 		log.Println("skipping storage integration tests in short mode.")
@@ -116,8 +117,5 @@ func verifyBucket(bucket *gcs.BucketHandle) error {
 	}
 
 	// Delete the object
-	if err := o.Delete(ctx); err != nil {
-		return err
-	}
-	return nil
+	return o.Delete(ctx)
 }

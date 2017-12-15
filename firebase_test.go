@@ -16,6 +16,7 @@ package firebase
 
 import (
 	"io/ioutil"
+
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -326,30 +327,33 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestAutoInit(t *testing.T) {
-	firebaseConf := Config{
+func TestAutoInitEnv(t *testing.T) {
+	want := Config{
 		DatabaseURL:   "https://hipster-chat.firebaseio.com",
 		ProjectID:     "hipster-chat",
 		StorageBucket: "hipster-chat.appspot.com",
 	}
+	//	log.Fatal("____", want)
 	FirebaseEnvName = "TEST_CONF_FB"
-	setEnvVar(firebaseConf, t)
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.databaseURL != firebaseConf.DatabaseURL {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, firebaseConf.DatabaseURL)
+	if app.databaseURL != want.DatabaseURL {
+		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, want.DatabaseURL)
 	}
-	if app.projectID != firebaseConf.ProjectID {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, firebaseConf.ProjectID)
+	if app.projectID != want.ProjectID {
+		t.Errorf("app.projectID = %q; want %q", app.projectID, want.ProjectID)
 	}
-	if app.storageBucket != firebaseConf.StorageBucket {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, firebaseConf.StorageBucket)
+	if app.storageBucket != want.StorageBucket {
+		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, want.StorageBucket)
 	}
 }
+
 func TestAutoInitNoEnvVar(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
+
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -366,12 +370,14 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 }
 
 func TestAutoInitPartialOverride(t *testing.T) {
-	firebaseConf := Config{
-		DatabaseURL: "https://hipster-chat.firebaseio.com",
-		ProjectID:   "hipster-chat",
-	}
 	FirebaseEnvName = "TEST_CONF_FB"
-	setEnvVar(firebaseConf, t)
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
+
+	want := Config{
+		DatabaseURL:   "database1",
+		ProjectID:     "hipster-chat",
+		StorageBucket: "sb1",
+	}
 	app, err := NewApp(context.Background(), &Config{
 		DatabaseURL:   "database1",
 		StorageBucket: "sb1",
@@ -379,23 +385,37 @@ func TestAutoInitPartialOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.databaseURL != "database1" {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "database1")
+	if app.databaseURL != want.DatabaseURL {
+		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, want.DatabaseURL)
 	}
-	if app.projectID != "hipster-chat" {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, "hipster-chat")
+	if app.projectID != want.ProjectID {
+		t.Errorf("app.projectID = %q; want %q", app.projectID, want.ProjectID)
 	}
-	if app.storageBucket != "sb1" {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "sb1")
+	if app.storageBucket != want.StorageBucket {
+		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, want.StorageBucket)
 	}
 }
 
-func setEnvVar(firebaseConf Config, t *testing.T) {
-	b, err := json.Marshal(firebaseConf)
-	if err != nil {
-		t.Fatal(err)
+func TestAutoInitNoFile(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_NF"
+	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
+
+	_, err := NewApp(context.Background(), &Config{})
+	we := "open testdata/no_such_file.json: no such file or directory"
+	if err.Error() != we {
+		t.Errorf("got error = %s; wanted %s", err, we)
 	}
-	os.Setenv(FirebaseEnvName, string(b))
+}
+
+func TestAutoInitBadJson(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_BAD"
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_json.json")
+
+	_, err := NewApp(context.Background(), &Config{})
+	we := "unexpected end of JSON input"
+	if err.Error() != we {
+		t.Errorf("got error = %s; wanted %s", err, we)
+	}
 }
 
 type testTokenSource struct {

@@ -48,6 +48,7 @@ func TestMain(m *testing.M) {
 		ctx   context.Context
 		creds *google.DefaultCredentials
 	)
+	fmt.Println("AUTH_TEST1")
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
 		if err != nil {

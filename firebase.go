@@ -20,6 +20,7 @@ package firebase
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"os"
 
 	"cloud.google.com/go/firestore"
@@ -107,17 +108,13 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-	fbc := Config{}
-
-	confFileName := os.Getenv(FirebaseEnvName)
-	if len(firebaseEnvVarConfig) > 0 {
-		err = json.Unmarshal([]byte(firebaseEnvVarConfig), &fbc)
-		if err != nil {
-			return nil, err
-		}
+	fbc, err := getDefaultConfig()
+	if err != nil {
+		return nil, err
 	}
+
 	if config == nil {
-		config = &fbc
+		config = fbc
 	} else {
 		if config.DatabaseURL == "" {
 			config.DatabaseURL = fbc.DatabaseURL
@@ -146,4 +143,20 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		storageBucket: config.StorageBucket,
 		opts:          o,
 	}, nil
+}
+
+func getDefaultConfig() (*Config, error) {
+	fbc := &Config{}
+	confFileName := os.Getenv(FirebaseEnvName)
+	if len(confFileName) > 0 {
+		dat, err := ioutil.ReadFile(confFileName)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(dat, fbc)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return fbc, nil
 }

@@ -37,6 +37,7 @@ const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verif
 var client *auth.Client
 
 func TestMain(m *testing.M) {
+	fmt.Println("AUTH_TEST")
 	flag.Parse()
 	if testing.Short() {
 		log.Println("skipping auth integration tests in short mode.")
