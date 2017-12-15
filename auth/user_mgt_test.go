@@ -709,12 +709,13 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	})
 	s.Srv = httptest.NewServer(handler)
 
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{
+	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{testToken}),
 		},
 		Version: testVersion,
-	})
+	}
+	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}

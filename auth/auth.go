@@ -101,6 +101,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 		email = svcAcct.ClientEmail
 	}
+
 	var snr signer
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}

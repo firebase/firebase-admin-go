@@ -41,6 +41,10 @@ var testIDToken string
 var testGetUserResponse []byte
 var testListUsersResponse []byte
 
+var defaultTestOpts = []option.ClientOption{
+	option.WithCredentialsFile("../testdata/service_account.json"),
+}
+
 func TestMain(m *testing.M) {
 	var (
 		err   error
@@ -63,7 +67,7 @@ func TestMain(m *testing.M) {
 		}
 	} else {
 		ctx = context.Background()
-		opts = append(opts, option.WithCredentialsFile("../testdata/service_account.json"))
+		opts = defaultTestOpts
 		creds, err = transport.Creds(ctx, opts...)
 		if err != nil {
 			log.Fatalln(err)
@@ -171,7 +175,9 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(context.Background(), &internal.AuthConfig{})
+	// AuthConfig with nil Creds
+	conf := &internal.AuthConfig{Opts: defaultTestOpts}
+	s, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +244,9 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(context.Background(), &internal.AuthConfig{})
+	// AuthConfig with empty ProjectID
+	conf := &internal.AuthConfig{Opts: defaultTestOpts}
+	c, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
