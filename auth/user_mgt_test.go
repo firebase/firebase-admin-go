@@ -25,8 +25,11 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
+
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 var testUser = &UserRecord{
@@ -621,24 +624,17 @@ func TestMakeExportedUser(t *testing.T) {
 }
 
 func TestHTTPError(t *testing.T) {
-	s := mockAuthServer{}
-	s.Srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.Req = append(s.Req, r)
-		w.WriteHeader(500)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error":"test"}`))
-	}))
+	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
+	s.Status = 500
 
-	client, err := NewClient(context.Background(), &internal.AuthConfig{})
-	if err != nil {
-		t.Fatal()
+	u, err := s.Client.GetUser(context.Background(), "some uid")
+	if u != nil || err == nil {
+		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 	}
-	client.url = s.Srv.URL + "/"
 
 	want := `http error status: 500; reason: {"error":"test"}`
-	_, err = client.GetUser(context.Background(), "some uid")
-	if err == nil || err.Error() != want {
+	if err.Error() != want {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
 	}
 }
@@ -664,7 +660,6 @@ type mockAuthServer struct {
 func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	var b []byte
 	var err error
-	testVersion := "test.version"
 	switch v := resp.(type) {
 	case nil:
 		b = []byte("")
@@ -678,19 +673,30 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	}
 	s := mockAuthServer{Resp: b}
 
+	const testToken = "test.token"
+	const testVersion = "test.version"
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		reqBody, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.Req = append(s.Req, r)
-		vh := r.Header.Get("X-Client-Version")
-		wantvh := "Go/Admin/" + testVersion
-		if vh != wantvh {
-			t.Errorf("version header = %s; want: %s", vh, wantvh)
-		}
 		s.Rbody = reqBody
+		s.Req = append(s.Req, r)
+
+		gh := r.Header.Get("Authorization")
+		wh := "Bearer " + testToken
+		if gh != wh {
+			t.Errorf("Authorization header = %q; want = %q", gh, wh)
+		}
+
+		gh = r.Header.Get("X-Client-Version")
+		wh = "Go/Admin/" + testVersion
+		if gh != wh {
+			t.Errorf("X-Client-Version header = %q; want: %q", gh, wh)
+		}
+
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}
@@ -702,7 +708,14 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	})
 	s.Srv = httptest.NewServer(handler)
-	authClient, err := NewClient(context.Background(), &internal.AuthConfig{Version: testVersion})
+
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{testToken}),
+		},
+		Version: testVersion,
+	}
+	authClient, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,4 +726,12 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.Srv.Close()
+}
+
+type mockTokenSource struct {
+	AccessToken string
+}
+
+func (m *mockTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: m.AccessToken}, nil
 }
