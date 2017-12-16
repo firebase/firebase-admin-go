@@ -336,7 +336,7 @@ func TestAutoInitEnv(t *testing.T) {
 	//	log.Fatal("____", want)
 	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
-	app, err := NewApp(context.Background(), nil)
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestAutoInitEnv(t *testing.T) {
 func TestAutoInitNoEnvVar(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
 
-	app, err := NewApp(context.Background(), nil)
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,10 +378,12 @@ func TestAutoInitPartialOverride(t *testing.T) {
 		ProjectID:     "hipster-chat",
 		StorageBucket: "sb1",
 	}
-	app, err := NewApp(context.Background(), &Config{
-		DatabaseURL:   "database1",
-		StorageBucket: "sb1",
-	})
+	app, err := NewApp(context.Background(),
+		&Config{
+			DatabaseURL:   "database1",
+			StorageBucket: "sb1",
+		},
+		option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
