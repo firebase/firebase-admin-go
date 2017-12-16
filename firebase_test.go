@@ -361,8 +361,8 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 	if app.databaseURL != "" {
 		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "")
 	}
-	if app.projectID != "" {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, "")
+	if app.projectID != "mock-project-id" { // Value from Credentials
+		t.Errorf("app.projectID = %q; want %q", app.projectID, "mock-project-id")
 	}
 	if app.storageBucket != "" {
 		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
@@ -402,7 +402,7 @@ func TestAutoInitNoFile(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NF"
 	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
 
-	_, err := NewApp(context.Background(), &Config{})
+	_, err := NewApp(context.Background(), &Config{}, option.WithCredentialsFile("testdata/service_account.json"))
 	we := "open testdata/no_such_file.json: no such file or directory"
 	if err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
@@ -413,7 +413,7 @@ func TestAutoInitBadJson(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_BAD"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_json.json")
 
-	_, err := NewApp(context.Background(), &Config{})
+	_, err := NewApp(context.Background(), &Config{}, option.WithCredentialsFile("testdata/service_account.json"))
 	we := "unexpected end of JSON input"
 	if err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
