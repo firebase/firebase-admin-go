@@ -108,14 +108,16 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-	fbc, err := getDefaultConfig()
-	if err != nil {
-		return nil, err
-	}
 
 	if config == nil {
-		config = fbc
-	} else {
+		config = &Config{}
+	}
+	var fbc *Config
+	if config.DatabaseURL == "" || config.ProjectID == "" || config.StorageBucket == "" {
+		fbc, err = getDefaultConfig()
+		if err != nil {
+			return nil, err
+		}
 		if config.DatabaseURL == "" {
 			config.DatabaseURL = fbc.DatabaseURL
 		}

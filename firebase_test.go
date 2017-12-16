@@ -408,6 +408,17 @@ func TestAutoInitNoFile(t *testing.T) {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}
 }
+func TestAutoInitNoFileButNotNeeded(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_NF_NN"
+	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
+
+	_, err := NewApp(context.Background(),
+		&Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"},
+		option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Error(err)
+	}
+}
 
 func TestAutoInitBadJson(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_BAD"
