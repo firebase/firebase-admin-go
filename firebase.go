@@ -112,9 +112,8 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if config == nil {
 		config = &Config{}
 	}
-	var fbc *Config
 	if config.DatabaseURL == "" || config.ProjectID == "" || config.StorageBucket == "" {
-		fbc, err = getDefaultConfig()
+		fbc, err := getDefaultConfig()
 		if err != nil {
 			return nil, err
 		}
