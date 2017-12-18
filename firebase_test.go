@@ -333,8 +333,6 @@ func TestAutoInitEnv(t *testing.T) {
 		ProjectID:     "hipster-chat",
 		StorageBucket: "hipster-chat.appspot.com",
 	}
-	//	log.Fatal("____", want)
-	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
 	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
 	if err != nil {
