@@ -334,7 +334,9 @@ func TestAutoInitEnv(t *testing.T) {
 		StorageBucket: "hipster-chat.appspot.com",
 	}
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	defer os.Unsetenv(FirebaseEnvName)
+
+	app, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,15 +354,16 @@ func TestAutoInitEnv(t *testing.T) {
 func TestAutoInitNoEnvVar(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
 
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	app, err := NewApp(context.Background(), nil)
+
 	if err != nil {
 		t.Fatal(err)
 	}
 	if app.databaseURL != "" {
 		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "")
 	}
-	if app.projectID != "mock-project-id" { // Value from Credentials
-		t.Errorf("app.projectID = %q; want %q", app.projectID, "mock-project-id")
+	if app.projectID != "" {
+		t.Errorf("app.projectID = %q; want %q", app.projectID, "")
 	}
 	if app.storageBucket != "" {
 		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
@@ -370,7 +373,7 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 func TestAutoInitPartialOverride(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
-
+	defer os.Unsetenv(FirebaseEnvName)
 	want := Config{
 		DatabaseURL:   "database1",
 		ProjectID:     "hipster-chat",
@@ -380,8 +383,8 @@ func TestAutoInitPartialOverride(t *testing.T) {
 		&Config{
 			DatabaseURL:   "database1",
 			StorageBucket: "sb1",
-		},
-		option.WithCredentialsFile("testdata/service_account.json"))
+		})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,9 +402,10 @@ func TestAutoInitPartialOverride(t *testing.T) {
 func TestAutoInitNoFile(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NF"
 	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
-
-	_, err := NewApp(context.Background(), &Config{}, option.WithCredentialsFile("testdata/service_account.json"))
+	defer os.Unsetenv(FirebaseEnvName)
+	_, err := NewApp(context.Background(), &Config{})
 	we := "open testdata/no_such_file.json: no such file or directory"
+
 	if err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}
@@ -409,10 +413,11 @@ func TestAutoInitNoFile(t *testing.T) {
 func TestAutoInitNoFileButNotNeeded(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NF_NN"
 	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
+	defer os.Unsetenv(FirebaseEnvName)
 
 	_, err := NewApp(context.Background(),
-		&Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"},
-		option.WithCredentialsFile("testdata/service_account.json"))
+		&Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"})
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -421,11 +426,20 @@ func TestAutoInitNoFileButNotNeeded(t *testing.T) {
 func TestAutoInitBadJson(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_BAD"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_json.json")
+	_, err := NewApp(context.Background(), &Config{})
+	os.Unsetenv(FirebaseEnvName)
 
-	_, err := NewApp(context.Background(), &Config{}, option.WithCredentialsFile("testdata/service_account.json"))
 	we := "unexpected end of JSON input"
 	if err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
+	}
+
+}
+func TestAutoInitempty(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_B"
+	_, err := NewApp(context.Background(), nil)
+	if err != nil {
+		t.Errorf("got error = %s; wanted nil", err)
 	}
 }
 
