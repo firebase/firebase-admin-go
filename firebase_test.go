@@ -329,9 +329,9 @@ func TestVersion(t *testing.T) {
 
 func TestAutoInitEnv(t *testing.T) {
 	want := Config{
-		DatabaseURL:   "https://hipster-chat.firebaseio.com",
-		ProjectID:     "hipster-chat",
-		StorageBucket: "hipster-chat.appspot.com",
+		DatabaseURL:   "https://hipster-chat.firebaseio.mock",
+		ProjectID:     "hipster-chat-mock",
+		StorageBucket: "hipster-chat.appspot.mock",
 	}
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
 	defer os.Unsetenv(FirebaseEnvName)
@@ -370,19 +370,38 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 	}
 }
 
+func TestAutoInitNoEnvVarWithConfigOptions(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
+
+	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.databaseURL != "" {
+		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "")
+	}
+	if app.projectID != "mock-project-id" { // value from credentials
+		t.Errorf("app.projectID = %q; want %q", app.projectID, "mock-project-id")
+	}
+	if app.storageBucket != "" {
+		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
+	}
+}
+
 func TestAutoInitPartialOverride(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
 	defer os.Unsetenv(FirebaseEnvName)
 	want := Config{
-		DatabaseURL:   "database1",
-		ProjectID:     "hipster-chat",
-		StorageBucket: "sb1",
+		DatabaseURL:   "database1-mock",
+		ProjectID:     "hipster-chat-mock",
+		StorageBucket: "sb1-mock",
 	}
 	app, err := NewApp(context.Background(),
 		&Config{
-			DatabaseURL:   "database1",
-			StorageBucket: "sb1",
+			DatabaseURL:   "database1-mock",
+			StorageBucket: "sb1-mock",
 		})
 
 	if err != nil {
