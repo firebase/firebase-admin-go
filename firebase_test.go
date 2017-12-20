@@ -436,7 +436,7 @@ func TestAutoInitNoFile(t *testing.T) {
 	_, err := NewApp(context.Background(), &Config{})
 	we := "open testdata/no_such_file.json: no such file or directory"
 
-	if err.Error() != we {
+	if err == nil || err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}
 }
@@ -460,9 +460,51 @@ func TestAutoInitNoFileButNotNeeded(t *testing.T) {
 	}
 }
 
+func TestAutoInitBadJsonKey(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_BAD"
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_key.json")
+	defer os.Unsetenv(FirebaseEnvName)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
+	_, err := NewApp(context.Background(), &Config{})
+
+	we := "invalid config value in config file"
+	if err == nil || err.Error() != we {
+		t.Errorf("got error = %s; wanted %s", err, we)
+	}
+}
+
 func TestAutoInitBadJson(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_BAD"
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_json.json")
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad.json")
+	defer os.Unsetenv(FirebaseEnvName)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
+	_, err := NewApp(context.Background(), &Config{})
+
+	we := "invalid character 'b' looking for beginning of value"
+	if err == nil || err.Error() != we {
+		t.Errorf("got error = %s; wanted %s", err, we)
+	}
+}
+
+func TestAutoInitEmptyJson(t *testing.T) {
+	FirebaseEnvName = "TEST_CONF_FB_BAD"
+	os.Setenv(FirebaseEnvName, "testdata/firebase_config_empty.json")
 	defer os.Unsetenv(FirebaseEnvName)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
@@ -476,11 +518,11 @@ func TestAutoInitBadJson(t *testing.T) {
 	_, err := NewApp(context.Background(), &Config{})
 
 	we := "unexpected end of JSON input"
-	if err.Error() != we {
+	if err == nil || err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}
-
 }
+
 func TestAutoInitempty(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_B"
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"

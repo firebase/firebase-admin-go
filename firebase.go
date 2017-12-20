@@ -153,6 +153,9 @@ func ammendDefaultConfig(config *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	for k, v := range fbc {
+//VISH
+	}
 	if config.DatabaseURL == "" {
 		config.DatabaseURL = fbc.DatabaseURL
 	}
