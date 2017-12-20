@@ -353,7 +353,6 @@ func TestAutoInitEnv(t *testing.T) {
 
 func TestAutoInitNoEnvVar(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
-
 	app, err := NewApp(context.Background(), nil)
 
 	if err != nil {
@@ -370,6 +369,7 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 	}
 }
 
+/*
 func TestAutoInitNoEnvVarWithConfigOptions(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
 
@@ -388,7 +388,7 @@ func TestAutoInitNoEnvVarWithConfigOptions(t *testing.T) {
 		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
 	}
 }
-
+*/
 func TestAutoInitPartialOverride(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
