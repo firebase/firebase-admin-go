@@ -475,7 +475,7 @@ func TestAutoInitBadJsonKey(t *testing.T) {
 
 	_, err := NewApp(context.Background(), &Config{})
 
-	we := "invalid config value in config file"
+	we := "unexpected field databaseUrl in JSON config file"
 	if err == nil || err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}

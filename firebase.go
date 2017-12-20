@@ -20,6 +20,7 @@ package firebase
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -57,6 +58,12 @@ type App struct {
 	projectID     string
 	storageBucket string
 	opts          []option.ClientOption
+}
+
+var validConfigFieldNames = map[string]bool{
+	"databaseURL":true,
+	"projectId":true,
+	"storageBucket":true,
 }
 
 // Config represents the configuration used to initialize an App.
@@ -153,8 +160,14 @@ func ammendDefaultConfig(config *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range fbc {
-//VISH
+	
+	jsonData :=  map[string]string{}
+	json.Unmarshal(dat, &jsonData)
+	
+	for k, _ := range jsonData {
+		if _,ok := validConfigFieldNames[k]; !ok{
+			return nil,  errors.New(fmt.Sprintf(`unexpected field %s in JSON config file`, k))
+		}
 	}
 	if config.DatabaseURL == "" {
 		config.DatabaseURL = fbc.DatabaseURL
