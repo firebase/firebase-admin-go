@@ -398,7 +398,7 @@ func TestAutoInitPartialOverride(t *testing.T) {
 
 	want := Config{
 		DatabaseURL:   "database1-mock",
-		ProjectID:     "hipster-chat-mock",
+		ProjectID:     "mock-project-id", // from default credentials
 		StorageBucket: "sb1-mock",
 	}
 	app, err := NewApp(context.Background(),

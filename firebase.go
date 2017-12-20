@@ -112,20 +112,9 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if config == nil {
 		config = &Config{}
 	}
-	if config.DatabaseURL == "" || config.ProjectID == "" || config.StorageBucket == "" {
-		fbc, err := getDefaultConfig()
-		if err != nil {
-			return nil, err
-		}
-		if config.DatabaseURL == "" {
-			config.DatabaseURL = fbc.DatabaseURL
-		}
-		if config.ProjectID == "" {
-			config.ProjectID = fbc.ProjectID
-		}
-		if config.StorageBucket == "" {
-			config.StorageBucket = fbc.StorageBucket
-		}
+	config, err = ammendDefaultConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	var pid string
@@ -146,18 +135,33 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}, nil
 }
 
-func getDefaultConfig() (*Config, error) {
+func ammendDefaultConfig(config *Config) (*Config, error) {
+	if config.DatabaseURL != "" || config.ProjectID != "" || config.StorageBucket != "" {
+		return config, nil
+	}
+
 	fbc := &Config{}
 	confFileName := os.Getenv(FirebaseEnvName)
-	if len(confFileName) > 0 {
-		dat, err := ioutil.ReadFile(confFileName)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(dat, fbc)
-		if err != nil {
-			return nil, err
-		}
+	if len(confFileName) == 0 {
+		return config, nil
 	}
-	return fbc, nil
+	dat, err := ioutil.ReadFile(confFileName)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(dat, fbc)
+	if err != nil {
+		return nil, err
+	}
+	if config.DatabaseURL == "" {
+		config.DatabaseURL = fbc.DatabaseURL
+	}
+	if config.ProjectID == "" {
+		config.ProjectID = fbc.ProjectID
+	}
+	if config.StorageBucket == "" {
+		config.StorageBucket = fbc.StorageBucket
+	}
+
+	return config, nil
 }
