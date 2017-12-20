@@ -116,5 +116,8 @@ func verifyBucket(bucket *gcs.BucketHandle) error {
 	}
 
 	// Delete the object
-	return o.Delete(ctx)
+	if err := o.Delete(ctx); err != nil {
+		return err
+	}
+	return nil
 }
