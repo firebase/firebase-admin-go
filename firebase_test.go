@@ -335,6 +335,13 @@ func TestAutoInitEnv(t *testing.T) {
 	}
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
 	defer os.Unsetenv(FirebaseEnvName)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
@@ -353,27 +360,15 @@ func TestAutoInitEnv(t *testing.T) {
 
 func TestAutoInitNoEnvVar(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
-	app, err := NewApp(context.Background(), nil)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
 
-	if err != nil {
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
 		t.Fatal(err)
 	}
-	if app.databaseURL != "" {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "")
-	}
-	if app.projectID != "" {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, "")
-	}
-	if app.storageBucket != "" {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
-	}
-}
+	defer os.Setenv(varName, current)
 
-/*
-func TestAutoInitNoEnvVarWithConfigOptions(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
-
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
+	app, err := NewApp(context.Background(), nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -388,11 +383,19 @@ func TestAutoInitNoEnvVarWithConfigOptions(t *testing.T) {
 		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
 	}
 }
-*/
+
 func TestAutoInitPartialOverride(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
 	defer os.Unsetenv(FirebaseEnvName)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
 	want := Config{
 		DatabaseURL:   "database1-mock",
 		ProjectID:     "hipster-chat-mock",
@@ -422,6 +425,14 @@ func TestAutoInitNoFile(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NF"
 	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
 	defer os.Unsetenv(FirebaseEnvName)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
 	_, err := NewApp(context.Background(), &Config{})
 	we := "open testdata/no_such_file.json: no such file or directory"
 
@@ -433,6 +444,13 @@ func TestAutoInitNoFileButNotNeeded(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_NF_NN"
 	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
 	defer os.Unsetenv(FirebaseEnvName)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
 
 	_, err := NewApp(context.Background(),
 		&Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"})
@@ -445,8 +463,17 @@ func TestAutoInitNoFileButNotNeeded(t *testing.T) {
 func TestAutoInitBadJson(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_BAD"
 	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_json.json")
+	defer os.Unsetenv(FirebaseEnvName)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
 	_, err := NewApp(context.Background(), &Config{})
-	os.Unsetenv(FirebaseEnvName)
 
 	we := "unexpected end of JSON input"
 	if err.Error() != we {
@@ -456,6 +483,14 @@ func TestAutoInitBadJson(t *testing.T) {
 }
 func TestAutoInitempty(t *testing.T) {
 	FirebaseEnvName = "TEST_CONF_FB_B"
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	current := os.Getenv(varName)
+
+	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(varName, current)
+
 	_, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Errorf("got error = %s; wanted nil", err)
