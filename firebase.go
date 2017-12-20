@@ -23,6 +23,7 @@ import (
 	"cloud.google.com/go/firestore"
 
 	"firebase.google.com/go/auth"
+	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/storage"
 
@@ -87,6 +88,15 @@ func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
 		return nil, errors.New("project id is required to access Firestore")
 	}
 	return firestore.NewClient(ctx, a.projectID, a.opts...)
+}
+
+// InstanceID returns an instance of iid.Client.
+func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
+	conf := &internal.InstanceIDConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+	}
+	return iid.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
