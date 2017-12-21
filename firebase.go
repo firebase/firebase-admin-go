@@ -129,7 +129,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if config == nil {
 		config = &Config{}
 	}
-	config, err = ammendDefaultConfig(config)
+	config, err = amendDefaultConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}, nil
 }
 
-func ammendDefaultConfig(config *Config) (*Config, error) {
+func amendDefaultConfig(config *Config) (*Config, error) {
 	fbc := &Config{}
 	confFileName := os.Getenv(FirebaseEnvName)
 	if len(confFileName) == 0 {
