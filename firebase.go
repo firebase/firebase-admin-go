@@ -49,7 +49,7 @@ var firebaseScopes = []string{
 const Version = "2.2.1"
 
 // FirebaseEnvName is the name of the enviornment variable with the Config.
-var FirebaseEnvName = "FIREBASE_CONFIG"
+const FirebaseEnvName = "FIREBASE_CONFIG"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
@@ -61,9 +61,9 @@ type App struct {
 }
 
 var validConfigFieldNames = map[string]bool{
-	"databaseURL":true,
-	"projectId":true,
-	"storageBucket":true,
+	"databaseURL":   true,
+	"projectId":     true,
+	"storageBucket": true,
 }
 
 // Config represents the configuration used to initialize an App.
@@ -143,10 +143,6 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 }
 
 func ammendDefaultConfig(config *Config) (*Config, error) {
-	if config.DatabaseURL != "" || config.ProjectID != "" || config.StorageBucket != "" {
-		return config, nil
-	}
-
 	fbc := &Config{}
 	confFileName := os.Getenv(FirebaseEnvName)
 	if len(confFileName) == 0 {
@@ -160,13 +156,11 @@ func ammendDefaultConfig(config *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	jsonData :=  map[string]string{}
+	jsonData := map[string]string{}
 	json.Unmarshal(dat, &jsonData)
-	
-	for k, _ := range jsonData {
-		if _,ok := validConfigFieldNames[k]; !ok{
-			return nil,  errors.New(fmt.Sprintf(`unexpected field %s in JSON config file`, k))
+	for k := range jsonData {
+		if _, ok := validConfigFieldNames[k]; !ok {
+			return nil, fmt.Errorf(`unexpected field %s in JSON config file`, k)
 		}
 	}
 	if config.DatabaseURL == "" {

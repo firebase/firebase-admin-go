@@ -328,150 +328,139 @@ func TestVersion(t *testing.T) {
 }
 
 func TestAutoInitEnv(t *testing.T) {
-	want := Config{
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
+
+	app, err := NewApp(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &Config{
 		DatabaseURL:   "https://hipster-chat.firebaseio.mock",
 		ProjectID:     "hipster-chat-mock",
 		StorageBucket: "hipster-chat.appspot.mock",
 	}
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config.json")
-	defer os.Unsetenv(FirebaseEnvName)
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
-
-	app, err := NewApp(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if app.databaseURL != want.DatabaseURL {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, want.DatabaseURL)
-	}
-	if app.projectID != want.ProjectID {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, want.ProjectID)
-	}
-	if app.storageBucket != want.StorageBucket {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, want.StorageBucket)
-	}
+	compareConfig(app, want, t)
 }
 
 func TestAutoInitNoEnvVar(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_NO_SUCH_VAR"
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
-
-	app, err := NewApp(context.Background(), nil)
-
+	err := os.Unsetenv(FirebaseEnvName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.databaseURL != "" {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, "")
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
+
+	app, err := NewApp(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if app.projectID != "mock-project-id" { // value from credentials
-		t.Errorf("app.projectID = %q; want %q", app.projectID, "mock-project-id")
+	want := &Config{
+		DatabaseURL:   "",
+		ProjectID:     "mock-project-id", // from default credentials
+		StorageBucket: "",
 	}
-	if app.storageBucket != "" {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, "")
-	}
+	compareConfig(app, want, t)
 }
 
 func TestAutoInitPartialOverride(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB"
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config_partial.json")
-	defer os.Unsetenv(FirebaseEnvName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
-
-	want := Config{
-		DatabaseURL:   "database1-mock",
-		ProjectID:     "mock-project-id", // from default credentials
-		StorageBucket: "sb1-mock",
-	}
 	app, err := NewApp(context.Background(),
 		&Config{
-			DatabaseURL:   "database1-mock",
+			DatabaseURL:   "db1-mock",
 			StorageBucket: "sb1-mock",
 		})
-
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.databaseURL != want.DatabaseURL {
-		t.Errorf("app.databaseURL = %q; want %q", app.databaseURL, want.DatabaseURL)
+
+	want := &Config{
+		DatabaseURL:   "db1-mock",
+		ProjectID:     "hipster-chat-mock",
+		StorageBucket: "sb1-mock",
 	}
-	if app.projectID != want.ProjectID {
-		t.Errorf("app.projectID = %q; want %q", app.projectID, want.ProjectID)
+	compareConfig(app, want, t)
+}
+
+func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	os.Unsetenv(FirebaseEnvName)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
+
+	app, err := NewApp(context.Background(),
+		&Config{
+			DatabaseURL: "db1-mock",
+			ProjectID:   "pid1-mock",
+		})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if app.storageBucket != want.StorageBucket {
-		t.Errorf("app.storageBucket = %q; want %q", app.storageBucket, want.StorageBucket)
+
+	want := &Config{
+		DatabaseURL: "db1-mock",
+		ProjectID:   "pid1-mock",
 	}
+	compareConfig(app, want, t)
 }
 
 func TestAutoInitNoFile(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_NF"
-	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
-	defer os.Unsetenv(FirebaseEnvName)
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/no_such_file.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
 	_, err := NewApp(context.Background(), &Config{})
-	we := "open testdata/no_such_file.json: no such file or directory"
 
+	we := "open testdata/no_such_file.json: no such file or directory"
 	if err == nil || err.Error() != we {
 		t.Errorf("got error = %s; wanted %s", err, we)
 	}
 }
+
 func TestAutoInitNoFileButNotNeeded(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_NF_NN"
-	os.Setenv(FirebaseEnvName, "testdata/no_such_file.json")
-	defer os.Unsetenv(FirebaseEnvName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/no_such_file.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+	we := "open testdata/no_such_file.json: no such file or directory"
 
-	_, err := NewApp(context.Background(),
-		&Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"})
-
-	if err != nil {
-		t.Error(err)
+	_, err := NewApp(context.Background(), &Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"})
+	if err == nil || err.Error() != we {
+		t.Errorf("got error = %s; wanted %s", err, we)
 	}
 }
 
 func TestAutoInitBadJsonKey(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_BAD"
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad_key.json")
-	defer os.Unsetenv(FirebaseEnvName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_bad_key.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
 	_, err := NewApp(context.Background(), &Config{})
 
@@ -482,17 +471,12 @@ func TestAutoInitBadJsonKey(t *testing.T) {
 }
 
 func TestAutoInitBadJson(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_BAD"
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config_bad.json")
-	defer os.Unsetenv(FirebaseEnvName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_bad.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
 	_, err := NewApp(context.Background(), &Config{})
 
@@ -503,17 +487,12 @@ func TestAutoInitBadJson(t *testing.T) {
 }
 
 func TestAutoInitEmptyJson(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_BAD"
-	os.Setenv(FirebaseEnvName, "testdata/firebase_config_empty.json")
-	defer os.Unsetenv(FirebaseEnvName)
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_empty.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
 	_, err := NewApp(context.Background(), &Config{})
 
@@ -523,20 +502,47 @@ func TestAutoInitEmptyJson(t *testing.T) {
 	}
 }
 
-func TestAutoInitempty(t *testing.T) {
-	FirebaseEnvName = "TEST_CONF_FB_B"
+func TestAutoInitNilOptionsNoConfig(t *testing.T) {
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	os.Unsetenv(FirebaseEnvName)
+
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
-
-	_, err := NewApp(context.Background(), nil)
+	app, err := NewApp(context.Background(), nil)
 	if err != nil {
 		t.Errorf("got error = %s; wanted nil", err)
 	}
+
+	want := &Config{
+		DatabaseURL:   "",
+		ProjectID:     "mock-project-id", // from default credentials
+		StorageBucket: "",
+	}
+	compareConfig(app, want, t)
+}
+
+func TestAutoInitNilOptionsWithConfig(t *testing.T) {
+	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json", t)
+	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
+	defer reinstateEnv(varName, credOld, credExists)
+
+	app, err := NewApp(context.Background(), nil)
+	if err != nil {
+		t.Errorf("got error = %s; wanted nil", err)
+	}
+
+	want := &Config{
+		DatabaseURL:   "https://hipster-chat.firebaseio.mock",
+		ProjectID:     "hipster-chat-mock",
+		StorageBucket: "hipster-chat.appspot.mock",
+	}
+	compareConfig(app, want, t)
 }
 
 type testTokenSource struct {
@@ -549,6 +555,34 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 		AccessToken: t.AccessToken,
 		Expiry:      t.Expiry,
 	}, nil
+}
+
+func overwriteEnv(varName, newVal string, t *testing.T) (string, bool) {
+	oldVal, wasSet := os.LookupEnv(varName)
+	if err := os.Setenv(varName, newVal); err != nil {
+		t.Fatal(err)
+	}
+	return oldVal, wasSet
+}
+
+func reinstateEnv(varName, oldVal string, varSet bool) {
+	if varSet {
+		os.Setenv(varName, oldVal)
+	} else {
+		os.Unsetenv(varName)
+	}
+}
+
+func compareConfig(got *App, want *Config, t *testing.T) {
+	if got.databaseURL != want.DatabaseURL {
+		t.Errorf("app.databaseURL = %q; want %q", got.databaseURL, want.DatabaseURL)
+	}
+	if got.projectID != want.ProjectID {
+		t.Errorf("app.projectID = %q; want %q", got.projectID, want.ProjectID)
+	}
+	if got.storageBucket != want.StorageBucket {
+		t.Errorf("app.storageBucket = %q; want %q", got.storageBucket, want.StorageBucket)
+	}
 }
 
 // mockServiceAcct generates a service account configuration with the provided URL as the
