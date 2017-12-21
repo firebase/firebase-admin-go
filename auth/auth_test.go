@@ -41,12 +41,17 @@ var testIDToken string
 var testGetUserResponse []byte
 var testListUsersResponse []byte
 
+var defaultTestOpts = []option.ClientOption{
+	option.WithCredentialsFile("../testdata/service_account.json"),
+}
+
 func TestMain(m *testing.M) {
 	var (
 		err   error
 		ks    keySource
 		ctx   context.Context
 		creds *google.DefaultCredentials
+		opts  []option.ClientOption
 	)
 	if appengine.IsDevAppServer() {
 		aectx, aedone, err := aetest.NewContext()
@@ -62,8 +67,8 @@ func TestMain(m *testing.M) {
 		}
 	} else {
 		ctx = context.Background()
-		opt := option.WithCredentialsFile("../testdata/service_account.json")
-		creds, err = transport.Creds(ctx, opt)
+		opts = defaultTestOpts
+		creds, err = transport.Creds(ctx, opts...)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -72,7 +77,7 @@ func TestMain(m *testing.M) {
 	}
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
-		Opts:      []option.ClientOption{option.WithCredentialsFile("../testdata/service_account.json")},
+		Opts:      opts,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
@@ -170,7 +175,9 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	s, err := NewClient(context.Background(), &internal.AuthConfig{})
+	// AuthConfig with nil Creds
+	conf := &internal.AuthConfig{Opts: defaultTestOpts}
+	s, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +244,9 @@ func TestVerifyIDTokenError(t *testing.T) {
 }
 
 func TestNoProjectID(t *testing.T) {
-	c, err := NewClient(context.Background(), &internal.AuthConfig{})
+	// AuthConfig with empty ProjectID
+	conf := &internal.AuthConfig{Opts: defaultTestOpts}
+	c, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}

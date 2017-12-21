@@ -173,6 +173,37 @@ func TestHTTPClient(t *testing.T) {
 	}
 }
 
+func TestContext(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{Client: http.DefaultClient}
+	ctx, cancel := context.WithCancel(context.Background())
+	resp, err := client.Do(ctx, &Request{
+		Method: "GET",
+		URL:    server.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
+		t.Fatal(err)
+	}
+
+	cancel()
+	resp, err = client.Do(ctx, &Request{
+		Method: "GET",
+		URL:    server.URL,
+	})
+	if resp != nil || err == nil {
+		t.Errorf("Do() = (%v; %v); want = (nil, error)", resp, err)
+	}
+}
+
 func TestErrorParser(t *testing.T) {
 	data := map[string]interface{}{
 		"error": "test error",
