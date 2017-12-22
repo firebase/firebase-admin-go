@@ -439,11 +439,11 @@ func TestAutoInit(t *testing.T) {
 			},
 		},
 	}
-	/*
-		varName := "GOOGLE_APPLICATION_CREDENTIALS"
-		credOld := overwriteEnv(varName, "testdata/service_account.json")
-		defer reinstateEnv(varName, credOld)
-	*/
+
+	varName := "GOOGLE_APPLICATION_CREDENTIALS"
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			overwriteEnv(FirebaseEnvName, test.confFilename)
