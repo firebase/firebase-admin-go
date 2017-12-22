@@ -450,9 +450,9 @@ func TestAutoInit(t *testing.T) {
 			app, err := NewApp(context.Background(), test.initOptions)
 			if err != nil {
 				t.Error(err)
+			} else {
+				compareConfig(app, test.wantOptions, t)
 			}
-			compareConfig(app, test.wantOptions, t)
-
 		})
 	}
 }
