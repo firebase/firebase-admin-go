@@ -16,6 +16,7 @@ package firebase
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,6 +35,12 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
+
+func TestMain(m *testing.M) {
+	configOld := overwriteEnv(FirebaseEnvName, "")
+	defer reinstateEnv(FirebaseEnvName, configOld)
+	os.Exit(m.Run())
+}
 
 func TestServiceAcctFile(t *testing.T) {
 	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/service_account.json"))
@@ -339,12 +346,12 @@ func TestVersion(t *testing.T) {
 }
 
 func TestAutoInitEnv(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
@@ -359,8 +366,8 @@ func TestAutoInitEnv(t *testing.T) {
 }
 
 func TestAutoInitNoEnvVar(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 
 	err := os.Unsetenv(FirebaseEnvName)
 	if err != nil {
@@ -368,8 +375,8 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 	}
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
@@ -384,12 +391,12 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 }
 
 func TestAutoInitPartialOverride(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(),
 		&Config{
@@ -409,13 +416,13 @@ func TestAutoInitPartialOverride(t *testing.T) {
 }
 
 func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 	os.Unsetenv(FirebaseEnvName)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(),
 		&Config{
@@ -432,99 +439,77 @@ func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
 	}
 	compareConfig(app, want, t)
 }
+func TestAutoInit(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+	}{}
 
-func TestAutoInitNoFile(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/no_such_file.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			overwriteEnv(FirebaseEnvName, test.filename)
+			NewApp(context.Background(), &Config{})
+			//#if err == nil || err.Error() != test.wantError {
+			//	t.Errorf("got error = %s; want %s", err, test.wantError)
 
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
-
-	_, err := NewApp(context.Background(), &Config{})
-
-	we := "open testdata/no_such_file.json: no such file or directory"
-	if err == nil || err.Error() != we {
-		t.Errorf("got error = %s; wanted %s", err, we)
+		})
 	}
 }
 
-func TestAutoInitNoFileButNotNeeded(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/no_such_file.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
-
-	we := "open testdata/no_such_file.json: no such file or directory"
-
-	_, err := NewApp(context.Background(), &Config{DatabaseURL: "d", ProjectID: "p", StorageBucket: "s"})
-	if err == nil || err.Error() != we {
-		t.Errorf("got error = %s; wanted %s", err, we)
+func TestAutoInitBadFiles(t *testing.T) {
+	tests := []struct {
+		name      string
+		filename  string
+		wantError string
+	}{
+		{
+			"nonexistant file",
+			"testdata/no_such_file.json",
+			"open testdata/no_such_file.json: no such file or directory",
+		}, {
+			"JSON with bad key",
+			"testdata/firebase_config_bad_key.json",
+			"unexpected field databaseUr1 in JSON config file",
+		}, {
+			"invalid JSON",
+			"testdata/firebase_config_bad.json",
+			"invalid character 'b' looking for beginning of value",
+		}, {
+			"empty file",
+			"testdata/firebase_config_empty.json",
+			"unexpected end of JSON input",
+		},
 	}
-}
-
-func TestAutoInitBadJsonKey(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_bad_key.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
-	_, err := NewApp(context.Background(), &Config{})
-
-	we := "unexpected field databaseUrl in JSON config file"
-	if err == nil || err.Error() != we {
-		t.Errorf("got error = %s; wanted %s", err, we)
-	}
-}
-
-func TestAutoInitBadJson(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_bad.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
-
-	_, err := NewApp(context.Background(), &Config{})
-
-	we := "invalid character 'b' looking for beginning of value"
-	if err == nil || err.Error() != we {
-		t.Errorf("got error = %s; wanted %s", err, we)
-	}
-}
-
-func TestAutoInitEmptyJson(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_empty.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
-
-	_, err := NewApp(context.Background(), &Config{})
-
-	we := "unexpected end of JSON input"
-	if err == nil || err.Error() != we {
-		t.Errorf("got error = %s; wanted %s", err, we)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			overwriteEnv(FirebaseEnvName, test.filename)
+			_, err := NewApp(context.Background(), &Config{})
+			if err == nil || err.Error() != test.wantError {
+				t.Errorf("got error = %s; want %s", err, test.wantError)
+			}
+		})
 	}
 }
 
 func TestAutoInitNilOptionsNoConfig(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 	os.Unsetenv(FirebaseEnvName)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
-		t.Errorf("got error = %s; wanted nil", err)
+		t.Errorf("got error = %s; want nil", err)
 	}
 
 	want := &Config{
@@ -536,16 +521,16 @@ func TestAutoInitNilOptionsNoConfig(t *testing.T) {
 }
 
 func TestAutoInitNilOptionsWithConfig(t *testing.T) {
-	configOld, configExists := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json", t)
-	defer reinstateEnv(FirebaseEnvName, configOld, configExists)
+	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json")
+	defer reinstateEnv(FirebaseEnvName, configOld)
 
 	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld, credExists := overwriteEnv(varName, "testdata/service_account.json", t)
-	defer reinstateEnv(varName, credOld, credExists)
+	credOld := overwriteEnv(varName, "testdata/service_account.json")
+	defer reinstateEnv(varName, credOld)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
-		t.Errorf("got error = %s; wanted nil", err)
+		t.Errorf("got error = %s; want nil", err)
 	}
 
 	want := &Config{
@@ -554,6 +539,10 @@ func TestAutoInitNilOptionsWithConfig(t *testing.T) {
 		StorageBucket: "hipster-chat.appspot.mock",
 	}
 	compareConfig(app, want, t)
+	//for _, pair := range os.Environ() {
+	//	fmt.Println(pair)
+	//}
+	//	t.Error("fff")
 }
 
 type testTokenSource struct {
@@ -568,16 +557,20 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-func overwriteEnv(varName, newVal string, t *testing.T) (string, bool) {
-	oldVal, wasSet := os.LookupEnv(varName)
-	if err := os.Setenv(varName, newVal); err != nil {
-		t.Fatal(err)
+func overwriteEnv(varName, newVal string) string {
+	oldVal := os.Getenv(varName)
+	if len(newVal) == 0 {
+		if err := os.Unsetenv(varName); err != nil {
+			log.Fatal(err)
+		}
+	} else if err := os.Setenv(varName, newVal); err != nil {
+		log.Fatal(err)
 	}
-	return oldVal, wasSet
+	return oldVal
 }
 
-func reinstateEnv(varName, oldVal string, varSet bool) {
-	if varSet {
+func reinstateEnv(varName, oldVal string) {
+	if len(varName) > 0 {
 		os.Setenv(varName, oldVal)
 	} else {
 		os.Unsetenv(varName)

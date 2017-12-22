@@ -49,7 +49,7 @@ var firebaseScopes = []string{
 // Version of the Firebase Go Admin SDK.
 const Version = "2.2.1"
 
-// FirebaseEnvName is the name of the enviornment variable with the Config.
+// FirebaseEnvName is the name of the environment variable with the Config.
 const FirebaseEnvName = "FIREBASE_CONFIG"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
@@ -129,7 +129,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	if config == nil {
 		config = &Config{}
 	}
-	config, err = amendDefaultConfig(config)
+	err = amendConfigWithDefaults(config)
 	if err != nil {
 		return nil, err
 	}
@@ -152,25 +152,32 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}, nil
 }
 
-func amendDefaultConfig(config *Config) (*Config, error) {
+// amendConfigWithDefaults reads the default config file, defined by the FIREBASE_COFIG
+// env variable, and uses those values where the config is missing values.
+func amendConfigWithDefaults(config *Config) error {
 	fbc := &Config{}
 	confFileName := os.Getenv(FirebaseEnvName)
 	if len(confFileName) == 0 {
-		return config, nil
+		return nil
 	}
 	dat, err := ioutil.ReadFile(confFileName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = json.Unmarshal(dat, fbc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	jsonData := map[string]string{}
 	json.Unmarshal(dat, &jsonData)
+	// TODO: remove this after we support Go 1.10+, specifically "DisallowUnknownFields"
+	//       https://github.com/golang/go/commit/2596a0c075aeddec571cd658f748ac7a712a2b69
+	//  d := json.NewDecoder(bytes.NewReader(dat))
+	//  d.DisallowUnknownFields()
+	//  e := d.Decode(fbc)
 	for k := range jsonData {
 		if _, ok := validConfigFieldNames[k]; !ok {
-			return nil, fmt.Errorf(`unexpected field %s in JSON config file`, k)
+			return fmt.Errorf(`unexpected field %s in JSON config file`, k)
 		}
 	}
 	if config.DatabaseURL == "" {
@@ -183,5 +190,5 @@ func amendDefaultConfig(config *Config) (*Config, error) {
 		config.StorageBucket = fbc.StorageBucket
 	}
 
-	return config, nil
+	return nil
 }
