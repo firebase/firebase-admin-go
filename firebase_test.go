@@ -347,76 +347,6 @@ func TestVersion(t *testing.T) {
 		}
 	}
 }
-
-func TestAutoInitNoEnvVar(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-
-	err := os.Unsetenv(FirebaseEnvName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := &Config{
-		ProjectID:     "mock-project-id", // from default credentials
-		StorageBucket: "",
-	}
-	compareConfig(app, want, t)
-}
-
-func TestAutoInitPartialOverride(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(),
-		&Config{
-			StorageBucket: "sb1-mock",
-		})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := &Config{
-		ProjectID:     "hipster-chat-mock",
-		StorageBucket: "sb1-mock",
-	}
-	compareConfig(app, want, t)
-}
-
-func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config_partial.json")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-	os.Unsetenv(FirebaseEnvName)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(),
-		&Config{
-			ProjectID: "pid1-mock",
-		})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := &Config{
-		ProjectID: "pid1-mock",
-	}
-	compareConfig(app, want, t)
-}
 func TestAutoInit(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -428,9 +358,7 @@ func TestAutoInit(t *testing.T) {
 			"no environment var, no options",
 			"",
 			nil,
-			&Config{
-				ProjectID: "mock-project-id",
-			},
+			&Config{ProjectID: "mock-project-id"}, // from default creds
 		}, {
 			"env var set, options not",
 			"testdata/firebase_config.json",
@@ -438,6 +366,43 @@ func TestAutoInit(t *testing.T) {
 			&Config{
 				ProjectID:     "hipster-chat-mock",
 				StorageBucket: "hipster-chat.appspot.mock",
+			},
+		}, {
+			"partial value override where only some values exist",
+			"testdata/firebase_config_partial.json",
+			&Config{StorageBucket: "sb1-mock"},
+			&Config{
+				ProjectID:     "hipster-chat-mock",
+				StorageBucket: "sb1-mock",
+			},
+		}, {
+			"partial value override without existing settings",
+			"testdata/firebase_config_partial.json",
+			&Config{},
+			&Config{ProjectID: "hipster-chat-mock"},
+		}, {
+			"partial value override does not clobber",
+			"testdata/firebase_config_partial.json",
+			&Config{ProjectID: "pid1-test"},
+			&Config{ProjectID: "pid1-test"},
+		}, {
+			"config file does not clobber but fills in missing value",
+			"testdata/firebase_config.json",
+			&Config{ProjectID: "pid1-test"},
+			&Config{
+				ProjectID:     "pid1-test",
+				StorageBucket: "hipster-chat.appspot.mock",
+			},
+		}, {
+			"config file does not clober, no op when all values present",
+			"testdata/firebase_config.json",
+			&Config{
+				ProjectID:     "pid-test",
+				StorageBucket: "sb1-test",
+			},
+			&Config{
+				ProjectID:     "pid-test",
+				StorageBucket: "sb1-test",
 			},
 		},
 	}
@@ -499,51 +464,6 @@ func TestAutoInitBadFiles(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestAutoInitNilOptionsNoConfig(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-	os.Unsetenv(FirebaseEnvName)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(), nil)
-	if err != nil {
-		t.Errorf("got error = %s; want nil", err)
-	}
-
-	want := &Config{
-		ProjectID:     "mock-project-id", // from default credentials
-		StorageBucket: "",
-	}
-	compareConfig(app, want, t)
-}
-
-func TestAutoInitNilOptionsWithConfig(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(), nil)
-	if err != nil {
-		t.Errorf("got error = %s; want nil", err)
-	}
-
-	want := &Config{
-		ProjectID:     "hipster-chat-mock",
-		StorageBucket: "hipster-chat.appspot.mock",
-	}
-	compareConfig(app, want, t)
-	//for _, pair := range os.Environ() {
-	//	fmt.Println(pair)
-	//}
-	//	t.Error("fff")
 }
 
 type testTokenSource struct {
