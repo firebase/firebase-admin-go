@@ -441,8 +441,10 @@ func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
 }
 func TestAutoInit(t *testing.T) {
 	tests := []struct {
-		name     string
-		filename string
+		name        string
+		filename    string
+		initOptions *Config
+		wantOptions *Config
 	}{}
 
 	for _, test := range tests {

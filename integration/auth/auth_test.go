@@ -28,6 +28,7 @@ import (
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
+	env "firebase.google.com/go/internal"
 
 	"golang.org/x/net/context"
 )
@@ -37,6 +38,13 @@ const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verif
 var client *auth.Client
 
 func TestMain(m *testing.M) {
+	// This isolates the integration tests from a possiblity that the
+	// default config env variable is set to a valid file containing the
+	// wanted default config
+	FirebaseEnvName := "FIREBASE_CONFIG"
+	configOld := env.OverwriteEnv(FirebaseEnvName, "")
+	defer env.ReinstateEnv(FirebaseEnvName, configOld)
+
 	flag.Parse()
 	if testing.Short() {
 		log.Println("skipping auth integration tests in short mode.")
@@ -53,6 +61,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	os.Exit(m.Run())
 }
 

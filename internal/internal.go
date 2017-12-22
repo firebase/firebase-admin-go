@@ -16,6 +16,9 @@
 package internal
 
 import (
+	"log"
+	"os"
+
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -49,4 +52,30 @@ type MockTokenSource struct {
 // Token returns the test token associated with the TokenSource.
 func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
 	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
+}
+
+// OverwriteEnv ovevrwrites env variables, used in testsing.
+func OverwriteEnv(varName, newVal string) string {
+	oldVal := os.Getenv(varName)
+	if len(newVal) == 0 {
+		log.Print(";;;", newVal, "<")
+		if err := os.Unsetenv(varName); err != nil {
+			log.Print(";;gg;")
+			log.Fatal(err)
+		}
+		log.Print(";:;", varName, oldVal, "}}", os.Getenv(varName), "{{")
+	} else if err := os.Setenv(varName, newVal); err != nil {
+		log.Fatal(err)
+	}
+	return oldVal
+}
+
+// ReinstateEnv restores the enviornment variable, will usually be used deferred with OverwriteEnv.
+func ReinstateEnv(varName, oldVal string) {
+	if len(varName) > 0 {
+		os.Setenv(varName, oldVal)
+	} else {
+		os.Unsetenv(varName)
+	}
+	log.Print(";--------;", oldVal)
 }
