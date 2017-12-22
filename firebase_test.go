@@ -37,6 +37,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// This isolates the tests from a possiblity that the
+	// default config env variable is set to a valid file containing the
+	// wanted default config
 	configOld := overwriteEnv(FirebaseEnvName, "")
 	defer reinstateEnv(FirebaseEnvName, configOld)
 	os.Exit(m.Run())
@@ -358,7 +361,6 @@ func TestAutoInitEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &Config{
-		DatabaseURL:   "https://hipster-chat.firebaseio.mock",
 		ProjectID:     "hipster-chat-mock",
 		StorageBucket: "hipster-chat.appspot.mock",
 	}
@@ -383,7 +385,6 @@ func TestAutoInitNoEnvVar(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &Config{
-		DatabaseURL:   "",
 		ProjectID:     "mock-project-id", // from default credentials
 		StorageBucket: "",
 	}
@@ -400,7 +401,6 @@ func TestAutoInitPartialOverride(t *testing.T) {
 
 	app, err := NewApp(context.Background(),
 		&Config{
-			DatabaseURL:   "db1-mock",
 			StorageBucket: "sb1-mock",
 		})
 	if err != nil {
@@ -408,7 +408,6 @@ func TestAutoInitPartialOverride(t *testing.T) {
 	}
 
 	want := &Config{
-		DatabaseURL:   "db1-mock",
 		ProjectID:     "hipster-chat-mock",
 		StorageBucket: "sb1-mock",
 	}
@@ -426,16 +425,14 @@ func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
 
 	app, err := NewApp(context.Background(),
 		&Config{
-			DatabaseURL: "db1-mock",
-			ProjectID:   "pid1-mock",
+			ProjectID: "pid1-mock",
 		})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := &Config{
-		DatabaseURL: "db1-mock",
-		ProjectID:   "pid1-mock",
+		ProjectID: "pid1-mock",
 	}
 	compareConfig(app, want, t)
 }
@@ -471,7 +468,7 @@ func TestAutoInitBadFiles(t *testing.T) {
 		}, {
 			"JSON with bad key",
 			"testdata/firebase_config_bad_key.json",
-			"unexpected field databaseUr1 in JSON config file",
+			"unexpected field project1d in JSON config file",
 		}, {
 			"invalid JSON",
 			"testdata/firebase_config_bad.json",
@@ -494,7 +491,7 @@ func TestAutoInitBadFiles(t *testing.T) {
 			overwriteEnv(FirebaseEnvName, test.filename)
 			_, err := NewApp(context.Background(), &Config{})
 			if err == nil || err.Error() != test.wantError {
-				t.Errorf("got error = %s; want %s", err, test.wantError)
+				t.Errorf("got error = %s; want = %s", err, test.wantError)
 			}
 		})
 	}
@@ -515,7 +512,6 @@ func TestAutoInitNilOptionsNoConfig(t *testing.T) {
 	}
 
 	want := &Config{
-		DatabaseURL:   "",
 		ProjectID:     "mock-project-id", // from default credentials
 		StorageBucket: "",
 	}
@@ -536,7 +532,6 @@ func TestAutoInitNilOptionsWithConfig(t *testing.T) {
 	}
 
 	want := &Config{
-		DatabaseURL:   "https://hipster-chat.firebaseio.mock",
 		ProjectID:     "hipster-chat-mock",
 		StorageBucket: "hipster-chat.appspot.mock",
 	}
@@ -561,7 +556,7 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 
 func overwriteEnv(varName, newVal string) string {
 	oldVal := os.Getenv(varName)
-	if len(newVal) == 0 {
+	if newVal == "" {
 		if err := os.Unsetenv(varName); err != nil {
 			log.Fatal(err)
 		}
@@ -580,14 +575,11 @@ func reinstateEnv(varName, oldVal string) {
 }
 
 func compareConfig(got *App, want *Config, t *testing.T) {
-	if got.databaseURL != want.DatabaseURL {
-		t.Errorf("app.databaseURL = %q; want %q", got.databaseURL, want.DatabaseURL)
-	}
 	if got.projectID != want.ProjectID {
-		t.Errorf("app.projectID = %q; want %q", got.projectID, want.ProjectID)
+		t.Errorf("app.projectID = %q; want = %q", got.projectID, want.ProjectID)
 	}
 	if got.storageBucket != want.StorageBucket {
-		t.Errorf("app.storageBucket = %q; want %q", got.storageBucket, want.StorageBucket)
+		t.Errorf("app.storageBucket = %q; want = %q", got.storageBucket, want.StorageBucket)
 	}
 }
 

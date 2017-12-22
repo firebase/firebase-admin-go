@@ -55,21 +55,18 @@ const FirebaseEnvName = "FIREBASE_CONFIG"
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
 	creds         *google.DefaultCredentials
-	databaseURL   string
 	projectID     string
 	storageBucket string
 	opts          []option.ClientOption
 }
 
 var validConfigFieldNames = map[string]bool{
-	"databaseURL":   true,
 	"projectId":     true,
 	"storageBucket": true,
 }
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	DatabaseURL   string `json:"databaseURL"`
 	ProjectID     string `json:"projectId"`
 	StorageBucket string `json:"storageBucket"`
 }
@@ -145,7 +142,6 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 
 	return &App{
 		creds:         creds,
-		databaseURL:   config.DatabaseURL,
 		projectID:     pid,
 		storageBucket: config.StorageBucket,
 		opts:          o,
@@ -157,7 +153,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 func amendConfigWithDefaults(config *Config) error {
 	fbc := &Config{}
 	confFileName := os.Getenv(FirebaseEnvName)
-	if len(confFileName) == 0 {
+	if confFileName == "" {
 		return nil
 	}
 	dat, err := ioutil.ReadFile(confFileName)
@@ -179,9 +175,6 @@ func amendConfigWithDefaults(config *Config) error {
 		if _, ok := validConfigFieldNames[k]; !ok {
 			return fmt.Errorf(`unexpected field %s in JSON config file`, k)
 		}
-	}
-	if config.DatabaseURL == "" {
-		config.DatabaseURL = fbc.DatabaseURL
 	}
 	if config.ProjectID == "" {
 		config.ProjectID = fbc.ProjectID

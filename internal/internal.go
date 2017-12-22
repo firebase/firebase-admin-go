@@ -57,13 +57,10 @@ func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
 // OverwriteEnv ovevrwrites env variables, used in testsing.
 func OverwriteEnv(varName, newVal string) string {
 	oldVal := os.Getenv(varName)
-	if len(newVal) == 0 {
-		log.Print(";;;", newVal, "<")
+	if newVal == "" {
 		if err := os.Unsetenv(varName); err != nil {
-			log.Print(";;gg;")
 			log.Fatal(err)
 		}
-		log.Print(";:;", varName, oldVal, "}}", os.Getenv(varName), "{{")
 	} else if err := os.Setenv(varName, newVal); err != nil {
 		log.Fatal(err)
 	}
@@ -77,5 +74,4 @@ func ReinstateEnv(varName, oldVal string) {
 	} else {
 		os.Unsetenv(varName)
 	}
-	log.Print(";--------;", oldVal)
 }
