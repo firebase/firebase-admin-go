@@ -348,25 +348,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestAutoInitEnv(t *testing.T) {
-	configOld := overwriteEnv(FirebaseEnvName, "testdata/firebase_config.json")
-	defer reinstateEnv(FirebaseEnvName, configOld)
-
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
-
-	app, err := NewApp(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := &Config{
-		ProjectID:     "hipster-chat-mock",
-		StorageBucket: "hipster-chat.appspot.mock",
-	}
-	compareConfig(app, want, t)
-}
-
 func TestAutoInitNoEnvVar(t *testing.T) {
 	configOld := overwriteEnv(FirebaseEnvName, "")
 	defer reinstateEnv(FirebaseEnvName, configOld)
@@ -438,18 +419,39 @@ func TestAutoInitPartialOverrideWithoutEnv(t *testing.T) {
 }
 func TestAutoInit(t *testing.T) {
 	tests := []struct {
-		name        string
-		filename    string
-		initOptions *Config
-		wantOptions *Config
-	}{}
-
+		name         string
+		confFilename string
+		initOptions  *Config
+		wantOptions  *Config
+	}{
+		{
+			"no environment var, no options",
+			"",
+			nil,
+			&Config{},
+		}, {
+			"env var set, options not",
+			"testdata/firebase_config.json",
+			nil,
+			&Config{
+				ProjectID:     "hipster-chat-mock",
+				StorageBucket: "hipster-chat.appspot.mock",
+			},
+		},
+	}
+	/*
+		varName := "GOOGLE_APPLICATION_CREDENTIALS"
+		credOld := overwriteEnv(varName, "testdata/service_account.json")
+		defer reinstateEnv(varName, credOld)
+	*/
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			overwriteEnv(FirebaseEnvName, test.filename)
-			NewApp(context.Background(), &Config{})
-			//#if err == nil || err.Error() != test.wantError {
-			//	t.Errorf("got error = %s; want %s", err, test.wantError)
+			overwriteEnv(FirebaseEnvName, test.confFilename)
+			app, err := NewApp(context.Background(), test.initOptions)
+			if err != nil {
+				t.Error(err)
+			}
+			compareConfig(app, test.wantOptions, t)
 
 		})
 	}
