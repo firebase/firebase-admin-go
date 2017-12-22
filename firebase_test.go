@@ -428,7 +428,9 @@ func TestAutoInit(t *testing.T) {
 			"no environment var, no options",
 			"",
 			nil,
-			&Config{},
+			&Config{
+				ProjectID: "mock-project-id",
+			},
 		}, {
 			"env var set, options not",
 			"testdata/firebase_config.json",
