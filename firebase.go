@@ -147,7 +147,7 @@ func NewApp(ctx context.Context, configOrig *Config, opts ...option.ClientOption
 	}, nil
 }
 
-// amendConfigWithDefaults reads the default config file, defined by the FIREBASE_COFIG
+// amendConfigWithDefaults reads the default config file, defined by the FIREBASE_CONFIG
 // env variable, and uses those values where the config is missing values.
 func amendConfigWithDefaults(config *Config) (*Config, error) {
 	fbc := &Config{}
