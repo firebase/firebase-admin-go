@@ -54,7 +54,7 @@ func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
 	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
 }
 
-// OverwriteEnv ovevrwrites env variables, used in testsing.
+// OverwriteEnv overwrites env variables, used in testsing.
 func OverwriteEnv(varName, newVal string) string {
 	oldVal := os.Getenv(varName)
 	if newVal == "" {

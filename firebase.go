@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 
 	"cloud.google.com/go/firestore"
 
@@ -49,8 +50,8 @@ var firebaseScopes = []string{
 // Version of the Firebase Go Admin SDK.
 const Version = "2.2.1"
 
-// FirebaseEnvName is the name of the environment variable with the Config.
-const FirebaseEnvName = "FIREBASE_CONFIG"
+// firebaseEnvName is the name of the environment variable with the Config.
+const firebaseEnvName = "FIREBASE_CONFIG"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
@@ -114,19 +115,17 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 // If the client options contain a valid credential (a service account file, a refresh token file or an
 // oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
 // authenticate the App with Google application default credentials.
-func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
+func NewApp(ctx context.Context, configOrig *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
-
+	if configOrig == nil {
+		configOrig = &Config{}
+	}
 	creds, err := transport.Creds(ctx, o...)
 	if err != nil {
 		return nil, err
 	}
-
-	if config == nil {
-		config = &Config{}
-	}
-	err = amendConfigWithDefaults(config)
+	config, err := amendConfigWithDefaults(configOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -150,19 +149,19 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 
 // amendConfigWithDefaults reads the default config file, defined by the FIREBASE_COFIG
 // env variable, and uses those values where the config is missing values.
-func amendConfigWithDefaults(config *Config) error {
+func amendConfigWithDefaults(config *Config) (*Config, error) {
 	fbc := &Config{}
-	confFileName := os.Getenv(FirebaseEnvName)
+	confFileName := os.Getenv(firebaseEnvName)
 	if confFileName == "" {
-		return nil
+		return config, nil
 	}
 	dat, err := ioutil.ReadFile(confFileName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = json.Unmarshal(dat, fbc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	jsonData := map[string]string{}
 	json.Unmarshal(dat, &jsonData)
@@ -173,15 +172,32 @@ func amendConfigWithDefaults(config *Config) error {
 	//  e := d.Decode(fbc)
 	for k := range jsonData {
 		if _, ok := validConfigFieldNames[k]; !ok {
-			return fmt.Errorf(`unexpected field %s in JSON config file`, k)
+			return nil, fmt.Errorf(`unexpected field %s in JSON config file`, k)
 		}
 	}
-	if config.ProjectID == "" {
-		config.ProjectID = fbc.ProjectID
+	if config != nil {
+		updateConfig(config, fbc)
 	}
-	if config.StorageBucket == "" {
-		config.StorageBucket = fbc.StorageBucket
-	}
+	return fbc, nil
+}
 
-	return nil
+func updateConfig(source, target *Config) {
+	s := reflect.ValueOf(source).Elem()
+	t := reflect.ValueOf(target).Elem()
+	for i := 0; i < s.NumField(); i++ {
+		fsi := s.Field(i).Interface()
+		ft := t.Field(i)
+		switch fsi.(type) {
+		case int:
+			if fsi != 0 {
+				ft.SetInt(int64(fsi.(int)))
+			}
+		case string:
+			if fsi != "" {
+				ft.SetString(fsi.(string))
+			}
+		default:
+			panic("non implemented Config{} field type")
+		}
+	}
 }

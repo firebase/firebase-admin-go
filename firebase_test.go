@@ -36,12 +36,14 @@ import (
 	"google.golang.org/api/option"
 )
 
+const credEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
+
 func TestMain(m *testing.M) {
 	// This isolates the tests from a possiblity that the
 	// default config env variable is set to a valid file containing the
 	// wanted default config
-	configOld := overwriteEnv(FirebaseEnvName, "")
-	defer reinstateEnv(FirebaseEnvName, configOld)
+	configOld := overwriteEnv(firebaseEnvName, "")
+	defer reinstateEnv(firebaseEnvName, configOld)
 	os.Exit(m.Run())
 }
 
@@ -161,13 +163,12 @@ func TestRefreshTokenWithEnvVar(t *testing.T) {
 }
 
 func TestAppDefault(t *testing.T) {
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	current := os.Getenv(credEnvVar)
 
-	if err := os.Setenv(varName, "testdata/service_account.json"); err != nil {
+	if err := os.Setenv(credEnvVar, "testdata/service_account.json"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Setenv(varName, current)
+	defer os.Setenv(credEnvVar, current)
 
 	app, err := NewApp(context.Background(), nil)
 	if err != nil {
@@ -185,13 +186,12 @@ func TestAppDefault(t *testing.T) {
 }
 
 func TestAppDefaultWithInvalidFile(t *testing.T) {
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	current := os.Getenv(varName)
+	current := os.Getenv(credEnvVar)
 
-	if err := os.Setenv(varName, "testdata/non_existing.json"); err != nil {
+	if err := os.Setenv(credEnvVar, "testdata/non_existing.json"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Setenv(varName, current)
+	defer os.Setenv(credEnvVar, current)
 
 	app, err := NewApp(context.Background(), nil)
 	if app != nil || err == nil {
@@ -407,13 +407,12 @@ func TestAutoInit(t *testing.T) {
 		},
 	}
 
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
+	credOld := overwriteEnv(credEnvVar, "testdata/service_account.json")
+	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			overwriteEnv(FirebaseEnvName, test.confFilename)
+			overwriteEnv(firebaseEnvName, test.confFilename)
 			app, err := NewApp(context.Background(), test.initOptions)
 			if err != nil {
 				t.Error(err)
@@ -448,16 +447,15 @@ func TestAutoInitBadFiles(t *testing.T) {
 			"unexpected end of JSON input",
 		},
 	}
-	configOld := overwriteEnv(FirebaseEnvName, "")
-	defer reinstateEnv(FirebaseEnvName, configOld)
+	configOld := overwriteEnv(firebaseEnvName, "")
+	defer reinstateEnv(firebaseEnvName, configOld)
 
-	varName := "GOOGLE_APPLICATION_CREDENTIALS"
-	credOld := overwriteEnv(varName, "testdata/service_account.json")
-	defer reinstateEnv(varName, credOld)
+	credOld := overwriteEnv(credEnvVar, "testdata/service_account.json")
+	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			overwriteEnv(FirebaseEnvName, test.filename)
+			overwriteEnv(firebaseEnvName, test.filename)
 			_, err := NewApp(context.Background(), &Config{})
 			if err == nil || err.Error() != test.wantError {
 				t.Errorf("got error = %s; want = %s", err, test.wantError)

@@ -29,9 +29,9 @@ func TestMain(m *testing.M) {
 	// This isolates the integration tests from a possiblity that the
 	// default config env variable is set to a valid file containing the
 	// wanted default config
-	FirebaseEnvName := "FIREBASE_CONFIG"
-	configOld := env.OverwriteEnv(FirebaseEnvName, "")
-	defer env.ReinstateEnv(FirebaseEnvName, configOld)
+	firebaseEnvName := "FIREBASE_CONFIG"
+	configOld := env.OverwriteEnv(firebaseEnvName, "")
+	defer env.ReinstateEnv(firebaseEnvName, configOld)
 
 	os.Exit(m.Run())
 }
