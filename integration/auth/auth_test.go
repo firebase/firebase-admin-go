@@ -139,7 +139,7 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
 	}
 	return ioutil.ReadAll(resp.Body)
