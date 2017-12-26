@@ -63,15 +63,15 @@ type ResponseMessage struct {
 // Message is the message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#Message
 type Message struct {
-	Name         string            `json:"name"`
-	Data         map[string]string `json:"data"`
-	Notification Notification      `json:"notification,omitempty"`
-	Android      AndroidConfig     `json:"android,omitempty"`
-	Webpush      WebpushConfig     `json:"webpush,omitempty"`
-	Apns         ApnsConfig        `json:"apns,omitempty"`
-	Token        string            `json:"token,omitempty"`
-	Topic        string            `json:"topic,omitempty"`
-	Condition    string            `json:"condition,omitempty"`
+	Name         string                 `json:"name"`
+	Data         map[string]interface{} `json:"data"`
+	Notification Notification           `json:"notification,omitempty"`
+	Android      AndroidConfig          `json:"android,omitempty"`
+	Webpush      WebpushConfig          `json:"webpush,omitempty"`
+	Apns         ApnsConfig             `json:"apns,omitempty"`
+	Token        string                 `json:"token,omitempty"`
+	Topic        string                 `json:"topic,omitempty"`
+	Condition    string                 `json:"condition,omitempty"`
 }
 
 // Notification is the Basic notification template to use across all platforms.
@@ -84,12 +84,12 @@ type Notification struct {
 // AndroidConfig is Android specific options for messages.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#AndroidConfig
 type AndroidConfig struct {
-	CollapseKey           string              `json:"collapse_key,omitempty"`
-	Priority              string              `json:"priority,omitempty"`
-	TTL                   string              `json:"ttl,omitempty"`
-	RestrictedPackageName string              `json:"restricted_package_name,omitempty"`
-	Data                  map[string]string   `json:"data,omitempty"`
-	Notification          AndroidNotification `json:"notification,omitempty"`
+	CollapseKey           string                 `json:"collapse_key,omitempty"`
+	Priority              string                 `json:"priority,omitempty"`
+	TTL                   string                 `json:"ttl,omitempty"`
+	RestrictedPackageName string                 `json:"restricted_package_name,omitempty"`
+	Data                  map[string]interface{} `json:"data,omitempty"`
+	Notification          AndroidNotification    `json:"notification,omitempty"`
 }
 
 // AndroidNotification is notification to send to android devices.
@@ -111,9 +111,9 @@ type AndroidNotification struct {
 // WebpushConfig is Webpush protocol options.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#WebpushConfig
 type WebpushConfig struct {
-	Headers      map[string]string   `json:"headers,omitempty"`
-	Data         map[string]string   `json:"data,omitempty"`
-	Notification WebpushNotification `json:"notification,omitempty"`
+	Headers      map[string]interface{} `json:"headers,omitempty"`
+	Data         map[string]interface{} `json:"data,omitempty"`
+	Notification WebpushNotification    `json:"notification,omitempty"`
 }
 
 // WebpushNotification is Web notification to send via webpush protocol.
@@ -157,9 +157,8 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 // Send a message to specified target (a registration token, topic or condition).
 // https://firebase.google.com/docs/cloud-messaging/send-message
 func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *ResponseMessage, err error) {
-	result := &ResponseMessage{}
-	if payload.Message.Token == "" && payload.Message.Condition == "" && payload.Message.Topic == "" {
-		return result, fmt.Errorf("target message is empty %v", payload)
+	if err := validateTarget(payload); err != nil {
+		return nil, err
 	}
 
 	request := &internal.Request{
@@ -169,14 +168,29 @@ func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *
 	}
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
 	if msg, ok := errorCodes[resp.Status]; ok {
-		return result, fmt.Errorf("project id %q: %s", c.project, msg)
+		return nil, fmt.Errorf("project id %q: %s", c.project, msg)
 	}
 
+	result := &ResponseMessage{}
 	err = resp.Unmarshal(http.StatusOK, result)
 
 	return result, err
+}
+
+// validators
+
+// TODO add validator : Data messages can have a 4KB maximum payload.
+// TODO add validator : topic name reg expression: "[a-zA-Z0-9-_.~%]+".
+// TODO add validator : Conditions for topics support two operators per
+// expression, and parentheses are supported.
+
+func validateTarget(payload RequestMessage) error {
+	if payload.Message.Token == "" && payload.Message.Condition == "" && payload.Message.Topic == "" {
+		return fmt.Errorf("target is empty you have to fill one of this fields (Token, Condition, Topic)")
+	}
+	return nil
 }
