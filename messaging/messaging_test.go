@@ -66,8 +66,8 @@ func TestSendMessage(t *testing.T) {
 	if tr.Body == nil {
 		t.Fatalf("Request = nil; want non-nil")
 	}
-	if tr.Method != "POST" {
-		t.Errorf("Method = %q; want = %q", tr.Method, "POST")
+	if tr.Method != http.MethodPost {
+		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
 	if tr.URL.Path != "/project/test-project/messages:send" {
 		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/messages:send")
