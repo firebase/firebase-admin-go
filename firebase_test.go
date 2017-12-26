@@ -86,7 +86,7 @@ func TestClientOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Status: %d; want: %q", resp.StatusCode, http.StatusOK)
+		t.Errorf("Status: %d; want: %d", resp.StatusCode, http.StatusOK)
 	}
 	if bearer != "Bearer mock-token" {
 		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer mock-token")
