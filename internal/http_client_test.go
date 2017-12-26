@@ -33,25 +33,25 @@ var cases = []struct {
 }{
 	{
 		req: &Request{
-			Method: "GET",
+			Method: http.MethodGet,
 		},
-		method: "GET",
+		method: http.MethodGet,
 	},
 	{
 		req: &Request{
-			Method: "GET",
+			Method: http.MethodGet,
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParam("testParam", "value2"),
 			},
 		},
-		method:  "GET",
+		method:  http.MethodGet,
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam": "value2"},
 	},
 	{
 		req: &Request{
-			Method: "POST",
+			Method: http.MethodPost,
 			Body:   NewJSONEntity(map[string]string{"foo": "bar"}),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
@@ -59,35 +59,35 @@ var cases = []struct {
 				WithQueryParam("testParam2", "value3"),
 			},
 		},
-		method:  "POST",
+		method:  http.MethodPost,
 		body:    "{\"foo\":\"bar\"}",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
 	{
 		req: &Request{
-			Method: "POST",
+			Method: http.MethodPost,
 			Body:   NewJSONEntity("body"),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParams(map[string]string{"testParam1": "value2", "testParam2": "value3"}),
 			},
 		},
-		method:  "POST",
+		method:  http.MethodPost,
 		body:    "\"body\"",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
 	{
 		req: &Request{
-			Method: "PUT",
+			Method: http.MethodPut,
 			Body:   NewJSONEntity(nil),
 			Opts: []HTTPOption{
 				WithHeader("Test-Header", "value1"),
 				WithQueryParams(map[string]string{"testParam1": "value2", "testParam2": "value3"}),
 			},
 		},
-		method:  "PUT",
+		method:  http.MethodPut,
 		body:    "null",
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
@@ -184,7 +184,7 @@ func TestContext(t *testing.T) {
 	client := &HTTPClient{Client: http.DefaultClient}
 	ctx, cancel := context.WithCancel(context.Background())
 	resp, err := client.Do(ctx, &Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    server.URL,
 	})
 	if err != nil {
@@ -196,7 +196,7 @@ func TestContext(t *testing.T) {
 
 	cancel()
 	resp, err = client.Do(ctx, &Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    server.URL,
 	})
 	if resp != nil || err == nil {
@@ -234,7 +234,7 @@ func TestErrorParser(t *testing.T) {
 		Client:    http.DefaultClient,
 		ErrParser: ep,
 	}
-	req := &Request{Method: "GET", URL: server.URL}
+	req := &Request{Method: http.MethodGet, URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +255,7 @@ func TestErrorParser(t *testing.T) {
 
 func TestInvalidURL(t *testing.T) {
 	req := &Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    "http://localhost:250/mock.url",
 	}
 	client := &HTTPClient{Client: http.DefaultClient}
@@ -281,7 +281,7 @@ func TestUnmarshalError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	req := &Request{Method: "GET", URL: server.URL}
+	req := &Request{Method: http.MethodGet, URL: server.URL}
 	client := &HTTPClient{Client: http.DefaultClient}
 	resp, err := client.Do(context.Background(), req)
 	if err != nil {
