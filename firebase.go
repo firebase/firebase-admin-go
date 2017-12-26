@@ -106,6 +106,7 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 	conf := &internal.MessagingConfig{
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return messaging.NewClient(ctx, conf)
 }

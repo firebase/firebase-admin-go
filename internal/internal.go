@@ -50,6 +50,7 @@ type MockTokenSource struct {
 type MessagingConfig struct {
 	Opts      []option.ClientOption
 	ProjectID string
+	Version   string
 }
 
 // Token returns the test token associated with the TokenSource.

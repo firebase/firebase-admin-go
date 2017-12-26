@@ -45,6 +45,7 @@ type Client struct {
 	endpoint string
 	client   *internal.HTTPClient
 	project  string
+	version  string
 }
 
 // RequestMessage is the request body message to send by Firebase Cloud Messaging Service.
@@ -149,6 +150,7 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		endpoint: messagingEndpoint,
 		client:   &internal.HTTPClient{Client: hc},
 		project:  c.ProjectID,
+		version:  "Go/Admin/" + c.Version,
 	}, nil
 }
 
@@ -161,10 +163,12 @@ func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *
 		return nil, err
 	}
 
+	versionHeader := internal.WithHeader("X-Client-Version", c.version)
 	request := &internal.Request{
 		Method: http.MethodPost,
 		URL:    fmt.Sprintf("%s/project/%s/messages:send", c.endpoint, c.project),
 		Body:   internal.NewJSONEntity(payload),
+		Opts:   []internal.HTTPOption{versionHeader},
 	}
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
