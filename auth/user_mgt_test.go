@@ -626,7 +626,7 @@ func TestMakeExportedUser(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
-	s.Status = 500
+	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
 	if u != nil || err == nil {

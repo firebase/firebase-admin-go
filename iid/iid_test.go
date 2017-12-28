@@ -75,8 +75,8 @@ func TestDeleteInstanceID(t *testing.T) {
 	if tr == nil {
 		t.Fatalf("Request = nil; want non-nil")
 	}
-	if tr.Method != "DELETE" {
-		t.Errorf("Method = %q; want = %q", tr.Method, "DELETE")
+	if tr.Method != http.MethodDelete {
+		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodDelete)
 	}
 	if tr.URL.Path != "/project/test-project/instanceId/test-iid" {
 		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/instanceId/test-iid")
@@ -87,7 +87,7 @@ func TestDeleteInstanceID(t *testing.T) {
 }
 
 func TestDeleteInstanceIDError(t *testing.T) {
-	status := 200
+	status := http.StatusOK
 	var tr *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
@@ -119,8 +119,8 @@ func TestDeleteInstanceIDError(t *testing.T) {
 		if tr == nil {
 			t.Fatalf("Request = nil; want non-nil")
 		}
-		if tr.Method != "DELETE" {
-			t.Errorf("Method = %q; want = %q", tr.Method, "DELETE")
+		if tr.Method != http.MethodDelete {
+			t.Errorf("Method = %q; want = %q", tr.Method, http.MethodDelete)
 		}
 		if tr.URL.Path != "/project/test-project/instanceId/test-iid" {
 			t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/instanceId/test-iid")
@@ -162,8 +162,8 @@ func TestDeleteInstanceIDUnexpectedError(t *testing.T) {
 	if tr == nil {
 		t.Fatalf("Request = nil; want non-nil")
 	}
-	if tr.Method != "DELETE" {
-		t.Errorf("Method = %q; want = %q", tr.Method, "DELETE")
+	if tr.Method != http.MethodDelete {
+		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodDelete)
 	}
 	if tr.URL.Path != "/project/test-project/instanceId/test-iid" {
 		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/instanceId/test-iid")
