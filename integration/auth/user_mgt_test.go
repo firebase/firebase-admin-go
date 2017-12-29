@@ -257,10 +257,12 @@ func testUpdateUser(t *testing.T) {
 			Email:       "abc@ab.ab",
 			PhotoURL:    "http://photo.png",
 			ProviderID:  "password",
+			UID:         "abc@ab.ab",
 		}
 		phoneUI := &auth.UserInfo{
 			PhoneNumber: "+12345678901",
 			ProviderID:  "phone",
+			UID:         "+12345678901",
 		}
 
 		var compareWith *auth.UserInfo
