@@ -59,11 +59,6 @@ type App struct {
 	opts          []option.ClientOption
 }
 
-var validConfigFieldNames = map[string]bool{
-	"projectId":     true,
-	"storageBucket": true,
-}
-
 // Config represents the configuration used to initialize an App.
 type Config struct {
 	ProjectID     string `json:"projectId"`
