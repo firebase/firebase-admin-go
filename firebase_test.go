@@ -85,8 +85,8 @@ func TestClientOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 {
-		t.Errorf("Status: %d; want: 200", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Status: %d; want: %d", resp.StatusCode, http.StatusOK)
 	}
 	if bearer != "Bearer mock-token" {
 		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer mock-token")
@@ -318,8 +318,8 @@ func TestCustomTokenSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 {
-		t.Errorf("Status: %d; want: 200", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Status: %d; want: %d", resp.StatusCode, http.StatusOK)
 	}
 	if bearer != "Bearer "+ts.AccessToken {
 		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer "+ts.AccessToken)
