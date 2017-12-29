@@ -17,24 +17,12 @@ package firestore
 import (
 	"context"
 	"log"
-	"os"
 	"reflect"
 	"testing"
 
 	"firebase.google.com/go/integration/internal"
-	env "firebase.google.com/go/internal"
 )
 
-func TestMain(m *testing.M) {
-	// This isolates the integration tests from a possiblity that the
-	// default config env variable is set to a valid file containing the
-	// wanted default config, but we the test is not expecting it.
-	firebaseEnvName := "FIREBASE_CONFIG"
-	configOld := env.OverwriteEnv(firebaseEnvName, "")
-	defer env.ReinstateEnv(firebaseEnvName, configOld)
-
-	os.Exit(m.Run())
-}
 func TestFirestore(t *testing.T) {
 	if testing.Short() {
 		log.Println("skipping Firestore integration tests in short mode.")

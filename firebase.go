@@ -20,10 +20,8 @@ package firebase
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 
 	"cloud.google.com/go/firestore"
 
@@ -115,19 +113,19 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 // If the client options contain a valid credential (a service account file, a refresh token file or an
 // oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
 // authenticate the App with Google application default credentials.
-func NewApp(ctx context.Context, configOrig *Config, opts ...option.ClientOption) (*App, error) {
+func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
-	if configOrig == nil {
-		configOrig = &Config{}
-	}
 	creds, err := transport.Creds(ctx, o...)
 	if err != nil {
 		return nil, err
 	}
-	config, err := amendConfigWithDefaults(configOrig)
-	if err != nil {
-		return nil, err
+	if config == nil {
+		config, err = getConfigDefaults()
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var pid string
@@ -149,55 +147,16 @@ func NewApp(ctx context.Context, configOrig *Config, opts ...option.ClientOption
 
 // amendConfigWithDefaults reads the default config file, defined by the FIREBASE_CONFIG
 // env variable, and uses those values where the config is missing values.
-func amendConfigWithDefaults(config *Config) (*Config, error) {
+func getConfigDefaults() (*Config, error) {
 	fbc := &Config{}
 	confFileName := os.Getenv(firebaseEnvName)
 	if confFileName == "" {
-		return config, nil
+		return fbc, nil
 	}
 	dat, err := ioutil.ReadFile(confFileName)
 	if err != nil {
 		return nil, err
 	}
 	err = json.Unmarshal(dat, fbc)
-	if err != nil {
-		return nil, err
-	}
-	jsonData := map[string]string{}
-	json.Unmarshal(dat, &jsonData)
-	// TODO: remove this after we support Go 1.10+, specifically "DisallowUnknownFields"
-	//       https://github.com/golang/go/commit/2596a0c075aeddec571cd658f748ac7a712a2b69
-	//  d := json.NewDecoder(bytes.NewReader(dat))
-	//  d.DisallowUnknownFields()
-	//  e := d.Decode(fbc)
-	for k := range jsonData {
-		if _, ok := validConfigFieldNames[k]; !ok {
-			return nil, fmt.Errorf(`unexpected field %s in JSON config file`, k)
-		}
-	}
-	if config != nil {
-		updateConfig(config, fbc)
-	}
-	return fbc, nil
-}
-
-func updateConfig(source, target *Config) {
-	s := reflect.ValueOf(source).Elem()
-	t := reflect.ValueOf(target).Elem()
-	for i := 0; i < s.NumField(); i++ {
-		fsi := s.Field(i).Interface()
-		ft := t.Field(i)
-		switch fsi.(type) {
-		case int:
-			if fsi != 0 {
-				ft.SetInt(int64(fsi.(int)))
-			}
-		case string:
-			if fsi != "" {
-				ft.SetString(fsi.(string))
-			}
-		default:
-			panic("non implemented Config{} field type")
-		}
-	}
+	return fbc, err
 }

@@ -16,6 +16,7 @@ package firebase
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,8 +34,6 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
-
-	env "firebase.google.com/go/internal"
 )
 
 const credEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
@@ -43,8 +42,8 @@ func TestMain(m *testing.M) {
 	// This isolates the tests from a possiblity that the default config env
 	// variable is set to a valid file containing the wanted default config,
 	// but we the test is not expecting it.
-	configOld := env.OverwriteEnv(firebaseEnvName, "")
-	defer env.ReinstateEnv(firebaseEnvName, configOld)
+	configOld := overwriteEnv(firebaseEnvName, "")
+	defer reinstateEnv(firebaseEnvName, configOld)
 	os.Exit(m.Run())
 }
 
@@ -359,7 +358,7 @@ func TestAutoInit(t *testing.T) {
 			"no environment var, no options",
 			"",
 			nil,
-			&Config{ProjectID: "mock-project-id"}, // from default creds
+			&Config{ProjectID: "mock-project-id"}, // from default creds here and below.
 		}, {
 			"env var set, options not",
 			"testdata/firebase_config.json",
@@ -369,30 +368,34 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "hipster-chat.appspot.mock",
 			},
 		}, {
-			"partial value override where only some values exist",
+			"partial value override with nil settings",
+			"testdata/firebase_config_partial.json",
+			nil,
+			&Config{ProjectID: "hipster-chat-mock"},
+		}, {
+			"partial values exists, ignore FIREBASE_CONFIG ",
 			"testdata/firebase_config_partial.json",
 			&Config{StorageBucket: "sb1-mock"},
 			&Config{
-				ProjectID:     "hipster-chat-mock",
+				ProjectID:     "mock-project-id",
 				StorageBucket: "sb1-mock",
 			},
 		}, {
-			"partial value override without existing settings",
+			"partial values ignore default settings",
 			"testdata/firebase_config_partial.json",
 			&Config{},
-			&Config{ProjectID: "hipster-chat-mock"},
+			&Config{ProjectID: "mock-project-id"},
 		}, {
 			"partial value override does not clobber",
 			"testdata/firebase_config_partial.json",
 			&Config{ProjectID: "pid1-test"},
 			&Config{ProjectID: "pid1-test"},
 		}, {
-			"config file does not clobber but fills in missing value",
+			"config file does not clobber and is ignored",
 			"testdata/firebase_config.json",
 			&Config{ProjectID: "pid1-test"},
 			&Config{
-				ProjectID:     "pid1-test",
-				StorageBucket: "hipster-chat.appspot.mock",
+				ProjectID: "pid1-test",
 			},
 		}, {
 			"config file does not clober, no op when all values present",
@@ -405,15 +408,23 @@ func TestAutoInit(t *testing.T) {
 				ProjectID:     "pid-test",
 				StorageBucket: "sb1-test",
 			},
+		}, {
+			"JSON with bad key",
+			"testdata/firebase_config_bad_key.json",
+			nil,
+			&Config{
+				ProjectID:     "mock-project-id",
+				StorageBucket: "hipster-chat.appspot.mock",
+			},
 		},
 	}
 
-	credOld := env.OverwriteEnv(credEnvVar, "testdata/service_account.json")
-	defer env.ReinstateEnv(credEnvVar, credOld)
+	credOld := overwriteEnv(credEnvVar, "testdata/service_account.json")
+	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			env.OverwriteEnv(firebaseEnvName, test.confFilename)
+			overwriteEnv(firebaseEnvName, test.confFilename)
 			app, err := NewApp(context.Background(), test.initOptions)
 			if err != nil {
 				t.Error(err)
@@ -435,10 +446,6 @@ func TestAutoInitBadFiles(t *testing.T) {
 			"testdata/no_such_file.json",
 			"open testdata/no_such_file.json: no such file or directory",
 		}, {
-			"JSON with bad key",
-			"testdata/firebase_config_bad_key.json",
-			"unexpected field project1d in JSON config file",
-		}, {
 			"invalid JSON",
 			"testdata/firebase_config_bad.json",
 			"invalid character 'b' looking for beginning of value",
@@ -448,13 +455,13 @@ func TestAutoInitBadFiles(t *testing.T) {
 			"unexpected end of JSON input",
 		},
 	}
-	credOld := env.OverwriteEnv(credEnvVar, "testdata/service_account.json")
-	defer env.ReinstateEnv(credEnvVar, credOld)
+	credOld := overwriteEnv(credEnvVar, "testdata/service_account.json")
+	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			env.OverwriteEnv(firebaseEnvName, test.filename)
-			_, err := NewApp(context.Background(), &Config{})
+			overwriteEnv(firebaseEnvName, test.filename)
+			_, err := NewApp(context.Background(), nil)
 			if err == nil || err.Error() != test.wantError {
 				t.Errorf("got error = %s; want = %s", err, test.wantError)
 			}
@@ -511,4 +518,26 @@ func initMockTokenServer() *httptest.Server {
 			"expires_in": 3600
 		}`))
 	}))
+}
+
+// overwriteEnv overwrites env variables, used in testsing.
+func overwriteEnv(varName, newVal string) string {
+	oldVal := os.Getenv(varName)
+	if newVal == "" {
+		if err := os.Unsetenv(varName); err != nil {
+			log.Fatal(err)
+		}
+	} else if err := os.Setenv(varName, newVal); err != nil {
+		log.Fatal(err)
+	}
+	return oldVal
+}
+
+// reinstateEnv restores the enviornment variable, will usually be used deferred with OverwriteEnv.
+func reinstateEnv(varName, oldVal string) {
+	if len(varName) > 0 {
+		os.Setenv(varName, oldVal)
+	} else {
+		os.Unsetenv(varName)
+	}
 }
