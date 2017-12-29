@@ -1,4 +1,8 @@
 language: go
 go_import_path: firebase.google.com/go
-script: go test -v -test.short ./...
+before_install:
+    - go get github.com/golang/lint/golint
+script:
+    - golint -set_exit_status $(go list ./...)
+    - go test -v -test.short ./...
 

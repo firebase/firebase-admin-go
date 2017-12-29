@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
@@ -131,7 +132,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 func (c *Client) makeHTTPCall(ctx context.Context, serviceName string, payload interface{}, result interface{}) error {
 	versionHeader := internal.WithHeader("X-Client-Version", c.version)
 	request := &internal.Request{
-		Method: "POST",
+		Method: http.MethodPost,
 		URL:    c.url + serviceName,
 		Body:   internal.NewJSONEntity(payload),
 		Opts:   []internal.HTTPOption{versionHeader},
@@ -140,7 +141,7 @@ func (c *Client) makeHTTPCall(ctx context.Context, serviceName string, payload i
 	if err != nil {
 		return err
 	}
-	return resp.Unmarshal(200, result)
+	return resp.Unmarshal(http.StatusOK, result)
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting
