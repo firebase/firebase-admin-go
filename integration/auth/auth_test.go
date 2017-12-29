@@ -53,7 +53,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	os.Exit(m.Run())
 }
 
