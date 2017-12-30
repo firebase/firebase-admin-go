@@ -246,12 +246,9 @@ func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator 
 
 func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 	request := &identitytoolkit.IdentitytoolkitRelyingpartyDownloadAccountRequest{
-		MaxResults: int64(pageSize),
+		MaxResults:    int64(pageSize),
+		NextPageToken: pageToken,
 	}
-	if pageToken != "" {
-		request.NextPageToken = pageToken
-	}
-
 	relyingpartyDownloadAccountCall := it.client.is.Relyingparty.DownloadAccount(request)
 	relyingpartyDownloadAccountCall.Header().Set("X-Client-Version", it.client.version)
 	resp, err := relyingpartyDownloadAccountCall.Context(it.ctx).Do()
