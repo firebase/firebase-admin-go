@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"google.golang.org/api/option"
@@ -32,7 +33,7 @@ func TestEmptyTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.SendMessage(ctx, RequestMessage{})
+	_, err = client.SendMessage(ctx, &RequestMessage{})
 	if err == nil {
 		t.Errorf("SendMessage(Message{empty}) = nil; want error")
 	}
@@ -54,7 +55,7 @@ func TestSendMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.endpoint = ts.URL
-	msg, err := client.SendMessage(ctx, RequestMessage{Message: Message{Topic: "my-topic"}})
+	msg, err := client.SendMessage(ctx, &RequestMessage{Message: Message{Topic: "my-topic"}})
 	if err != nil {
 		t.Errorf("SendMessage() = %v; want nil", err)
 	}
@@ -63,14 +64,18 @@ func TestSendMessage(t *testing.T) {
 		t.Errorf("response Name = %q; want = %q", msg.Name, msgName)
 	}
 
+	if !strings.HasPrefix(msg.Name, "projects/test-project/messages/") {
+		t.Errorf("response Name = %q; want prefix = %q", msg.Name, "projects/test-project/messages/")
+	}
+
 	if tr.Body == nil {
 		t.Fatalf("Request = nil; want non-nil")
 	}
 	if tr.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
-	if tr.URL.Path != "/project/test-project/messages:send" {
-		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/project/test-project/messages:send")
+	if tr.URL.Path != "/projects/test-project/messages:send" {
+		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/projects/test-project/messages:send")
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
