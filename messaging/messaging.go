@@ -51,8 +51,8 @@ type Client struct {
 // RequestMessage is the request body message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
 type RequestMessage struct {
-	ValidateOnly bool    `json:"validate_only"`
-	Message      Message `json:"message"`
+	ValidateOnly bool    `json:"validate_only,omitempty"`
+	Message      Message `json:"message,omitempty"`
 }
 
 // ResponseMessage is the identifier of the message sent.
@@ -64,8 +64,8 @@ type ResponseMessage struct {
 // Message is the message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#Message
 type Message struct {
-	Name         string                 `json:"name"`
-	Data         map[string]interface{} `json:"data"`
+	Name         string                 `json:"name,omitempty"`
+	Data         map[string]interface{} `json:"data,omitempty"`
 	Notification Notification           `json:"notification,omitempty"`
 	Android      AndroidConfig          `json:"android,omitempty"`
 	Webpush      WebpushConfig          `json:"webpush,omitempty"`
@@ -158,15 +158,16 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 //
 // Send a message to specified target (a registration token, topic or condition).
 // https://firebase.google.com/docs/cloud-messaging/send-message
-func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *ResponseMessage, err error) {
+func (c *Client) SendMessage(ctx context.Context, payload *RequestMessage) (msg *ResponseMessage, err error) {
 	if err := validateTarget(payload); err != nil {
 		return nil, err
 	}
 
 	versionHeader := internal.WithHeader("X-Client-Version", c.version)
+
 	request := &internal.Request{
 		Method: http.MethodPost,
-		URL:    fmt.Sprintf("%s/project/%s/messages:send", c.endpoint, c.project),
+		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.endpoint, c.project),
 		Body:   internal.NewJSONEntity(payload),
 		Opts:   []internal.HTTPOption{versionHeader},
 	}
@@ -175,8 +176,8 @@ func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *
 		return nil, err
 	}
 
-	if msg, ok := errorCodes[resp.Status]; ok {
-		return nil, fmt.Errorf("project id %q: %s", c.project, msg)
+	if _, ok := errorCodes[resp.Status]; ok {
+		return nil, fmt.Errorf("unexpected http status code : %d, reason: %v", resp.Status, string(resp.Body))
 	}
 
 	result := &ResponseMessage{}
@@ -192,7 +193,7 @@ func (c *Client) SendMessage(ctx context.Context, payload RequestMessage) (msg *
 // TODO add validator : Conditions for topics support two operators per
 // expression, and parentheses are supported.
 
-func validateTarget(payload RequestMessage) error {
+func validateTarget(payload *RequestMessage) error {
 	if payload.Message.Token == "" && payload.Message.Condition == "" && payload.Message.Topic == "" {
 		return fmt.Errorf("target is empty you have to fill one of this fields (Token, Condition, Topic)")
 	}
