@@ -15,6 +15,8 @@ import (
 var projectID string
 var client *messaging.Client
 
+// Enable API before testing
+// https://console.developers.google.com/apis/library/fcm.googleapis.com/?project=
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
