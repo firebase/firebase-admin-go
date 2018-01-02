@@ -17,6 +17,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
@@ -36,6 +37,16 @@ var commonValidators = map[string]func(interface{}) error{
 	"password":    validatePassword,
 	"photoUrl":    validatePhotoURL,
 	"localId":     validateUID,
+}
+
+// Create a new interface
+type headerable interface {
+	Header() http.Header
+}
+
+// set header
+func (c *Client) execute(ic headerable) {
+	ic.Header().Set("X-Client-Version", c.version)
 }
 
 // UserInfo is a collection of standard profile information for a user.
@@ -188,7 +199,7 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	}
 
 	relyingpartyDeleteAccountCall := c.is.Relyingparty.DeleteAccount(request)
-	relyingpartyDeleteAccountCall.Header().Set("X-Client-Version", c.version)
+	c.execute(relyingpartyDeleteAccountCall)
 	_, err := relyingpartyDeleteAccountCall.Context(ctx).Do()
 	return err
 }
@@ -250,7 +261,7 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		NextPageToken: pageToken,
 	}
 	relyingpartyDownloadAccountCall := it.client.is.Relyingparty.DownloadAccount(request)
-	relyingpartyDownloadAccountCall.Header().Set("X-Client-Version", it.client.version)
+	it.client.execute(relyingpartyDownloadAccountCall)
 	resp, err := relyingpartyDownloadAccountCall.Context(it.ctx).Do()
 	if err != nil {
 		return "", err
@@ -402,10 +413,10 @@ func validatePhone(val interface{}) error {
 	return nil
 }
 
-func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest) (map[string]interface{}, error) {
+func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest) error {
 	params := map[string]interface{}{}
 	if u.params == nil {
-		return params, nil
+		return nil
 	}
 
 	for k, v := range u.params {
@@ -414,7 +425,7 @@ func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 	for key, validate := range commonValidators {
 		if v, ok := params[key]; ok {
 			if err := validate(v); err != nil {
-				return nil, err
+				return err
 			}
 			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
 		}
@@ -432,10 +443,10 @@ func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 		}
 	}
 
-	return params, nil
+	return nil
 }
 
-func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest) (map[string]interface{}, error) {
+func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest) error {
 	params := map[string]interface{}{}
 	for k, v := range u.params {
 		params[k] = v
@@ -445,7 +456,7 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 	processDeletion(params, "phoneNumber", "deleteProvider", "phone")
 
 	if err := processClaims(params); err != nil {
-		return nil, err
+		return err
 	}
 
 	if params["customAttributes"] != nil {
@@ -455,7 +466,7 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 	for key, validate := range commonValidators {
 		if v, ok := params[key]; ok {
 			if err := validate(v); err != nil {
-				return nil, err
+				return err
 			}
 			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
 		}
@@ -479,7 +490,7 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 		user.DeleteProvider = params["deleteProvider"].([]string)
 	}
 
-	return params, nil
+	return nil
 }
 
 // End of validators
@@ -524,13 +535,12 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 
 	request := &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
 
-	_, err := user.preparePayload(request)
-	if err != nil {
+	if err := user.preparePayload(request); err != nil {
 		return "", err
 	}
 
 	relyingpartySignupNewUserCall := c.is.Relyingparty.SignupNewUser(request)
-	relyingpartySignupNewUserCall.Header().Set("X-Client-Version", c.version)
+	c.execute(relyingpartySignupNewUserCall)
 	resp, err := relyingpartySignupNewUserCall.Context(ctx).Do()
 	if err != nil {
 		return "", err
@@ -551,22 +561,20 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 		LocalId: uid,
 	}
 
-	_, err := user.preparePayload(request)
-
-	if err != nil {
+	if err := user.preparePayload(request); err != nil {
 		return err
 	}
 
 	relyingpartySetAccountInfoCall := c.is.Relyingparty.SetAccountInfo(request)
-	relyingpartySetAccountInfoCall.Header().Set("X-Client-Version", c.version)
-	_, err = relyingpartySetAccountInfoCall.Context(ctx).Do()
+	c.execute(relyingpartySetAccountInfoCall)
+	_, err := relyingpartySetAccountInfoCall.Context(ctx).Do()
 
 	return err
 }
 
 func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
 	relyingpartyGetAccountInfoCall := c.is.Relyingparty.GetAccountInfo(request)
-	relyingpartyGetAccountInfoCall.Header().Set("X-Client-Version", c.version)
+	c.execute(relyingpartyGetAccountInfoCall)
 	resp, err := relyingpartyGetAccountInfoCall.Context(ctx).Do()
 	if err != nil {
 		return nil, err
