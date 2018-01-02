@@ -128,7 +128,7 @@ type WebpushNotification struct {
 // ApnsConfig is Apple Push Notification Service specific options.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#ApnsConfig
 type ApnsConfig struct {
-	Headers map[string]string      `json:"headers,omitempty"`
+	Headers map[string]interface{} `json:"headers,omitempty"`
 	Payload map[string]interface{} `json:"payload,omitempty"`
 }
 
