@@ -40,12 +40,12 @@ var commonValidators = map[string]func(interface{}) error{
 }
 
 // Create a new interface
-type headerable interface {
+type relayingpartyCall interface {
 	Header() http.Header
 }
 
 // set header
-func (c *Client) execute(ic headerable) {
+func (c *Client) setHeader(ic relayingpartyCall) {
 	ic.Header().Set("X-Client-Version", c.version)
 }
 
@@ -199,7 +199,7 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	}
 
 	relyingpartyDeleteAccountCall := c.is.Relyingparty.DeleteAccount(request)
-	c.execute(relyingpartyDeleteAccountCall)
+	c.setHeader(relyingpartyDeleteAccountCall)
 	_, err := relyingpartyDeleteAccountCall.Context(ctx).Do()
 	return err
 }
@@ -261,7 +261,7 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		NextPageToken: pageToken,
 	}
 	relyingpartyDownloadAccountCall := it.client.is.Relyingparty.DownloadAccount(request)
-	it.client.execute(relyingpartyDownloadAccountCall)
+	it.client.setHeader(relyingpartyDownloadAccountCall)
 	resp, err := relyingpartyDownloadAccountCall.Context(it.ctx).Do()
 	if err != nil {
 		return "", err
@@ -540,7 +540,7 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 	}
 
 	relyingpartySignupNewUserCall := c.is.Relyingparty.SignupNewUser(request)
-	c.execute(relyingpartySignupNewUserCall)
+	c.setHeader(relyingpartySignupNewUserCall)
 	resp, err := relyingpartySignupNewUserCall.Context(ctx).Do()
 	if err != nil {
 		return "", err
@@ -566,7 +566,7 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	}
 
 	relyingpartySetAccountInfoCall := c.is.Relyingparty.SetAccountInfo(request)
-	c.execute(relyingpartySetAccountInfoCall)
+	c.setHeader(relyingpartySetAccountInfoCall)
 	_, err := relyingpartySetAccountInfoCall.Context(ctx).Do()
 
 	return err
@@ -574,7 +574,7 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 
 func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
 	relyingpartyGetAccountInfoCall := c.is.Relyingparty.GetAccountInfo(request)
-	c.execute(relyingpartyGetAccountInfoCall)
+	c.setHeader(relyingpartyGetAccountInfoCall)
 	resp, err := relyingpartyGetAccountInfoCall.Context(ctx).Do()
 	if err != nil {
 		return nil, err
