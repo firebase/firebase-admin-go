@@ -360,7 +360,7 @@ func TestAutoInit(t *testing.T) {
 			nil,
 			&Config{ProjectID: "mock-project-id"}, // from default creds here and below.
 		}, {
-			"env var set, options not",
+			"env var set to file, options not",
 			"testdata/firebase_config.json",
 			nil,
 			&Config{
@@ -368,13 +368,37 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "hipster-chat.appspot.mock",
 			},
 		}, {
-			"partial value override with nil settings",
+			"env var set to json, options not",
+			`{
+				"projectId": "hipster-chat-mock",
+				"storageBucket": "hipster-chat.appspot.mock"
+			  }`,
+			nil,
+			&Config{
+				ProjectID:     "hipster-chat-mock",
+				StorageBucket: "hipster-chat.appspot.mock",
+			},
+		}, {
+			"partial values in file override with nil settings",
 			"testdata/firebase_config_partial.json",
 			nil,
 			&Config{ProjectID: "hipster-chat-mock"},
 		}, {
-			"partial values exists, ignore FIREBASE_CONFIG ",
+			"partial values in json override with nil settings",
+			`{"projectId": "hipster-chat-mock"}`,
+			nil,
+			&Config{ProjectID: "hipster-chat-mock"},
+		}, {
+			"partial values exists, ignore FIREBASE_CONFIG file",
 			"testdata/firebase_config_partial.json",
+			&Config{StorageBucket: "sb1-mock"},
+			&Config{
+				ProjectID:     "mock-project-id",
+				StorageBucket: "sb1-mock",
+			},
+		}, {
+			"partial values exists, ignore FIREBASE_CONFIG json",
+			`{"projectId": "hipster-chat-mock"}`,
 			&Config{StorageBucket: "sb1-mock"},
 			&Config{
 				ProjectID:     "mock-project-id",
@@ -394,9 +418,12 @@ func TestAutoInit(t *testing.T) {
 			"config file does not clobber and is ignored",
 			"testdata/firebase_config.json",
 			&Config{ProjectID: "pid1-test"},
-			&Config{
-				ProjectID: "pid1-test",
-			},
+			&Config{ProjectID: "pid1-test"},
+		}, {
+			"config json does not clobber and is ignored",
+			`{"projectId": "hipster-chat-mock"}`,
+			&Config{ProjectID: "pid1-test"},
+			&Config{ProjectID: "pid1-test"},
 		}, {
 			"config file does not clober, no op when all values present",
 			"testdata/firebase_config.json",
@@ -409,8 +436,19 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "sb1-test",
 			},
 		}, {
-			"JSON with bad key",
+			"JSON file with bad key",
 			"testdata/firebase_config_bad_key.json",
+			nil,
+			&Config{
+				ProjectID:     "mock-project-id",
+				StorageBucket: "hipster-chat.appspot.mock",
+			},
+		}, {
+			"JSON string with bad key",
+			`{
+				"obviously_bad_key": "hipster-chat-mock",
+				"storageBucket": "hipster-chat.appspot.mock"
+			}`,
 			nil,
 			&Config{
 				ProjectID:     "mock-project-id",
