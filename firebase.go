@@ -148,10 +148,16 @@ func getConfigDefaults() (*Config, error) {
 	if confFileName == "" {
 		return fbc, nil
 	}
-	dat, err := ioutil.ReadFile(confFileName)
-	if err != nil {
-		return nil, err
+	var dat []byte
+	if confFileName[0] == byte('{') {
+		dat = []byte(confFileName)
+	} else {
+		var err error
+		dat, err = ioutil.ReadFile(confFileName)
+		if err != nil {
+			return nil, err
+		}
 	}
-	err = json.Unmarshal(dat, fbc)
+	err := json.Unmarshal(dat, fbc)
 	return fbc, err
 }
