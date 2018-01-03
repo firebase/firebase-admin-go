@@ -67,7 +67,6 @@ type Client struct {
 	ks        keySource
 	projectID string
 	snr       signer
-	url       string
 	version   string
 }
 

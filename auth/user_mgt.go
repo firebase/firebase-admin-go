@@ -40,12 +40,12 @@ var commonValidators = map[string]func(interface{}) error{
 }
 
 // Create a new interface
-type relayingpartyCall interface {
+type identitytoolkitCall interface {
 	Header() http.Header
 }
 
 // set header
-func (c *Client) setHeader(ic relayingpartyCall) {
+func (c *Client) setHeader(ic identitytoolkitCall) {
 	ic.Header().Set("X-Client-Version", c.version)
 }
 
@@ -198,9 +198,9 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 		LocalId: uid,
 	}
 
-	relyingpartyDeleteAccountCall := c.is.Relyingparty.DeleteAccount(request)
-	c.setHeader(relyingpartyDeleteAccountCall)
-	_, err := relyingpartyDeleteAccountCall.Context(ctx).Do()
+	call := c.is.Relyingparty.DeleteAccount(request)
+	c.setHeader(call)
+	_, err := call.Context(ctx).Do()
 	return err
 }
 
@@ -260,9 +260,9 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		MaxResults:    int64(pageSize),
 		NextPageToken: pageToken,
 	}
-	relyingpartyDownloadAccountCall := it.client.is.Relyingparty.DownloadAccount(request)
-	it.client.setHeader(relyingpartyDownloadAccountCall)
-	resp, err := relyingpartyDownloadAccountCall.Context(it.ctx).Do()
+	call := it.client.is.Relyingparty.DownloadAccount(request)
+	it.client.setHeader(call)
+	resp, err := call.Context(it.ctx).Do()
 	if err != nil {
 		return "", err
 	}
@@ -539,9 +539,9 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 		return "", err
 	}
 
-	relyingpartySignupNewUserCall := c.is.Relyingparty.SignupNewUser(request)
-	c.setHeader(relyingpartySignupNewUserCall)
-	resp, err := relyingpartySignupNewUserCall.Context(ctx).Do()
+	call := c.is.Relyingparty.SignupNewUser(request)
+	c.setHeader(call)
+	resp, err := call.Context(ctx).Do()
 	if err != nil {
 		return "", err
 	}
@@ -565,17 +565,17 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 		return err
 	}
 
-	relyingpartySetAccountInfoCall := c.is.Relyingparty.SetAccountInfo(request)
-	c.setHeader(relyingpartySetAccountInfoCall)
-	_, err := relyingpartySetAccountInfoCall.Context(ctx).Do()
+	call := c.is.Relyingparty.SetAccountInfo(request)
+	c.setHeader(call)
+	_, err := call.Context(ctx).Do()
 
 	return err
 }
 
 func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
-	relyingpartyGetAccountInfoCall := c.is.Relyingparty.GetAccountInfo(request)
-	c.setHeader(relyingpartyGetAccountInfoCall)
-	resp, err := relyingpartyGetAccountInfoCall.Context(ctx).Do()
+	call := c.is.Relyingparty.GetAccountInfo(request)
+	c.setHeader(call)
+	resp, err := call.Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -602,11 +602,6 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 		}
 	}
 
-	var providerID string
-	if len(r.ProviderUserInfo) == 1 {
-		providerID = r.ProviderUserInfo[0].ProviderId
-	}
-
 	var providerUserInfo []*UserInfo
 	for _, u := range r.ProviderUserInfo {
 		info := &UserInfo{
@@ -627,7 +622,6 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 				Email:       r.Email,
 				PhoneNumber: r.PhoneNumber,
 				PhotoURL:    r.PhotoUrl,
-				ProviderID:  providerID,
 				UID:         r.LocalId,
 			},
 			CustomClaims:     cc,

@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -704,11 +705,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.Rbody = reqBody
-		// remove extra newline for  reflect.DeepEqual
-		if string(s.Rbody[len(s.Rbody)-1]) == "\n" {
-			s.Rbody = s.Rbody[:len(s.Rbody)-1]
-		}
+		s.Rbody = bytes.TrimSpace(reqBody)
 		s.Req = append(s.Req, r)
 
 		gh := r.Header.Get("Authorization")
@@ -745,7 +742,6 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.url = s.Srv.URL + "/"
 	authClient.is.BasePath = s.Srv.URL + "/"
 	s.Client = authClient
 	return &s
