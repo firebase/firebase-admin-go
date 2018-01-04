@@ -51,11 +51,11 @@ var testUser = &UserRecord{
 			DisplayName: "Test User",
 			PhotoURL:    "http://www.example.com/testuser/photo.png",
 			Email:       "testuser@example.com",
-			UID:         "testuser@example.com",
+			UID:         "testuid",
 		}, {
 			ProviderID:  "phone",
 			PhoneNumber: "+1234567890",
-			UID:         "+1234567890",
+			UID:         "testuid",
 		},
 	},
 	UserMetadata: &UserMetadata{
@@ -617,11 +617,11 @@ func TestMakeExportedUser(t *testing.T) {
 				DisplayName: "Test User",
 				PhotoUrl:    "http://www.example.com/testuser/photo.png",
 				Email:       "testuser@example.com",
-				RawId:       "testuser@example.com",
+				RawId:       "testuid",
 			}, {
 				ProviderId:  "phone",
 				PhoneNumber: "+1234567890",
-				RawId:       "+1234567890",
+				RawId:       "testuid",
 			}},
 	}
 

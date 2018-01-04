@@ -13,11 +13,11 @@
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "federatedId" : "testuser@example.com",
             "email" : "testuser@example.com",
-            "rawId" : "testuser@example.com"
+            "rawId" : "testuid"
             }, {
                 "providerId" : "phone",
                 "phoneNumber" : "+1234567890",
-                "rawId" : "+1234567890"
+                "rawId" : "testuid"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "passwordHash" : "passwordhash1",
@@ -41,11 +41,11 @@
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "federatedId" : "testuser@example.com",
             "email" : "testuser@example.com",
-            "rawId" : "testuser@example.com"
+            "rawId" : "testuid"
             }, {
                 "providerId" : "phone",
                 "phoneNumber" : "+1234567890",
-                "rawId" : "+1234567890"
+                "rawId" : "testuid"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "passwordHash" : "passwordhash2",
@@ -69,11 +69,11 @@
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "federatedId" : "testuser@example.com",
             "email" : "testuser@example.com",
-            "rawId" : "testuser@example.com"
+            "rawId" : "testuid"
             }, {
                 "providerId" : "phone",
                 "phoneNumber" : "+1234567890",
-                "rawId" : "+1234567890"
+                "rawId" : "testuid"
             } ],
             "photoUrl" : "http://www.example.com/testuser/photo.png",
             "passwordHash" : "passwordhash3",
