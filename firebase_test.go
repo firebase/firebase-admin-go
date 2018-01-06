@@ -349,18 +349,18 @@ func TestVersion(t *testing.T) {
 }
 func TestAutoInit(t *testing.T) {
 	tests := []struct {
-		name         string
-		confFilename string
-		initOptions  *Config
-		wantOptions  *Config
+		name          string
+		optionsConfig string
+		initOptions   *Config
+		wantOptions   *Config
 	}{
 		{
-			"no environment var, no options",
+			"No environment variable, no explicit options",
 			"",
 			nil,
 			&Config{ProjectID: "mock-project-id"}, // from default creds here and below.
 		}, {
-			"env var set to file, options not",
+			"Environment variable set to file, no explicit options",
 			"testdata/firebase_config.json",
 			nil,
 			&Config{
@@ -368,7 +368,7 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "hipster-chat.appspot.mock",
 			},
 		}, {
-			"env var set to json, options not",
+			"Environment variable set to string, no explicit options",
 			`{
 				"projectId": "hipster-chat-mock",
 				"storageBucket": "hipster-chat.appspot.mock"
@@ -379,17 +379,17 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "hipster-chat.appspot.mock",
 			},
 		}, {
-			"partial values in file override with nil settings",
+			"Environment variable set to file with some values missing, no explicit options",
 			"testdata/firebase_config_partial.json",
 			nil,
 			&Config{ProjectID: "hipster-chat-mock"},
 		}, {
-			"partial values in json override with nil settings",
+			"Environment variable set to string with some values missing, no explicit options",
 			`{"projectId": "hipster-chat-mock"}`,
 			nil,
 			&Config{ProjectID: "hipster-chat-mock"},
 		}, {
-			"partial values exists, ignore FIREBASE_CONFIG file",
+			"Environment variable set to file which is ignored as some explicit options are passed",
 			"testdata/firebase_config_partial.json",
 			&Config{StorageBucket: "sb1-mock"},
 			&Config{
@@ -397,7 +397,7 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "sb1-mock",
 			},
 		}, {
-			"partial values exists, ignore FIREBASE_CONFIG json",
+			"Environment variable set to string which is ignored as some explicit options are passed",
 			`{"projectId": "hipster-chat-mock"}`,
 			&Config{StorageBucket: "sb1-mock"},
 			&Config{
@@ -405,46 +405,20 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "sb1-mock",
 			},
 		}, {
-			"partial values ignore default settings",
+			"Environment variable set to file which is ignored as options are explicitly empty",
 			"testdata/firebase_config_partial.json",
 			&Config{},
 			&Config{ProjectID: "mock-project-id"},
 		}, {
-			"partial value override does not clobber",
-			"testdata/firebase_config_partial.json",
-			&Config{ProjectID: "pid1-test"},
-			&Config{ProjectID: "pid1-test"},
-		}, {
-			"config file does not clobber and is ignored",
-			"testdata/firebase_config.json",
-			&Config{ProjectID: "pid1-test"},
-			&Config{ProjectID: "pid1-test"},
-		}, {
-			"config json does not clobber and is ignored",
-			`{"projectId": "hipster-chat-mock"}`,
-			&Config{ProjectID: "pid1-test"},
-			&Config{ProjectID: "pid1-test"},
-		}, {
-			"config file does not clober, no op when all values present",
-			"testdata/firebase_config.json",
-			&Config{
-				ProjectID:     "pid-test",
-				StorageBucket: "sb1-test",
-			},
-			&Config{
-				ProjectID:     "pid-test",
-				StorageBucket: "sb1-test",
-			},
-		}, {
-			"JSON file with bad key",
-			"testdata/firebase_config_bad_key.json",
+			"Environment variable set to file with an unknown key which is ignored, no explicit options",
+			"testdata/firebase_config_invalid_key.json",
 			nil,
 			&Config{
-				ProjectID:     "mock-project-id",
+				ProjectID:     "mock-project-id", // from default creds
 				StorageBucket: "hipster-chat.appspot.mock",
 			},
 		}, {
-			"JSON string with bad key",
+			"Environment variable set to string with an unknown key which is ignored, no explicit options",
 			`{
 				"obviously_bad_key": "hipster-chat-mock",
 				"storageBucket": "hipster-chat.appspot.mock"
@@ -462,7 +436,7 @@ func TestAutoInit(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			overwriteEnv(firebaseEnvName, test.confFilename)
+			overwriteEnv(firebaseEnvName, test.optionsConfig)
 			app, err := NewApp(context.Background(), test.initOptions)
 			if err != nil {
 				t.Error(err)
@@ -473,7 +447,7 @@ func TestAutoInit(t *testing.T) {
 	}
 }
 
-func TestAutoInitBadFiles(t *testing.T) {
+func TestAutoInitInvalidFiles(t *testing.T) {
 	tests := []struct {
 		name      string
 		filename  string
@@ -485,7 +459,7 @@ func TestAutoInitBadFiles(t *testing.T) {
 			"open testdata/no_such_file.json: no such file or directory",
 		}, {
 			"invalid JSON",
-			"testdata/firebase_config_bad.json",
+			"testdata/firebase_config_invalid.json",
 			"invalid character 'b' looking for beginning of value",
 		}, {
 			"empty file",

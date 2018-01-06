@@ -116,9 +116,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		return nil, err
 	}
 	if config == nil {
-		config, err = getConfigDefaults()
-
-		if err != nil {
+		if config, err = getConfigDefaults(); err != nil {
 			return nil, err
 		}
 	}
@@ -153,8 +151,7 @@ func getConfigDefaults() (*Config, error) {
 		dat = []byte(confFileName)
 	} else {
 		var err error
-		dat, err = ioutil.ReadFile(confFileName)
-		if err != nil {
+		if dat, err = ioutil.ReadFile(confFileName); err != nil {
 			return nil, err
 		}
 	}
