@@ -18,7 +18,10 @@
 package firebase
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"os"
 
 	"cloud.google.com/go/firestore"
 
@@ -26,8 +29,6 @@ import (
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/storage"
-
-	"os"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -47,6 +48,9 @@ var firebaseScopes = []string{
 // Version of the Firebase Go Admin SDK.
 const Version = "2.3.0"
 
+// firebaseEnvName is the name of the environment variable with the Config.
+const firebaseEnvName = "FIREBASE_CONFIG"
+
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
 	creds         *google.DefaultCredentials
@@ -57,8 +61,8 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	ProjectID     string
-	StorageBucket string
+	ProjectID     string `json:"projectId"`
+	StorageBucket string `json:"storageBucket"`
 }
 
 // Auth returns an instance of auth.Client.
@@ -107,14 +111,14 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
-
 	creds, err := transport.Creds(ctx, o...)
 	if err != nil {
 		return nil, err
 	}
-
 	if config == nil {
-		config = &Config{}
+		if config, err = getConfigDefaults(); err != nil {
+			return nil, err
+		}
 	}
 
 	var pid string
@@ -132,4 +136,25 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		storageBucket: config.StorageBucket,
 		opts:          o,
 	}, nil
+}
+
+// getConfigDefaults reads the default config file, defined by the FIREBASE_CONFIG
+// env variable, used only when options are nil.
+func getConfigDefaults() (*Config, error) {
+	fbc := &Config{}
+	confFileName := os.Getenv(firebaseEnvName)
+	if confFileName == "" {
+		return fbc, nil
+	}
+	var dat []byte
+	if confFileName[0] == byte('{') {
+		dat = []byte(confFileName)
+	} else {
+		var err error
+		if dat, err = ioutil.ReadFile(confFileName); err != nil {
+			return nil, err
+		}
+	}
+	err := json.Unmarshal(dat, fbc)
+	return fbc, err
 }
