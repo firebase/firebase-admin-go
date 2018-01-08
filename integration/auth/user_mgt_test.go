@@ -277,7 +277,7 @@ func testUpdateUser(t *testing.T) {
 		}
 	}
 
-	// compare provider info seperatley since the order of the providers isn't guaranteed.
+	// compare provider info separately since the order of the providers isn't guaranteed.
 	testProviderInfo(u.ProviderUserInfo, t)
 
 	// now compare the rest of the record, without the ProviderInfo
