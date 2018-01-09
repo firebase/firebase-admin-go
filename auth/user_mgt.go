@@ -57,8 +57,9 @@ type UserInfo struct {
 	Email       string
 	PhoneNumber string
 	PhotoURL    string
-	// ProviderID can be a short domain name (e.g. google.com),
+	// In the ProviderUserInfo[] ProviderID can be a short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
+	// In UserRecord.UserInfo it will return the constant string "firebase".
 	ProviderID string
 	UID        string
 }
