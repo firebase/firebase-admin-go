@@ -41,6 +41,7 @@ var testUser = &UserRecord{
 		PhoneNumber: "+1234567890",
 		DisplayName: "Test User",
 		PhotoURL:    "http://www.example.com/testuser/photo.png",
+		ProviderID:  defaultProviderID,
 	},
 	Disabled: false,
 

@@ -212,7 +212,10 @@ func testUpdateUser(t *testing.T) {
 	}
 
 	want := &auth.UserRecord{
-		UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
+		UserInfo: &auth.UserInfo{
+			UID:        testFixtures.sampleUserBlank.UID,
+			ProviderID: "firebase",
+		},
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
@@ -241,6 +244,7 @@ func testUpdateUser(t *testing.T) {
 			DisplayName: "name",
 			PhoneNumber: "+12345678901",
 			PhotoURL:    "http://photo.png",
+			ProviderID:  "firebase",
 			Email:       "abc@ab.ab",
 		},
 		UserMetadata: &auth.UserMetadata{

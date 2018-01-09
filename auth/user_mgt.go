@@ -30,6 +30,8 @@ import (
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
+const defaultProviderID = "firebase"
+
 var commonValidators = map[string]func(interface{}) error{
 	"displayName": validateDisplayName,
 	"email":       validateEmail,
@@ -622,6 +624,7 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 				Email:       r.Email,
 				PhoneNumber: r.PhoneNumber,
 				PhotoURL:    r.PhotoUrl,
+				ProviderID:  defaultProviderID,
 				UID:         r.LocalId,
 			},
 			CustomClaims:     cc,
