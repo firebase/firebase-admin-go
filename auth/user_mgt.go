@@ -17,16 +17,20 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 
-	"google.golang.org/api/iterator"
-
 	"golang.org/x/net/context"
+	"google.golang.org/api/identitytoolkit/v3"
+	"google.golang.org/api/iterator"
 )
 
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
+
+const defaultProviderID = "firebase"
 
 var commonValidators = map[string]func(interface{}) error{
 	"displayName": validateDisplayName,
@@ -37,16 +41,27 @@ var commonValidators = map[string]func(interface{}) error{
 	"localId":     validateUID,
 }
 
+// Create a new interface
+type identitytoolkitCall interface {
+	Header() http.Header
+}
+
+// set header
+func (c *Client) setHeader(ic identitytoolkitCall) {
+	ic.Header().Set("X-Client-Version", c.version)
+}
+
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
-	DisplayName string `json:"displayName,omitempty"`
-	Email       string `json:"email,omitempty"`
-	PhoneNumber string `json:"phoneNumber,omitempty"`
-	PhotoURL    string `json:"photoUrl,omitempty"`
-	// ProviderID can be a short domain name (e.g. google.com),
+	DisplayName string
+	Email       string
+	PhoneNumber string
+	PhotoURL    string
+	// In the ProviderUserInfo[] ProviderID can be a short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
-	ProviderID string `json:"providerId,omitempty"`
-	UID        string `json:"localId,omitempty"`
+	// In UserRecord.UserInfo it will return the constant string "firebase".
+	ProviderID string
+	UID        string
 }
 
 // UserMetadata contains additional metadata associated with a user account.
@@ -182,9 +197,14 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	if err := validateUID(uid); err != nil {
 		return err
 	}
-	var resp map[string]interface{}
-	deleteParams := map[string]interface{}{"localId": []string{uid}}
-	return c.makeHTTPCall(ctx, "deleteAccount", deleteParams, &resp)
+	request := &identitytoolkit.IdentitytoolkitRelyingpartyDeleteAccountRequest{
+		LocalId: uid,
+	}
+
+	call := c.is.Relyingparty.DeleteAccount(request)
+	c.setHeader(call)
+	_, err := call.Context(ctx).Do()
+	return err
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -192,7 +212,10 @@ func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
 	if err := validateUID(uid); err != nil {
 		return nil, err
 	}
-	return c.getUser(ctx, map[string]interface{}{"localId": []string{uid}})
+	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
+		LocalId: []string{uid},
+	}
+	return c.getUser(ctx, request)
 }
 
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
@@ -200,7 +223,10 @@ func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserR
 	if err := validatePhone(phone); err != nil {
 		return nil, err
 	}
-	return c.getUser(ctx, map[string]interface{}{"phoneNumber": []string{phone}})
+	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
+		PhoneNumber: []string{phone},
+	}
+	return c.getUser(ctx, request)
 }
 
 // GetUserByEmail gets the user data corresponding to the specified email.
@@ -208,7 +234,10 @@ func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord,
 	if err := validateEmail(email); err != nil {
 		return nil, err
 	}
-	return c.getUser(ctx, map[string]interface{}{"email": []string{email}})
+	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
+		Email: []string{email},
+	}
+	return c.getUser(ctx, request)
 }
 
 // Users returns an iterator over Users.
@@ -230,25 +259,26 @@ func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator 
 }
 
 func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	params := map[string]interface{}{"maxResults": pageSize}
-	if pageToken != "" {
-		params["nextPageToken"] = pageToken
+	request := &identitytoolkit.IdentitytoolkitRelyingpartyDownloadAccountRequest{
+		MaxResults:    int64(pageSize),
+		NextPageToken: pageToken,
 	}
-
-	var lur listUsersResponse
-	err := it.client.makeHTTPCall(it.ctx, "downloadAccount", params, &lur)
+	call := it.client.is.Relyingparty.DownloadAccount(request)
+	it.client.setHeader(call)
+	resp, err := call.Context(it.ctx).Do()
 	if err != nil {
 		return "", err
 	}
-	for _, u := range lur.Users {
+
+	for _, u := range resp.Users {
 		eu, err := makeExportedUser(u)
 		if err != nil {
 			return "", err
 		}
 		it.users = append(it.users, eu)
 	}
-	it.pageInfo.Token = lur.NextPage
-	return lur.NextPage, nil
+	it.pageInfo.Token = resp.NextPageToken
+	return resp.NextPageToken, nil
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
@@ -386,10 +416,10 @@ func validatePhone(val interface{}) error {
 	return nil
 }
 
-func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
+func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest) error {
 	params := map[string]interface{}{}
 	if u.params == nil {
-		return params, nil
+		return nil
 	}
 
 	for k, v := range u.params {
@@ -398,14 +428,28 @@ func (u *UserToCreate) preparePayload() (map[string]interface{}, error) {
 	for key, validate := range commonValidators {
 		if v, ok := params[key]; ok {
 			if err := validate(v); err != nil {
-				return nil, err
+				return err
 			}
+			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
 		}
 	}
-	return params, nil
+	if params["disabled"] != nil {
+		user.Disabled = params["disabled"].(bool)
+		if !user.Disabled {
+			user.ForceSendFields = append(user.ForceSendFields, "Disabled")
+		}
+	}
+	if params["emailVerified"] != nil {
+		user.EmailVerified = params["emailVerified"].(bool)
+		if !user.EmailVerified {
+			user.ForceSendFields = append(user.ForceSendFields, "EmailVerified")
+		}
+	}
+
+	return nil
 }
 
-func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
+func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest) error {
 	params := map[string]interface{}{}
 	for k, v := range u.params {
 		params[k] = v
@@ -415,17 +459,41 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 	processDeletion(params, "phoneNumber", "deleteProvider", "phone")
 
 	if err := processClaims(params); err != nil {
-		return nil, err
+		return err
+	}
+
+	if params["customAttributes"] != nil {
+		user.CustomAttributes = params["customAttributes"].(string)
 	}
 
 	for key, validate := range commonValidators {
 		if v, ok := params[key]; ok {
 			if err := validate(v); err != nil {
-				return nil, err
+				return err
 			}
+			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
 		}
 	}
-	return params, nil
+	if params["disableUser"] != nil {
+		user.DisableUser = params["disableUser"].(bool)
+		if !user.DisableUser {
+			user.ForceSendFields = append(user.ForceSendFields, "DisableUser")
+		}
+	}
+	if params["emailVerified"] != nil {
+		user.EmailVerified = params["emailVerified"].(bool)
+		if !user.EmailVerified {
+			user.ForceSendFields = append(user.ForceSendFields, "EmailVerified")
+		}
+	}
+	if params["deleteAttribute"] != nil {
+		user.DeleteAttribute = params["deleteAttribute"].([]string)
+	}
+	if params["deleteProvider"] != nil {
+		user.DeleteProvider = params["deleteProvider"].([]string)
+	}
+
+	return nil
 }
 
 // End of validators
@@ -433,32 +501,32 @@ func (u *UserToUpdate) preparePayload() (map[string]interface{}, error) {
 // Response Types -------------------------------
 
 type getUserResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
+	RequestType string
+	Users       []responseUserRecord
 }
 
 type responseUserRecord struct {
-	UID                string      `json:"localId,omitempty"`
-	DisplayName        string      `json:"displayName,omitempty"`
-	Email              string      `json:"email,omitempty"`
-	PhoneNumber        string      `json:"phoneNumber,omitempty"`
-	PhotoURL           string      `json:"photoUrl,omitempty"`
-	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
-	ProviderID         string      `json:"providerId,omitempty"`
-	CustomClaims       string      `json:"customAttributes,omitempty"`
-	Disabled           bool        `json:"disabled,omitempty"`
-	EmailVerified      bool        `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
-	PasswordHash       string      `json:"passwordHash,omitempty"`
-	PasswordSalt       string      `json:"salt,omitempty"`
-	ValidSince         int64       `json:"validSince,string,omitempty"`
+	UID                string
+	DisplayName        string
+	Email              string
+	PhoneNumber        string
+	PhotoURL           string
+	CreationTimestamp  int64
+	LastLogInTimestamp int64
+	ProviderID         string
+	CustomClaims       string
+	Disabled           bool
+	EmailVerified      bool
+	ProviderUserInfo   []*UserInfo
+	PasswordHash       string
+	PasswordSalt       string
+	ValidSince         int64
 }
 
 type listUsersResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
-	NextPage    string               `json:"nextPageToken,omitempty"`
+	RequestType string
+	Users       []responseUserRecord
+	NextPage    string
 }
 
 // Helper functions for retrieval and HTTP calls.
@@ -468,15 +536,20 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 		user = &UserToCreate{}
 	}
 
-	payload, err := user.preparePayload()
+	request := &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
+
+	if err := user.preparePayload(request); err != nil {
+		return "", err
+	}
+
+	call := c.is.Relyingparty.SignupNewUser(request)
+	c.setHeader(call)
+	resp, err := call.Context(ctx).Do()
 	if err != nil {
 		return "", err
 	}
-	var rur responseUserRecord
-	if err := c.makeHTTPCall(ctx, "signupNewUser", payload, &rur); err != nil {
-		return "", err
-	}
-	return rur.UID, nil
+
+	return resp.LocalId, nil
 }
 
 func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
@@ -486,37 +559,44 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	if user == nil || user.params == nil {
 		return fmt.Errorf("update parameters must not be nil or empty")
 	}
-	user.params["localId"] = uid
 
-	payload, err := user.preparePayload()
-	if err != nil {
+	request := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{
+		LocalId: uid,
+	}
+
+	if err := user.preparePayload(request); err != nil {
 		return err
 	}
 
-	var rur responseUserRecord
-	return c.makeHTTPCall(ctx, "setAccountInfo", payload, &rur)
+	call := c.is.Relyingparty.SetAccountInfo(request)
+	c.setHeader(call)
+	_, err := call.Context(ctx).Do()
+
+	return err
 }
 
-func (c *Client) getUser(ctx context.Context, params map[string]interface{}) (*UserRecord, error) {
-	var gur getUserResponse
-	err := c.makeHTTPCall(ctx, "getAccountInfo", params, &gur)
+func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
+	call := c.is.Relyingparty.GetAccountInfo(request)
+	c.setHeader(call)
+	resp, err := call.Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
-	if len(gur.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user from params: %v", params)
+	if len(resp.Users) == 0 {
+		return nil, fmt.Errorf("cannot find user from params: %v", request)
 	}
-	eu, err := makeExportedUser(gur.Users[0])
+
+	eu, err := makeExportedUser(resp.Users[0])
 	if err != nil {
 		return nil, err
 	}
 	return eu.UserRecord, nil
 }
 
-func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {
+func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) {
 	var cc map[string]interface{}
-	if r.CustomClaims != "" {
-		err := json.Unmarshal([]byte(r.CustomClaims), &cc)
+	if r.CustomAttributes != "" {
+		err := json.Unmarshal([]byte(r.CustomAttributes), &cc)
 		if err != nil {
 			return nil, err
 		}
@@ -525,27 +605,40 @@ func makeExportedUser(r responseUserRecord) (*ExportedUserRecord, error) {
 		}
 	}
 
+	var providerUserInfo []*UserInfo
+	for _, u := range r.ProviderUserInfo {
+		info := &UserInfo{
+			DisplayName: u.DisplayName,
+			Email:       u.Email,
+			PhoneNumber: u.PhoneNumber,
+			PhotoURL:    u.PhotoUrl,
+			ProviderID:  u.ProviderId,
+			UID:         u.RawId,
+		}
+		providerUserInfo = append(providerUserInfo, info)
+	}
+
 	resp := &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
 				DisplayName: r.DisplayName,
 				Email:       r.Email,
 				PhoneNumber: r.PhoneNumber,
-				PhotoURL:    r.PhotoURL,
-				ProviderID:  r.ProviderID,
-				UID:         r.UID,
+				PhotoURL:    r.PhotoUrl,
+				ProviderID:  defaultProviderID,
+				UID:         r.LocalId,
 			},
 			CustomClaims:     cc,
 			Disabled:         r.Disabled,
 			EmailVerified:    r.EmailVerified,
-			ProviderUserInfo: r.ProviderUserInfo,
+			ProviderUserInfo: providerUserInfo,
 			UserMetadata: &UserMetadata{
-				LastLogInTimestamp: r.LastLogInTimestamp,
-				CreationTimestamp:  r.CreationTimestamp,
+				LastLogInTimestamp: r.LastLoginAt,
+				CreationTimestamp:  r.CreatedAt,
 			},
 		},
 		PasswordHash: r.PasswordHash,
-		PasswordSalt: r.PasswordSalt,
+		PasswordSalt: r.Salt,
 	}
 	return resp, nil
 }
