@@ -152,6 +152,3 @@ To view the detailed coverage reports (per package)
 go test -cover -coverprofile=coverage.out   firebase.google.com/go/auth
 go tool cover -html=coverage.out
 ```
-
-```bash
-go test -cover -coverprofile=coverage.out   firebase.google.com/go/auth
