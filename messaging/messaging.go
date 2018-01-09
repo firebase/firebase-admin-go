@@ -26,7 +26,7 @@ import (
 	"google.golang.org/api/transport"
 )
 
-const messagingEndpoint = "https://fcm.googleapis.com/v1"
+const messagingEndpoint = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
 
 var errorCodes = map[int]string{
 	400: "malformed argument",
@@ -188,7 +188,7 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 
 	request := &internal.Request{
 		Method: http.MethodPost,
-		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.endpoint, c.project),
+		URL:    fmt.Sprintf(c.endpoint, c.project),
 		Body:   internal.NewJSONEntity(payload),
 		Opts:   []internal.HTTPOption{versionHeader},
 	}
