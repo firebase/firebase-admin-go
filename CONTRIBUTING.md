@@ -137,3 +137,21 @@ go test firebase.google.com/go/...
 ```
 
 This will execute both unit and integration test suites.
+
+### Test Coverage
+
+Coverage can be measured per package by invoking the -cover flag on the tests:
+
+```bash
+go test -cover firebase.google.com/go/auth
+```
+
+To view the detailed coverage reports (per package)
+
+```bash
+go test -cover -coverprofile=coverage.out   firebase.google.com/go/auth
+go tool cover -html=coverage.out
+```
+
+```bash
+go test -cover -coverprofile=coverage.out   firebase.google.com/go/auth
