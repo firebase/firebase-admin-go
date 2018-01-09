@@ -30,6 +30,8 @@ import (
 const maxReturnedResults = 1000
 const maxLenPayloadCC = 1000
 
+const defaultProviderID = "firebase"
+
 var commonValidators = map[string]func(interface{}) error{
 	"displayName": validateDisplayName,
 	"email":       validateEmail,
@@ -51,14 +53,15 @@ func (c *Client) setHeader(ic identitytoolkitCall) {
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
-	DisplayName string `json:"displayName,omitempty"`
-	Email       string `json:"email,omitempty"`
-	PhoneNumber string `json:"phoneNumber,omitempty"`
-	PhotoURL    string `json:"photoUrl,omitempty"`
-	// ProviderID can be a short domain name (e.g. google.com),
+	DisplayName string
+	Email       string
+	PhoneNumber string
+	PhotoURL    string
+	// In the ProviderUserInfo[] ProviderID can be a short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
-	ProviderID string `json:"providerId,omitempty"`
-	UID        string `json:"localId,omitempty"`
+	// In UserRecord.UserInfo it will return the constant string "firebase".
+	ProviderID string
+	UID        string
 }
 
 // UserMetadata contains additional metadata associated with a user account.
@@ -498,32 +501,32 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 // Response Types -------------------------------
 
 type getUserResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
+	RequestType string
+	Users       []responseUserRecord
 }
 
 type responseUserRecord struct {
-	UID                string      `json:"localId,omitempty"`
-	DisplayName        string      `json:"displayName,omitempty"`
-	Email              string      `json:"email,omitempty"`
-	PhoneNumber        string      `json:"phoneNumber,omitempty"`
-	PhotoURL           string      `json:"photoUrl,omitempty"`
-	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
-	ProviderID         string      `json:"providerId,omitempty"`
-	CustomClaims       string      `json:"customAttributes,omitempty"`
-	Disabled           bool        `json:"disabled,omitempty"`
-	EmailVerified      bool        `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
-	PasswordHash       string      `json:"passwordHash,omitempty"`
-	PasswordSalt       string      `json:"salt,omitempty"`
-	ValidSince         int64       `json:"validSince,string,omitempty"`
+	UID                string
+	DisplayName        string
+	Email              string
+	PhoneNumber        string
+	PhotoURL           string
+	CreationTimestamp  int64
+	LastLogInTimestamp int64
+	ProviderID         string
+	CustomClaims       string
+	Disabled           bool
+	EmailVerified      bool
+	ProviderUserInfo   []*UserInfo
+	PasswordHash       string
+	PasswordSalt       string
+	ValidSince         int64
 }
 
 type listUsersResponse struct {
-	RequestType string               `json:"kind,omitempty"`
-	Users       []responseUserRecord `json:"users,omitempty"`
-	NextPage    string               `json:"nextPageToken,omitempty"`
+	RequestType string
+	Users       []responseUserRecord
+	NextPage    string
 }
 
 // Helper functions for retrieval and HTTP calls.
@@ -622,6 +625,7 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 				Email:       r.Email,
 				PhoneNumber: r.PhoneNumber,
 				PhotoURL:    r.PhotoUrl,
+				ProviderID:  defaultProviderID,
 				UID:         r.LocalId,
 			},
 			CustomClaims:     cc,
