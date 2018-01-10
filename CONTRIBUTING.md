@@ -140,7 +140,7 @@ This will execute both unit and integration test suites.
 
 ### Test Coverage
 
-Coverage can be measured per package by passing the `-cover` flag to tests:
+Coverage can be measured per package by passing the `-cover` flag to the test invocation:
 
 ```bash
 go test -cover firebase.google.com/go/auth
