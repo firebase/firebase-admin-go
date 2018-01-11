@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
+	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -39,6 +41,7 @@ var testUser = &UserRecord{
 		PhoneNumber: "+1234567890",
 		DisplayName: "Test User",
 		PhotoURL:    "http://www.example.com/testuser/photo.png",
+		ProviderID:  defaultProviderID,
 	},
 	Disabled: false,
 
@@ -49,9 +52,11 @@ var testUser = &UserRecord{
 			DisplayName: "Test User",
 			PhotoURL:    "http://www.example.com/testuser/photo.png",
 			Email:       "testuser@example.com",
+			UID:         "testuid",
 		}, {
 			ProviderID:  "phone",
 			PhoneNumber: "+1234567890",
+			UID:         "testuid",
 		},
 	},
 	UserMetadata: &UserMetadata{
@@ -315,8 +320,16 @@ func TestCreateUser(t *testing.T) {
 			map[string]interface{}{"disabled": true},
 		},
 		{
+			(&UserToCreate{}).Disabled(false),
+			map[string]interface{}{"disabled": false},
+		},
+		{
 			(&UserToCreate{}).EmailVerified(true),
 			map[string]interface{}{"emailVerified": true},
+		},
+		{
+			(&UserToCreate{}).EmailVerified(false),
+			map[string]interface{}{"emailVerified": false},
 		},
 		{
 			(&UserToCreate{}).PhotoURL("http://some.url"),
@@ -421,8 +434,16 @@ func TestUpdateUser(t *testing.T) {
 			map[string]interface{}{"disableUser": true},
 		},
 		{
+			(&UserToUpdate{}).Disabled(false),
+			map[string]interface{}{"disableUser": false},
+		},
+		{
 			(&UserToUpdate{}).EmailVerified(true),
 			map[string]interface{}{"emailVerified": true},
+		},
+		{
+			(&UserToUpdate{}).EmailVerified(false),
+			map[string]interface{}{"emailVerified": false},
 		},
 		{
 			(&UserToUpdate{}).PhotoURL("http://some.url"),
@@ -576,32 +597,35 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-	rur := responseUserRecord{
-		UID:           "testuser",
-		Email:         "testuser@example.com",
-		PhoneNumber:   "+1234567890",
-		EmailVerified: true,
-		DisplayName:   "Test User",
-		ProviderUserInfo: []*UserInfo{
-			{
-				ProviderID:  "password",
-				DisplayName: "Test User",
-				PhotoURL:    "http://www.example.com/testuser/photo.png",
-				Email:       "testuser@example.com",
-			}, {
-				ProviderID:  "phone",
-				PhoneNumber: "+1234567890",
-			}},
-		PhotoURL:     "http://www.example.com/testuser/photo.png",
-		PasswordHash: "passwordhash",
-		PasswordSalt: "salt",
 
-		ValidSince:         1494364393,
-		Disabled:           false,
-		CreationTimestamp:  1234567890,
-		LastLogInTimestamp: 1233211232,
-		CustomClaims:       `{"admin": true, "package": "gold"}`,
+	rur := &identitytoolkit.UserInfo{
+		LocalId:          "testuser",
+		Email:            "testuser@example.com",
+		PhoneNumber:      "+1234567890",
+		EmailVerified:    true,
+		DisplayName:      "Test User",
+		Salt:             "salt",
+		PhotoUrl:         "http://www.example.com/testuser/photo.png",
+		PasswordHash:     "passwordhash",
+		ValidSince:       1494364393,
+		Disabled:         false,
+		CreatedAt:        1234567890,
+		LastLoginAt:      1233211232,
+		CustomAttributes: `{"admin": true, "package": "gold"}`,
+		ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
+			{
+				ProviderId:  "password",
+				DisplayName: "Test User",
+				PhotoUrl:    "http://www.example.com/testuser/photo.png",
+				Email:       "testuser@example.com",
+				RawId:       "testuid",
+			}, {
+				ProviderId:  "phone",
+				PhoneNumber: "+1234567890",
+				RawId:       "testuid",
+			}},
 	}
+
 	want := &ExportedUserRecord{
 		UserRecord:   testUser,
 		PasswordHash: "passwordhash",
@@ -626,14 +650,14 @@ func TestMakeExportedUser(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
-	s.Status = 500
+	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
 	if u != nil || err == nil {
 		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 	}
 
-	want := `http error status: 500; reason: {"error":"test"}`
+	want := `googleapi: got HTTP response code 500 with body: {"error":"test"}`
 	if err.Error() != want {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
 	}
@@ -682,7 +706,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.Rbody = reqBody
+		s.Rbody = bytes.TrimSpace(reqBody)
 		s.Req = append(s.Req, r)
 
 		gh := r.Header.Get("Authorization")
@@ -719,7 +743,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.url = s.Srv.URL + "/"
+	authClient.is.BasePath = s.Srv.URL + "/"
 	s.Client = authClient
 	return &s
 }

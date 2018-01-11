@@ -26,12 +26,12 @@ import (
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
+	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/transport"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
 const issuerPrefix = "https://securetoken.google.com/"
 const tokenExpSeconds = 3600
 
@@ -63,10 +63,10 @@ type Token struct {
 // by Firebase backend services.
 type Client struct {
 	hc        *internal.HTTPClient
+	is        *identitytoolkit.Service
 	ks        keySource
 	projectID string
 	snr       signer
-	url       string
 	version   string
 }
 
@@ -117,30 +117,19 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		return nil, err
 	}
 
+	is, err := identitytoolkit.New(hc)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
 		hc:        &internal.HTTPClient{Client: hc},
+		is:        is,
 		ks:        newHTTPKeySource(googleCertURL, hc),
 		projectID: c.ProjectID,
 		snr:       snr,
-		url:       idToolKitURL,
 		version:   "Go/Admin/" + c.Version,
 	}, nil
-}
-
-// Passes the request struct, returns a byte array of the json
-func (c *Client) makeHTTPCall(ctx context.Context, serviceName string, payload interface{}, result interface{}) error {
-	versionHeader := internal.WithHeader("X-Client-Version", c.version)
-	request := &internal.Request{
-		Method: "POST",
-		URL:    c.url + serviceName,
-		Body:   internal.NewJSONEntity(payload),
-		Opts:   []internal.HTTPOption{versionHeader},
-	}
-	resp, err := c.hc.Do(ctx, request)
-	if err != nil {
-		return err
-	}
-	return resp.Unmarshal(200, result)
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID. The resulting

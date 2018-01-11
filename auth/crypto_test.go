@@ -48,7 +48,7 @@ func newTestHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
 		Transport: &mockHTTPResponse{
 			Response: http.Response{
 				Status:     "200 OK",
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Header: http.Header{
 					"Cache-Control": {"public, max-age=100"},
 				},

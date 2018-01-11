@@ -42,7 +42,9 @@ requests, code review feedback, and also pull requests.
 ## Documentation
 
 * [Setup Guide](https://firebase.google.com/docs/admin/setup/)
+* [Authentication Guide](https://firebase.google.com/docs/auth/admin/)
 * [API Reference](https://godoc.org/firebase.google.com/go)
+* [Release Notes](https://firebase.google.com/support/release-notes/admin/go)
 
 
 ## License and Terms

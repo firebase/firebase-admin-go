@@ -212,7 +212,10 @@ func testUpdateUser(t *testing.T) {
 	}
 
 	want := &auth.UserRecord{
-		UserInfo: &auth.UserInfo{UID: testFixtures.sampleUserBlank.UID},
+		UserInfo: &auth.UserInfo{
+			UID:        testFixtures.sampleUserBlank.UID,
+			ProviderID: "firebase",
+		},
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
@@ -241,6 +244,7 @@ func testUpdateUser(t *testing.T) {
 			DisplayName: "name",
 			PhoneNumber: "+12345678901",
 			PhotoURL:    "http://photo.png",
+			ProviderID:  "firebase",
 			Email:       "abc@ab.ab",
 		},
 		UserMetadata: &auth.UserMetadata{
@@ -257,10 +261,12 @@ func testUpdateUser(t *testing.T) {
 			Email:       "abc@ab.ab",
 			PhotoURL:    "http://photo.png",
 			ProviderID:  "password",
+			UID:         "abc@ab.ab",
 		}
 		phoneUI := &auth.UserInfo{
 			PhoneNumber: "+12345678901",
 			ProviderID:  "phone",
+			UID:         "+12345678901",
 		}
 
 		var compareWith *auth.UserInfo
@@ -277,7 +283,7 @@ func testUpdateUser(t *testing.T) {
 		}
 	}
 
-	// compare provider info seperatley since the order of the providers isn't guaranteed.
+	// compare provider info separately since the order of the providers isn't guaranteed.
 	testProviderInfo(u.ProviderUserInfo, t)
 
 	// now compare the rest of the record, without the ProviderInfo

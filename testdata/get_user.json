@@ -1,31 +1,36 @@
 {
-  "kind" : "identitytoolkit#GetAccountInfoResponse",
-  "users" : [ {
-    "localId" : "testuser",
-    "email" : "testuser@example.com",
-    "phoneNumber" : "+1234567890",
-    "emailVerified" : true,
-    "displayName" : "Test User",
-    "providerUserInfo" : [ {
-      "providerId" : "password",
-      "displayName" : "Test User",
-      "photoUrl" : "http://www.example.com/testuser/photo.png",
-      "federatedId" : "testuser@example.com",
-      "email" : "testuser@example.com",
-      "rawId" : "testuser@example.com"
-    }, {
-        "providerId" : "phone",
-        "phoneNumber" : "+1234567890",
-        "rawId" : "+1234567890"
-    } ],
-    "photoUrl" : "http://www.example.com/testuser/photo.png",
-    "passwordHash" : "passwordhash",
-    "salt" : "salt===",
-    "passwordUpdatedAt" : 1.494364393E+12,
-    "validSince" : "1494364393",
-    "disabled" : false,
-    "createdAt" : "1234567890",
-    "lastLoginAt"	:"1233211232",
-    "customAttributes" : "{\"admin\": true, \"package\": \"gold\"}"
-  } ]
+  "kind": "identitytoolkit#GetAccountInfoResponse",
+  "users": [
+    {
+      "localId": "testuser",
+      "email": "testuser@example.com",
+      "phoneNumber": "+1234567890",
+      "emailVerified": true,
+      "displayName": "Test User",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "displayName": "Test User",
+          "photoUrl": "http://www.example.com/testuser/photo.png",
+          "federatedId": "testuser@example.com",
+          "email": "testuser@example.com",
+          "rawId": "testuid"
+        },
+        {
+          "providerId": "phone",
+          "phoneNumber": "+1234567890",
+          "rawId": "testuid"
+        }
+      ],
+      "photoUrl": "http://www.example.com/testuser/photo.png",
+      "passwordHash": "passwordhash",
+      "salt": "salt===",
+      "passwordUpdatedAt": 1.494364393E+12,
+      "validSince": "1494364393",
+      "disabled": false,
+      "createdAt": "1234567890",
+      "lastLoginAt": "1233211232",
+      "customAttributes": "{\"admin\": true, \"package\": \"gold\"}"
+    }
+  ]
 }
