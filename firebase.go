@@ -105,9 +105,12 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 
 // NewApp creates a new App from the provided config and client options.
 //
-// If the client options contain a valid credential (a service account file, a refresh token file or an
-// oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
-// authenticate the App with Google application default credentials.
+// If the client options contain a valid credential (a service account file, a refresh token
+// file or an oauth2.TokenSource) the App will be authenticated using that credential. Otherwise,
+// NewApp attempts to authenticate the App with Google application default credentials.
+// If `config` is nil, the SDK will attempt to load the config options from the
+// `FIREBASE_CONFIG` environment variable. If the value in it starts with a `{` it is parsed as a
+// JSON object, otherwise it is assumed to be the name of the JSON file containing the options.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
