@@ -1,4 +1,4 @@
 {
-  "projectId": "hipster-chat-mock",
-  "storageBucket": "hipster-chat.appspot.mock"
+  "projectId": "auto-init-project-id",
+  "storageBucket": "auto-init.storage.bucket"
 }
