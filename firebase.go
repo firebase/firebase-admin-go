@@ -48,7 +48,7 @@ var firebaseScopes = []string{
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.3.0"
+const Version = "2.4.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -117,9 +117,12 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 
 // NewApp creates a new App from the provided config and client options.
 //
-// If the client options contain a valid credential (a service account file, a refresh token file or an
-// oauth2.TokenSource) the App will be authenticated using that credential. Otherwise, NewApp attempts to
-// authenticate the App with Google application default credentials.
+// If the client options contain a valid credential (a service account file, a refresh token
+// file or an oauth2.TokenSource) the App will be authenticated using that credential. Otherwise,
+// NewApp attempts to authenticate the App with Google application default credentials.
+// If `config` is nil, the SDK will attempt to load the config options from the
+// `FIREBASE_CONFIG` environment variable. If the value in it starts with a `{` it is parsed as a
+// JSON object, otherwise it is assumed to be the name of the JSON file containing the options.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
 	o = append(o, opts...)
