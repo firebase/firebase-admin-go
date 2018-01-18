@@ -29,14 +29,14 @@ import (
 const messagingEndpoint = "https://fcm.googleapis.com/v1"
 
 var errorCodes = map[int]string{
-	400: "malformed argument",
-	401: "request not authorized",
-	403: "project does not match or the client does not have sufficient privileges",
-	404: "failed to find the ...",
-	409: "already deleted",
-	429: "request throttled out by the backend server",
-	500: "internal server error",
-	503: "backend servers are over capacity",
+	http.StatusBadRequest:          "malformed argument",
+	http.StatusUnauthorized:        "request not authorized",
+	http.StatusForbidden:           "project does not match or the client does not have sufficient privileges",
+	http.StatusNotFound:            "failed to find the ...",
+	http.StatusConflict:            "already deleted",
+	http.StatusTooManyRequests:     "request throttled out by the backend server",
+	http.StatusInternalServerError: "internal server error",
+	http.StatusServiceUnavailable:  "backend servers are over capacity",
 }
 
 // Client is the interface for the Firebase Messaging service.
