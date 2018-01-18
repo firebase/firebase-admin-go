@@ -55,9 +55,9 @@ type requestMessage struct {
 	Message      Message `json:"message,omitempty"`
 }
 
-// ResponseMessage is the identifier of the message sent.
+// responseMessage is the identifier of the message sent.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages
-type ResponseMessage struct {
+type responseMessage struct {
 	Name string `json:"name"`
 }
 
@@ -85,12 +85,12 @@ type Notification struct {
 // AndroidConfig is Android specific options for messages.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#AndroidConfig
 type AndroidConfig struct {
-	CollapseKey           string                 `json:"collapse_key,omitempty"`
-	Priority              string                 `json:"priority,omitempty"`
-	TTL                   string                 `json:"ttl,omitempty"`
-	RestrictedPackageName string                 `json:"restricted_package_name,omitempty"`
-	Data                  map[string]interface{} `json:"data,omitempty"`
-	Notification          AndroidNotification    `json:"notification,omitempty"`
+	CollapseKey           string              `json:"collapse_key,omitempty"`
+	Priority              string              `json:"priority,omitempty"`
+	TTL                   string              `json:"ttl,omitempty"`
+	RestrictedPackageName string              `json:"restricted_package_name,omitempty"`
+	Data                  map[string]string   `json:"data,omitempty"`
+	Notification          AndroidNotification `json:"notification,omitempty"`
 }
 
 // AndroidNotification is notification to send to android devices.
@@ -112,9 +112,9 @@ type AndroidNotification struct {
 // WebpushConfig is Webpush protocol options.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#WebpushConfig
 type WebpushConfig struct {
-	Headers      map[string]interface{} `json:"headers,omitempty"`
-	Data         map[string]interface{} `json:"data,omitempty"`
-	Notification WebpushNotification    `json:"notification,omitempty"`
+	Headers      map[string]string   `json:"headers,omitempty"`
+	Data         map[string]string   `json:"data,omitempty"`
+	Notification WebpushNotification `json:"notification,omitempty"`
 }
 
 // WebpushNotification is Web notification to send via webpush protocol.
@@ -128,8 +128,8 @@ type WebpushNotification struct {
 // ApnsConfig is Apple Push Notification Service specific options.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#ApnsConfig
 type ApnsConfig struct {
-	Headers map[string]interface{} `json:"headers,omitempty"`
-	Payload map[string]interface{} `json:"payload,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Payload map[string]string `json:"payload,omitempty"`
 }
 
 // NewClient creates a new instance of the Firebase Cloud Messaging Client.
@@ -201,7 +201,7 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 		return "", fmt.Errorf("unexpected http status code : %d, reason: %v", resp.Status, string(resp.Body))
 	}
 
-	result := &ResponseMessage{}
+	result := &responseMessage{}
 	err = resp.Unmarshal(http.StatusOK, result)
 
 	return result.Name, err

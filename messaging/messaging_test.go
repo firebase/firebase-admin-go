@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"google.golang.org/api/option"
@@ -64,10 +63,6 @@ func TestSend(t *testing.T) {
 		t.Errorf("response Name = %q; want = %q", name, msgName)
 	}
 
-	if !strings.HasPrefix(name, "projects/test-project/messages/") {
-		t.Errorf("response Name = %q; want prefix = %q", name, "projects/test-project/messages/")
-	}
-
 	if tr.Body == nil {
 		t.Fatalf("Request = nil; want non-nil")
 	}
@@ -105,10 +100,6 @@ func TestSendDryRun(t *testing.T) {
 
 	if name != msgName {
 		t.Errorf("response Name = %q; want = %q", name, msgName)
-	}
-
-	if !strings.HasPrefix(name, "projects/test-project/messages/") {
-		t.Errorf("response Name = %q; want prefix = %q", name, "projects/test-project/messages/")
 	}
 
 	if tr.Body == nil {
