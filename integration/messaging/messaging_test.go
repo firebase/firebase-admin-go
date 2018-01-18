@@ -245,7 +245,7 @@ func TestSendAndroidData(t *testing.T) {
 			CollapseKey: "Collapse",
 			Priority:    "HIGH",
 			TTL:         "3.5s",
-			Data: map[string]interface{}{
+			Data: map[string]string{
 				"private_key":  "foo",
 				"client_email": "bar@test.com",
 			},
@@ -271,7 +271,7 @@ func TestSendApnsNotification(t *testing.T) {
 			Body:  "This is a Notification",
 		},
 		Apns: messaging.ApnsConfig{
-			Payload: map[string]interface{}{
+			Payload: map[string]string{
 				"title": "APNS Title ",
 				"body":  "APNS bodym",
 			},
@@ -297,7 +297,7 @@ func TestSendApnsData(t *testing.T) {
 			Body:  "This is a Notification",
 		},
 		Apns: messaging.ApnsConfig{
-			Headers: map[string]interface{}{
+			Headers: map[string]string{
 				"private_key":  "foo",
 				"client_email": "bar@test.com",
 			},
