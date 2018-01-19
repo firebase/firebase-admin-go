@@ -1,4 +1,4 @@
 {
-  "project1d_bad_key": "hipster-chat-mock",
-  "storageBucket": "hipster-chat.appspot.mock"
+  "project1d_bad_key": "auto-init-project-id",
+  "storageBucket": "auto-init.storage.bucket"
 }
