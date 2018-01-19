@@ -498,37 +498,6 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 
 // End of validators
 
-// Response Types -------------------------------
-
-type getUserResponse struct {
-	RequestType string
-	Users       []responseUserRecord
-}
-
-type responseUserRecord struct {
-	UID                string
-	DisplayName        string
-	Email              string
-	PhoneNumber        string
-	PhotoURL           string
-	CreationTimestamp  int64
-	LastLogInTimestamp int64
-	ProviderID         string
-	CustomClaims       string
-	Disabled           bool
-	EmailVerified      bool
-	ProviderUserInfo   []*UserInfo
-	PasswordHash       string
-	PasswordSalt       string
-	ValidSince         int64
-}
-
-type listUsersResponse struct {
-	RequestType string
-	Users       []responseUserRecord
-	NextPage    string
-}
-
 // Helper functions for retrieval and HTTP calls.
 
 func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, error) {
