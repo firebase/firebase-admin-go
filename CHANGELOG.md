@@ -2,6 +2,7 @@
 - 
 
 # v2.4.0
+
 ### Initialization
 
 - [added] The [`firebase.NewApp()`](https://godoc.org/firebase.google.com/go#NewApp)
@@ -63,6 +64,7 @@
 # v1.0.2
 
 ### Authentication
+
 - [changed] When deployed in the Google App Engine environment, the SDK can
   now leverage the utilities provided by the
   [App Engine SDK](https://cloud.google.com/appengine/docs/standard/go/reference)
@@ -74,6 +76,7 @@
 # v1.0.1
 
 ### Authentication
+
 - [changed] Now uses the client options provided during
   [SDK initialization](https://godoc.org/firebase.google.com/go#NewApp) to
   create the [`http.Client`](https://godoc.org/net/http#Client) that is used
@@ -92,6 +95,7 @@
   to access your Firebase project.
 
 ### Authentication
+
 - [added] The initial release includes the `CustomToken()`,
   `CustomTokenWithClaims()`, and `VerifyIDToken()` functions for minting custom
   authentication tokens and verifying Firebase ID tokens.
