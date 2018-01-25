@@ -262,7 +262,7 @@ func TestSendAndroidData(t *testing.T) {
 	}
 }
 
-func TestSendApnsNotification(t *testing.T) {
+func TestSendAPNSNotification(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
@@ -270,7 +270,7 @@ func TestSendApnsNotification(t *testing.T) {
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		Apns: messaging.ApnsConfig{
+		APNS: messaging.APNSConfig{
 			Payload: map[string]string{
 				"title": "APNS Title ",
 				"body":  "APNS bodym",
@@ -288,7 +288,7 @@ func TestSendApnsNotification(t *testing.T) {
 	}
 }
 
-func TestSendApnsData(t *testing.T) {
+func TestSendAPNSData(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
@@ -296,7 +296,7 @@ func TestSendApnsData(t *testing.T) {
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		Apns: messaging.ApnsConfig{
+		APNS: messaging.APNSConfig{
 			Headers: map[string]string{
 				"private_key":  "foo",
 				"client_email": "bar@test.com",

@@ -69,7 +69,7 @@ type Message struct {
 	Notification Notification           `json:"notification,omitempty"`
 	Android      AndroidConfig          `json:"android,omitempty"`
 	Webpush      WebpushConfig          `json:"webpush,omitempty"`
-	Apns         ApnsConfig             `json:"apns,omitempty"`
+	APNS         APNSConfig             `json:"apns,omitempty"`
 	Token        string                 `json:"token,omitempty"`
 	Topic        string                 `json:"topic,omitempty"`
 	Condition    string                 `json:"condition,omitempty"`
@@ -125,9 +125,9 @@ type WebpushNotification struct {
 	Icon  string `json:"icon,omitempty"`
 }
 
-// ApnsConfig is Apple Push Notification Service specific options.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#ApnsConfig
-type ApnsConfig struct {
+// APNSConfig is Apple Push Notification Service specific options.
+// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#apnsconfig
+type APNSConfig struct {
 	Headers map[string]string `json:"headers,omitempty"`
 	Payload map[string]string `json:"payload,omitempty"`
 }
