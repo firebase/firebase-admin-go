@@ -77,6 +77,27 @@ func TestCustomToken(t *testing.T) {
 	}
 }
 
+func TestCustomTokenVerifyCheckIgnored(t *testing.T) {
+	ct, err := client.CustomToken("user1")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idt, err := signInWithCustomToken(ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vt, err := client.VerifyIDToken(idt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != "user1" {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
+	}
+}
+
 func TestCustomTokenWithClaims(t *testing.T) {
 	ct, err := client.CustomTokenWithClaims("user1", map[string]interface{}{
 		"premium": true,

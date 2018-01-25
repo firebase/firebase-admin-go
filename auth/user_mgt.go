@@ -442,12 +442,7 @@ func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 			if err := validate(v); err != nil {
 				return err
 			}
-			f := reflect.ValueOf(user).Elem().FieldByName(strings.Title(key))
-			if f.Kind() == reflect.String {
-				f.SetString(params[key].(string))
-			} else if f.Kind() == reflect.Int64 {
-				f.SetInt(params[key].(int64))
-			}
+			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
 		}
 	}
 	if params["disabled"] != nil {
