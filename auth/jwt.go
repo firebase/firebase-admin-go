@@ -113,7 +113,6 @@ func decodeToken(token string, ks keySource, h *jwtHeader, p jwtPayload) error {
 	if err := p.decode(s[1]); err != nil {
 		return err
 	}
-
 	keys, err := ks.Keys()
 	if err != nil {
 		return err

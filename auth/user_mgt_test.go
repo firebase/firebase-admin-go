@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/internal"
 
@@ -59,6 +60,7 @@ var testUser = &UserRecord{
 			UID:         "testuid",
 		},
 	},
+	TokensValidAfterTime: 1494364393,
 	UserMetadata: &UserMetadata{
 		CreationTimestamp:  1234567890,
 		LastLogInTimestamp: 1233211232,
@@ -496,6 +498,27 @@ func TestUpdateUser(t *testing.T) {
 		}
 	}
 }
+func TestRevokeRefreshToken(t *testing.T) {
+	resp := `{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "expectedUserID"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	before := time.Now().Unix()
+	tok := getIDToken(mockIDTokenPayload{"uid": "uid"})
+	err := s.Client.RevokeRefreshToken(ctx, tok)
+	after := time.Now().Unix()
+
+	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
+	err = json.Unmarshal(s.Rbody, &req)
+	if err != nil {
+		t.Error(err)
+	}
+	if req.ValidSince > after || req.ValidSince < before {
+		t.Errorf("validSince = %d, expecting time between %d and %d", req.ValidSince, before, after)
+	}
+}
 
 func TestInvalidSetCustomClaims(t *testing.T) {
 	cases := []struct {
@@ -673,6 +696,22 @@ type mockAuthServer struct {
 	Client *Client
 }
 
+func getEchoResponse(resp interface{}, t *testing.T) []byte {
+	var b []byte
+	var err error
+	switch v := resp.(type) {
+	case nil:
+		b = []byte("")
+	case []byte:
+		b = v
+	default:
+		if b, err = json.Marshal(resp); err != nil {
+			t.Fatal("marshaling error")
+		}
+	}
+	return b
+}
+
 // echoServer takes either a []byte or a string filename, or an object.
 //
 // echoServer returns a server whose client will reply with depending on the input type:
@@ -682,20 +721,7 @@ type mockAuthServer struct {
 // The marshalled request is available through s.rbody, s being the retuned server.
 // It also returns a closing functions that has to be defer closed.
 func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
-	var b []byte
-	var err error
-	switch v := resp.(type) {
-	case nil:
-		b = []byte("")
-	case []byte:
-		b = v
-	default:
-		b, err = json.Marshal(resp)
-		if err != nil {
-			t.Fatal("marshaling error")
-		}
-	}
-	s := mockAuthServer{Resp: b}
+	s := mockAuthServer{Resp: getEchoResponse(resp, t)}
 
 	const testToken = "test.token"
 	const testVersion = "test.version"
@@ -729,17 +755,17 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(s.Resp)
-
 	})
 	s.Srv = httptest.NewServer(handler)
-
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{testToken}),
-		},
-		Version: testVersion,
+			option.WithTokenSource(&mockTokenSource{testToken})},
+		ProjectID: "mock-project-id",
+		Version:   testVersion,
 	}
-	authClient, err := NewClient(context.Background(), conf)
+
+	authClient, err := NewClient(ctx, conf)
+	authClient.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
 	}

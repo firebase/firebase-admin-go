@@ -177,6 +177,16 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
+// RevokeRefreshToken revokes all tokens minted before the present.
+func (c *Client) RevokeRefreshToken(ctx context.Context, idToken string) error {
+	h := &jwtHeader{}
+	p := &Token{}
+	if err := decodeToken(idToken, c.ks, h, p); err != nil {
+		return err
+	}
+	return c.updateUser(ctx, p.UID, (&UserToUpdate{}).revokeRefreshToken())
+}
+
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
@@ -235,6 +245,25 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	}
 	p.UID = p.Subject
 	return p, nil
+}
+
+// VerifyIDTokenWithCheckRevoked verifies the signature	and payload of the provided ID token and
+// if requested, whether it was revoked.
+// see: VerifyIDToken above.
+func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string, checkToken bool) (*Token, error) {
+	p, err := c.VerifyIDToken(idToken)
+
+	if !checkToken || err != nil {
+		return p, err
+	}
+	user, err := c.GetUser(ctx, p.UID)
+	if err != nil {
+		return p, err
+	}
+	if p.IssuedAt < user.TokensValidAfterTime {
+		err = fmt.Errorf("the Firebase ID token has been revoked")
+	}
+	return p, err
 }
 
 func parseKey(key string) (*rsa.PrivateKey, error) {

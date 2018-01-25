@@ -37,10 +37,11 @@ import (
 )
 
 var client *Client
+var ctx context.Context
 var testIDToken string
 var testGetUserResponse []byte
+var testGetUserY2K2CResponse []byte
 var testListUsersResponse []byte
-
 var defaultTestOpts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
@@ -49,7 +50,6 @@ func TestMain(m *testing.M) {
 	var (
 		err   error
 		ks    keySource
-		ctx   context.Context
 		creds *google.DefaultCredentials
 		opts  []option.ClientOption
 	)
@@ -86,6 +86,11 @@ func TestMain(m *testing.M) {
 	client.ks = ks
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	testGetUserY2K2CResponse, err = ioutil.ReadFile("../testdata/get_user_valid_since_y2k2c.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -190,6 +195,49 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
+	}
+}
+
+func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil, testIDToken, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil, testIDToken, true)
+	if err != nil {
+		t.Error(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+func TestVerifyIDTokenWithCheckRevokedInvalidatedY2K2C(t *testing.T) {
+	s := echoServer(testGetUserY2K2CResponse, t)
+	defer s.Close()
+	_, err := s.Client.VerifyIDTokenWithCheckRevoked(nil,
+		getIDToken(mockIDTokenPayload{"uid": "uid"}),
+		true)
+	we := "the Firebase ID token has been revoked"
+	if err == nil || err.Error() != we {
+		t.Errorf("VerifyIDTokenWithCheckRevoked(..., token, true) = %v; want = %v", err, we)
 	}
 }
 
