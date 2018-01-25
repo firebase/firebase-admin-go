@@ -696,7 +696,15 @@ type mockAuthServer struct {
 	Client *Client
 }
 
-func getEchoResponse(resp interface{}, t *testing.T) []byte {
+// echoServer takes either a []byte or a string filename, or an object.
+//
+// echoServer returns a server whose client will reply with depending on the input type:
+//   * []byte: the []byte it got
+//   * object: the marshalled object, in []byte form
+//   * nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
+// The marshalled request is available through s.rbody, s being the retuned server.
+// It also returns a closing functions that has to be defer closed.
+func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	var b []byte
 	var err error
 	switch v := resp.(type) {
@@ -709,19 +717,7 @@ func getEchoResponse(resp interface{}, t *testing.T) []byte {
 			t.Fatal("marshaling error")
 		}
 	}
-	return b
-}
-
-// echoServer takes either a []byte or a string filename, or an object.
-//
-// echoServer returns a server whose client will reply with depending on the input type:
-//   * []byte: the []byte it got
-//   * object: the marshalled object, in []byte form
-//   * nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
-// The marshalled request is available through s.rbody, s being the retuned server.
-// It also returns a closing functions that has to be defer closed.
-func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
-	s := mockAuthServer{Resp: getEchoResponse(resp, t)}
+	s := mockAuthServer{Resp: b}
 
 	const testToken = "test.token"
 	const testVersion = "test.version"
