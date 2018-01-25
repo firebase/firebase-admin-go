@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
@@ -77,7 +78,7 @@ func TestCustomToken(t *testing.T) {
 	}
 }
 
-func TestCustomTokenVerifyCheckIgnored(t *testing.T) {
+func TestCustomTokenVerifyCheckRevokedIgnored(t *testing.T) {
 	ct, err := client.CustomToken("user1")
 
 	if err != nil {
@@ -89,13 +90,45 @@ func TestCustomTokenVerifyCheckIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(idt)
+	vt, err := client.VerifyIDTokenWithCheckRevoked(context.Background(), idt, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if vt.UID != "user1" {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
 	}
+}
+func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
+	revokedId := "user_revoked"
+	ct, err := client.CustomToken(revokedId)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idt, err := signInWithCustomToken(ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	vt, err := client.VerifyIDTokenWithCheckRevoked(ctx, idt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != revokedId {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedId)
+	}
+	time.Sleep(time.Second)
+	if err = client.RevokeRefreshToken(ctx, idt); err != nil {
+		t.Fatal(err)
+	}
+
+	vt, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true)
+	we := "the Firebase ID token has been revoked"
+	if err == nil || err.Error() != we {
+		t.Errorf("VerifyIDTokenWithCheckRevoked; err = %s; want err = %v", err, we)
+	}
+	err = client.DeleteUser(ctx, revokedId)
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {

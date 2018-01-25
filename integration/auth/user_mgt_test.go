@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"google.golang.org/api/iterator"
 
@@ -65,6 +66,14 @@ func testCreateUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// make sure that the user.TokensValidAvterTime is not in the future or stale.
+	if u.TokensValidAfterTime > time.Now().Unix() {
+		t.Errorf("timestamp cannot be in the future")
+	}
+	if u.TokensValidAfterTime < time.Now().Unix()-3600 {
+		t.Errorf("timestamp cannot be old")
+	}
+
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 
@@ -216,12 +225,13 @@ func testUpdateUser(t *testing.T) {
 			UID:        testFixtures.sampleUserBlank.UID,
 			ProviderID: "firebase",
 		},
+		TokensValidAfterTime: u.TokensValidAfterTime,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
 	}
 	if !reflect.DeepEqual(u, want) {
-		t.Errorf("GetUser() = %v; want = %v", u, want)
+		t.Errorf("GetUser() = %#v; want = %#v", u, want)
 	}
 
 	params := (&auth.UserToUpdate{}).
@@ -247,6 +257,7 @@ func testUpdateUser(t *testing.T) {
 			ProviderID:  "firebase",
 			Email:       "abc@ab.ab",
 		},
+		TokensValidAfterTime: u.TokensValidAfterTime,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
@@ -289,7 +300,7 @@ func testUpdateUser(t *testing.T) {
 	// now compare the rest of the record, without the ProviderInfo
 	u.ProviderUserInfo = nil
 	if !reflect.DeepEqual(u, want) {
-		t.Errorf("UpdateUser() = %v; want = %v", u, want)
+		t.Errorf("UpdateUser() = %#v; want = %#v", u, want)
 	}
 }
 

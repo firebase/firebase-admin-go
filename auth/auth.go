@@ -179,12 +179,11 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 
 // RevokeRefreshToken revokes all tokens minted before the present.
 func (c *Client) RevokeRefreshToken(ctx context.Context, idToken string) error {
-	h := &jwtHeader{}
-	p := &Token{}
-	if err := decodeToken(idToken, c.ks, h, p); err != nil {
+	vt, err := c.VerifyIDToken(idToken)
+	if err != nil {
 		return err
 	}
-	return c.updateUser(ctx, p.UID, (&UserToUpdate{}).revokeRefreshToken())
+	return c.updateUser(ctx, vt.UID, (&UserToUpdate{}).revokeRefreshToken())
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.

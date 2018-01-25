@@ -552,7 +552,6 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	if user == nil || user.params == nil {
 		return fmt.Errorf("update parameters must not be nil or empty")
 	}
-
 	request := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{
 		LocalId: uid,
 	}
