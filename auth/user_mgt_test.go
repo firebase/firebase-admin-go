@@ -507,7 +507,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 	defer s.Close()
 	before := time.Now().Unix()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid"})
-	err := s.Client.RevokeRefreshToken(ctx, tok)
+	err := s.Client.RevokeRefreshToken(nil, tok)
 	after := time.Now().Unix()
 
 	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}

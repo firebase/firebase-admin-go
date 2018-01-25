@@ -218,7 +218,7 @@ func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil, testIDToken, true)
+	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(ctx, testIDToken, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -232,7 +232,7 @@ func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 func TestVerifyIDTokenWithCheckRevokedInvalidatedY2K2C(t *testing.T) {
 	s := echoServer(testGetUserY2K2CResponse, t)
 	defer s.Close()
-	_, err := s.Client.VerifyIDTokenWithCheckRevoked(nil,
+	_, err := s.Client.VerifyIDTokenWithCheckRevoked(ctx,
 		getIDToken(mockIDTokenPayload{"uid": "uid"}),
 		true)
 	we := "the Firebase ID token has been revoked"
