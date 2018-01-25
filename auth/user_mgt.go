@@ -425,6 +425,13 @@ func validatePhone(val interface{}) error {
 }
 
 func validateValidSince(val interface{}) error {
+	validSince := val.(int64)
+	if validSince > time.Now().Unix() {
+		return fmt.Errorf("timestamp cannot be in the future")
+	}
+	if validSince < time.Now().Unix()-3600 {
+		return fmt.Errorf("timestamp cannot be old")
+	}
 	return nil
 }
 
