@@ -177,7 +177,9 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
-// RevokeRefreshToken revokes all tokens minted before the present.
+// RevokeRefreshToken revokes all tokens minted before the current second.
+// Note that if there is a possibility that a minted token it will be revoked in the same second
+// as it was created, the revoke will fail. In that case, sleep for 1 second before revoking.
 func (c *Client) RevokeRefreshToken(ctx context.Context, idToken string) error {
 	vt, err := c.VerifyIDToken(idToken)
 	if err != nil {
