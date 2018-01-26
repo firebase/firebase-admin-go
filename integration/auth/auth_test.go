@@ -99,8 +99,8 @@ func TestCustomTokenVerifyCheckRevokedIgnored(t *testing.T) {
 	}
 }
 func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
-	revokedId := "user_revoked"
-	ct, err := client.CustomToken(revokedId)
+	revokedID := "user_revoked"
+	ct, err := client.CustomToken(revokedID)
 
 	if err != nil {
 		t.Fatal(err)
@@ -115,8 +115,8 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != revokedId {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedId)
+	if vt.UID != revokedID {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedID)
 	}
 	time.Sleep(time.Second)
 	if err = client.RevokeRefreshToken(ctx, idt); err != nil {
@@ -128,7 +128,7 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 	if err == nil || err.Error() != we {
 		t.Errorf("VerifyIDTokenWithCheckRevoked; err = %s; want err = %v", err, we)
 	}
-	err = client.DeleteUser(ctx, revokedId)
+	err = client.DeleteUser(ctx, revokedID)
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
