@@ -177,9 +177,13 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
-// RevokeRefreshToken revokes all tokens minted before the current second.
-// Note that if there is a possibility that a minted token it will be revoked in the same second
-// as it was created, the revoke will fail. In that case, sleep for 1 second before revoking.
+// RevokeRefreshToken revokes all refresh tokens for the specified user identified by the uid provided.
+// In addition to revoking all refresh tokens for a user, all ID tokens issued
+// before revocation will also be revoked on the Auth backend. Any request with an
+// ID token generated before revocation will be rejected with a token expired error.
+// Note that due to the fact that the timestamp is stored in seconds, any tokens minted in
+// the same second as the revokation will still be valid. If there is a chance that a token
+//  was minted in the last second, delay for 1 second before revoking.all tokens minted before the current second.
 func (c *Client) RevokeRefreshToken(ctx context.Context, idToken string) error {
 	vt, err := c.VerifyIDToken(idToken)
 	if err != nil {
