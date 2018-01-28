@@ -506,7 +506,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	before := time.Now().Unix()
-	tok := getIDToken(mockIDTokenPayload{"uid": "uid"})
+	tok := getIDToken(mockIDTokenPayload{})
 	err := s.Client.RevokeRefreshToken(nil, tok)
 	after := time.Now().Unix()
 
