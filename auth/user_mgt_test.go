@@ -506,8 +506,10 @@ func TestRevokeRefreshToken(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	before := time.Now().Unix()
-	tok := getIDToken(mockIDTokenPayload{})
-	err := s.Client.RevokeRefreshToken(nil, tok)
+	err := s.Client.RevokeRefreshToken(nil, "some_uid")
+	if err != nil {
+		t.Error(err)
+	}
 	after := time.Now().Unix()
 
 	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
@@ -517,6 +519,20 @@ func TestRevokeRefreshToken(t *testing.T) {
 	}
 	if req.ValidSince > after || req.ValidSince < before {
 		t.Errorf("validSince = %d, expecting time between %d and %d", req.ValidSince, before, after)
+	}
+}
+
+func TestRevokeRefreshTokenInvalidUID(t *testing.T) {
+	resp := `{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "expectedUserID"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	we := "uid must not be empty"
+	if err := s.Client.RevokeRefreshToken(nil, ""); err.Error() != we {
+		t.Errorf("RevokeRefreshToken(); err = %s; want err = %s", err.Error(), we)
 	}
 }
 

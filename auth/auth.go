@@ -184,12 +184,8 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 // Note that due to the fact that the timestamp is stored in seconds, any tokens minted in
 // the same second as the revocation will still be valid. If there is a chance that a token
 //  was minted in the last second, delay for 1 second before revoking.all tokens minted before the current second.
-func (c *Client) RevokeRefreshToken(ctx context.Context, idToken string) error {
-	vt, err := c.VerifyIDToken(idToken)
-	if err != nil {
-		return err
-	}
-	return c.updateUser(ctx, vt.UID, (&UserToUpdate{}).revokeRefreshToken())
+func (c *Client) RevokeRefreshToken(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshToken())
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.

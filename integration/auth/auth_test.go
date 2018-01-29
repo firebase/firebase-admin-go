@@ -78,27 +78,7 @@ func TestCustomToken(t *testing.T) {
 	}
 }
 
-func TestCustomTokenVerifyCheckRevokedIgnored(t *testing.T) {
-	ct, err := client.CustomToken("user1")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	idt, err := signInWithCustomToken(ct)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	vt, err := client.VerifyIDTokenWithCheckRevoked(context.Background(), idt, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if vt.UID != "user1" {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
-	}
-}
-func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
+func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	revokedID := "user_revoked"
 	ct, err := client.CustomToken(revokedID)
 
@@ -119,7 +99,7 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedID)
 	}
 	time.Sleep(time.Second)
-	if err = client.RevokeRefreshToken(ctx, idt); err != nil {
+	if err = client.RevokeRefreshToken(ctx, revokedID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,6 +108,8 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 	if err == nil || err.Error() != we {
 		t.Errorf("VerifyIDTokenWithCheckRevoked; err = %s; want err = %v", err, we)
 	}
+
+	// Does not return error if it isn't checked
 	_, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, false)
 	if err != nil {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(.., false); err = %s; want err = <nil>", err)
@@ -135,6 +117,15 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 	err = client.DeleteUser(ctx, revokedID)
 	if err != nil {
 		t.Error(err)
+	}
+
+	// Sign in after revocation after revocation.
+	if idt, err = signInWithCustomToken(ct); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true); err != nil {
+		t.Errorf("VerifyIDTokenWithCheckRevoked(); err = %s; want err = <nil>", err)
 	}
 }
 
