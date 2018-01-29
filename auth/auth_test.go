@@ -192,22 +192,6 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
-	s := echoServer(testGetUserResponse, t)
-	defer s.Close()
-
-	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil, testIDToken, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
-	}
-	if ft.UID != ft.Subject {
-		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
 func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
@@ -223,6 +207,29 @@ func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
 	}
 }
+
+func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	u, err := s.Client.GetUser(ctx, "testuser")
+	if err != nil {
+		t.Fatal("Error retrieving user")
+	}
+
+	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil,
+		getIDToken(mockIDTokenPayload{"uid": "uid", "iat": int(u.TokensValidAfterTime - 10)}),
+		false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
 func TestVerifyIDTokenWithCheckRevokedInvalidated(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
