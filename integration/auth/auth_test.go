@@ -128,7 +128,14 @@ func TestCustomTokenVerifyCheckRevokedChecked(t *testing.T) {
 	if err == nil || err.Error() != we {
 		t.Errorf("VerifyIDTokenWithCheckRevoked; err = %s; want err = %v", err, we)
 	}
+	_, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, false)
+	if err != nil {
+		t.Errorf("VerifyIDTokenWithCheckRevoked(.., false); err = %s; want err = <nil>", err)
+	}
 	err = client.DeleteUser(ctx, revokedID)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
