@@ -1,6 +1,14 @@
 # Unreleased
 - 
 
+### Token revokaction
+- [added] The ['VerifyIDToken(...)'](https://godoc.org/firebase.google.com/go/auth#Client.VerifyIDToken)
+  method can now take an additional parameter `check_revoked`, when `True`, 
+  a further check will be performed to see if the token has been revoked. 
+- [added] A new method ['RevokeRefreshTokens(uid)'](https://godoc.org/firebase.google.com/go/auth#Client.RevokeRefreshTokens)
+  has been added to invalidate all tokens issued before the current second.
+- [added] A new property `TokensValidAfterTime` has been added to the ['UserRecord'](https://godoc.org/firebase.google.com/go/auth#UserRecord)
+
 # v2.4.0
 
 ### Initialization
