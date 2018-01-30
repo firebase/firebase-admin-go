@@ -216,8 +216,11 @@ func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
 		t.Fatal("Error retrieving user")
 	}
 
-	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(nil,
-		getIDToken(mockIDTokenPayload{"uid": "uid", "iat": int(u.TokensValidAfterTime - 10)}),
+	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(
+		nil,
+		getIDToken(mockIDTokenPayload{
+			"uid": "uid",
+			"iat": int(u.TokensValidAfterTime/1000) - 10}),
 		false)
 	if err != nil {
 		t.Fatal(err)
@@ -237,8 +240,11 @@ func TestVerifyIDTokenWithCheckRevokedInvalidated(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error retrieving user")
 	}
-	_, err = s.Client.VerifyIDTokenWithCheckRevoked(ctx,
-		getIDToken(mockIDTokenPayload{"uid": "uid", "iat": int(u.TokensValidAfterTime - 10)}),
+	_, err = s.Client.VerifyIDTokenWithCheckRevoked(
+		ctx,
+		getIDToken(mockIDTokenPayload{
+			"uid": "uid",
+			"iat": int(u.TokensValidAfterTime/1000) - 10}),
 		true)
 	we := "the Firebase ID token has been revoked"
 	if err == nil || err.Error() != we {

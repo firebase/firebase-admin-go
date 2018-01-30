@@ -67,6 +67,7 @@ type UserInfo struct {
 }
 
 // UserMetadata contains additional metadata associated with a user account.
+// Timestamps are in epoch milliseconds.
 type UserMetadata struct {
 	CreationTimestamp  int64
 	LastLogInTimestamp int64
@@ -79,7 +80,7 @@ type UserRecord struct {
 	Disabled             bool
 	EmailVerified        bool
 	ProviderUserInfo     []*UserInfo
-	TokensValidAfterTime int64
+	TokensValidAfterTime int64 // Epoch milliseconds
 	UserMetadata         *UserMetadata
 }
 
@@ -176,7 +177,9 @@ func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNum
 // PhotoURL setter.
 func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
 
-func (u *UserToUpdate) revokeRefreshToken() *UserToUpdate {
+// revokeRefreshTokens revokes all refresh tokens for a user by setting the validSince property
+// to the present in epoch seconds.
+func (u *UserToUpdate) revokeRefreshTokens() *UserToUpdate {
 	u.set("validSince", time.Now().Unix())
 	return u
 }
@@ -425,8 +428,9 @@ func validatePhone(val interface{}) error {
 }
 
 func validateValidSince(val interface{}) error {
-	if _, ok := val.(int64); !ok {
-		return fmt.Errorf("tokens valid after time must be an integer")
+	if v, ok := val.(int64); !ok || v > ((time.Now().Unix())*999) {
+		// If v is in seconds it signifies a date 40K years in the future, most likely milliseconds.
+		return fmt.Errorf("validSince must be an integer signifying epoch seconds")
 	}
 	return nil
 }
@@ -620,7 +624,7 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 			Disabled:             r.Disabled,
 			EmailVerified:        r.EmailVerified,
 			ProviderUserInfo:     providerUserInfo,
-			TokensValidAfterTime: r.ValidSince,
+			TokensValidAfterTime: r.ValidSince * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLoginAt,
 				CreationTimestamp:  r.CreatedAt,

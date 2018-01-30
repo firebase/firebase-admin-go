@@ -18,6 +18,7 @@ package auth
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,16 +36,26 @@ var testFixtures = struct {
 }{}
 
 func TestUserManagement(t *testing.T) {
-	t.Run("Create test users", testCreateUsers)
-	t.Run("Get user", testGetUser)
-	t.Run("Iterate users", testUserIterator)
-	t.Run("Paged iteration", testPager)
-	t.Run("Disable user account", testDisableUser)
-	t.Run("Update user", testUpdateUser)
-	t.Run("Remove user attributes", testRemovePhonePhotoName)
-	t.Run("Remove custom claims", testRemoveCustomClaims)
-	t.Run("Add custom claims", testAddCustomClaims)
-	t.Run("Delete test users", testDeleteUsers)
+	orderedRuns := []struct {
+		name     string
+		testFunc func(*testing.T)
+	}{
+		{"Create test users", testCreateUsers},
+		{"Get user", testGetUser},
+		{"Iterate users", testUserIterator},
+		{"Paged iteration", testPager},
+		{"Disable user account", testDisableUser},
+		{"Update user", testUpdateUser},
+		{"Remove user attributes", testRemovePhonePhotoName},
+		{"Remove custom claims", testRemoveCustomClaims},
+		{"Add custom claims", testAddCustomClaims},
+		{"Delete test users", testDeleteUsers},
+	}
+	for _, run := range orderedRuns {
+		if ok := t.Run(run.name, run.testFunc); !ok {
+			t.Fatalf("Failed run %v", run.name)
+		}
+	}
 }
 
 // N.B if the tests are failing due to inability to create existing users, manual
@@ -53,27 +64,33 @@ func TestUserManagement(t *testing.T) {
 func testCreateUsers(t *testing.T) {
 	// Create users with uid
 	for i := 0; i < 3; i++ {
-		params := (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i))
+		uid := fmt.Sprintf("tempTestUserID-%d", i)
+		params := (&auth.UserToCreate{}).UID(uid)
 		u, err := client.CreateUser(context.Background(), params)
 		if err != nil {
-			t.Fatal("failed to create user", i, err)
+			if strings.Contains(err.Error(), "DUPLICATE_LOCAL_ID") {
+				u, err = client.GetUser(context.Background(), uid)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				t.Fatal(err)
+			}
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
 	}
-
 	// Create user with no parameters (zero-value)
 	u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// make sure that the user.TokensValidAvterTime is not in the future or stale.
-	if u.TokensValidAfterTime > time.Now().Unix() {
+	// make sure that the user.TokensValidAfterTime is not in the future or stale.
+	if u.TokensValidAfterTime > time.Now().Unix()*1000 {
 		t.Errorf("timestamp cannot be in the future")
 	}
-	if u.TokensValidAfterTime < time.Now().Unix()-3600 {
+	if u.TokensValidAfterTime < (time.Now().Unix()-3600)*1000 {
 		t.Errorf("timestamp cannot be old")
 	}
-
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
 
@@ -85,7 +102,7 @@ func testCreateUsers(t *testing.T) {
 		DisplayName("display_name").
 		Password("password")
 	u, err = client.CreateUser(context.Background(), params)
-	if err != nil {
+	if err != nil || u == nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserWithData = u
@@ -94,6 +111,7 @@ func testCreateUsers(t *testing.T) {
 
 func testGetUser(t *testing.T) {
 	want := testFixtures.sampleUserWithData
+
 	u, err := client.GetUser(context.Background(), want.UID)
 	if err != nil {
 		t.Fatalf("error getting user %s", err)

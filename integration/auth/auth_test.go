@@ -63,7 +63,6 @@ func TestCustomToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	idt, err := signInWithCustomToken(ct)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +75,9 @@ func TestCustomToken(t *testing.T) {
 	if vt.UID != "user1" {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
 	}
+	if err = client.DeleteUser(context.Background(), "user1"); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
@@ -85,7 +87,6 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	idt, err := signInWithCustomToken(ct)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +100,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedID)
 	}
 	time.Sleep(time.Second)
-	if err = client.RevokeRefreshToken(ctx, revokedID); err != nil {
+	if err = client.RevokeRefreshTokens(ctx, revokedID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,10 +115,6 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	if err != nil {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(.., false); err = %s; want err = <nil>", err)
 	}
-	err = client.DeleteUser(ctx, revokedID)
-	if err != nil {
-		t.Error(err)
-	}
 
 	// Sign in after revocation after revocation.
 	if idt, err = signInWithCustomToken(ct); err != nil {
@@ -127,10 +124,15 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	if _, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true); err != nil {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(); err = %s; want err = <nil>", err)
 	}
+
+	err = client.DeleteUser(ctx, revokedID)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims("user1", map[string]interface{}{
+	ct, err := client.CustomTokenWithClaims("user2", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})
@@ -147,8 +149,8 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != "user1" {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
+	if vt.UID != "user2" {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, "user2")
 	}
 	if premium, ok := vt.Claims["premium"].(bool); !ok || !premium {
 		t.Errorf("Claims['premium'] = %v; want Claims['premium'] = true", vt.Claims["premium"])
@@ -156,6 +158,11 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if pkg, ok := vt.Claims["package"].(string); !ok || pkg != "gold" {
 		t.Errorf("Claims['package'] = %v; want Claims['package'] = \"gold\"", vt.Claims["package"])
 	}
+
+	if err = client.DeleteUser(context.Background(), "user2"); err != nil {
+		t.Error(err)
+	}
+
 }
 
 func signInWithCustomToken(token string) (string, error) {

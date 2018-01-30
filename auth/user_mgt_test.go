@@ -60,7 +60,7 @@ var testUser = &UserRecord{
 			UID:         "testuid",
 		},
 	},
-	TokensValidAfterTime: 1494364393,
+	TokensValidAfterTime: 1494364393000,
 	UserMetadata: &UserMetadata{
 		CreationTimestamp:  1234567890,
 		LastLogInTimestamp: 1233211232,
@@ -498,7 +498,7 @@ func TestUpdateUser(t *testing.T) {
 		}
 	}
 }
-func TestRevokeRefreshToken(t *testing.T) {
+func TestRevokeRefreshTokens(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "expectedUserID"
@@ -506,7 +506,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	before := time.Now().Unix()
-	err := s.Client.RevokeRefreshToken(nil, "some_uid")
+	err := s.Client.RevokeRefreshTokens(nil, "some_uid")
 	if err != nil {
 		t.Error(err)
 	}
@@ -522,7 +522,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 	}
 }
 
-func TestRevokeRefreshTokenInvalidUID(t *testing.T) {
+func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "expectedUserID"
@@ -531,8 +531,8 @@ func TestRevokeRefreshTokenInvalidUID(t *testing.T) {
 	defer s.Close()
 
 	we := "uid must not be empty"
-	if err := s.Client.RevokeRefreshToken(nil, ""); err.Error() != we {
-		t.Errorf("RevokeRefreshToken(); err = %s; want err = %s", err.Error(), we)
+	if err := s.Client.RevokeRefreshTokens(nil, ""); err.Error() != we {
+		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
 	}
 }
 
