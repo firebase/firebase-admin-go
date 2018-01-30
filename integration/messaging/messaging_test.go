@@ -72,7 +72,7 @@ func TestSendInvalidToken(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: "INVALID_TOKEN",
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -88,7 +88,7 @@ func TestSendDryRun(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -108,7 +108,7 @@ func TestSendToToken(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -128,7 +128,7 @@ func TestSendToTopic(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Topic: testFixtures.topic,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -148,7 +148,7 @@ func TestSendToCondition(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Condition: testFixtures.condition,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -168,7 +168,7 @@ func TestSendNotification(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
@@ -208,15 +208,15 @@ func TestSendAndroidNotification(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		Android: messaging.AndroidConfig{
+		Android: &messaging.AndroidConfig{
 			CollapseKey: "Collapse",
 			Priority:    "HIGH",
 			TTL:         "3.5s",
-			Notification: messaging.AndroidNotification{
+			Notification: &messaging.AndroidNotification{
 				Title: "Android Title",
 				Body:  "Android body",
 			},
@@ -237,11 +237,11 @@ func TestSendAndroidData(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		Android: messaging.AndroidConfig{
+		Android: &messaging.AndroidConfig{
 			CollapseKey: "Collapse",
 			Priority:    "HIGH",
 			TTL:         "3.5s",
@@ -266,11 +266,11 @@ func TestSendAPNSNotification(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		APNS: messaging.APNSConfig{
+		APNS: &messaging.APNSConfig{
 			Payload: map[string]string{
 				"title": "APNS Title ",
 				"body":  "APNS bodym",
@@ -292,11 +292,11 @@ func TestSendAPNSData(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Notification: messaging.Notification{
+		Notification: &messaging.Notification{
 			Title: "My Title",
 			Body:  "This is a Notification",
 		},
-		APNS: messaging.APNSConfig{
+		APNS: &messaging.APNSConfig{
 			Headers: map[string]string{
 				"private_key":  "foo",
 				"client_email": "bar@test.com",

@@ -21,6 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
+	"time"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -51,8 +54,8 @@ type Client struct {
 // RequestMessage is the request body message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
 type requestMessage struct {
-	ValidateOnly bool    `json:"validate_only,omitempty"`
-	Message      Message `json:"message,omitempty"`
+	ValidateOnly bool     `json:"validate_only,omitempty"`
+	Message      *Message `json:"message,omitempty"`
 }
 
 // responseMessage is the identifier of the message sent.
@@ -66,10 +69,10 @@ type responseMessage struct {
 type Message struct {
 	Name         string                 `json:"name,omitempty"`
 	Data         map[string]interface{} `json:"data,omitempty"`
-	Notification Notification           `json:"notification,omitempty"`
-	Android      AndroidConfig          `json:"android,omitempty"`
-	Webpush      WebpushConfig          `json:"webpush,omitempty"`
-	APNS         APNSConfig             `json:"apns,omitempty"`
+	Notification *Notification          `json:"notification,omitempty"`
+	Android      *AndroidConfig         `json:"android,omitempty"`
+	Webpush      *WebpushConfig         `json:"webpush,omitempty"`
+	APNS         *APNSConfig            `json:"apns,omitempty"`
 	Token        string                 `json:"token,omitempty"`
 	Topic        string                 `json:"topic,omitempty"`
 	Condition    string                 `json:"condition,omitempty"`
@@ -85,12 +88,12 @@ type Notification struct {
 // AndroidConfig is Android specific options for messages.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#AndroidConfig
 type AndroidConfig struct {
-	CollapseKey           string              `json:"collapse_key,omitempty"`
-	Priority              string              `json:"priority,omitempty"`
-	TTL                   string              `json:"ttl,omitempty"`
-	RestrictedPackageName string              `json:"restricted_package_name,omitempty"`
-	Data                  map[string]string   `json:"data,omitempty"`
-	Notification          AndroidNotification `json:"notification,omitempty"`
+	CollapseKey           string               `json:"collapse_key,omitempty"`
+	Priority              string               `json:"priority,omitempty"`
+	TTL                   string               `json:"ttl,omitempty"`
+	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
+	Data                  map[string]string    `json:"data,omitempty"`
+	Notification          *AndroidNotification `json:"notification,omitempty"`
 }
 
 // AndroidNotification is notification to send to android devices.
@@ -112,9 +115,9 @@ type AndroidNotification struct {
 // WebpushConfig is Webpush protocol options.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#WebpushConfig
 type WebpushConfig struct {
-	Headers      map[string]string   `json:"headers,omitempty"`
-	Data         map[string]string   `json:"data,omitempty"`
-	Notification WebpushNotification `json:"notification,omitempty"`
+	Headers      map[string]string    `json:"headers,omitempty"`
+	Data         map[string]string    `json:"data,omitempty"`
+	Notification *WebpushNotification `json:"notification,omitempty"`
 }
 
 // WebpushNotification is Web notification to send via webpush protocol.
@@ -163,7 +166,7 @@ func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 		return "", err
 	}
 	payload := &requestMessage{
-		Message: *message,
+		Message: message,
 	}
 	return c.sendRequestMessage(ctx, payload)
 }
@@ -178,7 +181,7 @@ func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, erro
 	}
 	payload := &requestMessage{
 		ValidateOnly: true,
-		Message:      *message,
+		Message:      message,
 	}
 	return c.sendRequestMessage(ctx, payload)
 }
@@ -207,21 +210,82 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 	return result.Name, err
 }
 
-// validators
-
-// TODO add validator : Data messages can have a 4KB maximum payload.
-// TODO add validator : topic name reg expression: "[a-zA-Z0-9-_.~%]+".
-// TODO add validator : Conditions for topics support two operators per
-// expression, and parentheses are supported.
-
+// validateMessage
 func validateMessage(message *Message) error {
-
 	if message == nil {
 		return fmt.Errorf("message is empty")
 	}
 
-	if message.Token == "" && message.Condition == "" && message.Topic == "" {
-		return fmt.Errorf("target is empty you have to fill one of this fields (Token, Condition, Topic)")
+	target := bool2int(message.Token != "") + bool2int(message.Condition != "") + bool2int(message.Topic != "")
+	if target != 1 {
+		return fmt.Errorf("Exactly one of token, topic or condition must be specified")
+	}
+
+	// Validate target
+	if message.Topic != "" {
+		if strings.HasPrefix(message.Topic, "/topics/") {
+			return fmt.Errorf("Topic name must not contain the /topics/ prefix")
+		}
+		if !regexp.MustCompile("[a-zA-Z0-9-_.~%]+").MatchString(message.Topic) {
+			return fmt.Errorf("Malformed topic name")
+		}
+	}
+
+	// validate AndroidConfig
+	if message.Android != nil {
+		if err := validateAndroidConfig(message.Android); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateAndroidConfig(config *AndroidConfig) error {
+	if config.TTL != "" && !strings.HasSuffix(config.TTL, "s") {
+		return fmt.Errorf("ttl must end with 's'")
+	}
+
+	if _, err := time.ParseDuration(config.TTL); err != nil {
+		return fmt.Errorf("invalid TTL")
+	}
+
+	if config.Priority != "" {
+		if config.Priority != "normal" && config.Priority != "high" {
+			return fmt.Errorf("priority must be 'normal' or 'high'")
+		}
+	}
+	// validate AndroidNotification
+	if config.Notification != nil {
+		if err := validateAndroidNotification(config.Notification); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func validateAndroidNotification(notification *AndroidNotification) error {
+	if notification.Color != "" {
+		if !regexp.MustCompile("^#[0-9a-fA-F]{6}$").MatchString(notification.Color) {
+			return fmt.Errorf("color must be in the form #RRGGBB")
+		}
+	}
+	if len(notification.TitleLocArgs) > 0 {
+		if notification.TitleLocKey == "" {
+			return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
+		}
+	}
+	if len(notification.BodyLocArgs) > 0 {
+		if notification.BodyLocKey == "" {
+			return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
+		}
+	}
+	return nil
+}
+
+func bool2int(b bool) int8 {
+	if b {
+		return 1
+	}
+	return 0
 }
