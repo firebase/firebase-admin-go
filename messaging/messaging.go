@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -33,15 +31,15 @@ import (
 
 const messagingEndpoint = "https://fcm.googleapis.com/v1"
 
-var errorCodes = map[int]string{
-	http.StatusBadRequest:          "malformed argument",
-	http.StatusUnauthorized:        "request not authorized",
-	http.StatusForbidden:           "project does not match or the client does not have sufficient privileges",
-	http.StatusNotFound:            "failed to find the ...",
-	http.StatusConflict:            "already deleted",
-	http.StatusTooManyRequests:     "request throttled out by the backend server",
-	http.StatusInternalServerError: "internal server error",
-	http.StatusServiceUnavailable:  "backend server is unavailable",
+const unknownError = "unknown-error"
+
+var fcmErrorCodes = map[string]string{
+	"INVALID_ARGUMENT":   "invalid-argument",
+	"NOT_FOUND":          "registration-token-not-registered",
+	"PERMISSION_DENIED":  "authentication-error",
+	"RESOURCE_EXHAUSTED": "message-rate-exceeded",
+	"UNAUTHENTICATED":    "authentication-error",
+	"UNAVAILABLE":        "server-unavailable",
 }
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
@@ -52,13 +50,13 @@ type Client struct {
 	version  string
 }
 
-// Message represents a message that can be sent via Firebase Cloud Messaging.
+// Message to be sent via Firebase Cloud Messaging.
 //
-// Message contains payload information, recipient information and platform-specific configuration
+// Message contains payload data, recipient information and platform-specific configuration
 // options. A Message must specify exactly one of Token, Topic or Condition fields. Apart from
 // that a Message may specify any combination of Data, Notification, Android, Webpush and APNS
 // fields. See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages for more
-// details on how the backend FCM servers interpret different message parameters.
+// details on how the backend FCM servers handle different message parameters.
 type Message struct {
 	Data         map[string]string `json:"data,omitempty"`
 	Notification *Notification     `json:"notification,omitempty"`
@@ -76,7 +74,7 @@ type Notification struct {
 	Body  string `json:"body,omitempty"`
 }
 
-// AndroidConfig contains Android-specific options for messages.
+// AndroidConfig contains messaging options specific to the Android platform..
 type AndroidConfig struct {
 	CollapseKey           string               `json:"collapse_key,omitempty"`
 	Priority              string               `json:"priority,omitempty"` // one of "normal" or "high"
@@ -110,10 +108,10 @@ func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// AndroidNotification is a notification to send to android devices.
+// AndroidNotification is a notification to send to Android devices.
 type AndroidNotification struct {
-	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
-	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
+	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
 	Icon         string   `json:"icon,omitempty"`
 	Color        string   `json:"color,omitempty"` // notification color in #RRGGBB format
 	Sound        string   `json:"sound,omitempty"`
@@ -125,7 +123,7 @@ type AndroidNotification struct {
 	TitleLocArgs []string `json:"title_loc_args,omitempty"`
 }
 
-// WebpushConfig contains options specific to the WebPush protocol.
+// WebpushConfig contains messaging options specific to the WebPush protocol.
 //
 // See https://tools.ietf.org/html/rfc8030#section-5 for additional details, and supported
 // headers.
@@ -135,26 +133,29 @@ type WebpushConfig struct {
 	Notification *WebpushNotification `json:"notification,omitempty"`
 }
 
-// WebpushNotification is a notification send via WebPush protocol.
+// WebpushNotification is a notification to send via WebPush protocol.
 type WebpushNotification struct {
-	Title string `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
-	Body  string `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
+	Title string `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body  string `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
 	Icon  string `json:"icon,omitempty"`
 }
 
-// APNSConfig contains options specified to Apple Push Notification Service (APNS).
+// APNSConfig contains messaging options specific to the Apple Push Notification Service (APNS).
 //
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
-// for more details on supported headers and parameter values.
+// for more details on supported headers and payload keys.
 type APNSConfig struct {
 	Headers map[string]string `json:"headers,omitempty"`
 	Payload *APNSPayload      `json:"payload,omitempty"`
 }
 
-// APNSPayload is the payload object that can be included in an APNS message.
+// APNSPayload is the payload that can be included in an APNS message.
 //
 // The payload mainly consists of the aps dictionary. Additionally it may contain arbitrary
 // key-values pairs as custom data fields.
+//
+// See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
+// for a full list of supported payload fields.
 type APNSPayload struct {
 	Aps        *Aps
 	CustomData map[string]interface{}
@@ -211,8 +212,8 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
 // for supported fields.
 type ApsAlert struct {
-	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
-	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
+	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
 	LocKey       string   `json:"loc-key,omitempty"`
 	LocArgs      []string `json:"loc-args,omitempty"`
 	TitleLocKey  string   `json:"title-loc-key,omitempty"`
@@ -243,19 +244,10 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}, nil
 }
 
-type requestMessage struct {
-	ValidateOnly bool     `json:"validate_only,omitempty"`
-	Message      *Message `json:"message,omitempty"`
-}
-
-type responseMessage struct {
-	Name string `json:"name"`
-}
-
 // Send sends a Message to Firebase Cloud Messaging.
 //
 // The Message must specify exactly one of Token, Topic and Condition fields. FCM will
-// customize the message for each target platform based on the parameters specified within the
+// customize the message for each target platform based on the parameters specified in the
 // Message.
 func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 	payload := &requestMessage{
@@ -266,7 +258,7 @@ func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 
 // SendDryRun sends a Message to Firebase Cloud Messaging in the dry run (validation only) mode.
 //
-// This function does not actually delivery the message to target devices. Instead, it performs all
+// This function does not actually deliver the message to target devices. Instead, it performs all
 // the SDK-level and backend validations on the message, and emulates the send operation.
 func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, error) {
 	payload := &requestMessage{
@@ -274,6 +266,22 @@ func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, erro
 		Message:      message,
 	}
 	return c.sendRequestMessage(ctx, payload)
+}
+
+type requestMessage struct {
+	ValidateOnly bool     `json:"validate_only,omitempty"`
+	Message      *Message `json:"message,omitempty"`
+}
+
+type responseMessage struct {
+	Name string `json:"name"`
+}
+
+type fcmError struct {
+	Error struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage) (string, error) {
@@ -291,114 +299,21 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 		return "", err
 	}
 
-	result := &responseMessage{}
-	if err := resp.Unmarshal(http.StatusOK, result); err != nil {
-		return "", err
-	}
-	return result.Name, nil
-}
-
-func validateMessage(message *Message) error {
-	if message == nil {
-		return fmt.Errorf("message must not be nil")
+	if resp.Status == http.StatusOK {
+		var result responseMessage
+		err := json.Unmarshal(resp.Body, &result)
+		return result.Name, err
 	}
 
-	target := bool2int(message.Token != "") + bool2int(message.Condition != "") + bool2int(message.Topic != "")
-	if target != 1 {
-		return fmt.Errorf("exactly one of token, topic or condition must be specified")
+	var fe fcmError
+	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
+	code := fcmErrorCodes[fe.Error.Status]
+	msg := fe.Error.Message
+	if code == "" {
+		code = unknownError
 	}
-
-	// validate topic
-	if message.Topic != "" {
-		if strings.HasPrefix(message.Topic, "/topics/") {
-			return fmt.Errorf("topic name must not contain the /topics/ prefix")
-		}
-		if !regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$").MatchString(message.Topic) {
-			return fmt.Errorf("malformed topic name")
-		}
+	if msg == "" {
+		msg = fmt.Sprintf("http error status: %d; body: %s", resp.Status, string(resp.Body))
 	}
-
-	// validate AndroidConfig
-	if err := validateAndroidConfig(message.Android); err != nil {
-		return err
-	}
-
-	// validate APNSConfig
-	return validateAPNSConfig(message.APNS)
-}
-
-func validateAndroidConfig(config *AndroidConfig) error {
-	if config == nil {
-		return nil
-	}
-
-	if config.TTL != nil && config.TTL.Seconds() < 0 {
-		return fmt.Errorf("ttl duration must not be negative")
-	}
-	if config.Priority != "" && config.Priority != "normal" && config.Priority != "high" {
-		return fmt.Errorf("priority must be 'normal' or 'high'")
-	}
-	// validate AndroidNotification
-	return validateAndroidNotification(config.Notification)
-}
-
-func validateAndroidNotification(notification *AndroidNotification) error {
-	if notification == nil {
-		return nil
-	}
-	const colorPattern = "^#[0-9a-fA-F]{6}$"
-	if notification.Color != "" && !regexp.MustCompile(colorPattern).MatchString(notification.Color) {
-		return fmt.Errorf("color must be in the #RRGGBB form")
-	}
-	if len(notification.TitleLocArgs) > 0 && notification.TitleLocKey == "" {
-		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
-	}
-	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
-		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
-	}
-	return nil
-}
-
-func validateAPNSConfig(config *APNSConfig) error {
-	if config != nil {
-		return validateAPNSPayload(config.Payload)
-	}
-	return nil
-}
-
-func validateAPNSPayload(payload *APNSPayload) error {
-	if payload != nil {
-		return validateAps(payload.Aps)
-	}
-	return nil
-}
-
-func validateAps(aps *Aps) error {
-	if aps != nil {
-		if aps.Alert != nil && aps.AlertString != "" {
-			return fmt.Errorf("multiple alert specifications")
-		}
-		return validateApsAlert(aps.Alert)
-	}
-	return nil
-}
-
-func validateApsAlert(alert *ApsAlert) error {
-	if alert == nil {
-		return nil
-	}
-	if len(alert.TitleLocArgs) > 0 && alert.TitleLocKey == "" {
-		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
-	}
-	if len(alert.LocArgs) > 0 && alert.LocKey == "" {
-		return fmt.Errorf("locKey is required when specifying locArgs")
-	}
-	return nil
-}
-
-func bool2int(b bool) int8 {
-	if b {
-		return 1
-	}
-	return 0
+	return "", fmt.Errorf("%s; code: %s", msg, code)
 }

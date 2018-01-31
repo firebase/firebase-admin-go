@@ -510,6 +510,48 @@ func TestSendDryRun(t *testing.T) {
 	}
 }
 
+func TestSendError(t *testing.T) {
+	var resp string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(resp))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.endpoint = ts.URL
+
+	cases := []struct {
+		resp string
+		want string
+	}{
+		{
+			resp: "{}",
+			want: "http error status: 500; body: {}; code: unknown-error",
+		},
+		{
+			resp: "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
+			want: "test error; code: invalid-argument",
+		},
+		{
+			resp: "not json",
+			want: "http error status: 500; body: not json; code: unknown-error",
+		},
+	}
+	for _, tc := range cases {
+		resp = tc.resp
+		name, err := client.Send(ctx, &Message{Topic: "topic"})
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("Send() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
+		}
+	}
+}
+
 func TestInvalidMessage(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
