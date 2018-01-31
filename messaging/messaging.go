@@ -31,15 +31,13 @@ import (
 
 const messagingEndpoint = "https://fcm.googleapis.com/v1"
 
-const unknownError = "unknown-error"
-
 var fcmErrorCodes = map[string]string{
-	"INVALID_ARGUMENT":   "invalid-argument",
-	"NOT_FOUND":          "registration-token-not-registered",
-	"PERMISSION_DENIED":  "authentication-error",
-	"RESOURCE_EXHAUSTED": "message-rate-exceeded",
-	"UNAUTHENTICATED":    "authentication-error",
-	"UNAVAILABLE":        "server-unavailable",
+	"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
+	"NOT_FOUND":          "specified registration token not found; code: registration-token-not-registered",
+	"PERMISSION_DENIED":  "client does not have permission to perform the requested operation; code: authentication-error",
+	"RESOURCE_EXHAUSTED": "messaging service quota exceeded; code: message-rate-exceeded",
+	"UNAUTHENTICATED":    "client failed to authenticate; code: authentication-error",
+	"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
 }
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
@@ -279,8 +277,7 @@ type responseMessage struct {
 
 type fcmError struct {
 	Error struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
+		Status string `json:"status"`
 	} `json:"error"`
 }
 
@@ -307,13 +304,9 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 
 	var fe fcmError
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
-	code := fcmErrorCodes[fe.Error.Status]
-	msg := fe.Error.Message
-	if code == "" {
-		code = unknownError
-	}
+	msg := fcmErrorCodes[fe.Error.Status]
 	if msg == "" {
-		msg = fmt.Sprintf("http error status: %d; body: %s", resp.Status, string(resp.Body))
+		msg = fmt.Sprintf("client encounterd an unknown error; response: %s", string(resp.Body))
 	}
-	return "", fmt.Errorf("%s; code: %s", msg, code)
+	return "", fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
 }

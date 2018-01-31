@@ -1,12 +1,25 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package messaging
 
 import (
 	"context"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -14,7 +27,6 @@ import (
 	"firebase.google.com/go/messaging"
 )
 
-var projectID string
 var client *messaging.Client
 
 var testFixtures = struct {
@@ -34,289 +46,65 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	token, err := ioutil.ReadFile(internal.Resource("integration_token.txt"))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	testFixtures.token = string(token)
-
-	topic, err := ioutil.ReadFile(internal.Resource("integration_topic.txt"))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	testFixtures.topic = string(topic)
-
-	condition, err := ioutil.ReadFile(internal.Resource("integration_condition.txt"))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	testFixtures.condition = string(condition)
-
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	projectID, err = internal.ProjectID()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	client, err = app.Messaging(ctx)
-
 	if err != nil {
 		log.Fatalln(err)
 	}
 	os.Exit(m.Run())
 }
 
-func TestSendInvalidToken(t *testing.T) {
+func TestSend(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
-		Token: "INVALID_TOKEN",
+		Topic: "foo-bar",
 		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	_, err := client.Send(ctx, msg)
-
-	if err == nil {
-		log.Fatal(err)
-	}
-}
-
-func TestSendDryRun(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	name, err := client.SendDryRun(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name != fmt.Sprintf("projects/%s/messages/fake_message_id", projectID) {
-		t.Errorf("Name : %s; want : projects/%s/messages/fake_message_id", name, projectID)
-	}
-}
-
-func TestSendToToken(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendToTopic(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Topic: testFixtures.topic,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendToCondition(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Condition: testFixtures.condition,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendNotification(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendData(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Data: map[string]string{
-			"private_key":  "foo",
-			"client_email": "bar@test.com",
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendAndroidNotification(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
+			Title: "Title",
+			Body:  "Body",
 		},
 		Android: &messaging.AndroidConfig{
-			CollapseKey: "Collapse",
-			Priority:    "HIGH",
-			TTL:         &ttl,
 			Notification: &messaging.AndroidNotification{
 				Title: "Android Title",
-				Body:  "Android body",
+				Body:  "Android Body",
 			},
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendAndroidData(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-		Android: &messaging.AndroidConfig{
-			CollapseKey: "Collapse",
-			Priority:    "HIGH",
-			TTL:         &ttl,
-			Data: map[string]string{
-				"private_key":  "foo",
-				"client_email": "bar@test.com",
-			},
-		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendAPNSNotification(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
 		},
 		APNS: &messaging.APNSConfig{
 			Payload: &messaging.APNSPayload{
 				Aps: &messaging.Aps{
 					Alert: &messaging.ApsAlert{
-						Title: "APNS title",
-						Body:  "APNS body",
+						Title: "APNS Title",
+						Body:  "APNS Body",
 					},
 				},
 			},
 		},
-	}
-	name, err := client.Send(ctx, msg)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
-	}
-}
-
-func TestSendAPNSData(t *testing.T) {
-	ctx := context.Background()
-	msg := &messaging.Message{
-		Token: testFixtures.token,
-		Notification: &messaging.Notification{
-			Title: "My Title",
-			Body:  "This is a Notification",
-		},
-		APNS: &messaging.APNSConfig{
-			Headers: map[string]string{
-				"private_key":  "foo",
-				"client_email": "bar@test.com",
+		Webpush: &messaging.WebpushConfig{
+			Notification: &messaging.WebpushNotification{
+				Title: "Webpush Title",
+				Body:  "Webpush Body",
 			},
 		},
 	}
-	name, err := client.Send(ctx, msg)
-
+	name, err := client.SendDryRun(ctx, msg)
 	if err != nil {
 		log.Fatal(err)
 	}
+	const pattern = "^projects/.*/messages/.*$"
+	if !regexp.MustCompile(pattern).MatchString(name) {
+		t.Errorf("Send() = %q; want = %q", name, pattern)
+	}
+}
 
-	if name == "" {
-		t.Errorf("Name : %s; want : projects/%s/messages/#id#", name, projectID)
+func TestSendInvalidToken(t *testing.T) {
+	ctx := context.Background()
+	msg := &messaging.Message{Token: "INVALID_TOKEN"}
+	_, err := client.Send(ctx, msg)
+	if err == nil {
+		t.Errorf("Send() = nil; want error")
 	}
 }
