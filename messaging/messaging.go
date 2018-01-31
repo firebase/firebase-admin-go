@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ type Client struct {
 	version  string
 }
 
-// RequestMessage is the request body message to send by Firebase Cloud Messaging Service.
+// requestMessage is the request body message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
 type requestMessage struct {
 	ValidateOnly bool     `json:"validate_only,omitempty"`
@@ -97,7 +97,6 @@ type AndroidConfig struct {
 }
 
 func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
-	type androidInternal AndroidConfig
 	var ttl string
 	if a.TTL != nil {
 		seconds := int64(*a.TTL / time.Second)
@@ -108,6 +107,8 @@ func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 			ttl = fmt.Sprintf("%ds", seconds)
 		}
 	}
+
+	type androidInternal AndroidConfig
 	s := &struct {
 		TTL string `json:"ttl,omitempty"`
 		*androidInternal
@@ -157,6 +158,9 @@ type APNSConfig struct {
 	Payload *APNSPayload      `json:"payload,omitempty"`
 }
 
+// APNSPayload is the payload object that can be included in an APNS message.
+//
+// The payload consists of an aps dictionary, and other custom key-value pairs.
 type APNSPayload struct {
 	Aps        *Aps
 	CustomData map[string]interface{}
@@ -171,20 +175,16 @@ func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 }
 
 type Aps struct {
-	AlertString      string
-	Alert            *ApsAlert
-	Badge            int    `json:"badge,omitempty"`
-	Sound            string `json:"sound,omitempty"`
-	ContentAvailable bool
-	Category         string `json:"category,omitempty"`
-	ThreadID         string `json:"thread-id,omitempty"`
+	AlertString      string    `json:"-"`
+	Alert            *ApsAlert `json:"-"`
+	Badge            int       `json:"badge,omitempty"`
+	Sound            string    `json:"sound,omitempty"`
+	ContentAvailable bool      `json:"-"`
+	Category         string    `json:"category,omitempty"`
+	ThreadID         string    `json:"thread-id,omitempty"`
 }
 
 func (a *Aps) MarshalJSON() ([]byte, error) {
-	if a.Alert != nil && a.AlertString != "" {
-		return nil, fmt.Errorf("multiple alert specifications")
-	}
-
 	type apsAlias Aps
 	s := &struct {
 		Alert            interface{} `json:"alert,omitempty"`
@@ -206,6 +206,10 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
+// ApsAlert is the alert payload that can be included in an APNS message.
+//
+// See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
+// for supported fields.
 type ApsAlert struct {
 	Title        string   `json:"title,omitempty"`
 	Body         string   `json:"body,omitempty"`
@@ -271,26 +275,23 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 		Method: http.MethodPost,
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.endpoint, c.project),
 		Body:   internal.NewJSONEntity(payload),
-		Opts:   []internal.HTTPOption{internal.WithHeader("X-Client-Version", c.version)},
 	}
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
 		return "", err
 	}
 
-	if _, ok := errorCodes[resp.Status]; ok {
-		return "", fmt.Errorf("unexpected http status code : %d, reason: %v", resp.Status, string(resp.Body))
-	}
-
 	result := &responseMessage{}
-	err = resp.Unmarshal(http.StatusOK, result)
-	return result.Name, err
+	if err := resp.Unmarshal(http.StatusOK, result); err != nil {
+		return "", err
+	}
+	return result.Name, nil
 }
 
 // validateMessage
 func validateMessage(message *Message) error {
 	if message == nil {
-		return fmt.Errorf("message is empty")
+		return fmt.Errorf("message must not be nil")
 	}
 
 	target := bool2int(message.Token != "") + bool2int(message.Condition != "") + bool2int(message.Topic != "")
@@ -298,12 +299,12 @@ func validateMessage(message *Message) error {
 		return fmt.Errorf("exactly one of token, topic or condition must be specified")
 	}
 
-	// Validate target
+	// Validate topic
 	if message.Topic != "" {
 		if strings.HasPrefix(message.Topic, "/topics/") {
 			return fmt.Errorf("topic name must not contain the /topics/ prefix")
 		}
-		if !regexp.MustCompile("[a-zA-Z0-9-_.~%]+").MatchString(message.Topic) {
+		if !regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$").MatchString(message.Topic) {
 			return fmt.Errorf("malformed topic name")
 		}
 	}
@@ -313,7 +314,8 @@ func validateMessage(message *Message) error {
 		return err
 	}
 
-	return nil
+	// Validate APNSConfig
+	return validateAPNSConfig(message.APNS)
 }
 
 func validateAndroidConfig(config *AndroidConfig) error {
@@ -324,32 +326,63 @@ func validateAndroidConfig(config *AndroidConfig) error {
 	if config.TTL != nil && config.TTL.Seconds() < 0 {
 		return fmt.Errorf("ttl duration must not be negative")
 	}
-	if config.Priority != "" {
-		if config.Priority != "normal" && config.Priority != "high" {
-			return fmt.Errorf("priority must be 'normal' or 'high'")
-		}
+	if config.Priority != "" && config.Priority != "normal" && config.Priority != "high" {
+		return fmt.Errorf("priority must be 'normal' or 'high'")
 	}
 	// validate AndroidNotification
-	if err := validateAndroidNotification(config.Notification); err != nil {
-		return err
-	}
-	return nil
+	return validateAndroidNotification(config.Notification)
 }
 
 func validateAndroidNotification(notification *AndroidNotification) error {
 	if notification == nil {
 		return nil
 	}
-	if notification.Color != "" {
-		if !regexp.MustCompile("^#[0-9a-fA-F]{6}$").MatchString(notification.Color) {
-			return fmt.Errorf("color must be in the form #RRGGBB")
-		}
+	const colorPattern = "^#[0-9a-fA-F]{6}$"
+	if notification.Color != "" && !regexp.MustCompile(colorPattern).MatchString(notification.Color) {
+		return fmt.Errorf("color must be in the #RRGGBB form")
 	}
 	if len(notification.TitleLocArgs) > 0 && notification.TitleLocKey == "" {
 		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
 	}
 	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
 		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
+	}
+	return nil
+}
+
+func validateAPNSConfig(config *APNSConfig) error {
+	if config != nil {
+		return validateAPNSPayload(config.Payload)
+	}
+	return nil
+}
+
+func validateAPNSPayload(payload *APNSPayload) error {
+	if payload != nil {
+		return validateAps(payload.Aps)
+	}
+	return nil
+}
+
+func validateAps(aps *Aps) error {
+	if aps != nil {
+		if aps.Alert != nil && aps.AlertString != "" {
+			return fmt.Errorf("multiple alert specifications")
+		}
+		return validateApsAlert(aps.Alert)
+	}
+	return nil
+}
+
+func validateApsAlert(alert *ApsAlert) error {
+	if alert == nil {
+		return nil
+	}
+	if len(alert.TitleLocArgs) > 0 && alert.TitleLocKey == "" {
+		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
+	}
+	if len(alert.LocArgs) > 0 && alert.LocKey == "" {
+		return fmt.Errorf("locKey is required when specifying locArgs")
 	}
 	return nil
 }

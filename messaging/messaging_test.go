@@ -1,3 +1,17 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package messaging
 
 import (
@@ -15,6 +29,8 @@ import (
 	"firebase.google.com/go/internal"
 )
 
+const testMessageID = "projects/test-project/messages/msg_id"
+
 var testMessagingConfig = &internal.MessagingConfig{
 	ProjectID: "test-project",
 	Opts: []option.ClientOption{
@@ -24,6 +40,7 @@ var testMessagingConfig = &internal.MessagingConfig{
 
 var ttlWithNanos = time.Duration(1500) * time.Millisecond
 var ttl = time.Duration(10) * time.Second
+var invalidTTL = time.Duration(-10) * time.Second
 
 var validMessages = []struct {
 	name string
@@ -31,22 +48,22 @@ var validMessages = []struct {
 	want map[string]interface{}
 }{
 	{
-		name: "token only",
+		name: "TokenOnly",
 		req:  &Message{Token: "test-token"},
 		want: map[string]interface{}{"token": "test-token"},
 	},
 	{
-		name: "topic only",
+		name: "TopicOnly",
 		req:  &Message{Topic: "test-topic"},
 		want: map[string]interface{}{"topic": "test-topic"},
 	},
 	{
-		name: "condition only",
+		name: "ConditionOnly",
 		req:  &Message{Condition: "test-condition"},
 		want: map[string]interface{}{"condition": "test-condition"},
 	},
 	{
-		name: "data message",
+		name: "DataMessage",
 		req: &Message{
 			Data: map[string]string{
 				"k1": "v1",
@@ -63,7 +80,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "notification message",
+		name: "NotificationMessage",
 		req: &Message{
 			Notification: &Notification{
 				Title: "t",
@@ -80,7 +97,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "android 1",
+		name: "AndroidDataMessage",
 		req: &Message{
 			Android: &AndroidConfig{
 				CollapseKey: "ck",
@@ -107,7 +124,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "android 2",
+		name: "AndroidNotificationMessage",
 		req: &Message{
 			Android: &AndroidConfig{
 				RestrictedPackageName: "rpn",
@@ -144,7 +161,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "android 3",
+		name: "AndroidNoTTL",
 		req: &Message{
 			Android: &AndroidConfig{
 				Priority: "high",
@@ -158,6 +175,274 @@ var validMessages = []struct {
 			"topic": "test-topic",
 		},
 	},
+	{
+		name: "WebpushMessage",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Headers: map[string]string{
+					"h1": "v1",
+					"h2": "v2",
+				},
+				Data: map[string]string{
+					"k1": "v1",
+					"k2": "v2",
+				},
+				Notification: &WebpushNotification{
+					Title: "t",
+					Body:  "b",
+					Icon:  "i",
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"webpush": map[string]interface{}{
+				"headers":      map[string]interface{}{"h1": "v1", "h2": "v2"},
+				"data":         map[string]interface{}{"k1": "v1", "k2": "v2"},
+				"notification": map[string]interface{}{"title": "t", "body": "b", "icon": "i"},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "APNSAlertString",
+		req: &Message{
+			APNS: &APNSConfig{
+				Headers: map[string]string{
+					"h1": "v1",
+					"h2": "v2",
+				},
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						AlertString:      "a",
+						Badge:            42,
+						Category:         "c",
+						Sound:            "s",
+						ThreadID:         "t",
+						ContentAvailable: true,
+					},
+					CustomData: map[string]interface{}{
+						"k1": "v1",
+						"k2": true,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"alert":             "a",
+						"badge":             float64(42),
+						"category":          "c",
+						"sound":             "s",
+						"thread-id":         "t",
+						"content-available": float64(1),
+					},
+					"k1": "v1",
+					"k2": true,
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "APNSAlertObject",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert: &ApsAlert{
+							Title:        "t",
+							Body:         "b",
+							TitleLocKey:  "tlk",
+							TitleLocArgs: []string{"t1", "t2"},
+							LocKey:       "blk",
+							LocArgs:      []string{"b1", "b2"},
+							ActionLocKey: "alk",
+							LaunchImage:  "li",
+						},
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"alert": map[string]interface{}{
+							"title":          "t",
+							"body":           "b",
+							"title-loc-key":  "tlk",
+							"title-loc-args": []interface{}{"t1", "t2"},
+							"loc-key":        "blk",
+							"loc-args":       []interface{}{"b1", "b2"},
+							"action-loc-key": "alk",
+							"launch-image":   "li",
+						},
+					},
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+}
+
+var invalidMessages = []struct {
+	name string
+	req  *Message
+	want string
+}{
+	{
+		name: "NilMessage",
+		req:  nil,
+		want: "message must not be nil",
+	},
+	{
+		name: "NoTargets",
+		req:  &Message{},
+		want: "exactly one of token, topic or condition must be specified",
+	},
+	{
+		name: "MultipleTargets",
+		req: &Message{
+			Token: "token",
+			Topic: "topic",
+		},
+		want: "exactly one of token, topic or condition must be specified",
+	},
+	{
+		name: "InvalidTopicPrefix",
+		req: &Message{
+			Topic: "/topics/foo",
+		},
+		want: "topic name must not contain the /topics/ prefix",
+	},
+	{
+		name: "InvalidTopicName",
+		req: &Message{
+			Topic: "foo*bar",
+		},
+		want: "malformed topic name",
+	},
+	{
+		name: "InvalidAndroidTTL",
+		req: &Message{
+			Android: &AndroidConfig{
+				TTL: &invalidTTL,
+			},
+			Topic: "topic",
+		},
+		want: "ttl duration must not be negative",
+	},
+	{
+		name: "InvalidAndroidPriority",
+		req: &Message{
+			Android: &AndroidConfig{
+				Priority: "not normal",
+			},
+			Topic: "topic",
+		},
+		want: "priority must be 'normal' or 'high'",
+	},
+	{
+		name: "InvalidAndroidColor1",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Color: "112233",
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in the #RRGGBB form",
+	},
+	{
+		name: "InvalidAndroidColor2",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Color: "#112233X",
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in the #RRGGBB form",
+	},
+	{
+		name: "InvalidAndroidTitleLocArgs",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					TitleLocArgs: []string{"a1"},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "titleLocKey is required when specifying titleLocArgs",
+	},
+	{
+		name: "InvalidAndroidBodyLocArgs",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					BodyLocArgs: []string{"a1"},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "bodyLocKey is required when specifying bodyLocArgs",
+	},
+	{
+		name: "APNSMultipleAlerts",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert:       &ApsAlert{},
+						AlertString: "alert",
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "multiple alert specifications",
+	},
+	{
+		name: "InvalidAPNSTitleLocArgs",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert: &ApsAlert{
+							TitleLocArgs: []string{"a1"},
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "titleLocKey is required when specifying titleLocArgs",
+	},
+	{
+		name: "InvalidAPNSLocArgs",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert: &ApsAlert{
+							LocArgs: []string{"a1"},
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "locKey is required when specifying locArgs",
+	},
 }
 
 func TestNoProjectID(t *testing.T) {
@@ -167,28 +452,14 @@ func TestNoProjectID(t *testing.T) {
 	}
 }
 
-func TestEmptyTarget(t *testing.T) {
-	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Send(ctx, &Message{})
-	if err == nil {
-		t.Errorf("SendMessage(Message{empty}) = nil; want error")
-	}
-}
-
 func TestSend(t *testing.T) {
 	var tr *http.Request
 	var b []byte
-	msgName := "projects/test-project/messages/msg_id"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
 		b, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{ \"name\":\"" + msgName + "\" }"))
+		w.Write([]byte("{ \"name\":\"" + testMessageID + "\" }"))
 	}))
 	defer ts.Close()
 
@@ -200,41 +471,24 @@ func TestSend(t *testing.T) {
 	client.endpoint = ts.URL
 
 	for _, tc := range validMessages {
-		name, err := client.Send(ctx, tc.req)
-		if err != nil {
-			t.Errorf("[%s] Send() = %v; want nil", tc.name, err)
-		}
-		if name != msgName {
-			t.Errorf("[%s] Response = %q; want = %q", tc.name, name, msgName)
-		}
-
-		var parsed map[string]interface{}
-		if err := json.Unmarshal(b, &parsed); err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(parsed["message"], tc.want) {
-			t.Errorf("[%s] Body = %v; want = %v", tc.name, parsed["message"], tc.want)
-		}
-
-		if tr.Method != http.MethodPost {
-			t.Errorf("[%s] Method = %q; want = %q", tc.name, tr.Method, http.MethodPost)
-		}
-		if tr.URL.Path != "/projects/test-project/messages:send" {
-			t.Errorf("[%s] Path = %q; want = %q", tc.name, tr.URL.Path, "/projects/test-project/messages:send")
-		}
-		if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
-			t.Errorf("[%s] Authorization = %q; want = %q", tc.name, h, "Bearer test-token")
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("Send() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
+			}
+			checkRequest(t, b, tr, tc.want, false)
+		})
 	}
 }
 
 func TestSendDryRun(t *testing.T) {
 	var tr *http.Request
-	msgName := "projects/test-project/messages/0:1500415314455276%31bd1c9631bd1c96"
+	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
+		b, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{ \"Name\":\"" + msgName + "\" }"))
+		w.Write([]byte("{ \"name\":\"" + testMessageID + "\" }"))
 	}))
 	defer ts.Close()
 
@@ -244,18 +498,52 @@ func TestSendDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.endpoint = ts.URL
-	name, err := client.SendDryRun(ctx, &Message{Topic: "my-topic"})
+
+	for _, tc := range validMessages {
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SendDryRun(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("SendDryRun() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
+			}
+			checkRequest(t, b, tr, tc.want, true)
+		})
+	}
+}
+
+func TestInvalidMessage(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
-		t.Errorf("SendMessage() = %v; want nil", err)
+		t.Fatal(err)
+	}
+	for _, tc := range invalidMessages {
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("Send() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
+			}
+		})
+	}
+}
+
+func checkRequest(t *testing.T, b []byte, tr *http.Request, want map[string]interface{}, dryRun bool) {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(parsed["message"], want) {
+		t.Errorf("Body = %v; want = %v", parsed["message"], want)
 	}
 
-	if name != msgName {
-		t.Errorf("response Name = %q; want = %q", name, msgName)
+	validate, ok := parsed["validate_only"]
+	if dryRun {
+		if !ok || validate != true {
+			t.Errorf("ValidateOnly = %v; want = true", validate)
+		}
+	} else if ok {
+		t.Errorf("ValidateOnly = %v; want none", validate)
 	}
 
-	if tr.Body == nil {
-		t.Fatalf("Request = nil; want non-nil")
-	}
 	if tr.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
