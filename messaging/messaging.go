@@ -18,6 +18,7 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,7 +40,7 @@ var errorCodes = map[int]string{
 	http.StatusConflict:            "already deleted",
 	http.StatusTooManyRequests:     "request throttled out by the backend server",
 	http.StatusInternalServerError: "internal server error",
-	http.StatusServiceUnavailable:  "backend servers are over capacity",
+	http.StatusServiceUnavailable:  "backend server is unavailable",
 }
 
 // Client is the interface for the Firebase Messaging service.
@@ -67,15 +68,14 @@ type responseMessage struct {
 // Message is the message to send by Firebase Cloud Messaging Service.
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#Message
 type Message struct {
-	Name         string                 `json:"name,omitempty"`
-	Data         map[string]interface{} `json:"data,omitempty"`
-	Notification *Notification          `json:"notification,omitempty"`
-	Android      *AndroidConfig         `json:"android,omitempty"`
-	Webpush      *WebpushConfig         `json:"webpush,omitempty"`
-	APNS         *APNSConfig            `json:"apns,omitempty"`
-	Token        string                 `json:"token,omitempty"`
-	Topic        string                 `json:"topic,omitempty"`
-	Condition    string                 `json:"condition,omitempty"`
+	Data         map[string]string `json:"data,omitempty"`
+	Notification *Notification     `json:"notification,omitempty"`
+	Android      *AndroidConfig    `json:"android,omitempty"`
+	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
+	APNS         *APNSConfig       `json:"apns,omitempty"`
+	Token        string            `json:"token,omitempty"`
+	Topic        string            `json:"topic,omitempty"`
+	Condition    string            `json:"condition,omitempty"`
 }
 
 // Notification is the Basic notification template to use across all platforms.
@@ -90,10 +90,32 @@ type Notification struct {
 type AndroidConfig struct {
 	CollapseKey           string               `json:"collapse_key,omitempty"`
 	Priority              string               `json:"priority,omitempty"`
-	TTL                   string               `json:"ttl,omitempty"`
+	TTL                   *time.Duration       `json:"-"`
 	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
 	Data                  map[string]string    `json:"data,omitempty"`
 	Notification          *AndroidNotification `json:"notification,omitempty"`
+}
+
+func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
+	type androidInternal AndroidConfig
+	var ttl string
+	if a.TTL != nil {
+		seconds := int64(*a.TTL / time.Second)
+		nanos := int64((*a.TTL - time.Duration(seconds)*time.Second) / time.Nanosecond)
+		if nanos > 0 {
+			ttl = fmt.Sprintf("%d.%09ds", seconds, nanos)
+		} else {
+			ttl = fmt.Sprintf("%ds", seconds)
+		}
+	}
+	s := &struct {
+		TTL string `json:"ttl,omitempty"`
+		*androidInternal
+	}{
+		TTL:             ttl,
+		androidInternal: (*androidInternal)(a),
+	}
+	return json.Marshal(s)
 }
 
 // AndroidNotification is notification to send to android devices.
@@ -132,7 +154,67 @@ type WebpushNotification struct {
 // See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#apnsconfig
 type APNSConfig struct {
 	Headers map[string]string `json:"headers,omitempty"`
-	Payload map[string]string `json:"payload,omitempty"`
+	Payload *APNSPayload      `json:"payload,omitempty"`
+}
+
+type APNSPayload struct {
+	Aps        *Aps
+	CustomData map[string]interface{}
+}
+
+func (p *APNSPayload) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{"aps": p.Aps}
+	for k, v := range p.CustomData {
+		m[k] = v
+	}
+	return json.Marshal(m)
+}
+
+type Aps struct {
+	AlertString      string
+	Alert            *ApsAlert
+	Badge            int    `json:"badge,omitempty"`
+	Sound            string `json:"sound,omitempty"`
+	ContentAvailable bool
+	Category         string `json:"category,omitempty"`
+	ThreadID         string `json:"thread-id,omitempty"`
+}
+
+func (a *Aps) MarshalJSON() ([]byte, error) {
+	if a.Alert != nil && a.AlertString != "" {
+		return nil, fmt.Errorf("multiple alert specifications")
+	}
+
+	type apsAlias Aps
+	s := &struct {
+		Alert            interface{} `json:"alert,omitempty"`
+		ContentAvailable *int        `json:"content-available,omitempty"`
+		*apsAlias
+	}{
+		apsAlias: (*apsAlias)(a),
+	}
+
+	if a.Alert != nil {
+		s.Alert = a.Alert
+	} else {
+		s.Alert = a.AlertString
+	}
+	if a.ContentAvailable {
+		one := 1
+		s.ContentAvailable = &one
+	}
+	return json.Marshal(s)
+}
+
+type ApsAlert struct {
+	Title        string   `json:"title,omitempty"`
+	Body         string   `json:"body,omitempty"`
+	LocKey       string   `json:"loc-key,omitempty"`
+	LocArgs      []string `json:"loc-args,omitempty"`
+	TitleLocKey  string   `json:"title-loc-key,omitempty"`
+	TitleLocArgs []string `json:"title-loc-args,omitempty"`
+	ActionLocKey string   `json:"action-loc-key,omitempty"`
+	LaunchImage  string   `json:"launch-image,omitempty"`
 }
 
 // NewClient creates a new instance of the Firebase Cloud Messaging Client.
@@ -162,9 +244,6 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 // Send a message to specified target (a registration token, topic or condition).
 // https://firebase.google.com/docs/cloud-messaging/send-message
 func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
-	if err := validateMessage(message); err != nil {
-		return "", err
-	}
 	payload := &requestMessage{
 		Message: message,
 	}
@@ -176,9 +255,6 @@ func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 // Send a message to specified target (a registration token, topic or condition).
 // https://firebase.google.com/docs/cloud-messaging/send-message
 func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, error) {
-	if err := validateMessage(message); err != nil {
-		return "", err
-	}
 	payload := &requestMessage{
 		ValidateOnly: true,
 		Message:      message,
@@ -187,13 +263,15 @@ func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, erro
 }
 
 func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage) (string, error) {
-	versionHeader := internal.WithHeader("X-Client-Version", c.version)
+	if err := validateMessage(payload.Message); err != nil {
+		return "", err
+	}
 
 	request := &internal.Request{
 		Method: http.MethodPost,
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.endpoint, c.project),
 		Body:   internal.NewJSONEntity(payload),
-		Opts:   []internal.HTTPOption{versionHeader},
+		Opts:   []internal.HTTPOption{internal.WithHeader("X-Client-Version", c.version)},
 	}
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
@@ -206,7 +284,6 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 
 	result := &responseMessage{}
 	err = resp.Unmarshal(http.StatusOK, result)
-
 	return result.Name, err
 }
 
@@ -218,67 +295,61 @@ func validateMessage(message *Message) error {
 
 	target := bool2int(message.Token != "") + bool2int(message.Condition != "") + bool2int(message.Topic != "")
 	if target != 1 {
-		return fmt.Errorf("Exactly one of token, topic or condition must be specified")
+		return fmt.Errorf("exactly one of token, topic or condition must be specified")
 	}
 
 	// Validate target
 	if message.Topic != "" {
 		if strings.HasPrefix(message.Topic, "/topics/") {
-			return fmt.Errorf("Topic name must not contain the /topics/ prefix")
+			return fmt.Errorf("topic name must not contain the /topics/ prefix")
 		}
 		if !regexp.MustCompile("[a-zA-Z0-9-_.~%]+").MatchString(message.Topic) {
-			return fmt.Errorf("Malformed topic name")
+			return fmt.Errorf("malformed topic name")
 		}
 	}
 
 	// validate AndroidConfig
-	if message.Android != nil {
-		if err := validateAndroidConfig(message.Android); err != nil {
-			return err
-		}
+	if err := validateAndroidConfig(message.Android); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func validateAndroidConfig(config *AndroidConfig) error {
-	if config.TTL != "" && !strings.HasSuffix(config.TTL, "s") {
-		return fmt.Errorf("ttl must end with 's'")
+	if config == nil {
+		return nil
 	}
 
-	if _, err := time.ParseDuration(config.TTL); err != nil {
-		return fmt.Errorf("invalid TTL")
+	if config.TTL != nil && config.TTL.Seconds() < 0 {
+		return fmt.Errorf("ttl duration must not be negative")
 	}
-
 	if config.Priority != "" {
 		if config.Priority != "normal" && config.Priority != "high" {
 			return fmt.Errorf("priority must be 'normal' or 'high'")
 		}
 	}
 	// validate AndroidNotification
-	if config.Notification != nil {
-		if err := validateAndroidNotification(config.Notification); err != nil {
-			return err
-		}
+	if err := validateAndroidNotification(config.Notification); err != nil {
+		return err
 	}
 	return nil
 }
 
 func validateAndroidNotification(notification *AndroidNotification) error {
+	if notification == nil {
+		return nil
+	}
 	if notification.Color != "" {
 		if !regexp.MustCompile("^#[0-9a-fA-F]{6}$").MatchString(notification.Color) {
 			return fmt.Errorf("color must be in the form #RRGGBB")
 		}
 	}
-	if len(notification.TitleLocArgs) > 0 {
-		if notification.TitleLocKey == "" {
-			return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
-		}
+	if len(notification.TitleLocArgs) > 0 && notification.TitleLocKey == "" {
+		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
 	}
-	if len(notification.BodyLocArgs) > 0 {
-		if notification.BodyLocKey == "" {
-			return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
-		}
+	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
+		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
 	}
 	return nil
 }

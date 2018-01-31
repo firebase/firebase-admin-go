@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/messaging"
@@ -21,6 +22,8 @@ var testFixtures = struct {
 	topic     string
 	condition string
 }{}
+
+var ttl = time.Duration(3) * time.Second
 
 // Enable API before testing
 // https://console.developers.google.com/apis/library/fcm.googleapis.com/?project=
@@ -188,7 +191,7 @@ func TestSendData(t *testing.T) {
 	ctx := context.Background()
 	msg := &messaging.Message{
 		Token: testFixtures.token,
-		Data: map[string]interface{}{
+		Data: map[string]string{
 			"private_key":  "foo",
 			"client_email": "bar@test.com",
 		},
@@ -215,7 +218,7 @@ func TestSendAndroidNotification(t *testing.T) {
 		Android: &messaging.AndroidConfig{
 			CollapseKey: "Collapse",
 			Priority:    "HIGH",
-			TTL:         "3.5s",
+			TTL:         &ttl,
 			Notification: &messaging.AndroidNotification{
 				Title: "Android Title",
 				Body:  "Android body",
@@ -244,7 +247,7 @@ func TestSendAndroidData(t *testing.T) {
 		Android: &messaging.AndroidConfig{
 			CollapseKey: "Collapse",
 			Priority:    "HIGH",
-			TTL:         "3.5s",
+			TTL:         &ttl,
 			Data: map[string]string{
 				"private_key":  "foo",
 				"client_email": "bar@test.com",
@@ -271,9 +274,13 @@ func TestSendAPNSNotification(t *testing.T) {
 			Body:  "This is a Notification",
 		},
 		APNS: &messaging.APNSConfig{
-			Payload: map[string]string{
-				"title": "APNS Title ",
-				"body":  "APNS bodym",
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					Alert: &messaging.ApsAlert{
+						Title: "APNS title",
+						Body:  "APNS body",
+					},
+				},
 			},
 		},
 	}
