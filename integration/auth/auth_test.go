@@ -81,8 +81,8 @@ func TestCustomToken(t *testing.T) {
 }
 
 func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
-	revokedID := "user_revoked"
-	ct, err := client.CustomToken(revokedID)
+	uid := "user_revoked"
+	ct, err := client.CustomToken(uid)
 
 	if err != nil {
 		t.Fatal(err)
@@ -96,18 +96,19 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != revokedID {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, revokedID)
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
 	}
 	time.Sleep(time.Second)
-	if err = client.RevokeRefreshTokens(ctx, revokedID); err != nil {
+	if err = client.RevokeRefreshTokens(ctx, uid); err != nil {
 		t.Fatal(err)
 	}
 
 	vt, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true)
-	we := "the Firebase ID token has been revoked"
-	if err == nil || err.Error() != we {
-		t.Errorf("VerifyIDTokenWithCheckRevoked; err = %s; want err = %v", err, we)
+	we := "id token has been revoked"
+	if vt != nil || err == nil || err.Error() != we {
+		t.Errorf("tok, err := VerifyIDTokenWithCheckRevoked(); got (%v, %s) ; want (%v, %v)",
+			vt, err, nil, we)
 	}
 
 	// Does not return error if it isn't checked
@@ -116,7 +117,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(.., false); err = %s; want err = <nil>", err)
 	}
 
-	// Sign in after revocation after revocation.
+	// Sign in after revocation.
 	if idt, err = signInWithCustomToken(ct); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(); err = %s; want err = <nil>", err)
 	}
 
-	err = client.DeleteUser(ctx, revokedID)
+	err = client.DeleteUser(ctx, uid)
 	if err != nil {
 		t.Error(err)
 	}

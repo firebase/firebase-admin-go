@@ -428,7 +428,7 @@ func validatePhone(val interface{}) error {
 }
 
 func validateValidSince(val interface{}) error {
-	if v, ok := val.(int64); !ok || v > ((time.Now().Unix())*999) {
+	if v, ok := val.(int64); !ok || v > 1e12 {
 		// If v is in seconds it signifies a date 40K years in the future, most likely milliseconds.
 		return fmt.Errorf("validSince must be an integer signifying epoch seconds")
 	}

@@ -177,13 +177,12 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
-// RevokeRefreshTokens revokes all refresh tokens for the specified user identified by the uid provided.
+// RevokeRefreshTokens revokes all refresh tokens for the specified user.
 // In addition to revoking all refresh tokens for a user, all ID tokens issued
-// before revocation will also be revoked on the Auth backend. Any request with an
+// before revocation will also be revoked at the Auth backend. Any request with an
 // ID token generated before revocation will be rejected with a token expired error.
-// Note that due to the fact that the timestamp is stored in seconds, any tokens minted in
-// the same second as the revocation will still be valid. If there is a chance that a token
-// was minted in the last second, delay for 1 second before revoking.all tokens minted before the current second.
+// Note that any tokens minted in the same epoch second as the revocation will still be valid.
+// If there is a chance that a token was minted in the last second, delay for 1 second before revoking.
 func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
@@ -251,10 +250,10 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 // VerifyIDTokenWithCheckRevoked verifies the signature and payload of the provided ID token and
 // if requested, whether it was revoked.
 // see: VerifyIDToken above.
-func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string, checkToken bool) (*Token, error) {
+func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
 	p, err := c.VerifyIDToken(idToken)
 
-	if !checkToken || err != nil {
+	if !checkRevoked || err != nil {
 		return p, err
 	}
 	user, err := c.GetUser(ctx, p.UID)
@@ -262,7 +261,8 @@ func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken stri
 		return p, err
 	}
 	if p.IssuedAt*1000 < user.TokensValidAfterTime {
-		err = fmt.Errorf("the Firebase ID token has been revoked")
+		err = fmt.Errorf("id token has been revoked")
+		p = nil
 	}
 	return p, err
 }
