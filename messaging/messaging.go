@@ -13,11 +13,10 @@
 // limitations under the License.
 
 // Package messaging contains functions for sending messages and managing
-// device subscriptions with Firebase Cloud Messaging.
+// device subscriptions with Firebase Cloud Messaging (FCM).
 package messaging
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +24,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -43,30 +44,21 @@ var errorCodes = map[int]string{
 	http.StatusServiceUnavailable:  "backend server is unavailable",
 }
 
-// Client is the interface for the Firebase Messaging service.
+// Client is the interface for the Firebase Cloud Messaging (FCM) service.
 type Client struct {
-	// To enable testing against arbitrary endpoints.
-	endpoint string
+	endpoint string // to enable testing against arbitrary endpoints
 	client   *internal.HTTPClient
 	project  string
 	version  string
 }
 
-// requestMessage is the request body message to send by Firebase Cloud Messaging Service.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
-type requestMessage struct {
-	ValidateOnly bool     `json:"validate_only,omitempty"`
-	Message      *Message `json:"message,omitempty"`
-}
-
-// responseMessage is the identifier of the message sent.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages
-type responseMessage struct {
-	Name string `json:"name"`
-}
-
-// Message is the message to send by Firebase Cloud Messaging Service.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#Message
+// Message represents a message that can be sent via Firebase Cloud Messaging.
+//
+// Message contains payload information, recipient information and platform-specific configuration
+// options. A Message must specify exactly one of Token, Topic or Condition fields. Apart from
+// that a Message may specify any combination of Data, Notification, Android, Webpush and APNS
+// fields. See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages for more
+// details on how the backend FCM servers interpret different message parameters.
 type Message struct {
 	Data         map[string]string `json:"data,omitempty"`
 	Notification *Notification     `json:"notification,omitempty"`
@@ -78,24 +70,23 @@ type Message struct {
 	Condition    string            `json:"condition,omitempty"`
 }
 
-// Notification is the Basic notification template to use across all platforms.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#Notification
+// Notification is the basic notification template to use across all platforms.
 type Notification struct {
 	Title string `json:"title,omitempty"`
 	Body  string `json:"body,omitempty"`
 }
 
-// AndroidConfig is Android specific options for messages.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#AndroidConfig
+// AndroidConfig contains Android-specific options for messages.
 type AndroidConfig struct {
 	CollapseKey           string               `json:"collapse_key,omitempty"`
-	Priority              string               `json:"priority,omitempty"`
+	Priority              string               `json:"priority,omitempty"` // one of "normal" or "high"
 	TTL                   *time.Duration       `json:"-"`
 	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
-	Data                  map[string]string    `json:"data,omitempty"`
+	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
 	Notification          *AndroidNotification `json:"notification,omitempty"`
 }
 
+// MarshalJSON marshals an AndroidConfig into JSON (for internal use only).
 func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 	var ttl string
 	if a.TTL != nil {
@@ -119,13 +110,12 @@ func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// AndroidNotification is notification to send to android devices.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#AndroidNotification
+// AndroidNotification is a notification to send to android devices.
 type AndroidNotification struct {
-	Title        string   `json:"title,omitempty"`
-	Body         string   `json:"body,omitempty"`
+	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
+	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
 	Icon         string   `json:"icon,omitempty"`
-	Color        string   `json:"color,omitempty"`
+	Color        string   `json:"color,omitempty"` // notification color in #RRGGBB format
 	Sound        string   `json:"sound,omitempty"`
 	Tag          string   `json:"tag,omitempty"`
 	ClickAction  string   `json:"click_action,omitempty"`
@@ -135,24 +125,27 @@ type AndroidNotification struct {
 	TitleLocArgs []string `json:"title_loc_args,omitempty"`
 }
 
-// WebpushConfig is Webpush protocol options.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#WebpushConfig
+// WebpushConfig contains options specific to the WebPush protocol.
+//
+// See https://tools.ietf.org/html/rfc8030#section-5 for additional details, and supported
+// headers.
 type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
 }
 
-// WebpushNotification is Web notification to send via webpush protocol.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#WebpushNotification
+// WebpushNotification is a notification send via WebPush protocol.
 type WebpushNotification struct {
-	Title string `json:"title,omitempty"`
-	Body  string `json:"body,omitempty"`
+	Title string `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
+	Body  string `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
 	Icon  string `json:"icon,omitempty"`
 }
 
-// APNSConfig is Apple Push Notification Service specific options.
-// See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#apnsconfig
+// APNSConfig contains options specified to Apple Push Notification Service (APNS).
+//
+// See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
+// for more details on supported headers and parameter values.
 type APNSConfig struct {
 	Headers map[string]string `json:"headers,omitempty"`
 	Payload *APNSPayload      `json:"payload,omitempty"`
@@ -160,12 +153,14 @@ type APNSConfig struct {
 
 // APNSPayload is the payload object that can be included in an APNS message.
 //
-// The payload consists of an aps dictionary, and other custom key-value pairs.
+// The payload mainly consists of the aps dictionary. Additionally it may contain arbitrary
+// key-values pairs as custom data fields.
 type APNSPayload struct {
 	Aps        *Aps
 	CustomData map[string]interface{}
 }
 
+// MarshalJSON marshals an APNSPayload into JSON (for internal use only).
 func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{"aps": p.Aps}
 	for k, v := range p.CustomData {
@@ -174,6 +169,10 @@ func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// Aps represents the aps dictionary that may be included in an APNSPayload.
+//
+// Alert may be specified as a string (via the AlertString field), or as a struct (via the Alert
+// field).
 type Aps struct {
 	AlertString      string    `json:"-"`
 	Alert            *ApsAlert `json:"-"`
@@ -184,6 +183,7 @@ type Aps struct {
 	ThreadID         string    `json:"thread-id,omitempty"`
 }
 
+// MarshalJSON marshals an Aps into JSON (for internal use only).
 func (a *Aps) MarshalJSON() ([]byte, error) {
 	type apsAlias Aps
 	s := &struct {
@@ -206,13 +206,13 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// ApsAlert is the alert payload that can be included in an APNS message.
+// ApsAlert is the alert payload that can be included in an Aps.
 //
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
 // for supported fields.
 type ApsAlert struct {
-	Title        string   `json:"title,omitempty"`
-	Body         string   `json:"body,omitempty"`
+	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of Notification type
+	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of Notification type
 	LocKey       string   `json:"loc-key,omitempty"`
 	LocArgs      []string `json:"loc-args,omitempty"`
 	TitleLocKey  string   `json:"title-loc-key,omitempty"`
@@ -224,7 +224,7 @@ type ApsAlert struct {
 // NewClient creates a new instance of the Firebase Cloud Messaging Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
-// the Messaging service through firebase.App.
+// the messaging service through firebase.App.
 func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error) {
 	if c.ProjectID == "" {
 		return nil, errors.New("project id is required to access firebase cloud messaging client")
@@ -243,10 +243,20 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}, nil
 }
 
+type requestMessage struct {
+	ValidateOnly bool     `json:"validate_only,omitempty"`
+	Message      *Message `json:"message,omitempty"`
+}
+
+type responseMessage struct {
+	Name string `json:"name"`
+}
+
 // Send sends a Message to Firebase Cloud Messaging.
 //
-// Send a message to specified target (a registration token, topic or condition).
-// https://firebase.google.com/docs/cloud-messaging/send-message
+// The Message must specify exactly one of Token, Topic and Condition fields. FCM will
+// customize the message for each target platform based on the parameters specified within the
+// Message.
 func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 	payload := &requestMessage{
 		Message: message,
@@ -254,10 +264,10 @@ func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 	return c.sendRequestMessage(ctx, payload)
 }
 
-// SendDryRun sends a dryRun Message to Firebase Cloud Messaging.
+// SendDryRun sends a Message to Firebase Cloud Messaging in the dry run (validation only) mode.
 //
-// Send a message to specified target (a registration token, topic or condition).
-// https://firebase.google.com/docs/cloud-messaging/send-message
+// This function does not actually delivery the message to target devices. Instead, it performs all
+// the SDK-level and backend validations on the message, and emulates the send operation.
 func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, error) {
 	payload := &requestMessage{
 		ValidateOnly: true,
@@ -288,7 +298,6 @@ func (c *Client) sendRequestMessage(ctx context.Context, payload *requestMessage
 	return result.Name, nil
 }
 
-// validateMessage
 func validateMessage(message *Message) error {
 	if message == nil {
 		return fmt.Errorf("message must not be nil")
@@ -299,7 +308,7 @@ func validateMessage(message *Message) error {
 		return fmt.Errorf("exactly one of token, topic or condition must be specified")
 	}
 
-	// Validate topic
+	// validate topic
 	if message.Topic != "" {
 		if strings.HasPrefix(message.Topic, "/topics/") {
 			return fmt.Errorf("topic name must not contain the /topics/ prefix")
@@ -314,7 +323,7 @@ func validateMessage(message *Message) error {
 		return err
 	}
 
-	// Validate APNSConfig
+	// validate APNSConfig
 	return validateAPNSConfig(message.APNS)
 }
 
