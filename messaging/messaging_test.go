@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -445,6 +446,41 @@ var invalidMessages = []struct {
 	},
 }
 
+var invalidTopicMgtArgs = []struct {
+	name   string
+	tokens []string
+	topic  string
+	want   string
+}{
+	{
+		name: "NoTokensAndTopic",
+		want: "no tokens specified",
+	},
+	{
+		name:   "NoTopic",
+		tokens: []string{"token1"},
+		want:   "topic name not specified",
+	},
+	{
+		name:   "InvalidTopicName",
+		tokens: []string{"token1"},
+		topic:  "foo*bar",
+		want:   "invalid topic name: \"foo*bar\"",
+	},
+	{
+		name:   "TooManyTokens",
+		tokens: strings.Split("a"+strings.Repeat(",a", 1000), ","),
+		topic:  "topic",
+		want:   "tokens list must not contain more than 1000 items",
+	},
+	{
+		name:   "EmptyToken",
+		tokens: []string{"foo", ""},
+		topic:  "topic",
+		want:   "tokens list must not contain empty strings",
+	},
+}
+
 func TestNoProjectID(t *testing.T) {
 	client, err := NewClient(context.Background(), &internal.MessagingConfig{})
 	if client != nil || err == nil {
@@ -468,7 +504,7 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.endpoint = ts.URL
+	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
 		t.Run(tc.name, func(t *testing.T) {
@@ -476,7 +512,7 @@ func TestSend(t *testing.T) {
 			if name != testMessageID || err != nil {
 				t.Errorf("Send() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
 			}
-			checkRequest(t, b, tr, tc.want, false)
+			checkFCMRequest(t, b, tr, tc.want, false)
 		})
 	}
 }
@@ -497,7 +533,7 @@ func TestSendDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.endpoint = ts.URL
+	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
 		t.Run(tc.name, func(t *testing.T) {
@@ -505,7 +541,7 @@ func TestSendDryRun(t *testing.T) {
 			if name != testMessageID || err != nil {
 				t.Errorf("SendDryRun() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
 			}
-			checkRequest(t, b, tr, tc.want, true)
+			checkFCMRequest(t, b, tr, tc.want, true)
 		})
 	}
 }
@@ -524,7 +560,7 @@ func TestSendError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.endpoint = ts.URL
+	client.fcmEndpoint = ts.URL
 
 	cases := []struct {
 		resp string
@@ -568,7 +604,140 @@ func TestInvalidMessage(t *testing.T) {
 	}
 }
 
-func checkRequest(t *testing.T, b []byte, tr *http.Request, want map[string]interface{}, dryRun bool) {
+func TestSubscribe(t *testing.T) {
+	var tr *http.Request
+	var b []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		b, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1", "id2"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkIIDRequest(t, b, tr, iidSubscribe)
+	checkTopicMgtResponse(t, resp)
+}
+
+func TestInvalidSubscribe(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range invalidTopicMgtArgs {
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("SubscribeToTopic() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
+			}
+		})
+	}
+}
+
+func TestUnsubscribe(t *testing.T) {
+	var tr *http.Request
+	var b []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		b, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidEndpoint = ts.URL
+
+	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1", "id2"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkIIDRequest(t, b, tr, iidSubscribe)
+	checkTopicMgtResponse(t, resp)
+}
+
+func TestInvalidUnsubscribe(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range invalidTopicMgtArgs {
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("UnsubscribeFromTopic() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
+			}
+		})
+	}
+}
+
+func TestTopicManagementError(t *testing.T) {
+	var resp string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(resp))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidEndpoint = ts.URL
+
+	cases := []struct {
+		resp string
+		want string
+	}{
+		{
+			resp: "{}",
+			want: "http error status: 500; reason: client encounterd an unknown error; response: {}",
+		},
+		{
+			resp: "{\"error\": \"INVALID_ARGUMENT\"}",
+			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+		},
+		{
+			resp: "not json",
+			want: "http error status: 500; reason: client encounterd an unknown error; response: not json",
+		},
+	}
+	for _, tc := range cases {
+		resp = tc.resp
+		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("SubscribeToTopic() = (%q, %v); want = (%q, %q)", tmr, err, "", tc.want)
+		}
+	}
+	for _, tc := range cases {
+		resp = tc.resp
+		tmr, err := client.UnsubscribeFromTopic(ctx, []string{"id1"}, "topic")
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("UnsubscribeFromTopic() = (%q, %v); want = (%q, %q)", tmr, err, "", tc.want)
+		}
+	}
+}
+
+func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]interface{}, dryRun bool) {
 	var parsed map[string]interface{}
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		t.Fatal(err)
@@ -594,5 +763,49 @@ func checkRequest(t *testing.T, b []byte, tr *http.Request, want map[string]inte
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+}
+
+func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]interface{}{
+		"to": "/topics/test-topic",
+		"registration_tokens": []interface{}{"id1", "id2"},
+	}
+	if !reflect.DeepEqual(parsed, want) {
+		t.Errorf("Body = %#v; want = %#v", parsed, want)
+	}
+
+	if tr.Method != http.MethodPost {
+		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
+	}
+	wantOp := "/" + op
+	if tr.URL.Path != wantOp {
+		t.Errorf("Path = %q; want = %q", tr.URL.Path, wantOp)
+	}
+	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
+		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+}
+
+func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
+	if resp.SuccessCount != 1 {
+		t.Errorf("SuccessCount = %d; want  = %d", resp.SuccessCount, 1)
+	}
+	if resp.FailureCount != 1 {
+		t.Errorf("FailureCount = %d; want  = %d", resp.FailureCount, 1)
+	}
+	if len(resp.Errors) != 1 {
+		t.Fatalf("Errors = %d; want = %d", len(resp.Errors), 1)
+	}
+	e := resp.Errors[0]
+	if e.Index != 1 {
+		t.Errorf("ErrorInfo.Index = %d; want = %d", e.Index, 1)
+	}
+	if e.Reason != "unknown-error" {
+		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "unknown-error")
 	}
 }
