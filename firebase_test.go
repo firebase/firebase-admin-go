@@ -304,6 +304,18 @@ func TestInstanceID(t *testing.T) {
 	}
 }
 
+func TestMessaging(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Messaging(ctx); c == nil || err != nil {
+		t.Errorf("Messaging() = (%v, %v); want (iid, nil)", c, err)
+	}
+}
+
 func TestCustomTokenSource(t *testing.T) {
 	ctx := context.Background()
 	ts := &testTokenSource{AccessToken: "mock-token-from-custom"}
