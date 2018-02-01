@@ -28,25 +28,28 @@ import (
 	"firebase.google.com/go/messaging"
 )
 
-const testRegistrationToken = "fGw0qy4TGgk:APA91bGtWGjuhp4WRhHXgbabIYp1jxEKI08ofj_v1bKhWAGJQ4e3arRCWzeTfHaLz83mBnDh0a" +
-	"PWB1AykXAVUUGl2h1wT4XI6XazWpvY7RBUSYfoxtqSWGIm2nvWh2BOP1YG501SsRoE"
+// The registration token has the proper format, but is not valid (i.e. expired). The intention of
+// these integration tests is to verify that the endpoints return the proper payload, but it is
+// hard to ensure this token remains valid. The tests below should still pass regardless.
+const testRegistrationToken = "fGw0qy4TGgk:APA91bGtWGjuhp4WRhHXgbabIYp1jxEKI08ofj_v1bKhWAGJQ4e3a" +
+	"rRCWzeTfHaLz83mBnDh0aPWB1AykXAVUUGl2h1wT4XI6XazWpvY7RBUSYfoxtqSWGIm2nvWh2BOP1YG501SsRoE"
 
-var client *messaging.Client
-
-var testFixtures = struct {
-	token     string
-	topic     string
-	condition string
-}{}
-
-var ttl = time.Duration(3) * time.Second
+var (
+	client       *messaging.Client
+	testFixtures = struct {
+		token     string
+		topic     string
+		condition string
+	}{}
+	ttl = time.Duration(3) * time.Second
+)
 
 // Enable API before testing
-// https://console.developers.google.com/apis/library/fcm.googleapis.com/?project=
+// https://console.developers.google.com/apis/library/fcm.googleapis.com
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		log.Println("skipping Messaging integration tests in short mode.")
+		log.Println("Skipping messaging integration tests in short mode.")
 		return
 	}
 
@@ -95,7 +98,7 @@ func TestSend(t *testing.T) {
 	}
 	name, err := client.SendDryRun(context.Background(), msg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	const pattern = "^projects/.*/messages/.*$"
 	if !regexp.MustCompile(pattern).MatchString(name) {
@@ -105,8 +108,7 @@ func TestSend(t *testing.T) {
 
 func TestSendInvalidToken(t *testing.T) {
 	msg := &messaging.Message{Token: "INVALID_TOKEN"}
-	_, err := client.Send(context.Background(), msg)
-	if err == nil {
+	if _, err := client.Send(context.Background(), msg); err == nil {
 		t.Errorf("Send() = nil; want error")
 	}
 }

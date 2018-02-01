@@ -20,6 +20,11 @@ import (
 	"strings"
 )
 
+var (
+	bareTopicNamePattern = regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$")
+	colorPattern         = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+)
+
 func validateMessage(message *Message) error {
 	if message == nil {
 		return fmt.Errorf("message must not be nil")
@@ -35,7 +40,7 @@ func validateMessage(message *Message) error {
 		if strings.HasPrefix(message.Topic, "/topics/") {
 			return fmt.Errorf("topic name must not contain the /topics/ prefix")
 		}
-		if !regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$").MatchString(message.Topic) {
+		if !bareTopicNamePattern.MatchString(message.Topic) {
 			return fmt.Errorf("malformed topic name")
 		}
 	}
@@ -68,8 +73,7 @@ func validateAndroidNotification(notification *AndroidNotification) error {
 	if notification == nil {
 		return nil
 	}
-	const colorPattern = "^#[0-9a-fA-F]{6}$"
-	if notification.Color != "" && !regexp.MustCompile(colorPattern).MatchString(notification.Color) {
+	if notification.Color != "" && !colorPattern.MatchString(notification.Color) {
 		return fmt.Errorf("color must be in the #RRGGBB form")
 	}
 	if len(notification.TitleLocArgs) > 0 && notification.TitleLocKey == "" {

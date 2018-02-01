@@ -586,7 +586,7 @@ func TestSendError(t *testing.T) {
 	}{
 		{
 			resp: "{}",
-			want: "http error status: 500; reason: client encounterd an unknown error; response: {}",
+			want: "http error status: 500; reason: client encountered an unknown error; response: {}",
 		},
 		{
 			resp: "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
@@ -594,7 +594,7 @@ func TestSendError(t *testing.T) {
 		},
 		{
 			resp: "not json",
-			want: "http error status: 500; reason: client encounterd an unknown error; response: not json",
+			want: "http error status: 500; reason: client encountered an unknown error; response: not json",
 		},
 	}
 	for _, tc := range cases {
@@ -728,7 +728,7 @@ func TestTopicManagementError(t *testing.T) {
 	}{
 		{
 			resp: "{}",
-			want: "http error status: 500; reason: client encounterd an unknown error; response: {}",
+			want: "http error status: 500; reason: client encountered an unknown error; response: {}",
 		},
 		{
 			resp: "{\"error\": \"INVALID_ARGUMENT\"}",
@@ -736,7 +736,7 @@ func TestTopicManagementError(t *testing.T) {
 		},
 		{
 			resp: "not json",
-			want: "http error status: 500; reason: client encounterd an unknown error; response: not json",
+			want: "http error status: 500; reason: client encountered an unknown error; response: not json",
 		},
 	}
 	for _, tc := range cases {

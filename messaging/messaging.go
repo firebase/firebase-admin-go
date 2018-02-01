@@ -31,26 +31,32 @@ import (
 	"google.golang.org/api/transport"
 )
 
-const messagingEndpoint = "https://fcm.googleapis.com/v1"
-const iidEndpoint = "https://iid.googleapis.com"
-const iidSubscribe = "iid/v1:batchAdd"
-const iidUnsubscribe = "iid/v1:batchRemove"
+const (
+	messagingEndpoint = "https://fcm.googleapis.com/v1"
+	iidEndpoint       = "https://iid.googleapis.com"
+	iidSubscribe      = "iid/v1:batchAdd"
+	iidUnsubscribe    = "iid/v1:batchRemove"
+)
 
-var fcmErrorCodes = map[string]string{
-	"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
-	"NOT_FOUND":          "request contains an invalid argument; code: registration-token-not-registered",
-	"PERMISSION_DENIED":  "client does not have permission to perform the requested operation; code: authentication-error",
-	"RESOURCE_EXHAUSTED": "messaging service quota exceeded; code: message-rate-exceeded",
-	"UNAUTHENTICATED":    "client failed to authenticate; code: authentication-error",
-	"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
-}
+var (
+	topicNamePattern = regexp.MustCompile("^(/topics/)?(private/)?[a-zA-Z0-9-_.~%]+$")
 
-var iidErrorCodes = map[string]string{
-	"INVALID_ARGUMENT": "request contains an invalid argument; code: invalid-argument",
-	"NOT_FOUND":        "request contains an invalid argument; code: registration-token-not-registered",
-	"INTERNAL":         "server encounterd an internal error; code: internal-error",
-	"TOO_MANY_TOPICS":  "client exceeded the number of allowed topics; code: too-many-topics",
-}
+	fcmErrorCodes = map[string]string{
+		"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
+		"NOT_FOUND":          "request contains an invalid argument; code: registration-token-not-registered",
+		"PERMISSION_DENIED":  "client does not have permission to perform the requested operation; code: authentication-error",
+		"RESOURCE_EXHAUSTED": "messaging service quota exceeded; code: message-rate-exceeded",
+		"UNAUTHENTICATED":    "client failed to authenticate; code: authentication-error",
+		"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
+	}
+
+	iidErrorCodes = map[string]string{
+		"INVALID_ARGUMENT": "request contains an invalid argument; code: invalid-argument",
+		"NOT_FOUND":        "request contains an invalid argument; code: registration-token-not-registered",
+		"INTERNAL":         "server encountered an internal error; code: internal-error",
+		"TOO_MANY_TOPICS":  "client exceeded the number of allowed topics; code: too-many-topics",
+	}
+)
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
 type Client struct {
@@ -85,7 +91,7 @@ type Notification struct {
 	Body  string `json:"body,omitempty"`
 }
 
-// AndroidConfig contains messaging options specific to the Android platform..
+// AndroidConfig contains messaging options specific to the Android platform.
 type AndroidConfig struct {
 	CollapseKey           string               `json:"collapse_key,omitempty"`
 	Priority              string               `json:"priority,omitempty"` // one of "normal" or "high"
@@ -257,7 +263,7 @@ func newTopicManagementResponse(resp *iidResponse) *TopicManagementResponse {
 			tmr.SuccessCount++
 		} else {
 			tmr.FailureCount++
-			code, _ := res["error"].(string)
+			code := res["error"].(string)
 			reason := iidErrorCodes[code]
 			if reason == "" {
 				reason = "unknown-error"
@@ -277,7 +283,7 @@ func newTopicManagementResponse(resp *iidResponse) *TopicManagementResponse {
 // the messaging service through firebase.App.
 func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error) {
 	if c.ProjectID == "" {
-		return nil, errors.New("project id is required to access firebase cloud messaging client")
+		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
 	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
@@ -297,7 +303,7 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 // Send sends a Message to Firebase Cloud Messaging.
 //
 // The Message must specify exactly one of Token, Topic and Condition fields. FCM will
-// customize the message for each target platform based on the parameters specified in the
+// customize the message for each target platform based on the arguments specified in the
 // Message.
 func (c *Client) Send(ctx context.Context, message *Message) (string, error) {
 	payload := &fcmRequest{
@@ -320,7 +326,7 @@ func (c *Client) SendDryRun(ctx context.Context, message *Message) (string, erro
 
 // SubscribeToTopic subscribes a list of registration tokens to a topic.
 //
-// The tokens list must not be empty, with at most 1000 tokens.
+// The tokens list must not be empty, and have at most 1000 tokens.
 func (c *Client) SubscribeToTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
 	req := &iidRequest{
 		Topic:  topic,
@@ -332,7 +338,7 @@ func (c *Client) SubscribeToTopic(ctx context.Context, tokens []string, topic st
 
 // UnsubscribeFromTopic unsubscribes a list of registration tokens from a topic.
 //
-// The tokens list must not be empty, with at most 1000 tokens.
+// The tokens list must not be empty, and have at most 1000 tokens.
 func (c *Client) UnsubscribeFromTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
 	req := &iidRequest{
 		Topic:  topic,
@@ -396,7 +402,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	msg := fcmErrorCodes[fe.Error.Status]
 	if msg == "" {
-		msg = fmt.Sprintf("client encounterd an unknown error; response: %s", string(resp.Body))
+		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
 	}
 	return "", fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
 }
@@ -417,7 +423,7 @@ func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest
 	if req.Topic == "" {
 		return nil, fmt.Errorf("topic name not specified")
 	}
-	if !regexp.MustCompile("^(/topics/)?(private/)?[a-zA-Z0-9-_.~%]+$").MatchString(req.Topic) {
+	if !topicNamePattern.MatchString(req.Topic) {
 		return nil, fmt.Errorf("invalid topic name: %q", req.Topic)
 	}
 
@@ -448,7 +454,7 @@ func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest
 	json.Unmarshal(resp.Body, &ie) // ignore any json parse errors at this level
 	msg := iidErrorCodes[ie.Error]
 	if msg == "" {
-		msg = fmt.Sprintf("client encounterd an unknown error; response: %s", string(resp.Body))
+		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
 	}
 	return nil, fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
 }
