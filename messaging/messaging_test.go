@@ -32,16 +32,21 @@ import (
 
 const testMessageID = "projects/test-project/messages/msg_id"
 
-var testMessagingConfig = &internal.MessagingConfig{
-	ProjectID: "test-project",
-	Opts: []option.ClientOption{
-		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
-	},
-}
+var (
+	testMessagingConfig = &internal.MessagingConfig{
+		ProjectID: "test-project",
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
+		},
+	}
 
-var ttlWithNanos = time.Duration(1500) * time.Millisecond
-var ttl = time.Duration(10) * time.Second
-var invalidTTL = time.Duration(-10) * time.Second
+	ttlWithNanos = time.Duration(1500) * time.Millisecond
+	ttl          = time.Duration(10) * time.Second
+	invalidTTL   = time.Duration(-10) * time.Second
+
+	badge     = 42
+	badgeZero = 0
+)
 
 var validMessages = []struct {
 	name string
@@ -234,7 +239,7 @@ var validMessages = []struct {
 				Payload: &APNSPayload{
 					Aps: &Aps{
 						AlertString:      "a",
-						Badge:            42,
+						Badge:            &badge,
 						Category:         "c",
 						Sound:            "s",
 						ThreadID:         "t",
@@ -254,7 +259,7 @@ var validMessages = []struct {
 				"payload": map[string]interface{}{
 					"aps": map[string]interface{}{
 						"alert":             "a",
-						"badge":             float64(42),
+						"badge":             float64(badge),
 						"category":          "c",
 						"sound":             "s",
 						"thread-id":         "t",
@@ -262,6 +267,37 @@ var validMessages = []struct {
 					},
 					"k1": "v1",
 					"k2": true,
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "APNSBadgeZero",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Badge:            &badgeZero,
+						Category:         "c",
+						Sound:            "s",
+						ThreadID:         "t",
+						ContentAvailable: true,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"badge":             float64(badgeZero),
+						"category":          "c",
+						"sound":             "s",
+						"thread-id":         "t",
+						"content-available": float64(1),
+					},
 				},
 			},
 			"topic": "test-topic",
@@ -761,7 +797,7 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(parsed["message"], want) {
-		t.Errorf("Body = %v; want = %v", parsed["message"], want)
+		t.Errorf("Body = %#v; want = %#v", parsed["message"], want)
 	}
 
 	validate, ok := parsed["validate_only"]

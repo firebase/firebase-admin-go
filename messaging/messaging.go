@@ -194,7 +194,7 @@ func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 type Aps struct {
 	AlertString      string    `json:"-"`
 	Alert            *ApsAlert `json:"-"`
-	Badge            int       `json:"badge,omitempty"`
+	Badge            *int      `json:"badge,omitempty"`
 	Sound            string    `json:"sound,omitempty"`
 	ContentAvailable bool      `json:"-"`
 	Category         string    `json:"category,omitempty"`
@@ -214,7 +214,7 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 
 	if a.Alert != nil {
 		s.Alert = a.Alert
-	} else {
+	} else if a.AlertString != "" {
 		s.Alert = a.AlertString
 	}
 	if a.ContentAvailable {
