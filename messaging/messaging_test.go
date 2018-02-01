@@ -206,6 +206,24 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "APNSHeadersOnly",
+		req: &Message{
+			APNS: &APNSConfig{
+				Headers: map[string]string{
+					"h1": "v1",
+					"h2": "v2",
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
 		name: "APNSAlertString",
 		req: &Message{
 			APNS: &APNSConfig{

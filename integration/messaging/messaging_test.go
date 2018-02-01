@@ -15,7 +15,6 @@
 package messaging
 
 import (
-	"context"
 	"flag"
 	"log"
 	"os"
@@ -23,9 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/messaging"
 )
+
+const testRegistrationToken = "fGw0qy4TGgk:APA91bGtWGjuhp4WRhHXgbabIYp1jxEKI08ofj_v1bKhWAGJQ4e3arRCWzeTfHaLz83mBnDh0a" +
+	"PWB1AykXAVUUGl2h1wT4XI6XazWpvY7RBUSYfoxtqSWGIm2nvWh2BOP1YG501SsRoE"
 
 var client *messaging.Client
 
@@ -60,7 +64,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestSend(t *testing.T) {
-	ctx := context.Background()
 	msg := &messaging.Message{
 		Topic: "foo-bar",
 		Notification: &messaging.Notification{
@@ -90,7 +93,7 @@ func TestSend(t *testing.T) {
 			},
 		},
 	}
-	name, err := client.SendDryRun(ctx, msg)
+	name, err := client.SendDryRun(context.Background(), msg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -101,10 +104,29 @@ func TestSend(t *testing.T) {
 }
 
 func TestSendInvalidToken(t *testing.T) {
-	ctx := context.Background()
 	msg := &messaging.Message{Token: "INVALID_TOKEN"}
-	_, err := client.Send(ctx, msg)
+	_, err := client.Send(context.Background(), msg)
 	if err == nil {
 		t.Errorf("Send() = nil; want error")
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	tmr, err := client.SubscribeToTopic(context.Background(), []string{testRegistrationToken}, "mock-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmr.SuccessCount+tmr.FailureCount != 1 {
+		t.Errorf("SubscribeToTopic() = %v; want total 1", tmr)
+	}
+}
+
+func TestUnsubscribe(t *testing.T) {
+	tmr, err := client.UnsubscribeFromTopic(context.Background(), []string{testRegistrationToken}, "mock-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmr.SuccessCount+tmr.FailureCount != 1 {
+		t.Errorf("UnsubscribeFromTopic() = %v; want total 1", tmr)
 	}
 }
