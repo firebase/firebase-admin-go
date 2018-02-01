@@ -1,5 +1,7 @@
 # Unreleased
-- 
+
+- [feature] Added the `messaging` package for sending Firebase notifications
+  and managing topic subscriptions.
 
 # v2.4.0
 
