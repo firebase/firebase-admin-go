@@ -50,12 +50,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestNonExisting(t *testing.T) {
-	err := client.DeleteInstanceID(context.Background(), "non-existing")
+	err := client.DeleteInstanceID(context.Background(), "dnon-existY")
 	if err == nil {
-		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
+		t.Errorf("DeleteInstanceID(\"dnon-existY\") = nil; want error")
 	}
-	want := `instance id "non-existing": failed to find the instance id`
+	want := `instance id "dnon-existY": failed to find the instance id`
 	if err.Error() != want {
-		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
+		t.Errorf("DeleteInstanceID(\"dnon-existY\") = %v; want = %v", err, want)
 	}
 }
