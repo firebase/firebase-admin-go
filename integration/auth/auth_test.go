@@ -92,7 +92,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	vt, err := client.VerifyIDTokenWithCheckRevoked(ctx, idt, true)
+	vt, err := client.VerifyIDTokenWithCheckRevoked(ctx, idt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true)
+	vt, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt)
 	we := "id token has been revoked"
 	if vt != nil || err == nil || err.Error() != we {
 		t.Errorf("tok, err := VerifyIDTokenWithCheckRevoked(); got (%v, %s) ; want (%v, %v)",
@@ -112,9 +112,9 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	}
 
 	// Does not return error if it isn't checked
-	_, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, false)
+	_, err = client.VerifyIDToken(idt)
 	if err != nil {
-		t.Errorf("VerifyIDTokenWithCheckRevoked(.., false); err = %s; want err = <nil>", err)
+		t.Errorf("VerifyIDToken(); err = %s; want err = <nil>", err)
 	}
 
 	// Sign in after revocation.
@@ -122,7 +122,7 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt, true); err != nil {
+	if _, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt); err != nil {
 		t.Errorf("VerifyIDTokenWithCheckRevoked(); err = %s; want err = <nil>", err)
 	}
 

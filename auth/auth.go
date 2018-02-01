@@ -248,23 +248,24 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 }
 
 // VerifyIDTokenWithCheckRevoked verifies the signature and payload of the provided ID token and
-// if requested, whether it was revoked.
+// checks that it wasn't revoked.
 // see: VerifyIDToken above.
-func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
+func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
 	p, err := c.VerifyIDToken(idToken)
 
-	if !checkRevoked || err != nil {
-		return p, err
+	if err != nil {
+		return nil, err
 	}
+
 	user, err := c.GetUser(ctx, p.UID)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
+
 	if p.IssuedAt*1000 < user.TokensValidAfterTime {
-		err = fmt.Errorf("id token has been revoked")
-		p = nil
+		return nil, fmt.Errorf("id token has been revoked")
 	}
-	return p, err
+	return p, nil
 }
 
 func parseKey(key string) (*rsa.PrivateKey, error) {
