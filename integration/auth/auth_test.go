@@ -80,7 +80,7 @@ func TestCustomToken(t *testing.T) {
 	}
 }
 
-func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
+func TestVerifyIDTokenWithCheckRevoked(t *testing.T) {
 	uid := "user_revoked"
 	ct, err := client.CustomToken(uid)
 
@@ -99,6 +99,11 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 	if vt.UID != uid {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
 	}
+	// The backend stores the validSince property in seconds since the epoch.
+	// The issuedAt property of the token is also in seconds, if a token was
+	// issued, and then in the same second tokens were revoked, the token will
+	// have the same timestamp as the tokensValidAfterTime, and will therefore
+	// not be considered revoked. Hence we wait one second before revoking.
 	time.Sleep(time.Second)
 	if err = client.RevokeRefreshTokens(ctx, uid); err != nil {
 		t.Fatal(err)
@@ -111,9 +116,8 @@ func TestCustomTokenVerifyCheckRevoked(t *testing.T) {
 			vt, err, nil, we)
 	}
 
-	// Does not return error if it isn't checked
-	_, err = client.VerifyIDToken(idt)
-	if err != nil {
+	// Does not return error for revoked token.
+	if _, err = client.VerifyIDToken(idt); err != nil {
 		t.Errorf("VerifyIDToken(); err = %s; want err = <nil>", err)
 	}
 
@@ -159,7 +163,6 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if pkg, ok := vt.Claims["package"].(string); !ok || pkg != "gold" {
 		t.Errorf("Claims['package'] = %v; want Claims['package'] = \"gold\"", vt.Claims["package"])
 	}
-
 	if err = client.DeleteUser(context.Background(), "user2"); err != nil {
 		t.Error(err)
 	}

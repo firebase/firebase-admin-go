@@ -211,15 +211,9 @@ func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	u, err := s.Client.GetUser(ctx, "testuser")
-	if err != nil {
-		t.Fatal("Error retrieving user")
-	}
+	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
-	ft, err := s.Client.VerifyIDToken(
-		getIDToken(mockIDTokenPayload{
-			"uid": "uid",
-			"iat": int(u.TokensValidAfterTime/1000) - 10}))
+	ft, err := s.Client.VerifyIDToken(tok)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,19 +228,12 @@ func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
 func TestVerifyIDTokenWithCheckRevokedInvalidated(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	u, err := s.Client.GetUser(ctx, "testuser")
-	if err != nil {
-		t.Fatal("Error retrieving user")
-	}
-	p, err := s.Client.VerifyIDTokenWithCheckRevoked(
-		ctx,
-		getIDToken(mockIDTokenPayload{
-			"uid": "uid",
-			"iat": int(u.TokensValidAfterTime/1000) - 10,
-		}))
+	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
+
+	p, err := s.Client.VerifyIDTokenWithCheckRevoked(ctx, tok)
 	we := "id token has been revoked"
 	if p != nil || err == nil || err.Error() != we {
-		t.Errorf("VerifyIDTokenWithCheckRevoked(..., token) =(%v, %v); want = (%v, %v)",
+		t.Errorf("VerifyIDTokenWithCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
 }

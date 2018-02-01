@@ -67,7 +67,7 @@ type UserInfo struct {
 }
 
 // UserMetadata contains additional metadata associated with a user account.
-// Timestamps are in epoch milliseconds.
+// Timestamps are in milliseconds since epoch.
 type UserMetadata struct {
 	CreationTimestamp  int64
 	LastLogInTimestamp int64
@@ -80,7 +80,7 @@ type UserRecord struct {
 	Disabled             bool
 	EmailVerified        bool
 	ProviderUserInfo     []*UserInfo
-	TokensValidAfterTime int64 // Epoch milliseconds
+	TokensValidAfterTime int64 // milliseconds since epoch.
 	UserMetadata         *UserMetadata
 }
 

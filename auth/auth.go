@@ -178,11 +178,11 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 }
 
 // RevokeRefreshTokens revokes all refresh tokens for the specified user.
+//
+// RevokeRefreshTokens revokes all refresh tokens for the specified user.
 // In addition to revoking all refresh tokens for a user, all ID tokens issued
 // before revocation will also be revoked at the Auth backend. Any request with an
 // ID token generated before revocation will be rejected with a token expired error.
-// Note that any tokens minted in the same epoch second as the revocation will still be valid.
-// If there is a chance that a token was minted in the last second, delay for 1 second before revoking.
 func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
@@ -194,6 +194,7 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
+// This does not check whether or not the token has been revoked, see VerifyIDTokenWithCheckRevoked below.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -247,12 +248,12 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	return p, nil
 }
 
+// VerifyIDTokenWithCheckRevoked verifies the provided ID token and checks it has not been revoked.
+//
 // VerifyIDTokenWithCheckRevoked verifies the signature and payload of the provided ID token and
-// checks that it wasn't revoked.
-// see: VerifyIDToken above.
+// checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
 func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
 	p, err := c.VerifyIDToken(idToken)
-
 	if err != nil {
 		return nil, err
 	}

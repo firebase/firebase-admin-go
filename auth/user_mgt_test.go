@@ -506,15 +506,13 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	before := time.Now().Unix()
-	err := s.Client.RevokeRefreshTokens(nil, "some_uid")
-	if err != nil {
+	if err := s.Client.RevokeRefreshTokens(nil, "some_uid"); err != nil {
 		t.Error(err)
 	}
 	after := time.Now().Unix()
 
 	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
-	err = json.Unmarshal(s.Rbody, &req)
-	if err != nil {
+	if err := json.Unmarshal(s.Rbody, &req); err != nil {
 		t.Error(err)
 	}
 	if req.ValidSince > after || req.ValidSince < before {
@@ -531,7 +529,7 @@ func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 	defer s.Close()
 
 	we := "uid must not be empty"
-	if err := s.Client.RevokeRefreshTokens(nil, ""); err.Error() != we {
+	if err := s.Client.RevokeRefreshTokens(nil, ""); err == nil || err.Error() != we {
 		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
 	}
 }

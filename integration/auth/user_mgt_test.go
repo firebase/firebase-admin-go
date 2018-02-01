@@ -51,6 +51,10 @@ func TestUserManagement(t *testing.T) {
 		{"Add custom claims", testAddCustomClaims},
 		{"Delete test users", testDeleteUsers},
 	}
+	// The tests are meant to be run in sequence, a failure in creating the users
+	// should be fatal so non of the other tests run. However calling Fatal from a
+	// subtest does not prevent the other subtests from running, hence we check the
+	// success of each subtest before proceeding.
 	for _, run := range orderedRuns {
 		if ok := t.Run(run.name, run.testFunc); !ok {
 			t.Fatalf("Failed run %v", run.name)
@@ -88,6 +92,7 @@ func testCreateUsers(t *testing.T) {
 	if u.TokensValidAfterTime > time.Now().Unix()*1000 {
 		t.Errorf("timestamp cannot be in the future")
 	}
+	log.Printf("\n -- - - - \n%#v, %v \n..,,,,..\n", u, u.TokensValidAfterTime)
 	if u.TokensValidAfterTime < (time.Now().Unix()-3600)*1000 {
 		t.Errorf("timestamp cannot be old")
 	}
