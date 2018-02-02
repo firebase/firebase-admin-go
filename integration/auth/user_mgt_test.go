@@ -89,11 +89,11 @@ func testCreateUsers(t *testing.T) {
 			t.Fatal(err)
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
-		// make sure that the user.TokensValidAfterTime is not in the future or stale.
-		if u.TokensValidAfterTime > time.Now().Unix()*1000 {
+		// make sure that the user.TokensValidAfterMillis is not in the future or stale.
+		if u.TokensValidAfterMillis > time.Now().Unix()*1000 {
 			t.Errorf("timestamp cannot be in the future")
 		}
-		if time.Now().Sub(time.Unix(u.TokensValidAfterTime, 0)) > time.Hour {
+		if time.Now().Sub(time.Unix(u.TokensValidAfterMillis, 0)) > time.Hour {
 			t.Errorf("timestamp should be recent")
 		}
 
@@ -254,7 +254,7 @@ func testUpdateUser(t *testing.T) {
 			UID:        testFixtures.sampleUserBlank.UID,
 			ProviderID: "firebase",
 		},
-		TokensValidAfterTime: u.TokensValidAfterTime,
+		TokensValidAfterMillis: u.TokensValidAfterMillis,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
@@ -286,7 +286,7 @@ func testUpdateUser(t *testing.T) {
 			ProviderID:  "firebase",
 			Email:       "abc@ab.ab",
 		},
-		TokensValidAfterTime: u.TokensValidAfterTime,
+		TokensValidAfterMillis: u.TokensValidAfterMillis,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},

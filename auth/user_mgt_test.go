@@ -60,7 +60,7 @@ var testUser = &UserRecord{
 			UID:         "testuid",
 		},
 	},
-	TokensValidAfterTime: 1494364393000,
+	TokensValidAfterMillis: 1494364393000,
 	UserMetadata: &UserMetadata{
 		CreationTimestamp:  1234567890,
 		LastLogInTimestamp: 1233211232,

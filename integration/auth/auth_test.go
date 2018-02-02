@@ -80,7 +80,7 @@ func TestCustomToken(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenWithCheckRevoked(t *testing.T) {
+func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	uid := "user_revoked"
 	ct, err := client.CustomToken(uid)
 
@@ -92,7 +92,7 @@ func TestVerifyIDTokenWithCheckRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	vt, err := client.VerifyIDTokenWithCheckRevoked(ctx, idt)
+	vt, err := client.VerifyIDTokenAndCheckRevoked(ctx, idt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,17 +102,17 @@ func TestVerifyIDTokenWithCheckRevoked(t *testing.T) {
 	// The backend stores the validSince property in seconds since the epoch.
 	// The issuedAt property of the token is also in seconds, if a token was
 	// issued, and then in the same second tokens were revoked, the token will
-	// have the same timestamp as the tokensValidAfterTime, and will therefore
+	// have the same timestamp as the tokensValidAfterMillis, and will therefore
 	// not be considered revoked. Hence we wait one second before revoking.
 	time.Sleep(time.Second)
 	if err = client.RevokeRefreshTokens(ctx, uid); err != nil {
 		t.Fatal(err)
 	}
 
-	vt, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt)
+	vt, err = client.VerifyIDTokenAndCheckRevoked(ctx, idt)
 	we := "id token has been revoked"
 	if vt != nil || err == nil || err.Error() != we {
-		t.Errorf("tok, err := VerifyIDTokenWithCheckRevoked(); got (%v, %s) ; want (%v, %v)",
+		t.Errorf("tok, err := VerifyIDTokenAndCheckRevoked(); got (%v, %s) ; want (%v, %v)",
 			vt, err, nil, we)
 	}
 
@@ -126,8 +126,8 @@ func TestVerifyIDTokenWithCheckRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = client.VerifyIDTokenWithCheckRevoked(ctx, idt); err != nil {
-		t.Errorf("VerifyIDTokenWithCheckRevoked(); err = %s; want err = <nil>", err)
+	if _, err = client.VerifyIDTokenAndCheckRevoked(ctx, idt); err != nil {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(); err = %s; want err = <nil>", err)
 	}
 
 	err = client.DeleteUser(ctx, uid)

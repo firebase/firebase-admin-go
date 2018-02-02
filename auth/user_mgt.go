@@ -76,12 +76,12 @@ type UserMetadata struct {
 // UserRecord contains metadata associated with a Firebase user account.
 type UserRecord struct {
 	*UserInfo
-	CustomClaims         map[string]interface{}
-	Disabled             bool
-	EmailVerified        bool
-	ProviderUserInfo     []*UserInfo
-	TokensValidAfterTime int64 // milliseconds since epoch.
-	UserMetadata         *UserMetadata
+	CustomClaims           map[string]interface{}
+	Disabled               bool
+	EmailVerified          bool
+	ProviderUserInfo       []*UserInfo
+	TokensValidAfterMillis int64 // milliseconds since epoch.
+	UserMetadata           *UserMetadata
 }
 
 // ExportedUserRecord is the returned user value used when listing all the users.
@@ -619,11 +619,11 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 				ProviderID:  defaultProviderID,
 				UID:         r.LocalId,
 			},
-			CustomClaims:         cc,
-			Disabled:             r.Disabled,
-			EmailVerified:        r.EmailVerified,
-			ProviderUserInfo:     providerUserInfo,
-			TokensValidAfterTime: r.ValidSince * 1000,
+			CustomClaims:           cc,
+			Disabled:               r.Disabled,
+			EmailVerified:          r.EmailVerified,
+			ProviderUserInfo:       providerUserInfo,
+			TokensValidAfterMillis: r.ValidSince * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLoginAt,
 				CreationTimestamp:  r.CreatedAt,

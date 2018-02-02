@@ -192,11 +192,11 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
+func TestVerifyIDTokenAndCheckRevokedValid(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	ft, err := s.Client.VerifyIDTokenWithCheckRevoked(ctx, testIDToken)
+	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, testIDToken)
 	if err != nil {
 		t.Error(err)
 	}
@@ -208,7 +208,7 @@ func TestVerifyIDTokenWithCheckRevokedValid(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
+func TestVerifyIDTokenAndCheckRevokedDoNotCheck(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
@@ -225,15 +225,15 @@ func TestVerifyIDTokenWithCheckRevokedDoNotCheck(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenWithCheckRevokedInvalidated(t *testing.T) {
+func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
-	p, err := s.Client.VerifyIDTokenWithCheckRevoked(ctx, tok)
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
 	we := "id token has been revoked"
 	if p != nil || err == nil || err.Error() != we {
-		t.Errorf("VerifyIDTokenWithCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
 }

@@ -194,7 +194,7 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
-// This does not check whether or not the token has been revoked, see VerifyIDTokenWithCheckRevoked below.
+// This does not check whether or not the token has been revoked, see VerifyIDTokenAndCheckRevoked below.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -248,11 +248,11 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	return p, nil
 }
 
-// VerifyIDTokenWithCheckRevoked verifies the provided ID token and checks it has not been revoked.
+// VerifyIDTokenAndCheckRevoked verifies the provided ID token and checks it has not been revoked.
 //
-// VerifyIDTokenWithCheckRevoked verifies the signature and payload of the provided ID token and
+// VerifyIDTokenAndCheckRevoked verifies the signature and payload of the provided ID token and
 // checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
-func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
+func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
 	p, err := c.VerifyIDToken(idToken)
 	if err != nil {
 		return nil, err
@@ -263,7 +263,7 @@ func (c *Client) VerifyIDTokenWithCheckRevoked(ctx context.Context, idToken stri
 		return nil, err
 	}
 
-	if p.IssuedAt*1000 < user.TokensValidAfterTime {
+	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
 		return nil, fmt.Errorf("id token has been revoked")
 	}
 	return p, nil
