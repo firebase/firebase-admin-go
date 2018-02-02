@@ -63,7 +63,7 @@ var testUser = &UserRecord{
 	TokensValidAfterMillis: 1494364393000,
 	UserMetadata: &UserMetadata{
 		CreationTimestamp:  1234567890000,
-		LastLogInTimestamp: 1233211230000,
+		LastLogInTimestamp: 1233211232000,
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 }
@@ -674,7 +674,8 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exported.UserRecord, want.UserRecord) {
 		// zero in
-		t.Errorf("makeExportedUser() = %#v; want: %#v", exported.UserRecord, want.UserRecord)
+		t.Errorf("makeExportedUser() = %#v; want: %#v \n(%#v)\n(%#v)", exported.UserRecord, want.UserRecord,
+			exported.UserMetadata, want.UserMetadata)
 	}
 	if exported.PasswordHash != want.PasswordHash {
 		t.Errorf("PasswordHash = %q; want = %q", exported.PasswordHash, want.PasswordHash)
