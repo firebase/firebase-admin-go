@@ -166,7 +166,6 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err = client.DeleteUser(context.Background(), "user2"); err != nil {
 		t.Error(err)
 	}
-
 }
 
 func signInWithCustomToken(token string) (string, error) {

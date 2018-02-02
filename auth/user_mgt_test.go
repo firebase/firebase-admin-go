@@ -506,7 +506,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	before := time.Now().Unix()
-	if err := s.Client.RevokeRefreshTokens(nil, "some_uid"); err != nil {
+	if err := s.Client.RevokeRefreshTokens(context.Background(), "some_uid"); err != nil {
 		t.Error(err)
 	}
 	after := time.Now().Unix()
@@ -529,7 +529,7 @@ func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 	defer s.Close()
 
 	we := "uid must not be empty"
-	if err := s.Client.RevokeRefreshTokens(nil, ""); err == nil || err.Error() != we {
+	if err := s.Client.RevokeRefreshTokens(context.Background(), ""); err == nil || err.Error() != we {
 		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
 	}
 }

@@ -62,6 +62,20 @@ func TestUserManagement(t *testing.T) {
 	}
 }
 
+func forceCreateUser(uid string, params *auth.UserToCreate) (*auth.UserRecord, error) {
+	u, err := client.CreateUser(context.Background(), params)
+	if err != nil {
+		if strings.Contains(err.Error(), "DUPLICATE_LOCAL_ID") {
+			if err = client.DeleteUser(context.Background(), uid); err != nil {
+				return nil, err
+			}
+			return client.CreateUser(context.Background(), params)
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
 // N.B if the tests are failing due to inability to create existing users, manual
 // cleanup of the previus test run might be required, delete the unwanted users via:
 // https://console.firebase.google.com/u/0/project/<project-id>/authentication/users
@@ -70,31 +84,24 @@ func testCreateUsers(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		uid := fmt.Sprintf("tempTestUserID-%d", i)
 		params := (&auth.UserToCreate{}).UID(uid)
-		u, err := client.CreateUser(context.Background(), params)
+		u, err := forceCreateUser(uid, params)
 		if err != nil {
-			if strings.Contains(err.Error(), "DUPLICATE_LOCAL_ID") {
-				u, err = client.GetUser(context.Background(), uid)
-				if err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
+		// make sure that the user.TokensValidAfterTime is not in the future or stale.
+		if u.TokensValidAfterTime > time.Now().Unix()*1000 {
+			t.Errorf("timestamp cannot be in the future")
+		}
+		if time.Now().Sub(time.Unix(u.TokensValidAfterTime, 0)) > time.Hour {
+			t.Errorf("timestamp should be recent")
+		}
+
 	}
 	// Create user with no parameters (zero-value)
 	u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}))
 	if err != nil {
 		t.Fatal(err)
-	}
-	// make sure that the user.TokensValidAfterTime is not in the future or stale.
-	if u.TokensValidAfterTime > time.Now().Unix()*1000 {
-		t.Errorf("timestamp cannot be in the future")
-	}
-	log.Printf("\n -- - - - \n%#v, %v \n..,,,,..\n", u, u.TokensValidAfterTime)
-	if u.TokensValidAfterTime < (time.Now().Unix()-3600)*1000 {
-		t.Errorf("timestamp cannot be old")
 	}
 	testFixtures.sampleUserBlank = u
 	testFixtures.uidList = append(testFixtures.uidList, u.UID)
@@ -106,8 +113,7 @@ func testCreateUsers(t *testing.T) {
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
 		Password("password")
-	u, err = client.CreateUser(context.Background(), params)
-	if err != nil || u == nil {
+	if u, err = forceCreateUser(uid, params); err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserWithData = u
