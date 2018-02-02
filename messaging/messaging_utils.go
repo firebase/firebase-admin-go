@@ -30,8 +30,8 @@ func validateMessage(message *Message) error {
 		return fmt.Errorf("message must not be nil")
 	}
 
-	target := bool2int(message.Token != "") + bool2int(message.Condition != "") + bool2int(message.Topic != "")
-	if target != 1 {
+	targets := countNonEmpty(message.Token, message.Condition, message.Topic)
+	if targets != 1 {
 		return fmt.Errorf("exactly one of token, topic or condition must be specified")
 	}
 
@@ -122,9 +122,12 @@ func validateApsAlert(alert *ApsAlert) error {
 	return nil
 }
 
-func bool2int(b bool) int8 {
-	if b {
-		return 1
+func countNonEmpty(strings ...string) int {
+	count := 0
+	for _, s := range strings {
+		if s != "" {
+			count++
+		}
 	}
-	return 0
+	return count
 }

@@ -408,7 +408,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 }
 
 func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest) (*TopicManagementResponse, error) {
-	if req.Tokens == nil {
+	if len(req.Tokens) == 0 {
 		return nil, fmt.Errorf("no tokens specified")
 	}
 	if len(req.Tokens) > 1000 {
