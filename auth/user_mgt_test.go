@@ -62,8 +62,8 @@ var testUser = &UserRecord{
 	},
 	TokensValidAfterMillis: 1494364393000,
 	UserMetadata: &UserMetadata{
-		CreationTimestamp:  1234567890,
-		LastLogInTimestamp: 1233211232,
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211230000,
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 }
@@ -646,8 +646,8 @@ func TestMakeExportedUser(t *testing.T) {
 		PasswordHash:     "passwordhash",
 		ValidSince:       1494364393,
 		Disabled:         false,
-		CreatedAt:        1234567890,
-		LastLoginAt:      1233211232,
+		CreatedAt:        1234567890000,
+		LastLoginAt:      1233211232000,
 		CustomAttributes: `{"admin": true, "package": "gold"}`,
 		ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
 			{
