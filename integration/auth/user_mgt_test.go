@@ -18,7 +18,6 @@ package auth
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -62,20 +61,6 @@ func TestUserManagement(t *testing.T) {
 	}
 }
 
-func forceCreateUser(uid string, params *auth.UserToCreate) (*auth.UserRecord, error) {
-	u, err := client.CreateUser(context.Background(), params)
-	if err != nil {
-		if strings.Contains(err.Error(), "DUPLICATE_LOCAL_ID") {
-			if err = client.DeleteUser(context.Background(), uid); err != nil {
-				return nil, err
-			}
-			return client.CreateUser(context.Background(), params)
-		}
-		return nil, err
-	}
-	return u, nil
-}
-
 // N.B if the tests are failing due to inability to create existing users, manual
 // cleanup of the previus test run might be required, delete the unwanted users via:
 // https://console.firebase.google.com/u/0/project/<project-id>/authentication/users
@@ -84,7 +69,7 @@ func testCreateUsers(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		uid := fmt.Sprintf("tempTestUserID-%d", i)
 		params := (&auth.UserToCreate{}).UID(uid)
-		u, err := forceCreateUser(uid, params)
+		u, err := client.CreateUser(context.Background(), params)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +98,8 @@ func testCreateUsers(t *testing.T) {
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
 		Password("password")
-	if u, err = forceCreateUser(uid, params); err != nil {
+
+	if u, err = client.CreateUser(context.Background(), params); err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserWithData = u
