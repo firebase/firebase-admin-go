@@ -51,7 +51,7 @@ func TestUserManagement(t *testing.T) {
 		{"Add custom claims", testAddCustomClaims},
 		{"Delete test users", testDeleteUsers},
 	}
-	// The tests are meant to be run in sequence, a failure in creating the users
+	// The tests are meant to be run in sequence. A failure in creating the users
 	// should be fatal so non of the other tests run. However calling Fatal from a
 	// subtest does not prevent the other subtests from running, hence we check the
 	// success of each subtest before proceeding.

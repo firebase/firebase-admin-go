@@ -179,10 +179,12 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 
 // RevokeRefreshTokens revokes all refresh tokens for the specified user.
 //
-// RevokeRefreshTokens revokes all refresh tokens for the specified user.
-// In addition to revoking all refresh tokens for a user, all ID tokens issued
-// before revocation will also be revoked at the Auth backend. Any request with an
-// ID token generated before revocation will be rejected with a token expired error.
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
 func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
@@ -194,7 +196,7 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
-// This does not check whether or not the token has been revoked, see VerifyIDTokenAndCheckRevoked below.
+// This does not check whether or not the token has been revoked. see `VerifyIDTokenAndCheckRevoked` below.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")

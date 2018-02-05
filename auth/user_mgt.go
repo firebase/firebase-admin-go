@@ -428,8 +428,8 @@ func validatePhone(val interface{}) error {
 }
 
 func validateValidSince(val interface{}) error {
-	if _, ok := val.(int64); !ok {
-		return fmt.Errorf("validSince must be an integer signifying seconds since the epoch")
+	if v, ok := val.(int64); !ok || v <= 0 {
+		return fmt.Errorf("validSince must be an positive integer signifying seconds since the epoch")
 	}
 	return nil
 }

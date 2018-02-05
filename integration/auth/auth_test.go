@@ -100,7 +100,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
 	}
 	// The backend stores the validSince property in seconds since the epoch.
-	// The issuedAt property of the token is also in seconds, if a token was
+	// The issuedAt property of the token is also in seconds. If a token was
 	// issued, and then in the same second tokens were revoked, the token will
 	// have the same timestamp as the tokensValidAfterMillis, and will therefore
 	// not be considered revoked. Hence we wait one second before revoking.
