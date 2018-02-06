@@ -177,7 +177,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
-// RevokeRefreshTokens revokes all refresh tokens for the specified user.
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
 //
 // RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
 // It is important that the server on which this is called has its clock set correctly and synchronized.
@@ -196,7 +196,7 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
-// This does not check whether or not the token has been revoked. see `VerifyIDTokenAndCheckRevoked` below.
+// This does not check whether or not the token has been revoked. See `VerifyIDTokenAndCheckRevoked` below.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")

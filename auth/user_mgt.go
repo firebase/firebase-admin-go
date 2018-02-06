@@ -40,7 +40,7 @@ var commonValidators = map[string]func(interface{}) error{
 	"password":    validatePassword,
 	"photoUrl":    validatePhotoURL,
 	"localId":     validateUID,
-	"validSince":  validateValidSince,
+	"validSince":  func(interface{}) error { return nil }, // Needed for preparePayload.
 }
 
 // Create a new interface
@@ -423,13 +423,6 @@ func validatePhone(val interface{}) error {
 	}
 	if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
 		return fmt.Errorf("phone number must be a valid, E.164 compliant identifier")
-	}
-	return nil
-}
-
-func validateValidSince(val interface{}) error {
-	if v, ok := val.(int64); !ok || v <= 0 {
-		return fmt.Errorf("validSince must be an positive integer signifying seconds since the epoch")
 	}
 	return nil
 }
