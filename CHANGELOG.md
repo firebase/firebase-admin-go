@@ -1,6 +1,6 @@
 # Unreleased
 
-### Token revokaction
+### Token revocation
 - [added] A New ['VerifyIDTokenAndCheckRevoked(ctx, token)'](https://godoc.org/firebase.google.com/go/auth#Client.VerifyIDToken)
   method has been added to check for revoked ID tokens.
 - [added] A new method ['RevokeRefreshTokens(uid)'](https://godoc.org/firebase.google.com/go/auth#Client.RevokeRefreshTokens)
