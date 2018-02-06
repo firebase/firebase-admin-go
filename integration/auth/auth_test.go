@@ -110,7 +110,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	}
 
 	vt, err = client.VerifyIDTokenAndCheckRevoked(ctx, idt)
-	we := "id token has been revoked"
+	we := "ID token has been revoked"
 	if vt != nil || err == nil || err.Error() != we {
 		t.Errorf("tok, err := VerifyIDTokenAndCheckRevoked(); got (%v, %s) ; want (%v, %v)",
 			vt, err, nil, we)

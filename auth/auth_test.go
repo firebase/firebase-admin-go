@@ -231,7 +231,7 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
-	we := "id token has been revoked"
+	we := "ID token has been revoked"
 	if p != nil || err == nil || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
