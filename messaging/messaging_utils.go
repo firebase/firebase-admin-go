@@ -37,10 +37,8 @@ func validateMessage(message *Message) error {
 
 	// validate topic
 	if message.Topic != "" {
-		if strings.HasPrefix(message.Topic, "/topics/") {
-			return fmt.Errorf("topic name must not contain the /topics/ prefix")
-		}
-		if !bareTopicNamePattern.MatchString(message.Topic) {
+		bt := strings.TrimPrefix(message.Topic, "/topics/")
+		if !bareTopicNamePattern.MatchString(bt) {
 			return fmt.Errorf("malformed topic name")
 		}
 	}

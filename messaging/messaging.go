@@ -81,8 +81,21 @@ type Message struct {
 	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
 	APNS         *APNSConfig       `json:"apns,omitempty"`
 	Token        string            `json:"token,omitempty"`
-	Topic        string            `json:"topic,omitempty"`
+	Topic        string            `json:"-"`
 	Condition    string            `json:"condition,omitempty"`
+}
+
+// MarshalJSON marshals a Message into JSON (for internal use only).
+func (m *Message) MarshalJSON() ([]byte, error) {
+	type messageInternal Message
+	s := &struct {
+		BareTopic string `json:"topic,omitempty"`
+		*messageInternal
+	}{
+		BareTopic:       strings.TrimPrefix(m.Topic, "/topics/"),
+		messageInternal: (*messageInternal)(m),
+	}
+	return json.Marshal(s)
 }
 
 // Notification is the basic notification template to use across all platforms.

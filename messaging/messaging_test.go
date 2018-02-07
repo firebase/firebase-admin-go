@@ -64,6 +64,11 @@ var validMessages = []struct {
 		want: map[string]interface{}{"topic": "test-topic"},
 	},
 	{
+		name: "PrefixedTopicOnly",
+		req:  &Message{Topic: "/topics/test-topic"},
+		want: map[string]interface{}{"topic": "test-topic"},
+	},
+	{
 		name: "ConditionOnly",
 		req:  &Message{Condition: "test-condition"},
 		want: map[string]interface{}{"condition": "test-condition"},
@@ -370,11 +375,11 @@ var invalidMessages = []struct {
 		want: "exactly one of token, topic or condition must be specified",
 	},
 	{
-		name: "InvalidTopicPrefix",
+		name: "InvalidPrefixedTopicName",
 		req: &Message{
-			Topic: "/topics/foo",
+			Topic: "/topics/",
 		},
-		want: "topic name must not contain the /topics/ prefix",
+		want: "malformed topic name",
 	},
 	{
 		name: "InvalidTopicName",
