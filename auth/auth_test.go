@@ -285,7 +285,7 @@ func verifyCustomToken(t *testing.T, token string, expected map[string]interface
 		t.Fatal(err)
 	}
 
-	email, err := client.snr.Email()
+	email, err := client.snr.Email(context.TODO())
 	if err != nil {
 		t.Fatal(err)
 	}

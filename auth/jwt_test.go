@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"strings"
@@ -63,11 +64,11 @@ type mockSigner struct {
 	err error
 }
 
-func (s *mockSigner) Email() (string, error) {
+func (s *mockSigner) Email(ctx context.Context) (string, error) {
 	return "", nil
 }
 
-func (s *mockSigner) Sign(b []byte) ([]byte, error) {
+func (s *mockSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

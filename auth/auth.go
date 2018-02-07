@@ -71,8 +71,8 @@ type Client struct {
 }
 
 type signer interface {
-	Email() (string, error)
-	Sign(b []byte) ([]byte, error)
+	Email(ctx context.Context) (string, error)
+	Sign(ctx context.Context, b []byte) ([]byte, error)
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -106,7 +106,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}
 	} else {
-		snr, err = newSigner(ctx)
+		snr, err = newSigner()
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +143,7 @@ func (c *Client) CustomToken(uid string) (string, error) {
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
 func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
-	iss, err := c.snr.Email()
+	iss, err := c.snr.Email(context.TODO())
 	if err != nil {
 		return "", err
 	}

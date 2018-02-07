@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -195,14 +196,14 @@ type serviceAcctSigner struct {
 	pk    *rsa.PrivateKey
 }
 
-func (s serviceAcctSigner) Email() (string, error) {
+func (s serviceAcctSigner) Email(ctx context.Context) (string, error) {
 	if s.email == "" {
 		return "", errors.New("service account email not available")
 	}
 	return s.email, nil
 }
 
-func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
+func (s serviceAcctSigner) Sign(ctx context.Context, ss []byte) ([]byte, error) {
 	if s.pk == nil {
 		return nil, errors.New("private key not available")
 	}

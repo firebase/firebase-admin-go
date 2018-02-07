@@ -16,8 +16,6 @@
 
 package auth
 
-import "context"
-
-func newSigner(ctx context.Context) (signer, error) {
+func newSigner() (signer, error) {
 	return serviceAcctSigner{}, nil
 }
