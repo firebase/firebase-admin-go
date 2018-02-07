@@ -87,6 +87,7 @@ type Message struct {
 
 // MarshalJSON marshals a Message into JSON (for internal use only).
 func (m *Message) MarshalJSON() ([]byte, error) {
+	// Create a new type to prevent infinite recursion.
 	type messageInternal Message
 	s := &struct {
 		BareTopic string `json:"topic,omitempty"`
