@@ -184,7 +184,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
-func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
+func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
 	}
