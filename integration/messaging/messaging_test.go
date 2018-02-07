@@ -20,7 +20,6 @@ import (
 	"os"
 	"regexp"
 	"testing"
-	"time"
 
 	"golang.org/x/net/context"
 
@@ -34,15 +33,7 @@ import (
 const testRegistrationToken = "fGw0qy4TGgk:APA91bGtWGjuhp4WRhHXgbabIYp1jxEKI08ofj_v1bKhWAGJQ4e3a" +
 	"rRCWzeTfHaLz83mBnDh0aPWB1AykXAVUUGl2h1wT4XI6XazWpvY7RBUSYfoxtqSWGIm2nvWh2BOP1YG501SsRoE"
 
-var (
-	client       *messaging.Client
-	testFixtures = struct {
-		token     string
-		topic     string
-		condition string
-	}{}
-	ttl = time.Duration(3) * time.Second
-)
+var client *messaging.Client
 
 // Enable API before testing
 // https://console.developers.google.com/apis/library/fcm.googleapis.com
