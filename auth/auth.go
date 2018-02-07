@@ -136,7 +136,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 // JWT can be used in a Firebase client SDK to trigger an authentication flow. See
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
 // for more details on how to use custom tokens for client authentication.
-func (c *Client) CustomToken(uid string) (string, error) {
+func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
 	return c.CustomTokenWithClaims(uid, nil)
 }
 
