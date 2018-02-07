@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -25,7 +26,6 @@ import (
 	gcs "cloud.google.com/go/storage"
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/storage"
-	"golang.org/x/net/context"
 )
 
 var ctx context.Context
