@@ -17,6 +17,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -29,8 +30,6 @@ import (
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"

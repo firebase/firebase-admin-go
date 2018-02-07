@@ -14,14 +14,13 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
-
-	"golang.org/x/net/context"
 )
 
 var cases = []struct {
