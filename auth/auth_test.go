@@ -139,7 +139,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		"premium": true,
 		"count":   float64(123),
 	}
-	token, err := client.CustomTokenWithClaims("user1", claims)
+	token, err := client.CustomTokenWithClaims(ctx, "user1", claims)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
-	token, err := client.CustomTokenWithClaims("user1", nil)
+	token, err := client.CustomTokenWithClaims(ctx, "user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestCustomTokenError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		token, err := client.CustomTokenWithClaims(tc.uid, tc.claims)
+		token, err := client.CustomTokenWithClaims(ctx, tc.uid, tc.claims)
 		if token != "" || err == nil {
 			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
 		}
@@ -187,7 +187,7 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
 
-	token, err = s.CustomTokenWithClaims("user1", map[string]interface{}{"foo": "bar"})
+	token, err = s.CustomTokenWithClaims(ctx, "user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}

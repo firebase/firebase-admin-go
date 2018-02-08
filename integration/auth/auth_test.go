@@ -79,7 +79,7 @@ func TestCustomToken(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims("user1", map[string]interface{}{
+	ct, err := client.CustomTokenWithClaims(ctx, "user1", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})

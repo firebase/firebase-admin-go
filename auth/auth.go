@@ -137,12 +137,12 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
 // for more details on how to use custom tokens for client authentication.
 func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
-	return c.CustomTokenWithClaims(uid, nil)
+	return c.CustomTokenWithClaims(ctx, uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
-func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
+func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
 	iss, err := c.snr.Email(context.TODO())
 	if err != nil {
 		return "", err
