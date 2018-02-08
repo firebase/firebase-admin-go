@@ -35,6 +35,7 @@ import (
 const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
 
 var client *auth.Client
+var ctx context.Context
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -43,7 +44,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	ctx := context.Background()
+	ctx = context.Background()
 	app, err := internal.NewTestApp(ctx)
 	if err != nil {
 		log.Fatalln(err)
@@ -57,7 +58,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCustomToken(t *testing.T) {
-	ct, err := client.CustomToken("user1")
+	ct, err := client.CustomToken(ctx, "user1")
 
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +69,7 @@ func TestCustomToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(idt)
+	vt, err := client.VerifyIDToken(ctx, idt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(idt)
+	vt, err := client.VerifyIDToken(ctx, idt)
 	if err != nil {
 		t.Fatal(err)
 	}

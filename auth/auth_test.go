@@ -37,6 +37,7 @@ import (
 )
 
 var client *Client
+var ctx context.Context
 var testIDToken string
 var testGetUserResponse []byte
 var testListUsersResponse []byte
@@ -49,7 +50,6 @@ func TestMain(m *testing.M) {
 	var (
 		err   error
 		ks    keySource
-		ctx   context.Context
 		creds *google.DefaultCredentials
 		opts  []option.ClientOption
 	)
@@ -104,7 +104,7 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 		JSON: []byte("foo"),
 	}
 	conf := &internal.AuthConfig{Creds: creds}
-	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+	if c, err := NewClient(ctx, conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
@@ -120,17 +120,17 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 	}
 	creds := &google.DefaultCredentials{JSON: b}
 	conf := &internal.AuthConfig{Creds: creds}
-	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+	if c, err := NewClient(ctx, conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
 
 func TestCustomToken(t *testing.T) {
-	token, err := client.CustomToken("user1")
+	token, err := client.CustomToken(ctx, "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(t, token, nil)
+	verifyCustomToken(ctx, token, nil, t)
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
@@ -143,7 +143,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(t, token, claims)
+	verifyCustomToken(ctx, token, claims, t)
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
@@ -151,7 +151,7 @@ func TestCustomTokenWithNilClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(t, token, nil)
+	verifyCustomToken(ctx, token, nil, t)
 }
 
 func TestCustomTokenError(t *testing.T) {
@@ -177,12 +177,12 @@ func TestCustomTokenError(t *testing.T) {
 func TestCustomTokenInvalidCredential(t *testing.T) {
 	// AuthConfig with nil Creds
 	conf := &internal.AuthConfig{Opts: defaultTestOpts}
-	s, err := NewClient(context.Background(), conf)
+	s, err := NewClient(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	token, err := s.CustomToken("user1")
+	token, err := s.CustomToken(ctx, "user1")
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
 	}
@@ -194,7 +194,7 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	ft, err := client.VerifyIDToken(testIDToken)
+	ft, err := client.VerifyIDToken(ctx, testIDToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestVerifyIDToken(t *testing.T) {
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
-	if ft, err := client.VerifyIDToken(token); ft != nil || err == nil {
+	if ft, err := client.VerifyIDToken(ctx, token); ft != nil || err == nil {
 		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
 	}
 }
@@ -237,7 +237,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if _, err := client.VerifyIDToken(tc.token); err == nil {
+		if _, err := client.VerifyIDToken(ctx, tc.token); err == nil {
 			t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
 		}
 	}
@@ -246,23 +246,23 @@ func TestVerifyIDTokenError(t *testing.T) {
 func TestNoProjectID(t *testing.T) {
 	// AuthConfig with empty ProjectID
 	conf := &internal.AuthConfig{Opts: defaultTestOpts}
-	c, err := NewClient(context.Background(), conf)
+	c, err := NewClient(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c.ks = client.ks
-	if _, err := c.VerifyIDToken(testIDToken); err == nil {
+	if _, err := c.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCustomTokenVerification(t *testing.T) {
-	token, err := client.CustomToken("user1")
+	token, err := client.CustomToken(ctx, "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := client.VerifyIDToken(token); err == nil {
+	if _, err := client.VerifyIDToken(ctx, token); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
@@ -273,19 +273,19 @@ func TestCertificateRequestError(t *testing.T) {
 	defer func() {
 		client.ks = ks
 	}()
-	if _, err := client.VerifyIDToken(testIDToken); err == nil {
+	if _, err := client.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
-func verifyCustomToken(t *testing.T, token string, expected map[string]interface{}) {
+func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
 	h := &jwtHeader{}
 	p := &customToken{}
 	if err := decodeToken(token, client.ks, h, p); err != nil {
 		t.Fatal(err)
 	}
 
-	email, err := client.snr.Email(context.TODO())
+	email, err := client.snr.Email(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
