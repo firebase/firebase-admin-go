@@ -43,11 +43,12 @@ var (
 
 	fcmErrorCodes = map[string]string{
 		"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
-		"NOT_FOUND":          "request contains an invalid argument; code: registration-token-not-registered",
-		"PERMISSION_DENIED":  "client does not have permission to perform the requested operation; code: authentication-error",
-		"RESOURCE_EXHAUSTED": "messaging service quota exceeded; code: message-rate-exceeded",
-		"UNAUTHENTICATED":    "client failed to authenticate; code: authentication-error",
+		"UNREGISTERED":       "app instance has been unregistered; code: registration-token-not-registered",
+		"SENDER_ID_MISMATCH": "sender id does not match regisration token; code: authentication-error",
+		"QUOTA_EXCEEDED":     "messaging service quota exceeded; code: message-rate-exceeded",
+		"APNS_AUTH_ERROR":    "apns certificate or auth key was invalid; code: authentication-error",
 		"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
+		"INTERNAL":           "back servers encountered an unknown internl error; code: internal-error",
 	}
 
 	iidErrorCodes = map[string]string{
@@ -416,7 +417,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	msg := fcmErrorCodes[fe.Error.Status]
 	if msg == "" {
-		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
+		msg = fmt.Sprintf("server responded with an unknown error; response: %s", string(resp.Body))
 	}
 	return "", fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
 }
