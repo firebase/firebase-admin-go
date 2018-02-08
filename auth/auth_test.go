@@ -327,7 +327,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	}
 	h := defaultHeader()
 	h.KeyID = kid
-	token, err := encodeToken(client.snr, h, pCopy)
+	token, err := encodeToken(ctx, client.snr, h, pCopy)
 	if err != nil {
 		log.Fatalln(err)
 	}

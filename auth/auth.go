@@ -174,7 +174,7 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-	return encodeToken(c.snr, defaultHeader(), payload)
+	return encodeToken(ctx, c.snr, defaultHeader(), payload)
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.

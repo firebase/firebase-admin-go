@@ -11,7 +11,7 @@ import (
 func TestEncodeToken(t *testing.T) {
 	h := defaultHeader()
 	p := mockIDTokenPayload{"key": "value"}
-	s, err := encodeToken(&mockSigner{}, h, p)
+	s, err := encodeToken(ctx, &mockSigner{}, h, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestEncodeSignError(t *testing.T) {
 	signer := &mockSigner{
 		err: errors.New("sign error"),
 	}
-	if s, err := encodeToken(signer, h, p); s != "" || err == nil {
+	if s, err := encodeToken(ctx, signer, h, p); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }
@@ -55,7 +55,7 @@ func TestEncodeSignError(t *testing.T) {
 func TestEncodeInvalidPayload(t *testing.T) {
 	h := defaultHeader()
 	p := mockIDTokenPayload{"key": func() {}}
-	if s, err := encodeToken(&mockSigner{}, h, p); s != "" || err == nil {
+	if s, err := encodeToken(ctx, &mockSigner{}, h, p); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }

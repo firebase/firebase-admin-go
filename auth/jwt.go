@@ -84,7 +84,7 @@ func decode(s string, i interface{}) error {
 	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
 }
 
-func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {
+func encodeToken(ctx context.Context, s signer, h jwtHeader, p jwtPayload) (string, error) {
 	header, err := encode(h)
 	if err != nil {
 		return "", err
@@ -95,7 +95,7 @@ func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {
 	}
 
 	ss := fmt.Sprintf("%s.%s", header, payload)
-	sig, err := s.Sign(context.Background(), []byte(ss))
+	sig, err := s.Sign(ctx, []byte(ss))
 	if err != nil {
 		return "", err
 	}
