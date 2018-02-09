@@ -102,7 +102,7 @@ func encodeToken(ctx context.Context, s signer, h jwtHeader, p jwtPayload) (stri
 	return fmt.Sprintf("%s.%s", ss, base64.RawURLEncoding.EncodeToString(sig)), nil
 }
 
-func decodeToken(token string, ks keySource, h *jwtHeader, p jwtPayload) error {
+func decodeToken(ctx context.Context, token string, ks keySource, h *jwtHeader, p jwtPayload) error {
 	s := strings.Split(token, ".")
 	if len(s) != 3 {
 		return errors.New("incorrect number of segments")
@@ -115,7 +115,7 @@ func decodeToken(token string, ks keySource, h *jwtHeader, p jwtPayload) error {
 		return err
 	}
 
-	keys, err := ks.Keys()
+	keys, err := ks.Keys(ctx)
 	if err != nil {
 		return err
 	}

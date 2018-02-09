@@ -281,7 +281,7 @@ func TestCertificateRequestError(t *testing.T) {
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
 	h := &jwtHeader{}
 	p := &customToken{}
-	if err := decodeToken(token, client.ks, h, p); err != nil {
+	if err := decodeToken(ctx, token, client.ks, h, p); err != nil {
 		t.Fatal(err)
 	}
 
@@ -346,7 +346,7 @@ type mockKeySource struct {
 	err  error
 }
 
-func (k *mockKeySource) Keys() ([]*publicKey, error) {
+func (k *mockKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 	return k.keys, k.err
 }
 
@@ -356,7 +356,7 @@ type fileKeySource struct {
 	CachedKeys []*publicKey
 }
 
-func (f *fileKeySource) Keys() ([]*publicKey, error) {
+func (f *fileKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 	if f.CachedKeys == nil {
 		certs, err := ioutil.ReadFile(f.FilePath)
 		if err != nil {
@@ -394,6 +394,6 @@ func newAEKeySource(ctx context.Context) (keySource, error) {
 }
 
 // Keys returns the RSA Public Keys managed by App Engine.
-func (k aeKeySource) Keys() ([]*publicKey, error) {
+func (k aeKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 	return k.keys, nil
 }

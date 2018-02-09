@@ -194,7 +194,7 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 
 	h := &jwtHeader{}
 	p := &Token{}
-	if err := decodeToken(idToken, c.ks, h, p); err != nil {
+	if err := decodeToken(ctx, idToken, c.ks, h, p); err != nil {
 		return nil, err
 	}
 

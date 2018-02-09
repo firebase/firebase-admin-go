@@ -61,7 +61,7 @@ func (m *mockClock) Now() time.Time {
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
 // signatures.
 type keySource interface {
-	Keys() ([]*publicKey, error)
+	Keys(context.Context) ([]*publicKey, error)
 }
 
 // httpKeySource fetches RSA public keys from a remote HTTP server, and caches them in
@@ -87,11 +87,11 @@ func newHTTPKeySource(uri string, hc *http.Client) *httpKeySource {
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
 // the cache is stale.
-func (k *httpKeySource) Keys() ([]*publicKey, error) {
+func (k *httpKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 	k.Mutex.Lock()
 	defer k.Mutex.Unlock()
 	if len(k.CachedKeys) == 0 || k.hasExpired() {
-		err := k.refreshKeys()
+		err := k.refreshKeys(ctx)
 		if err != nil && len(k.CachedKeys) == 0 {
 			return nil, err
 		}
@@ -104,9 +104,14 @@ func (k *httpKeySource) hasExpired() bool {
 	return k.Clock.Now().After(k.ExpiryTime)
 }
 
-func (k *httpKeySource) refreshKeys() error {
+func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	k.CachedKeys = nil
-	resp, err := k.HTTPClient.Get(k.KeyURI)
+	req, err := http.NewRequest("GET", k.KeyURI, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := k.HTTPClient.Do(req.WithContext(ctx))
+
 	if err != nil {
 		return err
 	}
