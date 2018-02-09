@@ -1,5 +1,6 @@
 # Unreleased
-- All functions that make network calls take context ans an argument.
+- All functions that make network calls take context as an argument.
+- Import context from golang.org/x/net/ for 1.6 compatibility
 
 # v2.4.0
 
