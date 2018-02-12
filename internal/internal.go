@@ -16,9 +16,9 @@
 package internal
 
 import (
-	"google.golang.org/api/option"
-
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 var FirebaseScopes = []string{
@@ -31,6 +31,13 @@ var FirebaseScopes = []string{
 type AuthConfig struct {
 	Opts      []option.ClientOption
 	Creds     *google.DefaultCredentials
+	ProjectID string
+	Version   string
+}
+
+// InstanceIDConfig represents the configuration of Firebase Instance ID service.
+type InstanceIDConfig struct {
+	Opts      []option.ClientOption
 	ProjectID string
 }
 
@@ -45,4 +52,14 @@ type DatabaseConfig struct {
 type StorageConfig struct {
 	Opts   []option.ClientOption
 	Bucket string
+}
+
+// MockTokenSource is a TokenSource implementation that can be used for testing.
+type MockTokenSource struct {
+	AccessToken string
+}
+
+// Token returns the test token associated with the TokenSource.
+func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
 }

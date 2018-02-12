@@ -32,7 +32,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-const idToolKitURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
+const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
 
 var client *auth.Client
 
@@ -53,12 +53,12 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	os.Exit(m.Run())
 }
 
 func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken("user1")
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,8 +119,7 @@ func signInWithCustomToken(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	resp, err := postRequest(fmt.Sprintf(idToolKitURL, apiKey), req)
+	resp, err := postRequest(fmt.Sprintf(apiURL, apiKey), req)
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +139,7 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
 	}
 	return ioutil.ReadAll(resp.Body)

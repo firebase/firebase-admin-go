@@ -26,6 +26,8 @@ import (
 
 	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
+	"google.golang.org/api/identitytoolkit/v3"
+	"google.golang.org/api/transport"
 )
 
 const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
@@ -60,9 +62,12 @@ type Token struct {
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
+	hc        *internal.HTTPClient
+	is        *identitytoolkit.Service
 	ks        keySource
 	projectID string
 	snr       signer
+	version   string
 }
 
 type signer interface {
@@ -96,6 +101,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 		email = svcAcct.ClientEmail
 	}
+
 	var snr signer
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}
@@ -106,15 +112,23 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 	}
 
-	ks, err := newHTTPKeySource(ctx, googleCertURL, c.Opts...)
+	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	is, err := identitytoolkit.New(hc)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		ks:        ks,
+		hc:        &internal.HTTPClient{Client: hc},
+		is:        is,
+		ks:        newHTTPKeySource(googleCertURL, hc),
 		projectID: c.ProjectID,
 		snr:       snr,
+		version:   "Go/Admin/" + c.Version,
 	}, nil
 }
 

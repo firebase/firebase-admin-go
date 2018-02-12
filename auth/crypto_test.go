@@ -22,10 +22,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
-
-	"google.golang.org/api/option"
 )
 
 type mockHTTPResponse struct {
@@ -43,7 +39,7 @@ type mockReadCloser struct {
 	closeCount int
 }
 
-func newHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
+func newTestHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
 	rc := &mockReadCloser{
 		data:       string(data),
 		closeCount: 0,
@@ -52,7 +48,7 @@ func newHTTPClient(data []byte) (*http.Client, *mockReadCloser) {
 		Transport: &mockHTTPResponse{
 			Response: http.Response{
 				Status:     "200 OK",
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Header: http.Header{
 					"Cache-Control": {"public, max-age=100"},
 				},
@@ -88,15 +84,11 @@ func TestHTTPKeySource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	ks := newHTTPKeySource("http://mock.url", http.DefaultClient)
 	if ks.HTTPClient == nil {
 		t.Errorf("HTTPClient = nil; want non-nil")
 	}
-	hc, rc := newHTTPClient(data)
+	hc, rc := newTestHTTPClient(data)
 	ks.HTTPClient = hc
 	if err := verifyHTTPKeySource(ks, rc); err != nil {
 		t.Fatal(err)
@@ -109,12 +101,8 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hc, rc := newHTTPClient(data)
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	hc, rc := newTestHTTPClient(data)
+	ks := newHTTPKeySource("http://mock.url", hc)
 	if ks.HTTPClient != hc {
 		t.Errorf("HTTPClient = %v; want %v", ks.HTTPClient, hc)
 	}
@@ -124,24 +112,16 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 }
 
 func TestHTTPKeySourceEmptyResponse(t *testing.T) {
-	hc, _ := newHTTPClient([]byte(""))
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	hc, _ := newTestHTTPClient([]byte(""))
+	ks := newHTTPKeySource("http://mock.url", hc)
 	if keys, err := ks.Keys(); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
 
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
-	hc, _ := newHTTPClient([]byte("{\"foo\": 1}"))
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
+	ks := newHTTPKeySource("http://mock.url", hc)
 	if keys, err := ks.Keys(); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
@@ -153,11 +133,7 @@ func TestHTTPKeySourceTransportError(t *testing.T) {
 			Err: errors.New("transport error"),
 		},
 	}
-	ks, err := newHTTPKeySource(context.Background(), "http://mock.url", option.WithHTTPClient(hc))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	ks := newHTTPKeySource("http://mock.url", hc)
 	if keys, err := ks.Keys(); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
