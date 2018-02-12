@@ -2,6 +2,7 @@
 
 - [feature] Added the `messaging` package for sending Firebase notifications
   and managing topic subscriptions.
+- [fixed] Import context from `golang.org/x/net` for 1.6 compatibility.
 
 # v2.4.0
 
