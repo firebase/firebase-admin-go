@@ -28,6 +28,7 @@ import (
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
+	"firebase.google.com/go/messaging"
 	"firebase.google.com/go/storage"
 
 	"golang.org/x/net/context"
@@ -43,6 +44,7 @@ var firebaseScopes = []string{
 	"https://www.googleapis.com/auth/firebase",
 	"https://www.googleapis.com/auth/identitytoolkit",
 	"https://www.googleapis.com/auth/userinfo.email",
+	"https://www.googleapis.com/auth/firebase.messaging",
 }
 
 // Version of the Firebase Go Admin SDK.
@@ -101,6 +103,16 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 		Opts:      a.opts,
 	}
 	return iid.NewClient(ctx, conf)
+}
+
+// Messaging returns an instance of messaging.Client.
+func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
+	conf := &internal.MessagingConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+		Version:   Version,
+	}
+	return messaging.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.

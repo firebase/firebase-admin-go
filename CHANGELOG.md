@@ -1,15 +1,21 @@
 # Unreleased
 
-### Token revocation
-- [added] A New ['VerifyIDTokenAndCheckRevoked(ctx, token)'](https://godoc.org/firebase.google.com/go/auth#Client.VerifyIDToken)
-  method has been added to check for revoked ID tokens.
-- [added] A new method ['RevokeRefreshTokens(uid)'](https://godoc.org/firebase.google.com/go/auth#Client.RevokeRefreshTokens)
-  has been added to invalidate all refresh tokens issued to a user.
-- [added] A new property 
-  `TokensValidAfterMillis` has been added to the ['UserRecord'](https://godoc.org/firebase.google.com/go/auth#UserRecord).
-  This property stores the time of the revocation truncated to 1 second accuracy.
-  
 - Import context from golang.org/x/net/ for 1.6 compatibility
+
+### Cloud Messaging
+
+- [feature] Added the `messaging` package for sending Firebase notifications
+  and managing topic subscriptions.
+
+### Authentication
+
+- [added] A new [`VerifyIDTokenAndCheckRevoked()`](https://godoc.org/firebase.google.com/go/auth#Client.VerifyIDToken)
+  function has been added to check for revoked ID tokens.
+- [added] A new [`RevokeRefreshTokens()`](https://godoc.org/firebase.google.com/go/auth#Client.RevokeRefreshTokens)
+  function has been added to invalidate all refresh tokens issued to a user.
+- [added] A new property `TokensValidAfterMillis` has been added to the
+  ['UserRecord'](https://godoc.org/firebase.google.com/go/auth#UserRecord)
+  type, which stores the time of the revocation truncated to 1 second accuracy.
 
 # v2.4.0
 
