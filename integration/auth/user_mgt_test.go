@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"google.golang.org/api/iterator"
 
@@ -34,16 +35,30 @@ var testFixtures = struct {
 }{}
 
 func TestUserManagement(t *testing.T) {
-	t.Run("Create test users", testCreateUsers)
-	t.Run("Get user", testGetUser)
-	t.Run("Iterate users", testUserIterator)
-	t.Run("Paged iteration", testPager)
-	t.Run("Disable user account", testDisableUser)
-	t.Run("Update user", testUpdateUser)
-	t.Run("Remove user attributes", testRemovePhonePhotoName)
-	t.Run("Remove custom claims", testRemoveCustomClaims)
-	t.Run("Add custom claims", testAddCustomClaims)
-	t.Run("Delete test users", testDeleteUsers)
+	orderedRuns := []struct {
+		name     string
+		testFunc func(*testing.T)
+	}{
+		{"Create test users", testCreateUsers},
+		{"Get user", testGetUser},
+		{"Iterate users", testUserIterator},
+		{"Paged iteration", testPager},
+		{"Disable user account", testDisableUser},
+		{"Update user", testUpdateUser},
+		{"Remove user attributes", testRemovePhonePhotoName},
+		{"Remove custom claims", testRemoveCustomClaims},
+		{"Add custom claims", testAddCustomClaims},
+		{"Delete test users", testDeleteUsers},
+	}
+	// The tests are meant to be run in sequence. A failure in creating the users
+	// should be fatal so non of the other tests run. However calling Fatal from a
+	// subtest does not prevent the other subtests from running, hence we check the
+	// success of each subtest before proceeding.
+	for _, run := range orderedRuns {
+		if ok := t.Run(run.name, run.testFunc); !ok {
+			t.Fatalf("Failed run %v", run.name)
+		}
+	}
 }
 
 // N.B if the tests are failing due to inability to create existing users, manual
@@ -52,14 +67,22 @@ func TestUserManagement(t *testing.T) {
 func testCreateUsers(t *testing.T) {
 	// Create users with uid
 	for i := 0; i < 3; i++ {
-		params := (&auth.UserToCreate{}).UID(fmt.Sprintf("tempTestUserID-%d", i))
+		uid := fmt.Sprintf("tempTestUserID-%d", i)
+		params := (&auth.UserToCreate{}).UID(uid)
 		u, err := client.CreateUser(context.Background(), params)
 		if err != nil {
-			t.Fatal("failed to create user", i, err)
+			t.Fatal(err)
 		}
 		testFixtures.uidList = append(testFixtures.uidList, u.UID)
-	}
+		// make sure that the user.TokensValidAfterMillis is not in the future or stale.
+		if u.TokensValidAfterMillis > time.Now().Unix()*1000 {
+			t.Errorf("timestamp cannot be in the future")
+		}
+		if time.Now().Sub(time.Unix(u.TokensValidAfterMillis, 0)) > time.Hour {
+			t.Errorf("timestamp should be recent")
+		}
 
+	}
 	// Create user with no parameters (zero-value)
 	u, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}))
 	if err != nil {
@@ -75,8 +98,8 @@ func testCreateUsers(t *testing.T) {
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
 		Password("password")
-	u, err = client.CreateUser(context.Background(), params)
-	if err != nil {
+
+	if u, err = client.CreateUser(context.Background(), params); err != nil {
 		t.Fatal(err)
 	}
 	testFixtures.sampleUserWithData = u
@@ -85,6 +108,7 @@ func testCreateUsers(t *testing.T) {
 
 func testGetUser(t *testing.T) {
 	want := testFixtures.sampleUserWithData
+
 	u, err := client.GetUser(context.Background(), want.UID)
 	if err != nil {
 		t.Fatalf("error getting user %s", err)
@@ -216,12 +240,13 @@ func testUpdateUser(t *testing.T) {
 			UID:        testFixtures.sampleUserBlank.UID,
 			ProviderID: "firebase",
 		},
+		TokensValidAfterMillis: u.TokensValidAfterMillis,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
 	}
 	if !reflect.DeepEqual(u, want) {
-		t.Errorf("GetUser() = %v; want = %v", u, want)
+		t.Errorf("GetUser() = %#v; want = %#v", u, want)
 	}
 
 	params := (&auth.UserToUpdate{}).
@@ -247,6 +272,7 @@ func testUpdateUser(t *testing.T) {
 			ProviderID:  "firebase",
 			Email:       "abc@ab.ab",
 		},
+		TokensValidAfterMillis: u.TokensValidAfterMillis,
 		UserMetadata: &auth.UserMetadata{
 			CreationTimestamp: testFixtures.sampleUserBlank.UserMetadata.CreationTimestamp,
 		},
@@ -289,7 +315,7 @@ func testUpdateUser(t *testing.T) {
 	// now compare the rest of the record, without the ProviderInfo
 	u.ProviderUserInfo = nil
 	if !reflect.DeepEqual(u, want) {
-		t.Errorf("UpdateUser() = %v; want = %v", u, want)
+		t.Errorf("UpdateUser() = %#v; want = %#v", u, want)
 	}
 }
 
