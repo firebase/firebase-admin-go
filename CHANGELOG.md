@@ -1,6 +1,6 @@
 # Unreleased
 
-- Import context from golang.org/x/net/ for 1.6 compatibility
+- [changed] Import context from `golang.org/x/net` for 1.6 compatibility
 
 ### Cloud Messaging
 
