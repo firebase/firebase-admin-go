@@ -15,6 +15,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -33,6 +34,19 @@ type Ref struct {
 
 	segs   []string
 	client *Client
+}
+
+// TransactionNode represents the value of a node within the scope of a transaction.
+type TransactionNode interface {
+	Unmarshal(v interface{}) error
+}
+
+type transactionNodeImpl struct {
+	Raw []byte
+}
+
+func (t *transactionNodeImpl) Unmarshal(v interface{}) error {
+	return json.Unmarshal(t.Raw, v)
 }
 
 // Parent returns a reference to the parent of the current node.
@@ -76,6 +90,17 @@ func (r *Ref) GetWithETag(ctx context.Context, v interface{}) (string, error) {
 		return "", err
 	}
 	return resp.Header.Get("Etag"), nil
+}
+
+// GetShallow performs a shallow read on the current database location.
+//
+// Shallow reads do not retrieve the child nodes of the current reference.
+func (r *Ref) GetShallow(ctx context.Context, v interface{}) error {
+	resp, err := r.send(ctx, "GET", internal.WithQueryParam("shallow", "true"))
+	if err != nil {
+		return err
+	}
+	return resp.Unmarshal(http.StatusOK, v)
 }
 
 // GetIfChanged retrieves the value and ETag of the current database location only if the specified
@@ -164,7 +189,7 @@ func (r *Ref) Update(ctx context.Context, v map[string]interface{}) error {
 }
 
 // UpdateFn represents a function type that can be passed into Transaction().
-type UpdateFn func(interface{}) (interface{}, error)
+type UpdateFn func(TransactionNode) (interface{}, error)
 
 // Transaction atomically modifies the data at this location.
 //
@@ -181,25 +206,26 @@ type UpdateFn func(interface{}) (interface{}, error)
 // The update function may also force an early abort by returning an error instead of returning a
 // value.
 func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
-	var curr interface{}
-	etag, err := r.GetWithETag(ctx, &curr)
+	resp, err := r.send(ctx, "GET", internal.WithHeader("X-Firebase-ETag", "true"))
 	if err != nil {
 		return err
+	} else if err := resp.CheckStatus(http.StatusOK); err != nil {
+		return err
 	}
+	etag := resp.Header.Get("Etag")
 
 	for i := 0; i < txnRetries; i++ {
-		new, err := fn(curr)
+		new, err := fn(&transactionNodeImpl{resp.Body})
 		if err != nil {
 			return err
 		}
-		resp, err := r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
+		resp, err = r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
 		if err != nil {
 			return err
 		}
 		if resp.Status == http.StatusOK {
 			return nil
-		}
-		if err := resp.Unmarshal(http.StatusPreconditionFailed, &curr); err != nil {
+		} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
 			return err
 		}
 		etag = resp.Header.Get("ETag")

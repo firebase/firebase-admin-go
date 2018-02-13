@@ -220,6 +220,20 @@ func TestGetWithETag(t *testing.T) {
 	}
 }
 
+func TestGetShallow(t *testing.T) {
+	var m map[string]interface{}
+	if err := ref.GetShallow(context.Background(), &m); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]interface{}{}
+	for k := range testData {
+		want[k] = true
+	}
+	if !reflect.DeepEqual(want, m) {
+		t.Errorf("GetShallow() = %v; want = %v", m, want)
+	}
+}
+
 func TestGetIfChanged(t *testing.T) {
 	var m map[string]interface{}
 	ok, etag, err := ref.GetIfChanged(context.Background(), "wrong-etag", &m)
@@ -480,11 +494,14 @@ func TestTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fn := func(curr interface{}) (interface{}, error) {
-		snap := curr.(map[string]interface{})
-		snap["name"] = "Richard Owen"
-		snap["since"] = 1804
-		return snap, nil
+	fn := func(t db.TransactionNode) (interface{}, error) {
+		var user User
+		if err := t.Unmarshal(&user); err != nil {
+			return nil, err
+		}
+		user.Name = "Richard Owen"
+		user.Since = 1804
+		return &user, nil
 	}
 	if err := u.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
@@ -504,8 +521,11 @@ func TestTransactionScalar(t *testing.T) {
 	if err := cnt.Set(context.Background(), 42); err != nil {
 		t.Fatal(err)
 	}
-	fn := func(curr interface{}) (interface{}, error) {
-		snap := curr.(float64)
+	fn := func(t db.TransactionNode) (interface{}, error) {
+		var snap float64
+		if err := t.Unmarshal(&snap); err != nil {
+			return nil, err
+		}
 		return snap + 1, nil
 	}
 	if err := cnt.Transaction(context.Background(), fn); err != nil {

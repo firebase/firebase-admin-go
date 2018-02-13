@@ -48,6 +48,14 @@ var testOps = []struct {
 		},
 	},
 	{
+		"GetShallow()",
+		"test",
+		func(r *Ref) error {
+			var got string
+			return r.GetShallow(context.Background(), &got)
+		},
+	},
+	{
 		"GetIfChanged()",
 		"test",
 		func(r *Ref) error {
@@ -97,7 +105,11 @@ var testOps = []struct {
 		"Transaction()",
 		nil,
 		func(r *Ref) error {
-			fn := func(v interface{}) (interface{}, error) {
+			fn := func(t TransactionNode) (interface{}, error) {
+				var v interface{}
+				if err := t.Unmarshal(&v); err != nil {
+					return nil, err
+				}
 				return v, nil
 			}
 			return r.Transaction(context.Background(), fn)
@@ -156,6 +168,32 @@ func TestGetWithStruct(t *testing.T) {
 		t.Errorf("Get(struct) = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+}
+
+func TestGetShallow(t *testing.T) {
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []interface{}{
+		nil, float64(1), true, "foo",
+		map[string]interface{}{"name": "Peter Parker", "age": float64(17)},
+		map[string]interface{}{"name": "Peter Parker", "nestedChild": true},
+	}
+	wantQuery := map[string]string{"shallow": "true"}
+	var want []*testReq
+	for _, tc := range cases {
+		mock.Resp = tc
+		var got interface{}
+		if err := testref.GetShallow(context.Background(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(tc, got) {
+			t.Errorf("Get() = %v; want = %v", got, tc)
+		}
+		want = append(want, &testReq{Method: "GET", Path: "/peter.json", Query: wantQuery})
+	}
+	checkAllRequests(t, mock.Reqs, want)
 }
 
 func TestGetWithETag(t *testing.T) {
@@ -492,10 +530,13 @@ func TestTransaction(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var fn UpdateFn = func(i interface{}) (interface{}, error) {
-		p := i.(map[string]interface{})
-		p["age"] = p["age"].(float64) + 1.0
-		return p, nil
+	var fn UpdateFn = func(t TransactionNode) (interface{}, error) {
+		var p person
+		if err := t.Unmarshal(&p); err != nil {
+			return nil, err
+		}
+		p.Age++
+		return &p, nil
 	}
 	if err := testref.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
@@ -527,7 +568,7 @@ func TestTransactionRetry(t *testing.T) {
 	defer srv.Close()
 
 	cnt := 0
-	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+	var fn UpdateFn = func(t TransactionNode) (interface{}, error) {
 		if cnt == 0 {
 			mock.Status = http.StatusPreconditionFailed
 			mock.Header = map[string]string{"ETag": "mock-etag2"}
@@ -536,9 +577,12 @@ func TestTransactionRetry(t *testing.T) {
 			mock.Status = http.StatusOK
 		}
 		cnt++
-		p := i.(map[string]interface{})
-		p["age"] = p["age"].(float64) + 1.0
-		return p, nil
+		var p person
+		if err := t.Unmarshal(&p); err != nil {
+			return nil, err
+		}
+		p.Age++
+		return &p, nil
 	}
 	if err := testref.Transaction(context.Background(), fn); err != nil {
 		t.Fatal(err)
@@ -583,7 +627,7 @@ func TestTransactionError(t *testing.T) {
 
 	cnt := 0
 	want := "user error"
-	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+	var fn UpdateFn = func(t TransactionNode) (interface{}, error) {
 		if cnt == 0 {
 			mock.Status = http.StatusPreconditionFailed
 			mock.Header = map[string]string{"ETag": "mock-etag2"}
@@ -592,9 +636,12 @@ func TestTransactionError(t *testing.T) {
 			return nil, fmt.Errorf(want)
 		}
 		cnt++
-		p := i.(map[string]interface{})
-		p["age"] = p["age"].(float64) + 1.0
-		return p, nil
+		var p person
+		if err := t.Unmarshal(&p); err != nil {
+			return nil, err
+		}
+		p.Age++
+		return &p, nil
 	}
 	if err := testref.Transaction(context.Background(), fn); err == nil || err.Error() != want {
 		t.Errorf("Transaction() = %v; want = %q", err, want)
@@ -629,15 +676,18 @@ func TestTransactionAbort(t *testing.T) {
 	defer srv.Close()
 
 	cnt := 0
-	var fn UpdateFn = func(i interface{}) (interface{}, error) {
+	var fn UpdateFn = func(t TransactionNode) (interface{}, error) {
 		if cnt == 0 {
 			mock.Status = http.StatusPreconditionFailed
 			mock.Header = map[string]string{"ETag": "mock-etag1"}
 		}
 		cnt++
-		p := i.(map[string]interface{})
-		p["age"] = p["age"].(float64) + 1.0
-		return p, nil
+		var p person
+		if err := t.Unmarshal(&p); err != nil {
+			return nil, err
+		}
+		p.Age++
+		return &p, nil
 	}
 	err := testref.Transaction(context.Background(), fn)
 	if err == nil {

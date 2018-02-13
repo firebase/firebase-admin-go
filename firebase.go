@@ -66,10 +66,10 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	AuthOverride  *db.AuthOverride
-	DatabaseURL   string `json:"databaseURL"`
-	ProjectID     string `json:"projectId"`
-	StorageBucket string `json:"storageBucket"`
+	AuthOverride  *db.AuthOverride `json:"databaseAuthVariableOverride"`
+	DatabaseURL   string           `json:"databaseURL"`
+	ProjectID     string           `json:"projectId"`
+	StorageBucket string           `json:"storageBucket"`
 }
 
 // Auth returns an instance of auth.Client.
