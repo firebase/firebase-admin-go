@@ -177,6 +177,18 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	return encodeToken(c.snr, defaultHeader(), payload)
 }
 
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
+//
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
+func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+}
+
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
@@ -184,6 +196,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
+// This does not check whether or not the token has been revoked. See `VerifyIDTokenAndCheckRevoked` below.
 func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -234,6 +247,27 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 		return nil, err
 	}
 	p.UID = p.Subject
+	return p, nil
+}
+
+// VerifyIDTokenAndCheckRevoked verifies the provided ID token and checks it has not been revoked.
+//
+// VerifyIDTokenAndCheckRevoked verifies the signature and payload of the provided ID token and
+// checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
+func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
+	p, err := c.VerifyIDToken(idToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := c.GetUser(ctx, p.UID)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
+		return nil, fmt.Errorf("ID token has been revoked")
+	}
 	return p, nil
 }
 

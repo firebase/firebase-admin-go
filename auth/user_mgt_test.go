@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/internal"
 
@@ -59,9 +60,10 @@ var testUser = &UserRecord{
 			UID:         "testuid",
 		},
 	},
+	TokensValidAfterMillis: 1494364393000,
 	UserMetadata: &UserMetadata{
-		CreationTimestamp:  1234567890,
-		LastLogInTimestamp: 1233211232,
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211232000,
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 }
@@ -496,6 +498,41 @@ func TestUpdateUser(t *testing.T) {
 		}
 	}
 }
+func TestRevokeRefreshTokens(t *testing.T) {
+	resp := `{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "expectedUserID"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	before := time.Now().Unix()
+	if err := s.Client.RevokeRefreshTokens(context.Background(), "some_uid"); err != nil {
+		t.Error(err)
+	}
+	after := time.Now().Unix()
+
+	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
+	if err := json.Unmarshal(s.Rbody, &req); err != nil {
+		t.Error(err)
+	}
+	if req.ValidSince > after || req.ValidSince < before {
+		t.Errorf("validSince = %d, expecting time between %d and %d", req.ValidSince, before, after)
+	}
+}
+
+func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
+	resp := `{
+		"kind": "identitytoolkit#SetAccountInfoResponse",
+		"localId": "expectedUserID"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	we := "uid must not be empty"
+	if err := s.Client.RevokeRefreshTokens(context.Background(), ""); err == nil || err.Error() != we {
+		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
+	}
+}
 
 func TestInvalidSetCustomClaims(t *testing.T) {
 	cases := []struct {
@@ -609,8 +646,8 @@ func TestMakeExportedUser(t *testing.T) {
 		PasswordHash:     "passwordhash",
 		ValidSince:       1494364393,
 		Disabled:         false,
-		CreatedAt:        1234567890,
-		LastLoginAt:      1233211232,
+		CreatedAt:        1234567890000,
+		LastLoginAt:      1233211232000,
 		CustomAttributes: `{"admin": true, "package": "gold"}`,
 		ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
 			{
@@ -637,7 +674,8 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exported.UserRecord, want.UserRecord) {
 		// zero in
-		t.Errorf("makeExportedUser() = %#v; want: %#v", exported.UserRecord, want.UserRecord)
+		t.Errorf("makeExportedUser() = %#v; want: %#v \n(%#v)\n(%#v)", exported.UserRecord, want.UserRecord,
+			exported.UserMetadata, want.UserMetadata)
 	}
 	if exported.PasswordHash != want.PasswordHash {
 		t.Errorf("PasswordHash = %q; want = %q", exported.PasswordHash, want.PasswordHash)
@@ -690,8 +728,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	case []byte:
 		b = v
 	default:
-		b, err = json.Marshal(resp)
-		if err != nil {
+		if b, err = json.Marshal(resp); err != nil {
 			t.Fatal("marshaling error")
 		}
 	}
@@ -729,17 +766,17 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(s.Resp)
-
 	})
 	s.Srv = httptest.NewServer(handler)
-
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{testToken}),
-		},
-		Version: testVersion,
+			option.WithTokenSource(&mockTokenSource{testToken})},
+		ProjectID: "mock-project-id",
+		Version:   testVersion,
 	}
-	authClient, err := NewClient(context.Background(), conf)
+
+	authClient, err := NewClient(ctx, conf)
+	authClient.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
 	}
