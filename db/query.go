@@ -260,16 +260,10 @@ const (
 	typeObject    = 5
 )
 
+// comparableKey is union type of numeric values and strings.
 type comparableKey struct {
 	Num *float64
 	Str *string
-}
-
-func (k *comparableKey) Val() interface{} {
-	if k.Str != nil {
-		return *k.Str
-	}
-	return *k.Num
 }
 
 func (k *comparableKey) Compare(o *comparableKey) int {
