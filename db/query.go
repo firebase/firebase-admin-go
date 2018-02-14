@@ -112,11 +112,11 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 // v must be a pointer to an array or a slice.
 func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("value must be a pointer")
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return fmt.Errorf("nil or not a pointer")
 	}
 	if rv.Elem().Kind() != reflect.Slice && rv.Elem().Kind() != reflect.Array {
-		return fmt.Errorf("value must be a pointer to an array or a slice")
+		return fmt.Errorf("non-array non-slice pointer")
 	}
 
 	var temp interface{}
@@ -288,6 +288,9 @@ func newComparableKey(v interface{}) *comparableKey {
 	if s, ok := v.(string); ok {
 		return &comparableKey{Str: &s}
 	}
+
+	// Numeric values could be int (in the case of array indices and type constants), or float64 (if
+	// the value was received as json).
 	if i, ok := v.(int); ok {
 		f := float64(i)
 		return &comparableKey{Num: &f}

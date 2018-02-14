@@ -409,15 +409,21 @@ func TestAllParamsQuery(t *testing.T) {
 func TestInvalidGetOrdered(t *testing.T) {
 	q := testref.OrderByKey()
 
-	var i interface{}
-	want := "value must be a pointer"
-	err := q.GetOrdered(context.Background(), i)
+	want := "nil or not a pointer"
+	var p *[]person // nil
+	err := q.GetOrdered(context.Background(), p)
 	if err == nil || err.Error() != want {
 		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
 	}
 
-	want = "value must be a pointer to an array or a slice"
-	err = q.GetOrdered(context.Background(), &i)
+	var i interface{} // not a pointer
+	err = q.GetOrdered(context.Background(), i)
+	if err == nil || err.Error() != want {
+		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
+	}
+
+	want = "non-array non-slice pointer"
+	err = q.GetOrdered(context.Background(), &i) // pointer to a non-array value
 	if err == nil || err.Error() != want {
 		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
 	}
@@ -438,8 +444,8 @@ func TestChildQueryGetOrdered(t *testing.T) {
 
 	var reqs []*testReq
 	for _, tc := range cases {
-		var result []person
-		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
+		var result *[]person
+		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), result); err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -449,7 +455,7 @@ func TestChildQueryGetOrdered(t *testing.T) {
 		})
 
 		var got []string
-		for _, r := range result {
+		for _, r := range *result {
 			got = append(got, r.Name)
 		}
 		if !reflect.DeepEqual(tc.want, got) {
