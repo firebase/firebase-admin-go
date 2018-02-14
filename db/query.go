@@ -124,7 +124,7 @@ func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
 		return err
 	}
 
-	sr, err := newSortableResult(temp, q.ob)
+	sr, err := newSortableQueryResult(temp, q.ob)
 	if err != nil {
 		return err
 	}
@@ -251,6 +251,7 @@ func (p orderByProperty) encode() (string, error) {
 	return string(b), nil
 }
 
+// Firebase type ordering: https://firebase.google.com/docs/database/rest/retrieve-data#section-rest-ordered-data
 const (
 	typeNull      = 0
 	typeBoolFalse = 1
@@ -260,7 +261,7 @@ const (
 	typeObject    = 5
 )
 
-// comparableKey is union type of numeric values and strings.
+// comparableKey is a union type of numeric values and strings.
 type comparableKey struct {
 	Num *float64
 	Str *string
@@ -277,6 +278,7 @@ func (k *comparableKey) Compare(o *comparableKey) int {
 		}
 		return 1
 	} else if k.Num != nil {
+		// numeric keys appear before string keys
 		return -1
 	}
 	return 1
@@ -295,56 +297,14 @@ func newComparableKey(v interface{}) *comparableKey {
 	return &comparableKey{Num: &f}
 }
 
-type sortableResult []*sortEntry
-
-func (s sortableResult) Len() int {
-	return len(s)
-}
-
-func (s sortableResult) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortableResult) Less(i, j int) bool {
-	a, b := s[i], s[j]
-	var aKey, bKey *comparableKey
-	if a.IndexType == b.IndexType {
-		if (a.IndexType == typeNumeric || a.IndexType == typeString) && a.Index != b.Index {
-			aKey, bKey = newComparableKey(a.Index), newComparableKey(b.Index)
-		} else {
-			aKey, bKey = a.Key, b.Key
-		}
-	} else {
-		aKey, bKey = newComparableKey(a.IndexType), newComparableKey(b.IndexType)
-	}
-
-	return aKey.Compare(bKey) < 0
-}
-
-func newSortableResult(values interface{}, order orderBy) (sortableResult, error) {
-	var entries sortableResult
-	if m, ok := values.(map[string]interface{}); ok {
-		for key, val := range m {
-			entries = append(entries, newSortEntry(key, val, order))
-		}
-	} else if l, ok := values.([]interface{}); ok {
-		for key, val := range l {
-			entries = append(entries, newSortEntry(key, val, order))
-		}
-	} else {
-		return nil, fmt.Errorf("sorting not supported for the result")
-	}
-	return entries, nil
-}
-
-type sortEntry struct {
+type queryResult struct {
 	Key       *comparableKey
 	Value     interface{}
 	Index     interface{}
 	IndexType int
 }
 
-func newSortEntry(key, val interface{}, order orderBy) *sortEntry {
+func newQueryResult(key, val interface{}, order orderBy) *queryResult {
 	var index interface{}
 	if prop, ok := order.(orderByProperty); ok {
 		if prop == "$value" {
@@ -356,7 +316,7 @@ func newSortEntry(key, val interface{}, order orderBy) *sortEntry {
 		path := order.(orderByChild)
 		index = extractChildValue(val, string(path))
 	}
-	return &sortEntry{
+	return &queryResult{
 		Key:       newComparableKey(key),
 		Value:     val,
 		Index:     index,
@@ -364,6 +324,55 @@ func newSortEntry(key, val interface{}, order orderBy) *sortEntry {
 	}
 }
 
+type sortableQueryResult []*queryResult
+
+func (s sortableQueryResult) Len() int {
+	return len(s)
+}
+
+func (s sortableQueryResult) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortableQueryResult) Less(i, j int) bool {
+	a, b := s[i], s[j]
+	var aKey, bKey *comparableKey
+	if a.IndexType == b.IndexType {
+		// If the indices have the same type and are comparable (i.e. numeric or string), compare
+		// them directly. Otherwise, compare the keys.
+		if (a.IndexType == typeNumeric || a.IndexType == typeString) && a.Index != b.Index {
+			aKey, bKey = newComparableKey(a.Index), newComparableKey(b.Index)
+		} else {
+			aKey, bKey = a.Key, b.Key
+		}
+	} else {
+		// If the indices are of different types, use the type ordering of Firebase.
+		aKey, bKey = newComparableKey(a.IndexType), newComparableKey(b.IndexType)
+	}
+
+	return aKey.Compare(bKey) < 0
+}
+
+func newSortableQueryResult(values interface{}, order orderBy) (sortableQueryResult, error) {
+	var entries sortableQueryResult
+	if m, ok := values.(map[string]interface{}); ok {
+		for key, val := range m {
+			entries = append(entries, newQueryResult(key, val, order))
+		}
+	} else if l, ok := values.([]interface{}); ok {
+		for key, val := range l {
+			entries = append(entries, newQueryResult(key, val, order))
+		}
+	} else {
+		return nil, fmt.Errorf("sorting not supported for the result")
+	}
+	return entries, nil
+}
+
+// extractChildValue retrieves the value at path from val.
+//
+// If the given path does not exist in val, or val does not support child path traversal,
+// extractChildValue returns nil.
 func extractChildValue(val interface{}, path string) interface{} {
 	segments := parsePath(path)
 	curr := val

@@ -14,6 +14,7 @@
 package db
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -423,6 +424,43 @@ func TestInvalidGetOrdered(t *testing.T) {
 }
 
 func TestChildQueryGetOrdered(t *testing.T) {
+	mock := &mockServer{Resp: sortableKeysResp}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []struct {
+		child string
+		want  []string
+	}{
+		{"name", []string{"alice", "bob", "charlie", "dave", "ernie"}},
+		{"age", []string{"ernie", "charlie", "bob", "dave", "alice"}},
+	}
+
+	var reqs []*testReq
+	for _, tc := range cases {
+		var result []person
+		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
+			t.Fatal(err)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": fmt.Sprintf("%q", tc.child)},
+		})
+
+		var got []string
+		for _, r := range result {
+			got = append(got, r.Name)
+		}
+		if !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("GetOrdered(child: %q) = %v; want = %v", tc.child, got, tc.want)
+		}
+	}
+
+	checkAllRequests(t, mock.Reqs, reqs)
+}
+
+func TestImmediateChildQueryGetOrdered(t *testing.T) {
 	mock := &mockServer{}
 	srv := mock.Start(client)
 	defer srv.Close()
@@ -461,7 +499,7 @@ func TestChildQueryGetOrdered(t *testing.T) {
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
-func TestGrandChildQueryGetOrdered(t *testing.T) {
+func TestNestedChildQueryGetOrdered(t *testing.T) {
 	mock := &mockServer{}
 	srv := mock.Start(client)
 	defer srv.Close()
@@ -504,7 +542,7 @@ func TestGrandChildQueryGetOrdered(t *testing.T) {
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
-func TestKeyQueryOrderedGet(t *testing.T) {
+func TestKeyQueryGetOrdered(t *testing.T) {
 	mock := &mockServer{Resp: sortableKeysResp}
 	srv := mock.Start(client)
 	defer srv.Close()
@@ -557,7 +595,7 @@ func TestValueQueryGetOrdered(t *testing.T) {
 	}
 }
 
-func TestValueQueryOrderedGetWithList(t *testing.T) {
+func TestValueQueryGetOrderedWithList(t *testing.T) {
 	cases := []struct {
 		resp []interface{}
 		want []interface{}
