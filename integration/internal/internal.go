@@ -76,6 +76,7 @@ func ProjectID() (string, error) {
 	return serviceAccount.ProjectID, nil
 }
 
+// NewHTTPClient creates an HTTP client for making authorized requests during tests.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
 	opts = append(
 		opts,

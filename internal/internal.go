@@ -21,9 +21,13 @@ import (
 	"google.golang.org/api/option"
 )
 
+// FirebaseScopes is the set of OAuth2 scopes used by the Admin SDK.
 var FirebaseScopes = []string{
+	"https://www.googleapis.com/auth/cloud-platform",
+	"https://www.googleapis.com/auth/datastore",
 	"https://www.googleapis.com/auth/devstorage.full_control",
 	"https://www.googleapis.com/auth/firebase",
+	"https://www.googleapis.com/auth/identitytoolkit",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
 
@@ -41,6 +45,7 @@ type InstanceIDConfig struct {
 	ProjectID string
 }
 
+// DatabaseConfig represents the configuration of Firebase Database service.
 type DatabaseConfig struct {
 	Opts    []option.ClientOption
 	URL     string
