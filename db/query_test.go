@@ -14,19 +14,82 @@
 package db
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
 	"golang.org/x/net/context"
 )
 
-var sortableResp = map[string]interface{}{
+var sortableKeysResp = map[string]interface{}{
 	"bob":     person{Name: "bob", Age: 20},
 	"alice":   person{Name: "alice", Age: 30},
 	"charlie": person{Name: "charlie", Age: 15},
 	"dave":    person{Name: "dave", Age: 25},
 	"ernie":   person{Name: "ernie"},
+}
+
+var sortableValuesResp = []struct {
+	resp map[string]interface{}
+	want []interface{}
+}{
+	{
+		resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 3},
+		want: []interface{}{1.0, 2.0, 3.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": 3, "k2": 2, "k3": 1},
+		want: []interface{}{1.0, 2.0, 3.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": 3, "k2": 1, "k3": 2},
+		want: []interface{}{1.0, 2.0, 3.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 1},
+		want: []interface{}{1.0, 1.0, 2.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": 1, "k2": 1, "k3": 2},
+		want: []interface{}{1.0, 1.0, 2.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": 2, "k2": 1, "k3": 1},
+		want: []interface{}{1.0, 1.0, 2.0},
+	},
+	{
+		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": "baz"},
+		want: []interface{}{"bar", "baz", "foo"},
+	},
+	{
+		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": 10},
+		want: []interface{}{10.0, "bar", "foo"},
+	},
+	{
+		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": nil},
+		want: []interface{}{nil, "bar", "foo"},
+	},
+	{
+		resp: map[string]interface{}{"k1": 5, "k2": "bar", "k3": nil},
+		want: []interface{}{nil, 5.0, "bar"},
+	},
+	{
+		resp: map[string]interface{}{
+			"k1": true, "k2": 0, "k3": "foo", "k4": "foo", "k5": false,
+			"k6": map[string]interface{}{"k1": true},
+		},
+		want: []interface{}{false, true, 0.0, "foo", "foo", map[string]interface{}{"k1": true}},
+	},
+	{
+		resp: map[string]interface{}{
+			"k1": true, "k2": 0, "k3": "foo", "k4": "foo", "k5": false,
+			"k6": map[string]interface{}{"k1": true}, "k7": nil,
+			"k8": map[string]interface{}{"k0": true},
+		},
+		want: []interface{}{
+			nil, false, true, 0.0, "foo", "foo",
+			map[string]interface{}{"k1": true}, map[string]interface{}{"k0": true},
+		},
+	},
 }
 
 func TestChildQuery(t *testing.T) {
@@ -342,45 +405,107 @@ func TestAllParamsQuery(t *testing.T) {
 	})
 }
 
-func TestOrderedChildQuery(t *testing.T) {
-	mock := &mockServer{Resp: sortableResp}
+func TestInvalidGetOrdered(t *testing.T) {
+	q := testref.OrderByKey()
+
+	var i interface{}
+	want := "value must be a pointer"
+	err := q.GetOrdered(context.Background(), i)
+	if err == nil || err.Error() != want {
+		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
+	}
+
+	want = "value must be a pointer to an array or a slice"
+	err = q.GetOrdered(context.Background(), &i)
+	if err == nil || err.Error() != want {
+		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
+	}
+}
+
+func TestChildQueryGetOrdered(t *testing.T) {
+	mock := &mockServer{}
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	cases := []struct {
-		child string
-		want  []string
-	}{
-		{"age", []string{"ernie", "charlie", "bob", "dave", "alice"}},
-		{"name", []string{"alice", "bob", "charlie", "dave", "ernie"}},
+	type parsedMap struct {
+		Child interface{} `json:"child"`
 	}
 
 	var reqs []*testReq
-	for _, tc := range cases {
-		var result []person
-		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
+	for _, tc := range sortableValuesResp {
+		resp := map[string]interface{}{}
+		for k, v := range tc.resp {
+			resp[k] = map[string]interface{}{"child": v}
+		}
+		mock.Resp = resp
+
+		var result []parsedMap
+		if err := testref.OrderByChild("child").GetOrdered(context.Background(), &result); err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": fmt.Sprintf("%q", tc.child)},
+			Query:  map[string]string{"orderBy": "\"child\""},
 		})
 
-		var got []string
+		var got []interface{}
 		for _, r := range result {
-			got = append(got, r.Name)
+			got = append(got, r.Child)
 		}
 		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "age", got, tc.want)
+			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child", got, tc.want)
 		}
 	}
 
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
-func TestOrderedKeyQuery(t *testing.T) {
-	mock := &mockServer{Resp: sortableResp}
+func TestGrandChildQueryGetOrdered(t *testing.T) {
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	type grandChild struct {
+		GrandChild interface{} `json:"grandchild"`
+	}
+	type parsedMap struct {
+		Child grandChild `json:"child"`
+	}
+
+	var reqs []*testReq
+	for _, tc := range sortableValuesResp {
+		resp := map[string]interface{}{}
+		for k, v := range tc.resp {
+			resp[k] = map[string]interface{}{"child": map[string]interface{}{"grandchild": v}}
+		}
+		mock.Resp = resp
+
+		var result []parsedMap
+		q := testref.OrderByChild("child/grandchild")
+		if err := q.GetOrdered(context.Background(), &result); err != nil {
+			t.Fatal(err)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": "\"child/grandchild\""},
+		})
+
+		var got []interface{}
+		for _, r := range result {
+			got = append(got, r.Child.GrandChild)
+		}
+		if !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child/grandchild", got, tc.want)
+		}
+	}
+
+	checkAllRequests(t, mock.Reqs, reqs)
+}
+
+func TestKeyQueryOrderedGet(t *testing.T) {
+	mock := &mockServer{Resp: sortableKeysResp}
 	srv := mock.Start(client)
 	defer srv.Close()
 
@@ -407,57 +532,63 @@ func TestOrderedKeyQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, req)
 }
 
-func TestOrderedValueQuery(t *testing.T) {
+func TestValueQueryGetOrdered(t *testing.T) {
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var reqs []*testReq
+	for _, tc := range sortableValuesResp {
+		mock.Resp = tc.resp
+
+		var got []interface{}
+		if err := testref.OrderByValue().GetOrdered(context.Background(), &got); err != nil {
+			t.Fatal(err)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": "\"$value\""},
+		})
+
+		if !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
+		}
+	}
+}
+
+func TestValueQueryOrderedGetWithList(t *testing.T) {
 	cases := []struct {
-		resp map[string]interface{}
+		resp []interface{}
 		want []interface{}
 	}{
 		{
-			resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 3},
+			resp: []interface{}{1, 2, 3},
 			want: []interface{}{1.0, 2.0, 3.0},
 		},
 		{
-			resp: map[string]interface{}{"k1": 3, "k2": 2, "k3": 1},
+			resp: []interface{}{3, 2, 1},
 			want: []interface{}{1.0, 2.0, 3.0},
 		},
 		{
-			resp: map[string]interface{}{"k1": 3, "k2": 1, "k3": 2},
+			resp: []interface{}{1, 3, 2},
 			want: []interface{}{1.0, 2.0, 3.0},
 		},
 		{
-			resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 1},
+			resp: []interface{}{1, 3, 3},
+			want: []interface{}{1.0, 3.0, 3.0},
+		},
+		{
+			resp: []interface{}{1, 2, 1},
 			want: []interface{}{1.0, 1.0, 2.0},
 		},
 		{
-			resp: map[string]interface{}{"k1": 1, "k2": 1, "k3": 2},
-			want: []interface{}{1.0, 1.0, 2.0},
-		},
-		{
-			resp: map[string]interface{}{"k1": 2, "k2": 1, "k3": 1},
-			want: []interface{}{1.0, 1.0, 2.0},
-		},
-		{
-			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": "baz"},
+			resp: []interface{}{"foo", "bar", "baz"},
 			want: []interface{}{"bar", "baz", "foo"},
 		},
 		{
-			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": 10},
-			want: []interface{}{10.0, "bar", "foo"},
-		},
-		{
-			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": nil},
-			want: []interface{}{nil, "bar", "foo"},
-		},
-		{
-			resp: map[string]interface{}{"k1": 5, "k2": "bar", "k3": nil},
-			want: []interface{}{nil, 5.0, "bar"},
-		},
-		{
-			resp: map[string]interface{}{
-				"k1": true, "k2": 0, "k3": "foo", "k4": "foo", "k5": false,
-				"k6": map[string]interface{}{"k1": true},
-			},
-			want: []interface{}{false, true, 0.0, "foo", "foo", map[string]interface{}{"k1": true}},
+			resp: []interface{}{"foo", 1, false, nil, 0, true},
+			want: []interface{}{nil, false, true, 0.0, 1.0, "foo"},
 		},
 	}
 

@@ -318,7 +318,7 @@ func (s sortableResult) Less(i, j int) bool {
 		if (a.IndexType == typeNumeric || a.IndexType == typeString) && a.Index != b.Index {
 			aKey, bKey = newComparableKey(a.Index), newComparableKey(b.Index)
 		} else {
-			aKey, bKey = newComparableKey(a.Key.Val()), newComparableKey(b.Key.Val())
+			aKey, bKey = a.Key, b.Key
 		}
 	} else {
 		aKey, bKey = newComparableKey(a.IndexType), newComparableKey(b.IndexType)
