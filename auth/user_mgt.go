@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/api/identitytoolkit/v3"
@@ -39,6 +40,7 @@ var commonValidators = map[string]func(interface{}) error{
 	"password":    validatePassword,
 	"photoUrl":    validatePhotoURL,
 	"localId":     validateUID,
+	"validSince":  func(interface{}) error { return nil }, // Needed for preparePayload.
 }
 
 // Create a new interface
@@ -65,6 +67,7 @@ type UserInfo struct {
 }
 
 // UserMetadata contains additional metadata associated with a user account.
+// Timestamps are in milliseconds since epoch.
 type UserMetadata struct {
 	CreationTimestamp  int64
 	LastLogInTimestamp int64
@@ -73,11 +76,12 @@ type UserMetadata struct {
 // UserRecord contains metadata associated with a Firebase user account.
 type UserRecord struct {
 	*UserInfo
-	CustomClaims     map[string]interface{}
-	Disabled         bool
-	EmailVerified    bool
-	ProviderUserInfo []*UserInfo
-	UserMetadata     *UserMetadata
+	CustomClaims           map[string]interface{}
+	Disabled               bool
+	EmailVerified          bool
+	ProviderUserInfo       []*UserInfo
+	TokensValidAfterMillis int64 // milliseconds since epoch.
+	UserMetadata           *UserMetadata
 }
 
 // ExportedUserRecord is the returned user value used when listing all the users.
@@ -172,6 +176,13 @@ func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNum
 
 // PhotoURL setter.
 func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
+
+// revokeRefreshTokens revokes all refresh tokens for a user by setting the validSince property
+// to the present in epoch seconds.
+func (u *UserToUpdate) revokeRefreshTokens() *UserToUpdate {
+	u.set("validSince", time.Now().Unix())
+	return u
+}
 
 // CreateUser creates a new user with the specified properties.
 func (c *Client) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
@@ -471,7 +482,12 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 			if err := validate(v); err != nil {
 				return err
 			}
-			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
+			f := reflect.ValueOf(user).Elem().FieldByName(strings.Title(key))
+			if f.Kind() == reflect.String {
+				f.SetString(params[key].(string))
+			} else if f.Kind() == reflect.Int64 {
+				f.SetInt(params[key].(int64))
+			}
 		}
 	}
 	if params["disableUser"] != nil {
@@ -497,37 +513,6 @@ func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyi
 }
 
 // End of validators
-
-// Response Types -------------------------------
-
-type getUserResponse struct {
-	RequestType string
-	Users       []responseUserRecord
-}
-
-type responseUserRecord struct {
-	UID                string
-	DisplayName        string
-	Email              string
-	PhoneNumber        string
-	PhotoURL           string
-	CreationTimestamp  int64
-	LastLogInTimestamp int64
-	ProviderID         string
-	CustomClaims       string
-	Disabled           bool
-	EmailVerified      bool
-	ProviderUserInfo   []*UserInfo
-	PasswordHash       string
-	PasswordSalt       string
-	ValidSince         int64
-}
-
-type listUsersResponse struct {
-	RequestType string
-	Users       []responseUserRecord
-	NextPage    string
-}
 
 // Helper functions for retrieval and HTTP calls.
 
@@ -559,7 +544,6 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	if user == nil || user.params == nil {
 		return fmt.Errorf("update parameters must not be nil or empty")
 	}
-
 	request := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{
 		LocalId: uid,
 	}
@@ -628,10 +612,11 @@ func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) 
 				ProviderID:  defaultProviderID,
 				UID:         r.LocalId,
 			},
-			CustomClaims:     cc,
-			Disabled:         r.Disabled,
-			EmailVerified:    r.EmailVerified,
-			ProviderUserInfo: providerUserInfo,
+			CustomClaims:           cc,
+			Disabled:               r.Disabled,
+			EmailVerified:          r.EmailVerified,
+			ProviderUserInfo:       providerUserInfo,
+			TokensValidAfterMillis: r.ValidSince * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLoginAt,
 				CreationTimestamp:  r.CreatedAt,

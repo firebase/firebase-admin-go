@@ -46,6 +46,13 @@ type MockTokenSource struct {
 	AccessToken string
 }
 
+// MessagingConfig represents the configuration of Firebase Cloud Messaging service.
+type MessagingConfig struct {
+	Opts      []option.ClientOption
+	ProjectID string
+	Version   string
+}
+
 // Token returns the test token associated with the TokenSource.
 func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
 	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
