@@ -48,7 +48,7 @@ var firebaseScopes = []string{
 }
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.4.0"
+const Version = "2.5.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
