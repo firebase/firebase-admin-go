@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -105,6 +107,40 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 	return resp.Unmarshal(http.StatusOK, v)
 }
 
+// GetOrdered executes the Query and provides the results as an ordered list.
+//
+// v must be a pointer to an array or a slice.
+func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr {
+		return fmt.Errorf("value must be a pointer")
+	}
+	if rv.Elem().Kind() != reflect.Slice && rv.Elem().Kind() != reflect.Array {
+		return fmt.Errorf("value must be a pointer to an array or a slice")
+	}
+
+	var temp interface{}
+	if err := q.Get(ctx, &temp); err != nil {
+		return err
+	}
+
+	sr, err := newSortableResult(temp, q.ob)
+	if err != nil {
+		return err
+	}
+	sort.Sort(sr)
+
+	var values []interface{}
+	for _, val := range sr {
+		values = append(values, val.Value)
+	}
+	b, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
+}
+
 // OrderByChild returns a Query that orders data by child values before applying filters.
 //
 // Returned Query can be used to set additional parameters, and execute complex database queries
@@ -167,10 +203,7 @@ func initQueryParams(q *Query, qp map[string]string) error {
 	if err := encodeFilter("endAt", q.end, qp); err != nil {
 		return err
 	}
-	if err := encodeFilter("equalTo", q.equalTo, qp); err != nil {
-		return err
-	}
-	return nil
+	return encodeFilter("equalTo", q.equalTo, qp)
 }
 
 func encodeFilter(key string, val interface{}, m map[string]string) error {
@@ -216,4 +249,158 @@ func (p orderByProperty) encode() (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+const (
+	typeNull      = 0
+	typeBoolFalse = 1
+	typeBoolTrue  = 2
+	typeNumeric   = 3
+	typeString    = 4
+	typeObject    = 5
+)
+
+type comparableKey struct {
+	Num *float64
+	Str *string
+}
+
+func (k *comparableKey) Val() interface{} {
+	if k.Str != nil {
+		return *k.Str
+	}
+	return *k.Num
+}
+
+func (k *comparableKey) Compare(o *comparableKey) int {
+	if k.Str != nil && o.Str != nil {
+		return strings.Compare(*k.Str, *o.Str)
+	} else if k.Num != nil && o.Num != nil {
+		if *k.Num < *o.Num {
+			return -1
+		} else if *k.Num == *o.Num {
+			return 0
+		}
+		return 1
+	} else if k.Num != nil {
+		return -1
+	}
+	return 1
+}
+
+func newComparableKey(v interface{}) *comparableKey {
+	if s, ok := v.(string); ok {
+		return &comparableKey{Str: &s}
+	}
+	if i, ok := v.(int); ok {
+		f := float64(i)
+		return &comparableKey{Num: &f}
+	}
+
+	f := v.(float64)
+	return &comparableKey{Num: &f}
+}
+
+type sortableResult []*sortEntry
+
+func (s sortableResult) Len() int {
+	return len(s)
+}
+
+func (s sortableResult) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortableResult) Less(i, j int) bool {
+	a, b := s[i], s[j]
+	var aKey, bKey *comparableKey
+	if a.IndexType == b.IndexType {
+		if (a.IndexType == typeNumeric || a.IndexType == typeString) && a.Index != b.Index {
+			aKey, bKey = newComparableKey(a.Index), newComparableKey(b.Index)
+		} else {
+			aKey, bKey = newComparableKey(a.Key), newComparableKey(b.Key)
+		}
+	} else {
+		aKey, bKey = newComparableKey(a.IndexType), newComparableKey(b.IndexType)
+	}
+
+	return aKey.Compare(bKey) < 0
+}
+
+func newSortableResult(values interface{}, order orderBy) (sortableResult, error) {
+	var entries sortableResult
+	if m, ok := values.(map[string]interface{}); ok {
+		for key, val := range m {
+			entries = append(entries, newSortEntry(key, val, order))
+		}
+	} else if l, ok := values.([]interface{}); ok {
+		for key, val := range l {
+			entries = append(entries, newSortEntry(key, val, order))
+		}
+	} else {
+		return nil, fmt.Errorf("sorting not supported for the result")
+	}
+	return entries, nil
+}
+
+type sortEntry struct {
+	Key       *comparableKey
+	Value     interface{}
+	Index     interface{}
+	IndexType int
+}
+
+func newSortEntry(key, val interface{}, order orderBy) *sortEntry {
+	var index interface{}
+	if prop, ok := order.(orderByProperty); ok {
+		if prop == "$value" {
+			index = val
+		} else {
+			index = key
+		}
+	} else {
+		path := order.(orderByChild)
+		index = extractChildValue(val, string(path))
+	}
+	return &sortEntry{
+		Key:       newComparableKey(key),
+		Value:     val,
+		Index:     index,
+		IndexType: getIndexType(index),
+	}
+}
+
+func extractChildValue(val interface{}, path string) interface{} {
+	segments := parsePath(path)
+	curr := val
+	for _, s := range segments {
+		if curr == nil {
+			return nil
+		}
+
+		currMap, ok := curr.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		if curr, ok = currMap[s]; !ok {
+			return nil
+		}
+	}
+	return curr
+}
+
+func getIndexType(index interface{}) int {
+	if index == nil {
+		return typeNull
+	} else if b, ok := index.(bool); ok {
+		if b {
+			return typeBoolTrue
+		}
+		return typeBoolFalse
+	} else if _, ok := index.(float64); ok {
+		return typeNumeric
+	} else if _, ok := index.(string); ok {
+		return typeString
+	}
+	return typeObject
 }

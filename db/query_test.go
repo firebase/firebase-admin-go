@@ -14,11 +14,20 @@
 package db
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"golang.org/x/net/context"
 )
+
+var sortableResp = map[string]interface{}{
+	"bob":     person{Name: "bob", Age: 20},
+	"alice":   person{Name: "alice", Age: 30},
+	"charlie": person{Name: "charlie", Age: 15},
+	"dave":    person{Name: "dave", Age: 25},
+	"ernie":   person{Name: "ernie"},
+}
 
 func TestChildQuery(t *testing.T) {
 	want := map[string]interface{}{"m1": "Hello", "m2": "Bye"}
@@ -331,4 +340,69 @@ func TestAllParamsQuery(t *testing.T) {
 			"orderBy":      "\"messages\"",
 		},
 	})
+}
+
+func TestOrderedChildQuery(t *testing.T) {
+	mock := &mockServer{Resp: sortableResp}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []struct {
+		child string
+		want  []string
+	}{
+		{"age", []string{"ernie", "charlie", "bob", "dave", "alice"}},
+		{"name", []string{"alice", "bob", "charlie", "dave", "ernie"}},
+	}
+
+	var reqs []*testReq
+	for _, tc := range cases {
+		var result []person
+		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
+			t.Fatal(err)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": fmt.Sprintf("%q", tc.child)},
+		})
+
+		var got []string
+		for _, r := range result {
+			got = append(got, r.Name)
+		}
+		if !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "age", got, tc.want)
+		}
+	}
+
+	checkAllRequests(t, mock.Reqs, reqs)
+}
+
+func TestOrderedKeyQuery(t *testing.T) {
+	mock := &mockServer{Resp: sortableResp}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var result []person
+	if err := testref.OrderByKey().GetOrdered(context.Background(), &result); err != nil {
+		t.Fatal(err)
+	}
+	req := &testReq{
+		Method: "GET",
+		Path:   "/peter.json",
+		Query:  map[string]string{"orderBy": "\"$key\""},
+	}
+
+	var got []string
+	for _, r := range result {
+		got = append(got, r.Name)
+	}
+
+	want := []string{"alice", "bob", "charlie", "dave", "ernie"}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("GetOrdered(child: %q) = %v; want = %v", "age", got, want)
+	}
+
+	checkOnlyRequest(t, mock.Reqs, req)
 }
