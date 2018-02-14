@@ -401,8 +401,86 @@ func TestOrderedKeyQuery(t *testing.T) {
 
 	want := []string{"alice", "bob", "charlie", "dave", "ernie"}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("GetOrdered(child: %q) = %v; want = %v", "age", got, want)
+		t.Errorf("GetOrdered(key) = %v; want = %v", got, want)
 	}
 
 	checkOnlyRequest(t, mock.Reqs, req)
+}
+
+func TestOrderedValueQuery(t *testing.T) {
+	cases := []struct {
+		resp map[string]interface{}
+		want []interface{}
+	}{
+		{
+			resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 3},
+			want: []interface{}{1.0, 2.0, 3.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": 3, "k2": 2, "k3": 1},
+			want: []interface{}{1.0, 2.0, 3.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": 3, "k2": 1, "k3": 2},
+			want: []interface{}{1.0, 2.0, 3.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 1},
+			want: []interface{}{1.0, 1.0, 2.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": 1, "k2": 1, "k3": 2},
+			want: []interface{}{1.0, 1.0, 2.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": 2, "k2": 1, "k3": 1},
+			want: []interface{}{1.0, 1.0, 2.0},
+		},
+		{
+			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": "baz"},
+			want: []interface{}{"bar", "baz", "foo"},
+		},
+		{
+			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": 10},
+			want: []interface{}{10.0, "bar", "foo"},
+		},
+		{
+			resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": nil},
+			want: []interface{}{nil, "bar", "foo"},
+		},
+		{
+			resp: map[string]interface{}{"k1": 5, "k2": "bar", "k3": nil},
+			want: []interface{}{nil, 5.0, "bar"},
+		},
+		{
+			resp: map[string]interface{}{
+				"k1": true, "k2": 0, "k3": "foo", "k4": "foo", "k5": false,
+				"k6": map[string]interface{}{"k1": true},
+			},
+			want: []interface{}{false, true, 0.0, "foo", "foo", map[string]interface{}{"k1": true}},
+		},
+	}
+
+	mock := &mockServer{}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var reqs []*testReq
+	for _, tc := range cases {
+		mock.Resp = tc.resp
+
+		var got []interface{}
+		if err := testref.OrderByValue().GetOrdered(context.Background(), &got); err != nil {
+			t.Fatal(err)
+		}
+		reqs = append(reqs, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  map[string]string{"orderBy": "\"$value\""},
+		})
+
+		if !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
+		}
+	}
 }
