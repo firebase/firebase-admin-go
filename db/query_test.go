@@ -444,8 +444,8 @@ func TestChildQueryGetOrdered(t *testing.T) {
 
 	var reqs []*testReq
 	for _, tc := range cases {
-		var result *[]person
-		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), result); err != nil {
+		var result []person
+		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -455,7 +455,7 @@ func TestChildQueryGetOrdered(t *testing.T) {
 		})
 
 		var got []string
-		for _, r := range *result {
+		for _, r := range result {
 			got = append(got, r.Name)
 		}
 		if !reflect.DeepEqual(tc.want, got) {
