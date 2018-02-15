@@ -423,6 +423,7 @@ func TestAutoInit(t *testing.T) {
 			"testdata/firebase_config.json",
 			nil,
 			&Config{
+				DatabaseURL:   "https://auto-init.database.url",
 				ProjectID:     "auto-init-project-id",
 				StorageBucket: "auto-init.storage.bucket",
 			},
@@ -430,11 +431,13 @@ func TestAutoInit(t *testing.T) {
 		{
 			"<env=string,opts=nil>",
 			`{
+				"databaseURL": "https://auto-init.database.url",
 				"projectId": "auto-init-project-id",
 				"storageBucket": "auto-init.storage.bucket"
 			  }`,
 			nil,
 			&Config{
+				DatabaseURL:   "https://auto-init.database.url",
 				ProjectID:     "auto-init-project-id",
 				StorageBucket: "auto-init.storage.bucket",
 			},
@@ -568,6 +571,9 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func compareConfig(got *App, want *Config, t *testing.T) {
+	if got.dbURL != want.DatabaseURL {
+		t.Errorf("app.dbURL = %q; want = %q", got.dbURL, want.DatabaseURL)
+	}
 	if got.projectID != want.ProjectID {
 		t.Errorf("app.projectID = %q; want = %q", got.projectID, want.ProjectID)
 	}
