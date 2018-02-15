@@ -44,48 +44,48 @@ type Query struct {
 	start, end, equalTo interface{}
 }
 
-// WithStartAt returns a shallow copy of the Query with v set as a lower bound of a range query.
+// StartAt returns a shallow copy of the Query with v set as a lower bound of a range query.
 //
 // The resulting Query will only return child nodes with a value greater than or equal to v.
-func (q *Query) WithStartAt(v interface{}) *Query {
+func (q *Query) StartAt(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
 	q2.start = v
 	return q2
 }
 
-// WithEndAt returns a shallow copy of the Query with v set as a upper bound of a range query.
+// EndAt returns a shallow copy of the Query with v set as a upper bound of a range query.
 //
 // The resulting Query will only return child nodes with a value less than or equal to v.
-func (q *Query) WithEndAt(v interface{}) *Query {
+func (q *Query) EndAt(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
 	q2.end = v
 	return q2
 }
 
-// WithEqualTo returns a shallow copy of the Query with v set as an equals constraint.
+// EqualTo returns a shallow copy of the Query with v set as an equals constraint.
 //
 // The resulting Query will only return child nodes whose values equal to v.
-func (q *Query) WithEqualTo(v interface{}) *Query {
+func (q *Query) EqualTo(v interface{}) *Query {
 	q2 := new(Query)
 	*q2 = *q
 	q2.equalTo = v
 	return q2
 }
 
-// WithLimitToFirst returns a shallow copy of the Query, which is anchored to the first n
+// LimitToFirst returns a shallow copy of the Query, which is anchored to the first n
 // elements of the window.
-func (q *Query) WithLimitToFirst(n int) *Query {
+func (q *Query) LimitToFirst(n int) *Query {
 	q2 := new(Query)
 	*q2 = *q
 	q2.limFirst = n
 	return q2
 }
 
-// WithLimitToLast returns a shallow copy of the Query, which is anchored to the last n
+// LimitToLast returns a shallow copy of the Query, which is anchored to the last n
 // elements of the window.
-func (q *Query) WithLimitToLast(n int) *Query {
+func (q *Query) LimitToLast(n int) *Query {
 	q2 := new(Query)
 	*q2 = *q
 	q2.limLast = n
@@ -94,7 +94,12 @@ func (q *Query) WithLimitToLast(n int) *Query {
 
 // Get executes the Query and populates v with the results.
 //
-// Results will not be stored in any particular order in v.
+// Data deserialization is performed using https://golang.org/pkg/encoding/json/#Unmarshal, and
+// therefore v has the same requirements as the json package. Specifically, it must be a pointer,
+// and must not be nil.
+//
+// Despite the ordering constraint of the Query, results are not stored in any particular order
+// in v. Use GetOrdered() to obtain ordered results.
 func (q *Query) Get(ctx context.Context, v interface{}) error {
 	qp := make(map[string]string)
 	if err := initQueryParams(q, qp); err != nil {
@@ -109,7 +114,9 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 
 // GetOrdered executes the Query and provides the results as an ordered list.
 //
-// v must be a pointer to an array or a slice.
+// v must be a pointer to an array or a slice. Only the child values returned by the query are
+// unmarshalled into v. Top-level keys are not returned. Although if the Query was created using
+// OrderByKey(), the returned values will still be ordered based on their keys.
 func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {

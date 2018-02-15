@@ -88,7 +88,7 @@ func TestAuthOverrideRangeQuery(t *testing.T) {
 
 	ref := aoClient.NewRef("peter")
 	var got string
-	if err := ref.OrderByChild("foo").WithStartAt(1).WithEndAt(10).Get(context.Background(), &got); err != nil {
+	if err := ref.OrderByChild("foo").StartAt(1).EndAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got != "data" {

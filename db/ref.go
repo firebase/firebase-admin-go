@@ -72,7 +72,7 @@ func (r *Ref) Child(path string) *Ref {
 //
 // Data deserialization is performed using https://golang.org/pkg/encoding/json/#Unmarshal, and
 // therefore v has the same requirements as the json package. Specifically, it must be a pointer,
-// and it must not be nil.
+// and must not be nil.
 func (r *Ref) Get(ctx context.Context, v interface{}) error {
 	resp, err := r.send(ctx, "GET")
 	if err != nil {

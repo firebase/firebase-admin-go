@@ -147,7 +147,7 @@ func TestChildQueryWithParams(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q := testref.OrderByChild("messages").WithStartAt("m4").WithEndAt("m50").WithLimitToFirst(10)
+	q := testref.OrderByChild("messages").StartAt("m4").EndAt("m50").LimitToFirst(10)
 	var got map[string]interface{}
 	if err := q.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
@@ -235,11 +235,11 @@ func TestLimitFirstQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithLimitToFirst(10).Get(context.Background(), &got); err != nil {
+	if err := testref.OrderByChild("messages").LimitToFirst(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("query.WithLimitToFirst() = %v; want = %v", got, want)
+		t.Errorf("LimitToFirst() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -255,11 +255,11 @@ func TestLimitLastQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithLimitToLast(10).Get(context.Background(), &got); err != nil {
+	if err := testref.OrderByChild("messages").LimitToLast(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("query.WithLimitToLast() = %v; want = %v", got, want)
+		t.Errorf("LimitToLast() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -279,9 +279,9 @@ func TestInvalidLimitQuery(t *testing.T) {
 		name string
 		q    *Query
 	}{
-		{"BothLimits", q.WithLimitToFirst(10).WithLimitToLast(10)},
-		{"NegativeFirst", q.WithLimitToFirst(-10)},
-		{"NegativeLast", q.WithLimitToLast(-10)},
+		{"BothLimits", q.LimitToFirst(10).LimitToLast(10)},
+		{"NegativeFirst", q.LimitToFirst(-10)},
+		{"NegativeLast", q.LimitToLast(-10)},
 	}
 	for _, tc := range cases {
 		var got map[string]interface{}
@@ -301,11 +301,11 @@ func TestStartAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithStartAt(10).Get(context.Background(), &got); err != nil {
+	if err := testref.OrderByChild("messages").StartAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("WithStartAt() = %v; want = %v", got, want)
+		t.Errorf("StartAt() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -321,11 +321,11 @@ func TestEndAtQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithEndAt(10).Get(context.Background(), &got); err != nil {
+	if err := testref.OrderByChild("messages").EndAt(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("WithEndAt() = %v; want = %v", got, want)
+		t.Errorf("EndAt() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -341,11 +341,11 @@ func TestEqualToQuery(t *testing.T) {
 	defer srv.Close()
 
 	var got map[string]interface{}
-	if err := testref.OrderByChild("messages").WithEqualTo(10).Get(context.Background(), &got); err != nil {
+	if err := testref.OrderByChild("messages").EqualTo(10).Get(context.Background(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("WithEqualTo() = %v; want = %v", got, want)
+		t.Errorf("EqualTo() = %v; want = %v", got, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
@@ -365,9 +365,9 @@ func TestInvalidFilterQuery(t *testing.T) {
 		name string
 		q    *Query
 	}{
-		{"InvalidStartAt", q.WithStartAt(func() {})},
-		{"InvalidEndAt", q.WithEndAt(func() {})},
-		{"InvalidEqualTo", q.WithEqualTo(func() {})},
+		{"InvalidStartAt", q.StartAt(func() {})},
+		{"InvalidEndAt", q.EndAt(func() {})},
+		{"InvalidEqualTo", q.EqualTo(func() {})},
 	}
 	for _, tc := range cases {
 		var got map[string]interface{}
@@ -386,7 +386,7 @@ func TestAllParamsQuery(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	q := testref.OrderByChild("messages").WithLimitToFirst(100).WithStartAt("bar").WithEndAt("foo")
+	q := testref.OrderByChild("messages").LimitToFirst(100).StartAt("bar").EndAt("foo")
 	var got map[string]interface{}
 	if err := q.Get(context.Background(), &got); err != nil {
 		t.Fatal(err)

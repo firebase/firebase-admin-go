@@ -36,7 +36,7 @@ func TestLimitToFirst(t *testing.T) {
 	for _, tc := range []int{2, 10} {
 		var d []Dinosaur
 		if err := dinos.OrderByChild("height").
-			WithLimitToFirst(tc).
+			LimitToFirst(tc).
 			GetOrdered(context.Background(), &d); err != nil {
 			t.Fatal(err)
 		}
@@ -44,11 +44,11 @@ func TestLimitToFirst(t *testing.T) {
 		wl := min(tc, len(heightSorted))
 		want := heightSorted[:wl]
 		if len(d) != wl {
-			t.Errorf("WithLimitToFirst() = %v; want = %v", d, want)
+			t.Errorf("LimitToFirst() = %v; want = %v", d, want)
 		}
 		for i, w := range want {
 			if d[i] != parsedTestData[w] {
-				t.Errorf("[%d] WithLimitToFirst() = %v; want = %v", i, d[i], parsedTestData[w])
+				t.Errorf("[%d] LimitToFirst() = %v; want = %v", i, d[i], parsedTestData[w])
 			}
 		}
 	}
@@ -58,7 +58,7 @@ func TestLimitToLast(t *testing.T) {
 	for _, tc := range []int{2, 10} {
 		var d []Dinosaur
 		if err := dinos.OrderByChild("height").
-			WithLimitToLast(tc).
+			LimitToLast(tc).
 			GetOrdered(context.Background(), &d); err != nil {
 			t.Fatal(err)
 		}
@@ -66,11 +66,11 @@ func TestLimitToLast(t *testing.T) {
 		wl := min(tc, len(heightSorted))
 		want := heightSorted[len(heightSorted)-wl:]
 		if len(d) != wl {
-			t.Errorf("WithLimitToLast() = %v; want = %v", d, want)
+			t.Errorf("LimitToLast() = %v; want = %v", d, want)
 		}
 		for i, w := range want {
 			if d[i] != parsedTestData[w] {
-				t.Errorf("[%d] WithLimitToLast() = %v; want = %v", i, d[i], parsedTestData[w])
+				t.Errorf("[%d] LimitToLast() = %v; want = %v", i, d[i], parsedTestData[w])
 			}
 		}
 	}
@@ -79,18 +79,18 @@ func TestLimitToLast(t *testing.T) {
 func TestStartAt(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByChild("height").
-		WithStartAt(3.5).
+		StartAt(3.5).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
 
 	want := heightSorted[len(heightSorted)-2:]
 	if len(d) != len(want) {
-		t.Errorf("WithStartAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt() = %v; want = %v", d, want)
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
-			t.Errorf("[%d] WithStartAt() = %v; want = %v", i, d[i], parsedTestData[w])
+			t.Errorf("[%d] StartAt() = %v; want = %v", i, d[i], parsedTestData[w])
 		}
 	}
 }
@@ -98,18 +98,18 @@ func TestStartAt(t *testing.T) {
 func TestEndAt(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByChild("height").
-		WithEndAt(3.5).
+		EndAt(3.5).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
 
 	want := heightSorted[:4]
 	if len(d) != len(want) {
-		t.Errorf("WithStartAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt() = %v; want = %v", d, want)
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
-			t.Errorf("[%d] WithEndAt() = %v; want = %v", i, d[i], parsedTestData[w])
+			t.Errorf("[%d] EndAt() = %v; want = %v", i, d[i], parsedTestData[w])
 		}
 	}
 }
@@ -117,19 +117,19 @@ func TestEndAt(t *testing.T) {
 func TestStartAndEndAt(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByChild("height").
-		WithStartAt(2.5).
-		WithEndAt(5).
+		StartAt(2.5).
+		EndAt(5).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
 
 	want := heightSorted[len(heightSorted)-3 : len(heightSorted)-1]
 	if len(d) != len(want) {
-		t.Errorf("WithStartAt(), WithEndAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt(), EndAt() = %v; want = %v", d, want)
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
-			t.Errorf("[%d] WithStartAt(), WithEndAt() = %v; want = %v", i, d[i], parsedTestData[w])
+			t.Errorf("[%d] StartAt(), EndAt() = %v; want = %v", i, d[i], parsedTestData[w])
 		}
 	}
 }
@@ -137,18 +137,18 @@ func TestStartAndEndAt(t *testing.T) {
 func TestEqualTo(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByChild("height").
-		WithEqualTo(0.6).
+		EqualTo(0.6).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
 
 	want := heightSorted[:2]
 	if len(d) != len(want) {
-		t.Errorf("WithEqualTo() = %v; want = %v", d, want)
+		t.Errorf("EqualTo() = %v; want = %v", d, want)
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
-			t.Errorf("[%d] WithEqualTo() = %v; want = %v", i, d[i], parsedTestData[w])
+			t.Errorf("[%d] EqualTo() = %v; want = %v", i, d[i], parsedTestData[w])
 		}
 	}
 }
@@ -156,7 +156,7 @@ func TestEqualTo(t *testing.T) {
 func TestOrderByNestedChild(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByChild("ratings/pos").
-		WithStartAt(4).
+		StartAt(4).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestOrderByNestedChild(t *testing.T) {
 func TestOrderByKey(t *testing.T) {
 	var d []Dinosaur
 	if err := dinos.OrderByKey().
-		WithLimitToFirst(2).
+		LimitToFirst(2).
 		GetOrdered(context.Background(), &d); err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestOrderByValue(t *testing.T) {
 	scores := ref.Child("scores")
 	var s []int
 	if err := scores.OrderByValue().
-		WithLimitToLast(2).
+		LimitToLast(2).
 		GetOrdered(context.Background(), &s); err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestOrderByValue(t *testing.T) {
 
 func TestQueryWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	q := dinos.OrderByKey().WithLimitToFirst(2)
+	q := dinos.OrderByKey().LimitToFirst(2)
 	var m map[string]Dinosaur
 	if err := q.Get(ctx, &m); err != nil {
 		t.Fatal(err)
@@ -241,19 +241,19 @@ func TestQueryWithContext(t *testing.T) {
 func TestUnorderedQuery(t *testing.T) {
 	var m map[string]Dinosaur
 	if err := dinos.OrderByChild("height").
-		WithStartAt(2.5).
-		WithEndAt(5).
+		StartAt(2.5).
+		EndAt(5).
 		Get(context.Background(), &m); err != nil {
 		t.Fatal(err)
 	}
 
 	want := heightSorted[len(heightSorted)-3 : len(heightSorted)-1]
 	if len(m) != len(want) {
-		t.Errorf("WithStartAt(), WithEndAt() = %v; want = %v", m, want)
+		t.Errorf("StartAt(), EndAt() = %v; want = %v", m, want)
 	}
 	for _, w := range want {
 		if _, ok := m[w]; !ok {
-			t.Errorf("WithStartAt(), WithEndAt() = %v; want key = %v", m, w)
+			t.Errorf("StartAt(), EndAt() = %v; want key = %v", m, w)
 		}
 	}
 }
