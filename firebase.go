@@ -38,15 +38,7 @@ import (
 	"google.golang.org/api/transport"
 )
 
-var firebaseScopes = []string{
-	"https://www.googleapis.com/auth/cloud-platform",
-	"https://www.googleapis.com/auth/datastore",
-	"https://www.googleapis.com/auth/devstorage.full_control",
-	"https://www.googleapis.com/auth/firebase",
-	"https://www.googleapis.com/auth/identitytoolkit",
-	"https://www.googleapis.com/auth/userinfo.email",
-	"https://www.googleapis.com/auth/firebase.messaging",
-}
+var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
 const Version = "2.5.0"
@@ -66,10 +58,10 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	AuthOverride  *db.AuthOverride `json:"databaseAuthVariableOverride"`
-	DatabaseURL   string           `json:"databaseURL"`
-	ProjectID     string           `json:"projectId"`
-	StorageBucket string           `json:"storageBucket"`
+	AuthOverride  *map[string]interface{} `json:"databaseAuthVariableOverride"`
+	DatabaseURL   string                  `json:"databaseURL"`
+	ProjectID     string                  `json:"projectId"`
+	StorageBucket string                  `json:"storageBucket"`
 }
 
 // Auth returns an instance of auth.Client.
@@ -161,9 +153,9 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		pid = os.Getenv("GCLOUD_PROJECT")
 	}
 
-	ao := make(map[string]interface{})
+	ao := defaultAuthOverrides
 	if config.AuthOverride != nil {
-		ao = config.AuthOverride.Map
+		ao = *config.AuthOverride
 	}
 
 	return &App{
@@ -193,6 +185,19 @@ func getConfigDefaults() (*Config, error) {
 			return nil, err
 		}
 	}
-	err := json.Unmarshal(dat, fbc)
-	return fbc, err
+	if err := json.Unmarshal(dat, fbc); err != nil {
+		return nil, err
+	}
+
+	// Some special handling necessary for db auth overrides
+	var m map[string]interface{}
+	if err := json.Unmarshal(dat, &m); err != nil {
+		return nil, err
+	}
+	if ao, ok := m["databaseAuthVariableOverride"]; ok && ao == nil {
+		// Auth overrides are explicitly set to null
+		var nullMap map[string]interface{}
+		fbc.AuthOverride = &nullMap
+	}
+	return fbc, nil
 }

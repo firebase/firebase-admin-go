@@ -34,7 +34,6 @@ import (
 
 	"reflect"
 
-	"firebase.google.com/go/db"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
@@ -255,7 +254,7 @@ func TestDatabaseAuthOverrides(t *testing.T) {
 	for _, tc := range cases {
 		ctx := context.Background()
 		conf := &Config{
-			AuthOverride: &db.AuthOverride{tc},
+			AuthOverride: &tc,
 			DatabaseURL:  "https://mock-db.firebaseio.com",
 		}
 		app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
@@ -405,7 +404,10 @@ func TestVersion(t *testing.T) {
 		}
 	}
 }
+
 func TestAutoInit(t *testing.T) {
+	var nullMap map[string]interface{}
+	uidMap := map[string]interface{}{"uid": "test"}
 	tests := []struct {
 		name          string
 		optionsConfig string
@@ -504,6 +506,34 @@ func TestAutoInit(t *testing.T) {
 				StorageBucket: "auto-init.storage.bucket",
 			},
 		},
+		{
+			"<env=string_null_auth_override,opts=nil>",
+			`{
+				"databaseURL": "https://auto-init.database.url",
+				"projectId": "auto-init-project-id",
+				"databaseAuthVariableOverride": null
+			}`,
+			nil,
+			&Config{
+				DatabaseURL:  "https://auto-init.database.url",
+				ProjectID:    "auto-init-project-id",
+				AuthOverride: &nullMap,
+			},
+		},
+		{
+			"<env=string_auth_override,opts=nil>",
+			`{
+				"databaseURL": "https://auto-init.database.url",
+				"projectId": "auto-init-project-id",
+				"databaseAuthVariableOverride": {"uid": "test"}
+			}`,
+			nil,
+			&Config{
+				DatabaseURL:  "https://auto-init.database.url",
+				ProjectID:    "auto-init-project-id",
+				AuthOverride: &uidMap,
+			},
+		},
 	}
 
 	credOld := overwriteEnv(credEnvVar, "testdata/service_account.json")
@@ -573,6 +603,13 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 func compareConfig(got *App, want *Config, t *testing.T) {
 	if got.dbURL != want.DatabaseURL {
 		t.Errorf("app.dbURL = %q; want = %q", got.dbURL, want.DatabaseURL)
+	}
+	if want.AuthOverride != nil {
+		if !reflect.DeepEqual(got.ao, *want.AuthOverride) {
+			t.Errorf("app.ao = %#v; want = %#v", got.ao, *want.AuthOverride)
+		}
+	} else if !reflect.DeepEqual(got.ao, defaultAuthOverrides) {
+		t.Errorf("app.ao = %#v; want = nil", got.ao)
 	}
 	if got.projectID != want.ProjectID {
 		t.Errorf("app.projectID = %q; want = %q", got.projectID, want.ProjectID)
