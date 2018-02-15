@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func TestLimitToFirst(t *testing.T) {
 		wl := min(tc, len(heightSorted))
 		want := heightSorted[:wl]
 		if len(d) != wl {
-			t.Errorf("LimitToFirst() = %v; want = %v", d, want)
+			t.Errorf("LimitToFirst() = %d; want = %d", len(d), wl)
 		}
 		for i, w := range want {
 			if d[i] != parsedTestData[w] {
@@ -66,7 +66,7 @@ func TestLimitToLast(t *testing.T) {
 		wl := min(tc, len(heightSorted))
 		want := heightSorted[len(heightSorted)-wl:]
 		if len(d) != wl {
-			t.Errorf("LimitToLast() = %v; want = %v", d, want)
+			t.Errorf("LimitToLast() = %d; want = %d", len(d), wl)
 		}
 		for i, w := range want {
 			if d[i] != parsedTestData[w] {
@@ -86,7 +86,7 @@ func TestStartAt(t *testing.T) {
 
 	want := heightSorted[len(heightSorted)-2:]
 	if len(d) != len(want) {
-		t.Errorf("StartAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt() = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -105,7 +105,7 @@ func TestEndAt(t *testing.T) {
 
 	want := heightSorted[:4]
 	if len(d) != len(want) {
-		t.Errorf("StartAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt() = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -125,7 +125,7 @@ func TestStartAndEndAt(t *testing.T) {
 
 	want := heightSorted[len(heightSorted)-3 : len(heightSorted)-1]
 	if len(d) != len(want) {
-		t.Errorf("StartAt(), EndAt() = %v; want = %v", d, want)
+		t.Errorf("StartAt(), EndAt() = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -144,7 +144,7 @@ func TestEqualTo(t *testing.T) {
 
 	want := heightSorted[:2]
 	if len(d) != len(want) {
-		t.Errorf("EqualTo() = %v; want = %v", d, want)
+		t.Errorf("EqualTo() = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -163,7 +163,7 @@ func TestOrderByNestedChild(t *testing.T) {
 
 	want := []string{"pterodactyl", "stegosaurus", "triceratops"}
 	if len(d) != len(want) {
-		t.Errorf("OrderByChild(ratings/pos) = %v; want = %v", d, want)
+		t.Errorf("OrderByChild(ratings/pos) = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -182,7 +182,7 @@ func TestOrderByKey(t *testing.T) {
 
 	want := []string{"bruhathkayosaurus", "lambeosaurus"}
 	if len(d) != len(want) {
-		t.Errorf("OrderByKey() = %v; want = %v", d, want)
+		t.Errorf("OrderByKey() = %d; want = %d", len(d), len(want))
 	}
 	for i, w := range want {
 		if d[i] != parsedTestData[w] {
@@ -202,13 +202,13 @@ func TestOrderByValue(t *testing.T) {
 
 	want := []string{"linhenykus", "pterodactyl"}
 	if len(s) != len(want) {
-		t.Errorf("OrderByValue() = %v; want = %v", s, want)
+		t.Errorf("OrderByValue() = %d; want = %d", len(s), len(want))
 	}
 	scoresData := testData["scores"].(map[string]interface{})
 	for i, w := range want {
 		ws := int(scoresData[w].(float64))
 		if s[i] != ws {
-			t.Errorf("[%d] OrderByValue() = %v; want = %v", i, s[i], ws)
+			t.Errorf("[%d] OrderByValue() = %d; want = %d", i, s[i], ws)
 		}
 	}
 }
@@ -223,12 +223,7 @@ func TestQueryWithContext(t *testing.T) {
 
 	want := []string{"bruhathkayosaurus", "lambeosaurus"}
 	if len(m) != len(want) {
-		t.Errorf("OrderByKey() = %v; want = %v", m, want)
-	}
-	for _, d := range want {
-		if _, ok := m[d]; !ok {
-			t.Errorf("OrderByKey() = %v; want key %q", m, d)
-		}
+		t.Errorf("OrderByKey() = %d; want = %d", len(m), len(want))
 	}
 
 	cancel()
@@ -249,11 +244,11 @@ func TestUnorderedQuery(t *testing.T) {
 
 	want := heightSorted[len(heightSorted)-3 : len(heightSorted)-1]
 	if len(m) != len(want) {
-		t.Errorf("StartAt(), EndAt() = %v; want = %v", m, want)
+		t.Errorf("Get() = %d; want = %d", len(m), len(want))
 	}
-	for _, w := range want {
+	for i, w := range want {
 		if _, ok := m[w]; !ok {
-			t.Errorf("StartAt(), EndAt() = %v; want key = %v", m, w)
+			t.Errorf("[%d] result[%q] not present", i, w)
 		}
 	}
 }

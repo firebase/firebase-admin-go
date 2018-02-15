@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -131,10 +131,10 @@ func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
 		return err
 	}
 
-	sr, err := newSortableQueryResult(temp, q.ob)
-	if err != nil {
-		return err
+	if temp == nil {
+		return nil
 	}
+	sr := newSortableQueryResult(temp, q.ob)
 	sort.Sort(sr)
 
 	var values []interface{}
@@ -363,7 +363,7 @@ func (s sortableQueryResult) Less(i, j int) bool {
 	return aKey.Compare(bKey) < 0
 }
 
-func newSortableQueryResult(values interface{}, order orderBy) (sortableQueryResult, error) {
+func newSortableQueryResult(values interface{}, order orderBy) sortableQueryResult {
 	var entries sortableQueryResult
 	if m, ok := values.(map[string]interface{}); ok {
 		for key, val := range m {
@@ -374,9 +374,9 @@ func newSortableQueryResult(values interface{}, order orderBy) (sortableQueryRes
 			entries = append(entries, newQueryResult(key, val, order))
 		}
 	} else {
-		return nil, fmt.Errorf("sorting not supported for the result")
+		entries = append(entries, newQueryResult(0, values, order))
 	}
-	return entries, nil
+	return entries
 }
 
 // extractChildValue retrieves the value at path from val.

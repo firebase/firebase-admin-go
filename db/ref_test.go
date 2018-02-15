@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ func TestGetShallow(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(tc, got) {
-			t.Errorf("Get() = %v; want = %v", got, tc)
+			t.Errorf("GetShallow() = %v; want = %v", got, tc)
 		}
 		want = append(want, &testReq{Method: "GET", Path: "/peter.json", Query: wantQuery})
 	}
@@ -333,7 +333,7 @@ func TestInvalidPath(t *testing.T) {
 	}
 
 	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+		t.Errorf("Requests = %v; want = empty", mock.Reqs)
 	}
 }
 
@@ -356,7 +356,7 @@ func TestInvalidChildPath(t *testing.T) {
 	}
 
 	if len(mock.Reqs) != 0 {
-		t.Errorf("Requests: %v; want: empty", mock.Reqs)
+		t.Errorf("Requests = %v; want = empty", mock.Reqs)
 	}
 }
 
@@ -398,7 +398,7 @@ func TestInvalidSet(t *testing.T) {
 	}
 	for _, tc := range cases {
 		if err := testref.Set(context.Background(), tc); err == nil {
-			t.Errorf("Set(%v) = nil; want error", tc)
+			t.Errorf("Set(%v) = nil; want = error", tc)
 		}
 	}
 	if len(mock.Reqs) != 0 {

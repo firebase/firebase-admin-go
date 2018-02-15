@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package db contains integration tests for the firebase.google.com/go/db package.
 package db
 
 import (

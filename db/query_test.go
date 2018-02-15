@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -440,6 +440,7 @@ func TestChildQueryGetOrdered(t *testing.T) {
 	}{
 		{"name", []string{"alice", "bob", "charlie", "dave", "ernie"}},
 		{"age", []string{"ernie", "charlie", "bob", "dave", "alice"}},
+		{"nonexisting", []string{"alice", "bob", "charlie", "dave", "ernie"}},
 	}
 
 	var reqs []*testReq
@@ -462,7 +463,6 @@ func TestChildQueryGetOrdered(t *testing.T) {
 			t.Errorf("GetOrdered(child: %q) = %v; want = %v", tc.child, got, tc.want)
 		}
 	}
-
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
@@ -501,7 +501,6 @@ func TestImmediateChildQueryGetOrdered(t *testing.T) {
 			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child", got, tc.want)
 		}
 	}
-
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
@@ -544,7 +543,6 @@ func TestNestedChildQueryGetOrdered(t *testing.T) {
 			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child/grandchild", got, tc.want)
 		}
 	}
-
 	checkAllRequests(t, mock.Reqs, reqs)
 }
 
@@ -572,7 +570,6 @@ func TestKeyQueryGetOrdered(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("GetOrdered(key) = %v; want = %v", got, want)
 	}
-
 	checkOnlyRequest(t, mock.Reqs, req)
 }
 
@@ -599,6 +596,7 @@ func TestValueQueryGetOrdered(t *testing.T) {
 			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
 		}
 	}
+	checkAllRequests(t, mock.Reqs, reqs)
 }
 
 func TestValueQueryGetOrderedWithList(t *testing.T) {
@@ -657,5 +655,52 @@ func TestValueQueryGetOrderedWithList(t *testing.T) {
 		if !reflect.DeepEqual(tc.want, got) {
 			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
 		}
+	}
+	checkAllRequests(t, mock.Reqs, reqs)
+}
+
+func TestGetOrderedWithNilResult(t *testing.T) {
+	mock := &mockServer{Resp: nil}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got []interface{}
+	if err := testref.OrderByChild("child").GetOrdered(context.Background(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("GetOrdered(value) = %v; want = nil", got)
+	}
+}
+
+func TestGetOrderedWithLeafNode(t *testing.T) {
+	mock := &mockServer{Resp: "foo"}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	var got []interface{}
+	if err := testref.OrderByChild("child").GetOrdered(context.Background(), &got); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []interface{}{"foo"}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("GetOrdered(value) = %v; want = %v", got, want)
+	}
+}
+
+func TestQueryHttpError(t *testing.T) {
+	mock := &mockServer{Resp: map[string]string{"error": "test error"}, Status: 500}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	want := "http error status: 500; reason: test error"
+	var got []string
+	err := testref.OrderByChild("child").GetOrdered(context.Background(), &got)
+	if err == nil || err.Error() != want {
+		t.Errorf("GetOrdered() = %v; want = %v", err, want)
+	}
+	if got != nil {
+		t.Errorf("GetOrdered() = %v; want = nil", got)
 	}
 }
