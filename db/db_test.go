@@ -53,10 +53,10 @@ var testref *Ref
 func TestMain(m *testing.M) {
 	var err error
 	client, err = NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:    testOpts,
-		URL:     testURL,
-		Version: "1.2.3",
-		AO:      map[string]interface{}{},
+		Opts:         testOpts,
+		URL:          testURL,
+		Version:      "1.2.3",
+		AuthOverride: map[string]interface{}{},
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -64,10 +64,10 @@ func TestMain(m *testing.M) {
 
 	ao := map[string]interface{}{"uid": "user1"}
 	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:    testOpts,
-		URL:     testURL,
-		Version: "1.2.3",
-		AO:      ao,
+		Opts:         testOpts,
+		URL:          testURL,
+		Version:      "1.2.3",
+		AuthOverride: ao,
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -86,9 +86,9 @@ func TestMain(m *testing.M) {
 
 func TestNewClient(t *testing.T) {
 	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts: testOpts,
-		URL:  testURL,
-		AO:   make(map[string]interface{}),
+		Opts:         testOpts,
+		URL:          testURL,
+		AuthOverride: make(map[string]interface{}),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -99,8 +99,8 @@ func TestNewClient(t *testing.T) {
 	if c.hc == nil {
 		t.Errorf("NewClient().hc = nil; want non-nil")
 	}
-	if c.ao != "" {
-		t.Errorf("NewClient().ao = %q; want = %q", c.ao, "")
+	if c.authOverride != "" {
+		t.Errorf("NewClient().ao = %q; want = %q", c.authOverride, "")
 	}
 }
 
@@ -111,9 +111,9 @@ func TestNewClientAuthOverrides(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts: testOpts,
-			URL:  testURL,
-			AO:   tc,
+			Opts:         testOpts,
+			URL:          testURL,
+			AuthOverride: tc,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -128,8 +128,8 @@ func TestNewClientAuthOverrides(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.ao != string(b) {
-			t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.ao, string(b))
+		if c.authOverride != string(b) {
+			t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.authOverride, string(b))
 		}
 	}
 }
@@ -154,9 +154,9 @@ func TestInvalidURL(t *testing.T) {
 
 func TestInvalidAuthOverride(t *testing.T) {
 	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts: testOpts,
-		URL:  testURL,
-		AO:   map[string]interface{}{"uid": func() {}},
+		Opts:         testOpts,
+		URL:          testURL,
+		AuthOverride: map[string]interface{}{"uid": func() {}},
 	})
 	if c != nil || err == nil {
 		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)

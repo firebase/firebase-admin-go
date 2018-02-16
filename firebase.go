@@ -48,7 +48,7 @@ const firebaseEnvName = "FIREBASE_CONFIG"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
-	ao            map[string]interface{}
+	authOverride  map[string]interface{}
 	creds         *google.DefaultCredentials
 	dbURL         string
 	projectID     string
@@ -78,10 +78,10 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 // Database returns an instance of db.Client.
 func (a *App) Database(ctx context.Context) (*db.Client, error) {
 	conf := &internal.DatabaseConfig{
-		AO:      a.ao,
-		URL:     a.dbURL,
-		Opts:    a.opts,
-		Version: Version,
+		AuthOverride: a.authOverride,
+		URL:          a.dbURL,
+		Opts:         a.opts,
+		Version:      Version,
 	}
 	return db.NewClient(ctx, conf)
 }
@@ -159,7 +159,7 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	}
 
 	return &App{
-		ao:            ao,
+		authOverride:  ao,
 		creds:         creds,
 		dbURL:         config.DatabaseURL,
 		projectID:     pid,

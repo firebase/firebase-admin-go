@@ -25,6 +25,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// txnRetires is the maximum number of times a transaction is retried before giving up. Transaction
+// retries are triggered by concurrent conflicting updates to the same database location.
 const txnRetries = 25
 
 // Ref represents a node in the Firebase Realtime Database.

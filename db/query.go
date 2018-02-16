@@ -39,7 +39,7 @@ import (
 type Query struct {
 	client              *Client
 	path                string
-	ob                  orderBy
+	order               orderBy
 	limFirst, limLast   int
 	start, end, equalTo interface{}
 }
@@ -48,7 +48,7 @@ type Query struct {
 //
 // The resulting Query will only return child nodes with a value greater than or equal to v.
 func (q *Query) StartAt(v interface{}) *Query {
-	q2 := new(Query)
+	q2 := &Query{}
 	*q2 = *q
 	q2.start = v
 	return q2
@@ -58,7 +58,7 @@ func (q *Query) StartAt(v interface{}) *Query {
 //
 // The resulting Query will only return child nodes with a value less than or equal to v.
 func (q *Query) EndAt(v interface{}) *Query {
-	q2 := new(Query)
+	q2 := &Query{}
 	*q2 = *q
 	q2.end = v
 	return q2
@@ -68,7 +68,7 @@ func (q *Query) EndAt(v interface{}) *Query {
 //
 // The resulting Query will only return child nodes whose values equal to v.
 func (q *Query) EqualTo(v interface{}) *Query {
-	q2 := new(Query)
+	q2 := &Query{}
 	*q2 = *q
 	q2.equalTo = v
 	return q2
@@ -77,7 +77,7 @@ func (q *Query) EqualTo(v interface{}) *Query {
 // LimitToFirst returns a shallow copy of the Query, which is anchored to the first n
 // elements of the window.
 func (q *Query) LimitToFirst(n int) *Query {
-	q2 := new(Query)
+	q2 := &Query{}
 	*q2 = *q
 	q2.limFirst = n
 	return q2
@@ -86,7 +86,7 @@ func (q *Query) LimitToFirst(n int) *Query {
 // LimitToLast returns a shallow copy of the Query, which is anchored to the last n
 // elements of the window.
 func (q *Query) LimitToLast(n int) *Query {
-	q2 := new(Query)
+	q2 := &Query{}
 	*q2 = *q
 	q2.limLast = n
 	return q2
@@ -134,7 +134,7 @@ func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
 	if temp == nil {
 		return nil
 	}
-	sr := newSortableQueryResult(temp, q.ob)
+	sr := newSortableQueryResult(temp, q.order)
 	sort.Sort(sr)
 
 	var values []interface{}
@@ -179,12 +179,12 @@ func newQuery(r *Ref, ob orderBy) *Query {
 	return &Query{
 		client: r.client,
 		path:   r.Path,
-		ob:     ob,
+		order:  ob,
 	}
 }
 
 func initQueryParams(q *Query, qp map[string]string) error {
-	ob, err := q.ob.encode()
+	ob, err := q.order.encode()
 	if err != nil {
 		return err
 	}

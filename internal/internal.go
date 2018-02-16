@@ -47,10 +47,10 @@ type InstanceIDConfig struct {
 
 // DatabaseConfig represents the configuration of Firebase Database service.
 type DatabaseConfig struct {
-	Opts    []option.ClientOption
-	URL     string
-	Version string
-	AO      map[string]interface{}
+	Opts         []option.ClientOption
+	URL          string
+	Version      string
+	AuthOverride map[string]interface{}
 }
 
 // StorageConfig represents the configuration of Google Cloud Storage service.

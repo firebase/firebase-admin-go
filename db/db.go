@@ -36,9 +36,9 @@ const authVarOverride = "auth_variable_override"
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
-	hc  *internal.HTTPClient
-	url string
-	ao  string
+	hc           *internal.HTTPClient
+	url          string
+	authOverride string
 }
 
 // NewClient creates a new instance of the Firebase Database Client.
@@ -58,14 +58,14 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	if err != nil {
 		return nil, err
 	} else if p.Scheme != "https" {
-		return nil, fmt.Errorf("invalid database URL (incorrect scheme): %q", c.URL)
+		return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
 	} else if !strings.HasSuffix(p.Host, ".firebaseio.com") {
-		return nil, fmt.Errorf("invalid database URL (incorrest host): %q", c.URL)
+		return nil, fmt.Errorf("invalid database URL: %q; want host: %q", c.URL, "firebaseio.com")
 	}
 
 	var ao []byte
-	if c.AO == nil || len(c.AO) > 0 {
-		ao, err = json.Marshal(c.AO)
+	if c.AuthOverride == nil || len(c.AuthOverride) > 0 {
+		ao, err = json.Marshal(c.AuthOverride)
 		if err != nil {
 			return nil, err
 		}
@@ -81,9 +81,9 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return p.Error
 	}
 	return &Client{
-		hc:  &internal.HTTPClient{Client: hc, ErrParser: ep},
-		url: fmt.Sprintf("https://%s", p.Host),
-		ao:  string(ao),
+		hc:           &internal.HTTPClient{Client: hc, ErrParser: ep},
+		url:          fmt.Sprintf("https://%s", p.Host),
+		authOverride: string(ao),
 	}, nil
 }
 
@@ -112,8 +112,8 @@ func (c *Client) send(
 	if strings.ContainsAny(path, invalidChars) {
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
 	}
-	if c.ao != "" {
-		opts = append(opts, internal.WithQueryParam(authVarOverride, c.ao))
+	if c.authOverride != "" {
+		opts = append(opts, internal.WithQueryParam(authVarOverride, c.authOverride))
 	}
 	return c.hc.Do(ctx, &internal.Request{
 		Method: method,

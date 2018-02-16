@@ -278,7 +278,7 @@ func TestGetIfChanged(t *testing.T) {
 	})
 }
 
-func TestWerlformedHttpError(t *testing.T) {
+func TestWelformedHttpError(t *testing.T) {
 	mock := &mockServer{Resp: map[string]string{"error": "test error"}, Status: 500}
 	srv := mock.Start(client)
 	defer srv.Close()

@@ -237,8 +237,8 @@ func TestDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if app.ao == nil || len(app.ao) != 0 {
-		t.Errorf("AuthOverrides = %v; want = empty map", app.ao)
+	if app.authOverride == nil || len(app.authOverride) != 0 {
+		t.Errorf("AuthOverrides = %v; want = empty map", app.authOverride)
 	}
 	if c, err := app.Database(ctx); c == nil || err != nil {
 		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
@@ -262,8 +262,8 @@ func TestDatabaseAuthOverrides(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if !reflect.DeepEqual(app.ao, tc) {
-			t.Errorf("AuthOverrides = %v; want = %v", app.ao, tc)
+		if !reflect.DeepEqual(app.authOverride, tc) {
+			t.Errorf("AuthOverrides = %v; want = %v", app.authOverride, tc)
 		}
 		if c, err := app.Database(ctx); c == nil || err != nil {
 			t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
@@ -605,11 +605,11 @@ func compareConfig(got *App, want *Config, t *testing.T) {
 		t.Errorf("app.dbURL = %q; want = %q", got.dbURL, want.DatabaseURL)
 	}
 	if want.AuthOverride != nil {
-		if !reflect.DeepEqual(got.ao, *want.AuthOverride) {
-			t.Errorf("app.ao = %#v; want = %#v", got.ao, *want.AuthOverride)
+		if !reflect.DeepEqual(got.authOverride, *want.AuthOverride) {
+			t.Errorf("app.ao = %#v; want = %#v", got.authOverride, *want.AuthOverride)
 		}
-	} else if !reflect.DeepEqual(got.ao, defaultAuthOverrides) {
-		t.Errorf("app.ao = %#v; want = nil", got.ao)
+	} else if !reflect.DeepEqual(got.authOverride, defaultAuthOverrides) {
+		t.Errorf("app.ao = %#v; want = nil", got.authOverride)
 	}
 	if got.projectID != want.ProjectID {
 		t.Errorf("app.projectID = %q; want = %q", got.projectID, want.ProjectID)
