@@ -122,7 +122,7 @@ func accessServicesMultipleApp() (*auth.Client, error) {
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens
 // ==================================================================
 
-func createCustomToken(app *firebase.App) sting {
+func createCustomToken(app *firebase.App) string {
 	// [START create_custom_token]
 	client, err := app.Auth(context.Background())
 	if err != nil {
@@ -136,7 +136,7 @@ func createCustomToken(app *firebase.App) sting {
 
 	log.Printf("Got custom token: %v\n", token)
 	// [END create_custom_token]
-
+	a := 4
 	return token
 }
 
