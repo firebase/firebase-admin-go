@@ -136,7 +136,6 @@ func createCustomToken(app *firebase.App) string {
 
 	log.Printf("Got custom token: %v\n", token)
 	// [END create_custom_token]
-	a := 4
 	return token
 }
 
