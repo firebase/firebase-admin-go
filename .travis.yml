@@ -1,7 +1,17 @@
 language: go
+
+go:
+  - 1.6.x
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+
 go_import_path: firebase.google.com/go
+
 before_install:
     - go get github.com/golang/lint/golint
+
 script:
     - golint -set_exit_status $(go list ./...)
     - go test -v -test.short ./...
