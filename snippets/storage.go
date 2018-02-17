@@ -68,9 +68,3 @@ func cloudStorageCustomBucket(app *firebase.App) {
 	}
 	log.Printf("Created bucket handle: %v\n", bucket)
 }
-
-func storageMain() {
-	app := initializeAppWithServiceAccount()
-	cloudStorage()
-	cloudStorageCustomBucket(app)
-}

@@ -116,15 +116,3 @@ func accessServicesMultipleApp() (*auth.Client, error) {
 	_ = defaultClient
 	return otherClient, nil
 }
-
-func main() {
-	_ = initializeAppWithRefreshToken()
-	_ = initializeAppWithServiceAccount()
-	_ = initializeAppDefault()
-	_, _ = accessServicesSingleApp()
-	_, _ = accessServicesMultipleApp()
-	tokenMain()
-	usersMain()
-	storageMain()
-	messagingMain()
-}

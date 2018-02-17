@@ -257,21 +257,3 @@ func unsubscribeFromTopic(ctx context.Context, client *messaging.Client) {
 	fmt.Println(response.SuccessCount, "tokens were unsubscribed successfully")
 	// [END unsubscribe_golang]
 }
-
-func messagingMain() {
-	app := initializeAppDefault()
-	ctx := context.Background()
-	client, _ := app.Messaging(ctx)
-
-	sendToToken(app)
-	sendToTopic(ctx, client)
-	sendToCondition(ctx, client)
-	sendDryRun(ctx, client)
-	_ = androidMessage()
-	_ = apnsMessage()
-	_ = webpushMessage()
-	_ = allPlatformsMessage()
-	subscribeToTopic(ctx, client)
-	unsubscribeFromTopic(ctx, client)
-
-}
