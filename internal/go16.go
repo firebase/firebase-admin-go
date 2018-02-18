@@ -17,8 +17,9 @@
 package internal
 
 import (
-	"context"
 	"io/ioutil"
+
+	"golang.org/x/net/context"
 )
 
 // Do executes the given Request, and returns a Response.
