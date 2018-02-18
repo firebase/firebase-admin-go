@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/shurcooL/go/ctxhttp"
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 func withContext(ctx context.Context, r *http.Request) *http.Request {
