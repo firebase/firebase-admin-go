@@ -6,13 +6,22 @@ go:
   - 1.8.x
   - 1.9.x
   - "1.10"
+  - master
+
+matrix:
+  # Build OK if fails on unstable development versions of Go.
+  allow_failures:
+    - go: master
+  # Don't wait for tests to finish on allow_failures.
+  # Mark the build finished if tests pass on other versions of Go.
+  fast_finish: true
 
 go_import_path: firebase.google.com/go
 
 before_install:
-    - go get github.com/golang/lint/golint
+    - go get github.com/golang/lint/golint #Golint requires Go 1.6 or later.
 
 script:
     - golint -set_exit_status $(go list ./...)
-    - go test -v -test.short ./...
-
+    - go test -v -race -test.short ./...        # Run tests with the race detector.
+    - go vet -v ./...                           # Run Go static analyzer.
