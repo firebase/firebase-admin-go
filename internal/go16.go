@@ -18,23 +18,10 @@ package internal
 
 import (
 	"io/ioutil"
-	"net/http"
-	"net/url"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
 )
-
-func withContext(ctx context.Context, r *http.Request) *http.Request {
-	if ctx == nil {
-		panic("nil context")
-	}
-	r2 := new(http.Request)
-	*r2 = *r
-	r2.URL = &url.URL{}
-	*(r2.URL) = *(r.URL)
-	return r2
-}
 
 // Do executes the given Request, and returns a Response.
 func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
