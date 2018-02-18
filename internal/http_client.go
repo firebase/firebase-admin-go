@@ -19,10 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-
-	"golang.org/x/net/context"
 )
 
 // HTTPClient is a convenient API to make HTTP calls.
@@ -35,31 +32,6 @@ import (
 type HTTPClient struct {
 	Client    *http.Client
 	ErrParser ErrorParser
-}
-
-// Do executes the given Request, and returns a Response.
-func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
-	req, err := r.buildHTTPRequest()
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.Client.Do(req.WithContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return &Response{
-		Status:    resp.StatusCode,
-		Body:      b,
-		Header:    resp.Header,
-		errParser: c.ErrParser,
-	}, nil
 }
 
 // Request contains all the parameters required to construct an outgoing HTTP request.
