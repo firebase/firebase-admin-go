@@ -19,7 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+
+	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 // HTTPClient is a convenient API to make HTTP calls.
@@ -40,6 +44,31 @@ type Request struct {
 	URL    string
 	Body   HTTPEntity
 	Opts   []HTTPOption
+}
+
+// Do executes the given Request, and returns a Response.
+func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
+	req, err := r.buildHTTPRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := ctxhttp.Do(ctx, c.Client, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{
+		Status:    resp.StatusCode,
+		Body:      b,
+		Header:    resp.Header,
+		errParser: c.ErrParser,
+	}, nil
 }
 
 func (r *Request) buildHTTPRequest() (*http.Request, error) {
