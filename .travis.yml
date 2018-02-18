@@ -22,7 +22,8 @@ before_install:
     - go get github.com/golang/lint/golint #Golint requires Go 1.6 or later.
 
 install:
-    - go get -t -v  | go list ./... | grep -v integration
+    # prio to go 1.8 package with only test go get returns : "no buildable Go source files ..."
+    - go get -t -v $(go list ./... | grep -v integration)
 
 script:
     - golint -set_exit_status $(go list ./...)
