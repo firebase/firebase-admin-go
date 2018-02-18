@@ -21,6 +21,9 @@ go_import_path: firebase.google.com/go
 before_install:
     - go get github.com/golang/lint/golint #Golint requires Go 1.6 or later.
 
+install:
+    - go get -t -v  | go list ./... | grep -v integration
+
 script:
     - golint -set_exit_status $(go list ./...)
     - go test -v -race -test.short ./...        # Run tests with the race detector.
