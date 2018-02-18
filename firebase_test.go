@@ -574,7 +574,7 @@ func overwriteEnv(varName, newVal string) string {
 	return oldVal
 }
 
-// reinstateEnv restores the enviornment variable, will usually be used deferred with overwriteEnv.
+// reinstateEnv restores the environment variable, will usually be used deferred with overwriteEnv.
 func reinstateEnv(varName, oldVal string) {
 	if len(varName) > 0 {
 		os.Setenv(varName, oldVal)
