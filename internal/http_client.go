@@ -38,14 +38,6 @@ type HTTPClient struct {
 	ErrParser ErrorParser
 }
 
-// Request contains all the parameters required to construct an outgoing HTTP request.
-type Request struct {
-	Method string
-	URL    string
-	Body   HTTPEntity
-	Opts   []HTTPOption
-}
-
 // Do executes the given Request, and returns a Response.
 func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 	req, err := r.buildHTTPRequest()
@@ -69,6 +61,14 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		Header:    resp.Header,
 		errParser: c.ErrParser,
 	}, nil
+}
+
+// Request contains all the parameters required to construct an outgoing HTTP request.
+type Request struct {
+	Method string
+	URL    string
+	Body   HTTPEntity
+	Opts   []HTTPOption
 }
 
 func (r *Request) buildHTTPRequest() (*http.Request, error) {
