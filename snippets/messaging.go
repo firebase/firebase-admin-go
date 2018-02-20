@@ -25,7 +25,7 @@ import (
 )
 
 func sendToToken(app *firebase.App) {
-	// [START send_to_token]
+	// [START send_to_token_golang]
 	// Obtain a messaging.Client from the App.
 	ctx := context.Background()
 	client, err := app.Messaging(ctx)
@@ -50,11 +50,11 @@ func sendToToken(app *firebase.App) {
 	}
 	// Response is a message ID string.
 	fmt.Println("Successfully sent message:", response)
-	// [END send_to_token]
+	// [END send_to_token_golang]
 }
 
 func sendToTopic(ctx context.Context, client *messaging.Client) {
-	// [START send_to_topic]
+	// [START send_to_topic_golang]
 	// The topic name can be optionally prefixed with "/topics/".
 	topic := "highScores"
 
@@ -74,11 +74,11 @@ func sendToTopic(ctx context.Context, client *messaging.Client) {
 	}
 	// Response is a message ID string.
 	fmt.Println("Successfully sent message:", response)
-	// [END send_to_topic]
+	// [END send_to_topic_golang]
 }
 
 func sendToCondition(ctx context.Context, client *messaging.Client) {
-	// [START send_to_condition]
+	// [START send_to_condition_golang]
 	// Define a condition which will send to devices which are subscribed
 	// to either the Google stock or the tech industry topics.
 	condition := "'stock-GOOG' in topics || 'industry-tech' in topics"
@@ -100,7 +100,7 @@ func sendToCondition(ctx context.Context, client *messaging.Client) {
 	}
 	// Response is a message ID string.
 	fmt.Println("Successfully sent message:", response)
-	// [END send_to_condition]
+	// [END send_to_condition_golang]
 }
 
 func sendDryRun(ctx context.Context, client *messaging.Client) {
@@ -112,7 +112,7 @@ func sendDryRun(ctx context.Context, client *messaging.Client) {
 		Token: "token",
 	}
 
-	// [START send_dry_run]
+	// [START send_dry_run_golang]
 	// Send a message in the dry run mode.
 	response, err := client.SendDryRun(ctx, message)
 	if err != nil {
@@ -120,11 +120,11 @@ func sendDryRun(ctx context.Context, client *messaging.Client) {
 	}
 	// Response is a message ID string.
 	fmt.Println("Dry run successful:", response)
-	// [END send_dry_run]
+	// [END send_dry_run_golang]
 }
 
 func androidMessage() *messaging.Message {
-	// [START android_message]
+	// [START android_message_golang]
 	oneHour := time.Duration(1) * time.Hour
 	message := &messaging.Message{
 		Android: &messaging.AndroidConfig{
@@ -139,12 +139,12 @@ func androidMessage() *messaging.Message {
 		},
 		Topic: "industry-tech",
 	}
-	// [END android_message]
+	// [END android_message_golang]
 	return message
 }
 
 func apnsMessage() *messaging.Message {
-	// [START apns_message]
+	// [START apns_message_golang]
 	badge := 42
 	message := &messaging.Message{
 		APNS: &messaging.APNSConfig{
@@ -163,12 +163,12 @@ func apnsMessage() *messaging.Message {
 		},
 		Topic: "industry-tech",
 	}
-	// [END apns_message]
+	// [END apns_message_golang]
 	return message
 }
 
 func webpushMessage() *messaging.Message {
-	// [START webpush_message]
+	// [START webpush_message_golang]
 	message := &messaging.Message{
 		Webpush: &messaging.WebpushConfig{
 			Notification: &messaging.WebpushNotification{
@@ -179,12 +179,12 @@ func webpushMessage() *messaging.Message {
 		},
 		Topic: "industry-tech",
 	}
-	// [END webpush_message]
+	// [END webpush_message_golang]
 	return message
 }
 
 func allPlatformsMessage() *messaging.Message {
-	// [START multi_platforms_message]
+	// [START multi_platforms_message_golang]
 	oneHour := time.Duration(1) * time.Hour
 	badge := 42
 	message := &messaging.Message{
@@ -208,14 +208,14 @@ func allPlatformsMessage() *messaging.Message {
 		},
 		Topic: "industry-tech",
 	}
-	// [END multi_platforms_message]
+	// [END multi_platforms_message_golang]
 	return message
 }
 
 func subscribeToTopic(ctx context.Context, client *messaging.Client) {
 	topic := "highScores"
 
-	// [START subscribe]
+	// [START subscribe_golang]
 	// These registration tokens come from the client FCM SDKs.
 	registrationTokens := []string{
 		"YOUR_REGISTRATION_TOKEN_1",
@@ -232,13 +232,13 @@ func subscribeToTopic(ctx context.Context, client *messaging.Client) {
 	// See the TopicManagementResponse reference documentation
 	// for the contents of response.
 	fmt.Println(response.SuccessCount, "tokens were subscribed successfully")
-	// [END subscribe]
+	// [END subscribe_golang]
 }
 
 func unsubscribeFromTopic(ctx context.Context, client *messaging.Client) {
 	topic := "highScores"
 
-	// [START unsubscribe]
+	// [START unsubscribe_golang]
 	// These registration tokens come from the client FCM SDKs.
 	registrationTokens := []string{
 		"YOUR_REGISTRATION_TOKEN_1",
@@ -255,5 +255,5 @@ func unsubscribeFromTopic(ctx context.Context, client *messaging.Client) {
 	// See the TopicManagementResponse reference documentation
 	// for the contents of response.
 	fmt.Println(response.SuccessCount, "tokens were unsubscribed successfully")
-	// [END unsubscribe]
+	// [END unsubscribe_golang]
 }

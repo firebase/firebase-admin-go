@@ -14,7 +14,6 @@
 
 package snippets
 
-// [START admin_import]
 import (
 	"context"
 	"log"
@@ -23,107 +22,14 @@ import (
 	"firebase.google.com/go/auth"
 
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
-
-// [END admin_import]
-
-// ==================================================================
-// https://firebase.google.com/docs/admin/setup
-// ==================================================================
-
-func initializeAppWithServiceAccount() *firebase.App {
-	// [START initialize_app_service_account]
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-	app, err := firebase.NewApp(context.Background(), nil, opt)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-	// [END initialize_app_service_account]
-
-	return app
-}
-
-func initializeAppWithRefreshToken() *firebase.App {
-	// [START initialize_app_refresh_token]
-	opt := option.WithCredentialsFile("path/to/refreshToken.json")
-	config := &firebase.Config{ProjectID: "my-project-id"}
-	app, err := firebase.NewApp(context.Background(), config, opt)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-	// [END initialize_app_refresh_token]
-
-	return app
-}
-
-func initializeAppDefault() *firebase.App {
-	// [START initialize_app_default]
-	app, err := firebase.NewApp(context.Background(), nil)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-	// [END initialize_app_default]
-
-	return app
-}
-
-func accessServicesSingleApp() (*auth.Client, error) {
-	// [START access_services_single_app]
-	// Initialize default app
-	app, err := firebase.NewApp(context.Background(), nil)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-
-	// Access auth service from the default app
-	client, err := app.Auth(context.Background())
-	if err != nil {
-		log.Fatalf("error getting Auth client: %v\n", err)
-	}
-	// [END access_services_single_app]
-
-	return client, err
-}
-
-func accessServicesMultipleApp() (*auth.Client, error) {
-	// [START access_services_multiple_app]
-	// Initialize the default app
-	defaultApp, err := firebase.NewApp(context.Background(), nil)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-
-	// Initialize another app with a different config
-	opt := option.WithCredentialsFile("service-account-other.json")
-	otherApp, err := firebase.NewApp(context.Background(), nil, opt)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
-
-	// Access Auth service from default app
-	defaultClient, err := defaultApp.Auth(context.Background())
-	if err != nil {
-		log.Fatalf("error getting Auth client: %v\n", err)
-	}
-
-	// Access auth service from other app
-	otherClient, err := otherApp.Auth(context.Background())
-	if err != nil {
-		log.Fatalf("error getting Auth client: %v\n", err)
-	}
-	// [END access_services_multiple_app]
-	// Avoid unused
-	_ = defaultClient
-	return otherClient, nil
-}
 
 // ==================================================================
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens
 // ==================================================================
 
 func createCustomToken(app *firebase.App) string {
-	// [START create_custom_token]
+	// [START create_custom_token_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
@@ -135,13 +41,13 @@ func createCustomToken(app *firebase.App) string {
 	}
 
 	log.Printf("Got custom token: %v\n", token)
-	// [END create_custom_token]
+	// [END create_custom_token_golang]
 
 	return token
 }
 
 func createCustomTokenWithClaims(app *firebase.App) string {
-	// [START create_custom_token_claims]
+	// [START create_custom_token_claims_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
@@ -157,7 +63,7 @@ func createCustomTokenWithClaims(app *firebase.App) string {
 	}
 
 	log.Printf("Got custom token: %v\n", token)
-	// [END create_custom_token_claims]
+	// [END create_custom_token_claims_golang]
 
 	return token
 }
@@ -167,7 +73,7 @@ func createCustomTokenWithClaims(app *firebase.App) string {
 // ==================================================================
 
 func verifyIDToken(app *firebase.App, idToken string) *auth.Token {
-	// [START verify_id_token]
+	// [START verify_id_token_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
@@ -179,7 +85,7 @@ func verifyIDToken(app *firebase.App, idToken string) *auth.Token {
 	}
 
 	log.Printf("Verified ID token: %v\n", token)
-	// [END verify_id_token]
+	// [END verify_id_token_golang]
 
 	return token
 }
@@ -190,7 +96,7 @@ func verifyIDToken(app *firebase.App, idToken string) *auth.Token {
 
 func revokeRefreshTokens(app *firebase.App, uid string) {
 
-	// [START revoke_tokens]
+	// [START revoke_tokens_golang]
 	ctx := context.Background()
 	client, err := app.Auth(ctx)
 	if err != nil {
@@ -206,12 +112,12 @@ func revokeRefreshTokens(app *firebase.App, uid string) {
 	}
 	timestamp := u.TokensValidAfterMillis / 1000
 	log.Printf("the refresh tokens were revoked at: %d (UTC seconds) ", timestamp)
-	// [END revoke_tokens]
+	// [END revoke_tokens_golang]
 }
 
 func verifyIDTokenAndCheckRevoked(app *firebase.App, idToken string) *auth.Token {
 	ctx := context.Background()
-	// [START verify_id_token_and_check_revoked]
+	// [START verify_id_token_and_check_revoked_golang]
 	client, err := app.Auth(ctx)
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
@@ -225,7 +131,7 @@ func verifyIDTokenAndCheckRevoked(app *firebase.App, idToken string) *auth.Token
 		}
 	}
 	log.Printf("Verified ID token: %v\n", token)
-	// [END verify_id_token_and_check_revoked]
+	// [END verify_id_token_and_check_revoked_golang]
 
 	return token
 }
@@ -237,7 +143,7 @@ func verifyIDTokenAndCheckRevoked(app *firebase.App, idToken string) *auth.Token
 func getUser(ctx context.Context, app *firebase.App) *auth.UserRecord {
 	uid := "some_string_uid"
 
-	// [START get_user]
+	// [START get_user_golang]
 	// Get an auth client from the firebase.App
 	client, err := app.Auth(context.Background())
 	if err != nil {
@@ -249,36 +155,36 @@ func getUser(ctx context.Context, app *firebase.App) *auth.UserRecord {
 		log.Fatalf("error getting user %s: %v\n", uid, err)
 	}
 	log.Printf("Successfully fetched user data: %v\n", u)
-	// [END get_user]
+	// [END get_user_golang]
 	return u
 }
 
 func getUserByEmail(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	email := "some@email.com"
-	// [START get_user_by_email]
+	// [START get_user_by_email_golang]
 	u, err := client.GetUserByEmail(ctx, email)
 	if err != nil {
 		log.Fatalf("error getting user by email %s: %v\n", email, err)
 	}
 	log.Printf("Successfully fetched user data: %v\n", u)
-	// [END get_user_by_email]
+	// [END get_user_by_email_golang]
 	return u
 }
 
 func getUserByPhone(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	phone := "+13214567890"
-	// [START get_user_by_phone]
+	// [START get_user_by_phone_golang]
 	u, err := client.GetUserByPhoneNumber(ctx, phone)
 	if err != nil {
 		log.Fatalf("error getting user by phone %s: %v\n", phone, err)
 	}
 	log.Printf("Successfully fetched user data: %v\n", u)
-	// [END get_user_by_phone]
+	// [END get_user_by_phone_golang]
 	return u
 }
 
 func createUser(ctx context.Context, client *auth.Client) *auth.UserRecord {
-	// [START create_user]
+	// [START create_user_golang]
 	params := (&auth.UserToCreate{}).
 		Email("user@example.com").
 		EmailVerified(false).
@@ -292,13 +198,13 @@ func createUser(ctx context.Context, client *auth.Client) *auth.UserRecord {
 		log.Fatalf("error creating user: %v\n", err)
 	}
 	log.Printf("Successfully created user: %v\n", u)
-	// [END create_user]
+	// [END create_user_golang]
 	return u
 }
 
 func createUserWithUID(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	uid := "something"
-	// [START create_user_with_uid]
+	// [START create_user_with_uid_golang]
 	params := (&auth.UserToCreate{}).
 		UID(uid).
 		Email("user@example.com").
@@ -308,13 +214,13 @@ func createUserWithUID(ctx context.Context, client *auth.Client) *auth.UserRecor
 		log.Fatalf("error creating user: %v\n", err)
 	}
 	log.Printf("Successfully created user: %v\n", u)
-	// [END create_user_with_uid]
+	// [END create_user_with_uid_golang]
 	return u
 }
 
 func updateUser(ctx context.Context, client *auth.Client) {
 	uid := "d"
-	// [START update_user]
+	// [START update_user_golang]
 	params := (&auth.UserToUpdate{}).
 		Email("user@example.com").
 		EmailVerified(true).
@@ -328,23 +234,23 @@ func updateUser(ctx context.Context, client *auth.Client) {
 		log.Fatalf("error updating user: %v\n", err)
 	}
 	log.Printf("Successfully updated user: %v\n", u)
-	// [END update_user]
+	// [END update_user_golang]
 }
 
 func deleteUser(ctx context.Context, client *auth.Client) {
 	uid := "d"
-	// [START delete_user]
+	// [START delete_user_golang]
 	err := client.DeleteUser(context.Background(), uid)
 	if err != nil {
 		log.Fatalf("error deleting user: %v\n", err)
 	}
 	log.Printf("Successfully deleted user: %s\n", uid)
-	// [END delete_user]
+	// [END delete_user_golang]
 }
 
 func customClaimsSet(ctx context.Context, app *firebase.App) {
 	uid := "uid"
-	// [START set_custom_user_claims]
+	// [START set_custom_user_claims_golang]
 	// Get an auth client from the firebase.App
 	client, err := app.Auth(context.Background())
 	if err != nil {
@@ -359,13 +265,13 @@ func customClaimsSet(ctx context.Context, app *firebase.App) {
 	}
 	// The new custom claims will propagate to the user's ID token the
 	// next time a new one is issued.
-	// [END set_custom_user_claims]
+	// [END set_custom_user_claims_golang]
 	// erase all existing custom claims
 }
 
 func customClaimsVerify(ctx context.Context, client *auth.Client) {
 	idToken := "token"
-	// [START verify_custom_claims]
+	// [START verify_custom_claims_golang]
 	// Verify the ID token first.
 	token, err := client.VerifyIDToken(idToken)
 	if err != nil {
@@ -378,12 +284,12 @@ func customClaimsVerify(ctx context.Context, client *auth.Client) {
 			//Allow access to requested admin resource.
 		}
 	}
-	// [END verify_custom_claims]
+	// [END verify_custom_claims_golang]
 }
 
 func customClaimsRead(ctx context.Context, client *auth.Client) {
 	uid := "uid"
-	// [START read_custom_user_claims]
+	// [START read_custom_user_claims_golang]
 	// Lookup the user associated with the specified uid.
 	user, err := client.GetUser(ctx, uid)
 	if err != nil {
@@ -395,11 +301,11 @@ func customClaimsRead(ctx context.Context, client *auth.Client) {
 			log.Println(admin)
 		}
 	}
-	// [END read_custom_user_claims]
+	// [END read_custom_user_claims_golang]
 }
 
 func customClaimsScript(ctx context.Context, client *auth.Client) {
-	// [START set_custom_user_claims_script]
+	// [START set_custom_user_claims_script_golang]
 	user, err := client.GetUserByEmail(ctx, "user@admin.example.com")
 	if err != nil {
 		log.Fatal(err)
@@ -414,11 +320,11 @@ func customClaimsScript(ctx context.Context, client *auth.Client) {
 		}
 
 	}
-	// [END set_custom_user_claims_script]
+	// [END set_custom_user_claims_script_golang]
 }
 
 func customClaimsIncremental(ctx context.Context, client *auth.Client) {
-	// [START set_custom_user_claims_incremental]
+	// [START set_custom_user_claims_incremental_golang]
 	user, err := client.GetUserByEmail(ctx, "user@admin.example.com")
 	if err != nil {
 		log.Fatal(err)
@@ -439,11 +345,11 @@ func customClaimsIncremental(ctx context.Context, client *auth.Client) {
 		}
 
 	}
-	// [END set_custom_user_claims_incremental]
+	// [END set_custom_user_claims_incremental_golang]
 }
 
 func listUsers(ctx context.Context, client *auth.Client) {
-	// [START list_all_users]
+	// [START list_all_users_golang]
 	// Note, behind the scenes, the Users() iterator will retrive 1000 Users at a time through the API
 	iter := client.Users(context.Background(), "")
 	for {
@@ -474,62 +380,5 @@ func listUsers(ctx context.Context, client *auth.Client) {
 			break
 		}
 	}
-	// [END list_all_users]
-}
-
-// ==================================================================
-// https://firebase.google.com/docs/storage/admin/start
-// ==================================================================
-
-func cloudStorage() {
-	// [START cloud_storage]
-	config := &firebase.Config{
-		StorageBucket: "<BUCKET_NAME>.appspot.com",
-	}
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-	app, err := firebase.NewApp(context.Background(), config, opt)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	client, err := app.Storage(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	bucket, err := client.DefaultBucket()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	// 'bucket' is an object defined in the cloud.google.com/go/storage package.
-	// See https://godoc.org/cloud.google.com/go/storage#BucketHandle
-	// for more details.
-	// [END cloud_storage]
-
-	log.Printf("Created bucket handle: %v\n", bucket)
-}
-
-func cloudStorageCustomBucket(app *firebase.App) {
-	client, err := app.Storage(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	// [START cloud_storage_custom_bucket]
-	bucket, err := client.Bucket("my-custom-bucket")
-	// [END cloud_storage_custom_bucket]
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("Created bucket handle: %v\n", bucket)
-}
-
-func main() {
-	app := initializeAppWithServiceAccount()
-
-	_ = createCustomToken(app)
-	_ = createCustomTokenWithClaims(app)
-	_ = verifyIDToken(app, "some-token")
-	cloudStorage()
-	cloudStorageCustomBucket(app)
+	// [END list_all_users_golang]
 }
