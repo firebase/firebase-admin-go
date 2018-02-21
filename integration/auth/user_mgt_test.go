@@ -371,6 +371,9 @@ func testRemoveCustomClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 	u, err = client.GetUser(context.Background(), testFixtures.sampleUserBlank.UID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if u.CustomClaims != nil {
 		t.Errorf("CustomClaims() = %#v; want = nil", u.CustomClaims)
 	}
