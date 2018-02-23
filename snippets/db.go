@@ -239,7 +239,7 @@ func pushValue(ctx context.Context, ref *db.Ref) {
 	}
 
 	if err := newPostRef.Set(ctx, &Post{
-		Author: "gracehope",
+		Author: "gracehop",
 		Title:  "Announcing COBOL, a New Programming Language",
 	}); err != nil {
 		log.Fatalln("Error setting value: %v", err)
