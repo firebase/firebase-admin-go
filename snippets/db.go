@@ -296,3 +296,89 @@ func transaction(ctx context.Context, client *db.Client) {
 	}
 	// [END transaction]
 }
+
+func readValue(ctx context.Context, app *firebase.App) {
+	// [START read_value]
+	// Create a database client from App.
+	client, err := app.Database(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing database client: %v", err)
+	}
+
+	// Get a database reference to our posts
+	ref := client.NewRef("server/saving-data/fireblog/posts")
+
+	// Read the data at the posts reference (this is a blocking operation)
+	var post Post
+	if err := ref.Get(ctx, &post); err != nil {
+		log.Fatalln("Error reading value: %v", err)
+	}
+	// [END read_value]
+	fmt.Println(ref.Path)
+}
+
+// [START dinosaur_type]
+
+// Dinosaur is a json-serializable type.
+type Dinosaur struct {
+	Height int `json:"height"`
+	Width  int `json:"width"`
+}
+
+// [END dinosaur_type]
+
+func orderByChild(ctx context.Context, client *db.Client) {
+	// [START order_by_child]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("height").Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	// Results obtained from Get() are not ordered.
+	// Use GetOrdered() to retrieve sorted results.
+	for key, val := range results {
+		fmt.Printf("%s was %d meteres tall", key, val.Height)
+	}
+	// [END order_by_child]
+}
+
+func orderByNestedChild(ctx context.Context, client *db.Client) {
+	// [START order_by_nested_child]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("dimensions/height").Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key, val := range results {
+		fmt.Printf("%s was %d meteres tall\n", key, val.Height)
+	}
+	// [END order_by_nested_child]
+}
+
+func orderByKey(ctx context.Context, client *db.Client) {
+	// [START order_by_key]
+	ref := client.NewRef("dinosaurs")
+
+	var results []Dinosaur
+	if err := ref.OrderByKey().GetOrdered(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	fmt.Println(results)
+	// [END order_by_key]
+}
+
+func orderByValue(ctx context.Context, client *db.Client) {
+	// [START order_by_value]
+	ref := client.NewRef("scores")
+
+	var results map[string]int
+	if err := ref.OrderByKey().Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key, val := range results {
+		fmt.Printf("The %s dinosaur's score is %d\n", key, val)
+	}
+	// [END order_by_value]
+}
