@@ -374,7 +374,7 @@ func orderByValue(ctx context.Context, client *db.Client) {
 	ref := client.NewRef("scores")
 
 	var snapshot map[string]int
-	if err := ref.OrderByKey().Get(ctx, &snapshot); err != nil {
+	if err := ref.OrderByValue().Get(ctx, &snapshot); err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
 	for key, val := range snapshot {
