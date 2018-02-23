@@ -1,0 +1,298 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package snippets
+
+// [START authenticate_db_imports]
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"firebase.google.com/go/db"
+
+	"firebase.google.com/go"
+	"google.golang.org/api/option"
+)
+
+// [END authenticate_db_imports]
+
+func authenticateWithAdminPrivileges() {
+	// [START authenticate_with_admin_privileges]
+	ctx := context.Background()
+	conf := &firebase.Config{
+		DatabaseURL: "https://databaseName.firebaseio.com",
+	}
+	// Fetch the service account key JSON file contents
+	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
+
+	// Initialize the app with a service account, granting admin privileges
+	app, err := firebase.NewApp(ctx, conf, opt)
+	if err != nil {
+		log.Fatalln("Error initializing app: %v", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing database client: %v", err)
+	}
+
+	// As an admin, the app has access to read and write all data, regradless of Security Rules
+	ref := client.NewRef("restricted_access/secret_document")
+	var data map[string]interface{}
+	if err := ref.Get(ctx, &data); err != nil {
+		log.Fatalln("Error reading from database: %v", err)
+	}
+	fmt.Println(data)
+	// [END authenticate_with_admin_privileges]
+}
+
+func authenticateWithLimitedPrivileges() {
+	// [START authenticate_with_limited_privileges]
+	ctx := context.Background()
+	// Initialize the app with a custom auth variable, limiting the server's access
+	ao := map[string]interface{}{"uid": "my-service-worker"}
+	conf := &firebase.Config{
+		DatabaseURL:  "https://databaseName.firebaseio.com",
+		AuthOverride: &ao,
+	}
+
+	// Fetch the service account key JSON file contents
+	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
+
+	app, err := firebase.NewApp(ctx, conf, opt)
+	if err != nil {
+		log.Fatalln("Error initializing app: %v", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing database client: %v", err)
+	}
+
+	// The app only has access as defined in the Security Rules
+	ref := client.NewRef("/some_resource")
+	var data map[string]interface{}
+	if err := ref.Get(ctx, &data); err != nil {
+		log.Fatalln("Error reading from database: %v", err)
+	}
+	fmt.Println(data)
+	// [END authenticate_with_limited_privileges]
+}
+
+func authenticateWithGuestPrivileges() {
+	// [START authenticate_with_guest_privileges]
+	ctx := context.Background()
+	// Initialize the app with a nil auth variable, limiting the server's access
+	var nilMap map[string]interface{}
+	conf := &firebase.Config{
+		DatabaseURL:  "https://databaseName.firebaseio.com",
+		AuthOverride: &nilMap,
+	}
+
+	// Fetch the service account key JSON file contents
+	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
+
+	app, err := firebase.NewApp(ctx, conf, opt)
+	if err != nil {
+		log.Fatalln("Error initializing app: %v", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing database client: %v", err)
+	}
+
+	// The app only has access to public data as defined in the Security Rules
+	ref := client.NewRef("/some_resource")
+	var data map[string]interface{}
+	if err := ref.Get(ctx, &data); err != nil {
+		log.Fatalln("Error reading from database: %v", err)
+	}
+	fmt.Println(data)
+	// [END authenticate_with_guest_privileges]
+}
+
+func getReference(ctx context.Context, app *firebase.App) {
+	// [START get_reference]
+	// Create a database client from App.
+	client, err := app.Database(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing database client: %v", err)
+	}
+
+	// Get a database reference to our blog.
+	ref := client.NewRef("server/saving-data/fireblog")
+	// [END get_reference]
+	fmt.Println(ref.Path)
+}
+
+// [START user_type]
+
+// User is a json-serializable type.
+type User struct {
+	DateOfBirth string `json:"date_of_birth,omitempty"`
+	FullName    string `json:"full_name,omitempty"`
+	Nickname    string `json:"nickname,omitempty"`
+}
+
+// [END user_type]
+
+func setValue(ctx context.Context, ref *db.Ref) {
+	// [START set_value]
+	usersRef := ref.Child("users")
+	err := usersRef.Set(ctx, map[string]*User{
+		"alanisawesome": &User{
+			DateOfBirth: "June 23, 1912",
+			FullName:    "Alan Turing",
+		},
+		"gracehop": &User{
+			DateOfBirth: "December 9, 1906",
+			FullName:    "Grace Hopper",
+		},
+	})
+	if err != nil {
+		log.Fatalln("Error setting value: %v", err)
+	}
+	// [END set_value]
+}
+
+func setChildValue(ctx context.Context, usersRef *db.Ref) {
+	// [START set_child_value]
+	if err := usersRef.Child("alanisawesome").Set(ctx, &User{
+		DateOfBirth: "June 23, 1912",
+		FullName:    "Alan Turing",
+	}); err != nil {
+		log.Fatalln("Error setting value: %v", err)
+	}
+
+	if err := usersRef.Child("gracehop").Set(ctx, &User{
+		DateOfBirth: "December 9, 1906",
+		FullName:    "Grace Hopper",
+	}); err != nil {
+		log.Fatalln("Error setting value: %v", err)
+	}
+	// [END set_child_value]
+}
+
+func updateChild(ctx context.Context, usersRef *db.Ref) {
+	// [START update_child]
+	hopperRef := usersRef.Child("gracehop")
+	if err := hopperRef.Update(ctx, map[string]interface{}{
+		"nickname": "Amazing Grace",
+	}); err != nil {
+		log.Fatalln("Error updating child: %v", err)
+	}
+	// [END update_child]
+}
+
+func updateChildren(ctx context.Context, usersRef *db.Ref) {
+	// [START update_children]
+	if err := usersRef.Update(ctx, map[string]interface{}{
+		"alanisawesome/nickname": "Alan The Machine",
+		"gracehop/nickname":      "Amazing Grace",
+	}); err != nil {
+		log.Fatalln("Error updating children: %v", err)
+	}
+	// [END update_children]
+}
+
+func overwriteValue(ctx context.Context, usersRef *db.Ref) {
+	// [START overwrite_value]
+	if err := usersRef.Update(ctx, map[string]interface{}{
+		"alanisawesome": &User{Nickname: "Alan The Machine"},
+		"gracehop":      &User{Nickname: "Amazing Grace"},
+	}); err != nil {
+		log.Fatalln("Error updating children: %v", err)
+	}
+	// [END overwrite_value]
+}
+
+// [START post_type]
+
+// Post is a json-serializable type.
+type Post struct {
+	Author string `json:"author,omitempty"`
+	Title  string `json:"title,omitempty"`
+}
+
+// [END post_type]
+
+func pushValue(ctx context.Context, ref *db.Ref) {
+	// [START push_value]
+	postsRef := ref.Child("posts")
+
+	newPostRef, err := postsRef.Push(ctx, nil)
+	if err != nil {
+		log.Fatalln("Error pushing child node: %v", err)
+	}
+
+	if err := newPostRef.Set(ctx, &Post{
+		Author: "gracehope",
+		Title:  "Announcing COBOL, a New Programming Language",
+	}); err != nil {
+		log.Fatalln("Error setting value: %v", err)
+	}
+
+	// We can also chain the two calls together
+	if _, err := postsRef.Push(ctx, &Post{
+		Author: "alanisawesome",
+		Title:  "The Turing Machine",
+	}); err != nil {
+		log.Fatalln("Error pushing child node: %v", err)
+	}
+	// [END push_value]
+}
+
+func pushAndSetValue(ctx context.Context, postsRef *db.Ref) {
+	// [START push_and_set_value]
+	if _, err := postsRef.Push(ctx, &Post{
+		Author: "gracehop",
+		Title:  "Announcing COBOL, a New Programming Language",
+	}); err != nil {
+		log.Fatalln("Error pushing child node: %v", err)
+	}
+	// [END push_and_set_value]
+}
+
+func pushKey(ctx context.Context, postsRef *db.Ref) {
+	// [START push_key]
+	// Generate a reference to a new location and add some data using Push()
+	newPostRef, err := postsRef.Push(ctx, nil)
+	if err != nil {
+		log.Fatalln("Error pushing child node: %v", err)
+	}
+
+	// Get the unique key generated by Push()
+	postID := newPostRef.Key
+	// [END push_key]
+	fmt.Println(postID)
+}
+
+func transaction(ctx context.Context, client *db.Client) {
+	// [START transaction]
+	fn := func(t db.TransactionNode) (interface{}, error) {
+		var currentValue int
+		if err := t.Unmarshal(&currentValue); err != nil {
+			return nil, err
+		}
+		return currentValue + 1, nil
+	}
+
+	ref := client.NewRef("server/saving-data/fireblog/posts/-JRHTHaIs-jNPLXOQivY/upvotes")
+	if err := ref.Transaction(ctx, fn); err != nil {
+		log.Fatalln("Transaction failed to commit: %v", err)
+	}
+	// [END transaction]
+}
