@@ -382,3 +382,128 @@ func orderByValue(ctx context.Context, client *db.Client) {
 	}
 	// [END order_by_value]
 }
+
+func limitToLast(ctx context.Context, client *db.Client) {
+	// [START limit_query_1]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("weight").LimitToLast(2).Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END limit_query_1]
+}
+
+func limitToFirst(ctx context.Context, client *db.Client) {
+	// [START limit_query_2]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("height").LimitToFirst(2).Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END limit_query_2]
+}
+
+func limitWithValueOrder(ctx context.Context, client *db.Client) {
+	// [START limit_query_3]
+	ref := client.NewRef("scores")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByValue().LimitToLast(3).Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key, val := range results {
+		fmt.Printf("The %s dinosaur's score is %d\n", key, val)
+	}
+	// [END limit_query_3]
+}
+
+func startAt(ctx context.Context, client *db.Client) {
+	// [START range_query_1]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("height").StartAt(3).Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END range_query_1]
+}
+
+func endAt(ctx context.Context, client *db.Client) {
+	// [START range_query_2]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByKey().EndAt("pterodactyl").Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END range_query_2]
+}
+
+func startAndEndAt(ctx context.Context, client *db.Client) {
+	// [START range_query_3]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByKey().StartAt("b").EndAt("b\uf8ff").Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END range_query_3]
+}
+
+func equalTo(ctx context.Context, client *db.Client) {
+	// [START range_query_4]
+	ref := client.NewRef("dinosaurs")
+
+	var results map[string]Dinosaur
+	if err := ref.OrderByChild("height").EqualTo(25).Get(ctx, &results); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	for key := range results {
+		fmt.Println(key)
+	}
+	// [END range_query_4]
+}
+
+func complexQuery(ctx context.Context, client *db.Client) {
+	// [START complex_query]
+	ref := client.NewRef("dinosaurs")
+
+	var favDinoHeight int
+	if err := ref.Child("stegosaurus").Child("height").Get(ctx, &favDinoHeight); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	query := ref.OrderByChild("height").EndAt(favDinoHeight).LimitToLast(2)
+	var snapshot map[string]Dinosaur
+	if err := query.Get(ctx, &snapshot); err != nil {
+		log.Fatalln("Error querying database: %v", err)
+	}
+	if len(snapshot) == 2 {
+		for key := range snapshot {
+			// Data read by Get() are not ordered. So we check for the keys.
+			if key != "stegosaurus" {
+				fmt.Printf("The dinosaur just shorter than the stegosaurus is %s", key)
+				return
+			}
+		}
+	} else {
+		fmt.Println("The stegosaurus is the shortest dino")
+	}
+	// [END complex_query]
+}
