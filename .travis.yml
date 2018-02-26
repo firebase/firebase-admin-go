@@ -18,10 +18,10 @@ matrix:
 go_import_path: firebase.google.com/go
 
 before_install:
-    - go get github.com/golang/lint/golint #Golint requires Go 1.6 or later.
+    - go get github.com/golang/lint/golint # Golint requires Go 1.6 or later.
 
 install:
-    # prio to go 1.8 package with only test go get returns : "no buildable Go source files ..."
+    # Prior to golang 1.8, this can trigger an error for packages containing only tests.
     - go get -t -v $(go list ./... | grep -v integration)
 
 script:
