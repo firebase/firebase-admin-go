@@ -15,12 +15,11 @@
 package snippets
 
 import (
-	"context"
 	"log"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
-
+	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 )
 

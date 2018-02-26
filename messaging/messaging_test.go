@@ -15,7 +15,6 @@
 package messaging
 
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -25,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/api/option"
-
 	"firebase.google.com/go/internal"
+	"golang.org/x/net/context"
+	"google.golang.org/api/option"
 )
 
 const testMessageID = "projects/test-project/messages/msg_id"
