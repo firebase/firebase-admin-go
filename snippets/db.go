@@ -40,19 +40,19 @@ func authenticateWithAdminPrivileges() {
 	// Initialize the app with a service account, granting admin privileges
 	app, err := firebase.NewApp(ctx, conf, opt)
 	if err != nil {
-		log.Fatalln("Error initializing app: %v", err)
+		log.Fatalln("Error initializing app:", err)
 	}
 
 	client, err := app.Database(ctx)
 	if err != nil {
-		log.Fatalln("Error initializing database client: %v", err)
+		log.Fatalln("Error initializing database client:", err)
 	}
 
 	// As an admin, the app has access to read and write all data, regradless of Security Rules
 	ref := client.NewRef("restricted_access/secret_document")
 	var data map[string]interface{}
 	if err := ref.Get(ctx, &data); err != nil {
-		log.Fatalln("Error reading from database: %v", err)
+		log.Fatalln("Error reading from database:", err)
 	}
 	fmt.Println(data)
 	// [END authenticate_with_admin_privileges]
@@ -73,19 +73,19 @@ func authenticateWithLimitedPrivileges() {
 
 	app, err := firebase.NewApp(ctx, conf, opt)
 	if err != nil {
-		log.Fatalln("Error initializing app: %v", err)
+		log.Fatalln("Error initializing app:", err)
 	}
 
 	client, err := app.Database(ctx)
 	if err != nil {
-		log.Fatalln("Error initializing database client: %v", err)
+		log.Fatalln("Error initializing database client:", err)
 	}
 
 	// The app only has access as defined in the Security Rules
 	ref := client.NewRef("/some_resource")
 	var data map[string]interface{}
 	if err := ref.Get(ctx, &data); err != nil {
-		log.Fatalln("Error reading from database: %v", err)
+		log.Fatalln("Error reading from database:", err)
 	}
 	fmt.Println(data)
 	// [END authenticate_with_limited_privileges]
@@ -106,19 +106,19 @@ func authenticateWithGuestPrivileges() {
 
 	app, err := firebase.NewApp(ctx, conf, opt)
 	if err != nil {
-		log.Fatalln("Error initializing app: %v", err)
+		log.Fatalln("Error initializing app:", err)
 	}
 
 	client, err := app.Database(ctx)
 	if err != nil {
-		log.Fatalln("Error initializing database client: %v", err)
+		log.Fatalln("Error initializing database client:", err)
 	}
 
 	// The app only has access to public data as defined in the Security Rules
 	ref := client.NewRef("/some_resource")
 	var data map[string]interface{}
 	if err := ref.Get(ctx, &data); err != nil {
-		log.Fatalln("Error reading from database: %v", err)
+		log.Fatalln("Error reading from database:", err)
 	}
 	fmt.Println(data)
 	// [END authenticate_with_guest_privileges]
@@ -129,7 +129,7 @@ func getReference(ctx context.Context, app *firebase.App) {
 	// Create a database client from App.
 	client, err := app.Database(ctx)
 	if err != nil {
-		log.Fatalln("Error initializing database client: %v", err)
+		log.Fatalln("Error initializing database client:", err)
 	}
 
 	// Get a database reference to our blog.
@@ -163,7 +163,7 @@ func setValue(ctx context.Context, ref *db.Ref) {
 		},
 	})
 	if err != nil {
-		log.Fatalln("Error setting value: %v", err)
+		log.Fatalln("Error setting value:", err)
 	}
 	// [END set_value]
 }
@@ -174,14 +174,14 @@ func setChildValue(ctx context.Context, usersRef *db.Ref) {
 		DateOfBirth: "June 23, 1912",
 		FullName:    "Alan Turing",
 	}); err != nil {
-		log.Fatalln("Error setting value: %v", err)
+		log.Fatalln("Error setting value:", err)
 	}
 
 	if err := usersRef.Child("gracehop").Set(ctx, &User{
 		DateOfBirth: "December 9, 1906",
 		FullName:    "Grace Hopper",
 	}); err != nil {
-		log.Fatalln("Error setting value: %v", err)
+		log.Fatalln("Error setting value:", err)
 	}
 	// [END set_child_value]
 }
@@ -192,7 +192,7 @@ func updateChild(ctx context.Context, usersRef *db.Ref) {
 	if err := hopperRef.Update(ctx, map[string]interface{}{
 		"nickname": "Amazing Grace",
 	}); err != nil {
-		log.Fatalln("Error updating child: %v", err)
+		log.Fatalln("Error updating child:", err)
 	}
 	// [END update_child]
 }
@@ -203,7 +203,7 @@ func updateChildren(ctx context.Context, usersRef *db.Ref) {
 		"alanisawesome/nickname": "Alan The Machine",
 		"gracehop/nickname":      "Amazing Grace",
 	}); err != nil {
-		log.Fatalln("Error updating children: %v", err)
+		log.Fatalln("Error updating children:", err)
 	}
 	// [END update_children]
 }
@@ -214,7 +214,7 @@ func overwriteValue(ctx context.Context, usersRef *db.Ref) {
 		"alanisawesome": &User{Nickname: "Alan The Machine"},
 		"gracehop":      &User{Nickname: "Amazing Grace"},
 	}); err != nil {
-		log.Fatalln("Error updating children: %v", err)
+		log.Fatalln("Error updating children:", err)
 	}
 	// [END overwrite_value]
 }
@@ -235,14 +235,14 @@ func pushValue(ctx context.Context, ref *db.Ref) {
 
 	newPostRef, err := postsRef.Push(ctx, nil)
 	if err != nil {
-		log.Fatalln("Error pushing child node: %v", err)
+		log.Fatalln("Error pushing child node:", err)
 	}
 
 	if err := newPostRef.Set(ctx, &Post{
 		Author: "gracehop",
 		Title:  "Announcing COBOL, a New Programming Language",
 	}); err != nil {
-		log.Fatalln("Error setting value: %v", err)
+		log.Fatalln("Error setting value:", err)
 	}
 
 	// We can also chain the two calls together
@@ -250,7 +250,7 @@ func pushValue(ctx context.Context, ref *db.Ref) {
 		Author: "alanisawesome",
 		Title:  "The Turing Machine",
 	}); err != nil {
-		log.Fatalln("Error pushing child node: %v", err)
+		log.Fatalln("Error pushing child node:", err)
 	}
 	// [END push_value]
 }
@@ -261,7 +261,7 @@ func pushAndSetValue(ctx context.Context, postsRef *db.Ref) {
 		Author: "gracehop",
 		Title:  "Announcing COBOL, a New Programming Language",
 	}); err != nil {
-		log.Fatalln("Error pushing child node: %v", err)
+		log.Fatalln("Error pushing child node:", err)
 	}
 	// [END push_and_set_value]
 }
@@ -271,7 +271,7 @@ func pushKey(ctx context.Context, postsRef *db.Ref) {
 	// Generate a reference to a new location and add some data using Push()
 	newPostRef, err := postsRef.Push(ctx, nil)
 	if err != nil {
-		log.Fatalln("Error pushing child node: %v", err)
+		log.Fatalln("Error pushing child node:", err)
 	}
 
 	// Get the unique key generated by Push()
@@ -292,7 +292,7 @@ func transaction(ctx context.Context, client *db.Client) {
 
 	ref := client.NewRef("server/saving-data/fireblog/posts/-JRHTHaIs-jNPLXOQivY/upvotes")
 	if err := ref.Transaction(ctx, fn); err != nil {
-		log.Fatalln("Transaction failed to commit: %v", err)
+		log.Fatalln("Transaction failed to commit:", err)
 	}
 	// [END transaction]
 }
@@ -302,7 +302,7 @@ func readValue(ctx context.Context, app *firebase.App) {
 	// Create a database client from App.
 	client, err := app.Database(ctx)
 	if err != nil {
-		log.Fatalln("Error initializing database client: %v", err)
+		log.Fatalln("Error initializing database client:", err)
 	}
 
 	// Get a database reference to our posts
@@ -311,7 +311,7 @@ func readValue(ctx context.Context, app *firebase.App) {
 	// Read the data at the posts reference (this is a blocking operation)
 	var post Post
 	if err := ref.Get(ctx, &post); err != nil {
-		log.Fatalln("Error reading value: %v", err)
+		log.Fatalln("Error reading value:", err)
 	}
 	// [END read_value]
 	fmt.Println(ref.Path)
@@ -333,12 +333,12 @@ func orderByChild(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("height").GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		var d Dinosaur
 		if err := r.Unmarshal(&d); err != nil {
-			log.Fatalln("Error unmarshaling result: %v", err)
+			log.Fatalln("Error unmarshaling result:", err)
 		}
 		fmt.Printf("%s was %d meteres tall", r.Key(), d.Height)
 	}
@@ -351,12 +351,12 @@ func orderByNestedChild(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("dimensions/height").GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		var d Dinosaur
 		if err := r.Unmarshal(&d); err != nil {
-			log.Fatalln("Error unmarshaling result: %v", err)
+			log.Fatalln("Error unmarshaling result:", err)
 		}
 		fmt.Printf("%s was %d meteres tall", r.Key(), d.Height)
 	}
@@ -369,13 +369,13 @@ func orderByKey(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByKey().GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	snapshot := make([]Dinosaur, len(results))
 	for i, r := range results {
 		var d Dinosaur
 		if err := r.Unmarshal(&d); err != nil {
-			log.Fatalln("Error unmarshaling result: %v", err)
+			log.Fatalln("Error unmarshaling result:", err)
 		}
 		snapshot[i] = d
 	}
@@ -389,12 +389,12 @@ func orderByValue(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByValue().GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		var score int
 		if err := r.Unmarshal(&score); err != nil {
-			log.Fatalln("Error unmarshaling result: %v", err)
+			log.Fatalln("Error unmarshaling result:", err)
 		}
 		fmt.Printf("The %s dinosaur's score is %d\n", r.Key(), score)
 	}
@@ -407,7 +407,7 @@ func limitToLast(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("weight").LimitToLast(2).GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -421,7 +421,7 @@ func limitToFirst(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("height").LimitToFirst(2).GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -435,12 +435,12 @@ func limitWithValueOrder(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByValue().LimitToLast(3).GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		var score int
 		if err := r.Unmarshal(&score); err != nil {
-			log.Fatalln("Error unmarshaling result: %v", err)
+			log.Fatalln("Error unmarshaling result:", err)
 		}
 		fmt.Printf("The %s dinosaur's score is %d\n", r.Key(), score)
 	}
@@ -453,7 +453,7 @@ func startAt(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("height").StartAt(3).GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -467,7 +467,7 @@ func endAt(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByKey().EndAt("pterodactyl").GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -481,7 +481,7 @@ func startAndEndAt(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByKey().StartAt("b").EndAt("b\uf8ff").GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -495,7 +495,7 @@ func equalTo(ctx context.Context, client *db.Client) {
 
 	results, err := ref.OrderByChild("height").EqualTo(25).GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	for _, r := range results {
 		fmt.Println(r.Key())
@@ -509,13 +509,13 @@ func complexQuery(ctx context.Context, client *db.Client) {
 
 	var favDinoHeight int
 	if err := ref.Child("stegosaurus").Child("height").Get(ctx, &favDinoHeight); err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 
 	query := ref.OrderByChild("height").EndAt(favDinoHeight).LimitToLast(2)
 	results, err := query.GetOrdered(ctx)
 	if err != nil {
-		log.Fatalln("Error querying database: %v", err)
+		log.Fatalln("Error querying database:", err)
 	}
 	if len(results) == 2 {
 		// Data is ordered by increasing height, so we want the first entry.
