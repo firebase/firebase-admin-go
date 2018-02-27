@@ -331,14 +331,16 @@ func orderByChild(ctx context.Context, client *db.Client) {
 	// [START order_by_child]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("height").Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("height").GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	// Results obtained from Get() are not ordered.
-	// Use GetOrdered() to retrieve sorted results.
-	for key, val := range snapshot {
-		fmt.Printf("%s was %d meteres tall", key, val.Height)
+	for _, r := range results {
+		var d Dinosaur
+		if err := r.Unmarshal(&d); err != nil {
+			log.Fatalln("Error unmarshaling result: %v", err)
+		}
+		fmt.Printf("%s was %d meteres tall", r.Key(), d.Height)
 	}
 	// [END order_by_child]
 }
@@ -347,12 +349,16 @@ func orderByNestedChild(ctx context.Context, client *db.Client) {
 	// [START order_by_nested_child]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("dimensions/height").Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("dimensions/height").GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key, val := range snapshot {
-		fmt.Printf("%s was %d meteres tall\n", key, val.Height)
+	for _, r := range results {
+		var d Dinosaur
+		if err := r.Unmarshal(&d); err != nil {
+			log.Fatalln("Error unmarshaling result: %v", err)
+		}
+		fmt.Printf("%s was %d meteres tall", r.Key(), d.Height)
 	}
 	// [END order_by_nested_child]
 }
@@ -361,9 +367,17 @@ func orderByKey(ctx context.Context, client *db.Client) {
 	// [START order_by_key]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot []Dinosaur
-	if err := ref.OrderByKey().GetOrdered(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByKey().GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
+	}
+	snapshot := make([]Dinosaur, len(results))
+	for i, r := range results {
+		var d Dinosaur
+		if err := r.Unmarshal(&d); err != nil {
+			log.Fatalln("Error unmarshaling result: %v", err)
+		}
+		snapshot[i] = d
 	}
 	fmt.Println(snapshot)
 	// [END order_by_key]
@@ -373,12 +387,16 @@ func orderByValue(ctx context.Context, client *db.Client) {
 	// [START order_by_value]
 	ref := client.NewRef("scores")
 
-	var snapshot map[string]int
-	if err := ref.OrderByValue().Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByValue().GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key, val := range snapshot {
-		fmt.Printf("The %s dinosaur's score is %d\n", key, val)
+	for _, r := range results {
+		var score int
+		if err := r.Unmarshal(&score); err != nil {
+			log.Fatalln("Error unmarshaling result: %v", err)
+		}
+		fmt.Printf("The %s dinosaur's score is %d\n", r.Key(), score)
 	}
 	// [END order_by_value]
 }
@@ -387,12 +405,12 @@ func limitToLast(ctx context.Context, client *db.Client) {
 	// [START limit_query_1]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("weight").LimitToLast(2).Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("weight").LimitToLast(2).GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END limit_query_1]
 }
@@ -401,12 +419,12 @@ func limitToFirst(ctx context.Context, client *db.Client) {
 	// [START limit_query_2]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("height").LimitToFirst(2).Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("height").LimitToFirst(2).GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END limit_query_2]
 }
@@ -415,12 +433,16 @@ func limitWithValueOrder(ctx context.Context, client *db.Client) {
 	// [START limit_query_3]
 	ref := client.NewRef("scores")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByValue().LimitToLast(3).Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByValue().LimitToLast(3).GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key, val := range snapshot {
-		fmt.Printf("The %s dinosaur's score is %d\n", key, val)
+	for _, r := range results {
+		var score int
+		if err := r.Unmarshal(&score); err != nil {
+			log.Fatalln("Error unmarshaling result: %v", err)
+		}
+		fmt.Printf("The %s dinosaur's score is %d\n", r.Key(), score)
 	}
 	// [END limit_query_3]
 }
@@ -429,12 +451,12 @@ func startAt(ctx context.Context, client *db.Client) {
 	// [START range_query_1]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("height").StartAt(3).Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("height").StartAt(3).GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END range_query_1]
 }
@@ -443,12 +465,12 @@ func endAt(ctx context.Context, client *db.Client) {
 	// [START range_query_2]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByKey().EndAt("pterodactyl").Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByKey().EndAt("pterodactyl").GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END range_query_2]
 }
@@ -457,12 +479,12 @@ func startAndEndAt(ctx context.Context, client *db.Client) {
 	// [START range_query_3]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByKey().StartAt("b").EndAt("b\uf8ff").Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByKey().StartAt("b").EndAt("b\uf8ff").GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END range_query_3]
 }
@@ -471,12 +493,12 @@ func equalTo(ctx context.Context, client *db.Client) {
 	// [START range_query_4]
 	ref := client.NewRef("dinosaurs")
 
-	var snapshot map[string]Dinosaur
-	if err := ref.OrderByChild("height").EqualTo(25).Get(ctx, &snapshot); err != nil {
+	results, err := ref.OrderByChild("height").EqualTo(25).GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	for key := range snapshot {
-		fmt.Println(key)
+	for _, r := range results {
+		fmt.Println(r.Key())
 	}
 	// [END range_query_4]
 }
@@ -489,19 +511,16 @@ func complexQuery(ctx context.Context, client *db.Client) {
 	if err := ref.Child("stegosaurus").Child("height").Get(ctx, &favDinoHeight); err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
+
 	query := ref.OrderByChild("height").EndAt(favDinoHeight).LimitToLast(2)
-	var snapshot map[string]Dinosaur
-	if err := query.Get(ctx, &snapshot); err != nil {
+	results, err := query.GetOrdered(ctx)
+	if err != nil {
 		log.Fatalln("Error querying database: %v", err)
 	}
-	if len(snapshot) == 2 {
-		for key := range snapshot {
-			// Data read by Get() are not ordered. So we check for the keys.
-			if key != "stegosaurus" {
-				fmt.Printf("The dinosaur just shorter than the stegosaurus is %s", key)
-				return
-			}
-		}
+	if len(results) == 2 {
+		// Data is ordered by increasing height, so we want the first entry.
+		// Second entry is stegosarus.
+		fmt.Printf("The dinosaur just shorter than the stegosaurus is %s\n", results[0].Key())
 	} else {
 		fmt.Println("The stegosaurus is the shortest dino")
 	}
