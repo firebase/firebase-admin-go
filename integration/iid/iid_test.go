@@ -16,6 +16,7 @@
 package iid
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -23,8 +24,6 @@ import (
 
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 var client *iid.Client

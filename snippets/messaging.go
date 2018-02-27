@@ -15,13 +15,13 @@
 package snippets
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/messaging"
-	"golang.org/x/net/context"
 )
 
 func sendToToken(app *firebase.App) {

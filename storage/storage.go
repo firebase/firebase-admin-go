@@ -16,12 +16,11 @@
 package storage
 
 import (
+	"context"
 	"errors"
 
 	"cloud.google.com/go/storage"
 	"firebase.google.com/go/internal"
-
-	"golang.org/x/net/context"
 )
 
 // Client is the interface for the Firebase Storage service.

@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
@@ -25,7 +26,6 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/transport"
 )

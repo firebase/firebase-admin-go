@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -24,8 +25,6 @@ import (
 	"google.golang.org/api/iterator"
 
 	"firebase.google.com/go/auth"
-
-	"golang.org/x/net/context"
 )
 
 var testFixtures = struct {
