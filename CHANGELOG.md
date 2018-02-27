@@ -1,6 +1,6 @@
 # Unreleased
 
--
+- [changed] Import context from base package giving up on 1.6 compatibility
 
 # v2.5.0
 
