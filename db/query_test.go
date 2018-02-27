@@ -30,55 +30,67 @@ var sortableKeysResp = map[string]interface{}{
 }
 
 var sortableValuesResp = []struct {
-	resp map[string]interface{}
-	want []interface{}
+	resp     map[string]interface{}
+	want     []interface{}
+	wantKeys []string
 }{
 	{
-		resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 3},
-		want: []interface{}{1.0, 2.0, 3.0},
+		resp:     map[string]interface{}{"k1": 1, "k2": 2, "k3": 3},
+		want:     []interface{}{1.0, 2.0, 3.0},
+		wantKeys: []string{"k1", "k2", "k3"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 3, "k2": 2, "k3": 1},
-		want: []interface{}{1.0, 2.0, 3.0},
+		resp:     map[string]interface{}{"k1": 3, "k2": 2, "k3": 1},
+		want:     []interface{}{1.0, 2.0, 3.0},
+		wantKeys: []string{"k3", "k2", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 3, "k2": 1, "k3": 2},
-		want: []interface{}{1.0, 2.0, 3.0},
+		resp:     map[string]interface{}{"k1": 3, "k2": 1, "k3": 2},
+		want:     []interface{}{1.0, 2.0, 3.0},
+		wantKeys: []string{"k2", "k3", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 1, "k2": 2, "k3": 1},
-		want: []interface{}{1.0, 1.0, 2.0},
+		resp:     map[string]interface{}{"k1": 1, "k2": 2, "k3": 1},
+		want:     []interface{}{1.0, 1.0, 2.0},
+		wantKeys: []string{"k1", "k3", "k2"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 1, "k2": 1, "k3": 2},
-		want: []interface{}{1.0, 1.0, 2.0},
+		resp:     map[string]interface{}{"k1": 1, "k2": 1, "k3": 2},
+		want:     []interface{}{1.0, 1.0, 2.0},
+		wantKeys: []string{"k1", "k2", "k3"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 2, "k2": 1, "k3": 1},
-		want: []interface{}{1.0, 1.0, 2.0},
+		resp:     map[string]interface{}{"k1": 2, "k2": 1, "k3": 1},
+		want:     []interface{}{1.0, 1.0, 2.0},
+		wantKeys: []string{"k2", "k3", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": "baz"},
-		want: []interface{}{"bar", "baz", "foo"},
+		resp:     map[string]interface{}{"k1": "foo", "k2": "bar", "k3": "baz"},
+		want:     []interface{}{"bar", "baz", "foo"},
+		wantKeys: []string{"k2", "k3", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": 10},
-		want: []interface{}{10.0, "bar", "foo"},
+		resp:     map[string]interface{}{"k1": "foo", "k2": "bar", "k3": 10},
+		want:     []interface{}{10.0, "bar", "foo"},
+		wantKeys: []string{"k3", "k2", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": "foo", "k2": "bar", "k3": nil},
-		want: []interface{}{nil, "bar", "foo"},
+		resp:     map[string]interface{}{"k1": "foo", "k2": "bar", "k3": nil},
+		want:     []interface{}{nil, "bar", "foo"},
+		wantKeys: []string{"k3", "k2", "k1"},
 	},
 	{
-		resp: map[string]interface{}{"k1": 5, "k2": "bar", "k3": nil},
-		want: []interface{}{nil, 5.0, "bar"},
+		resp:     map[string]interface{}{"k1": 5, "k2": "bar", "k3": nil},
+		want:     []interface{}{nil, 5.0, "bar"},
+		wantKeys: []string{"k3", "k1", "k2"},
 	},
 	{
 		resp: map[string]interface{}{
 			"k1": true, "k2": 0, "k3": "foo", "k4": "foo", "k5": false,
 			"k6": map[string]interface{}{"k1": true},
 		},
-		want: []interface{}{false, true, 0.0, "foo", "foo", map[string]interface{}{"k1": true}},
+		want:     []interface{}{false, true, 0.0, "foo", "foo", map[string]interface{}{"k1": true}},
+		wantKeys: []string{"k5", "k1", "k2", "k3", "k4", "k6"},
 	},
 	{
 		resp: map[string]interface{}{
@@ -90,6 +102,7 @@ var sortableValuesResp = []struct {
 			nil, false, true, 0.0, "foo", "foo",
 			map[string]interface{}{"k1": true}, map[string]interface{}{"k0": true},
 		},
+		wantKeys: []string{"k7", "k5", "k1", "k2", "k3", "k4", "k6", "k8"},
 	},
 }
 
@@ -406,29 +419,6 @@ func TestAllParamsQuery(t *testing.T) {
 	})
 }
 
-func TestInvalidGetOrdered(t *testing.T) {
-	q := testref.OrderByKey()
-
-	want := "nil or not a pointer"
-	var p *[]person // nil
-	err := q.GetOrdered(context.Background(), p)
-	if err == nil || err.Error() != want {
-		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
-	}
-
-	var i interface{} // not a pointer
-	err = q.GetOrdered(context.Background(), i)
-	if err == nil || err.Error() != want {
-		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
-	}
-
-	want = "non-array non-slice pointer"
-	err = q.GetOrdered(context.Background(), &i) // pointer to a non-array value
-	if err == nil || err.Error() != want {
-		t.Errorf("GetOrdered(interface) = %v; want = %v", err, want)
-	}
-}
-
 func TestChildQueryGetOrdered(t *testing.T) {
 	mock := &mockServer{Resp: sortableKeysResp}
 	srv := mock.Start(client)
@@ -444,9 +434,9 @@ func TestChildQueryGetOrdered(t *testing.T) {
 	}
 
 	var reqs []*testReq
-	for _, tc := range cases {
-		var result []person
-		if err := testref.OrderByChild(tc.child).GetOrdered(context.Background(), &result); err != nil {
+	for idx, tc := range cases {
+		result, err := testref.OrderByChild(tc.child).GetOrdered(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -455,12 +445,20 @@ func TestChildQueryGetOrdered(t *testing.T) {
 			Query:  map[string]string{"orderBy": fmt.Sprintf("%q", tc.child)},
 		})
 
-		var got []string
+		var gotKeys, gotVals []string
 		for _, r := range result {
-			got = append(got, r.Name)
+			var p person
+			if err := r.Unmarshal(&p); err != nil {
+				t.Fatal(err)
+			}
+			gotKeys = append(gotKeys, r.Key())
+			gotVals = append(gotVals, p.Name)
 		}
-		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(child: %q) = %v; want = %v", tc.child, got, tc.want)
+		if !reflect.DeepEqual(tc.want, gotKeys) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, tc.child, gotKeys, tc.want)
+		}
+		if !reflect.DeepEqual(tc.want, gotVals) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, tc.child, gotVals, tc.want)
 		}
 	}
 	checkAllRequests(t, mock.Reqs, reqs)
@@ -476,15 +474,15 @@ func TestImmediateChildQueryGetOrdered(t *testing.T) {
 	}
 
 	var reqs []*testReq
-	for _, tc := range sortableValuesResp {
+	for idx, tc := range sortableValuesResp {
 		resp := map[string]interface{}{}
 		for k, v := range tc.resp {
 			resp[k] = map[string]interface{}{"child": v}
 		}
 		mock.Resp = resp
 
-		var result []parsedMap
-		if err := testref.OrderByChild("child").GetOrdered(context.Background(), &result); err != nil {
+		result, err := testref.OrderByChild("child").GetOrdered(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -493,12 +491,21 @@ func TestImmediateChildQueryGetOrdered(t *testing.T) {
 			Query:  map[string]string{"orderBy": "\"child\""},
 		})
 
-		var got []interface{}
+		var gotKeys []string
+		var gotVals []interface{}
 		for _, r := range result {
-			got = append(got, r.Child)
+			var p parsedMap
+			if err := r.Unmarshal(&p); err != nil {
+				t.Fatal(err)
+			}
+			gotKeys = append(gotKeys, r.Key())
+			gotVals = append(gotVals, p.Child)
 		}
-		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child", got, tc.want)
+		if !reflect.DeepEqual(tc.wantKeys, gotKeys) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, "child", gotKeys, tc.wantKeys)
+		}
+		if !reflect.DeepEqual(tc.want, gotVals) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, "child", gotVals, tc.want)
 		}
 	}
 	checkAllRequests(t, mock.Reqs, reqs)
@@ -517,16 +524,16 @@ func TestNestedChildQueryGetOrdered(t *testing.T) {
 	}
 
 	var reqs []*testReq
-	for _, tc := range sortableValuesResp {
+	for idx, tc := range sortableValuesResp {
 		resp := map[string]interface{}{}
 		for k, v := range tc.resp {
 			resp[k] = map[string]interface{}{"child": map[string]interface{}{"grandchild": v}}
 		}
 		mock.Resp = resp
 
-		var result []parsedMap
 		q := testref.OrderByChild("child/grandchild")
-		if err := q.GetOrdered(context.Background(), &result); err != nil {
+		result, err := q.GetOrdered(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -535,12 +542,21 @@ func TestNestedChildQueryGetOrdered(t *testing.T) {
 			Query:  map[string]string{"orderBy": "\"child/grandchild\""},
 		})
 
-		var got []interface{}
+		var gotKeys []string
+		var gotVals []interface{}
 		for _, r := range result {
-			got = append(got, r.Child.GrandChild)
+			var p parsedMap
+			if err := r.Unmarshal(&p); err != nil {
+				t.Fatal(err)
+			}
+			gotKeys = append(gotKeys, r.Key())
+			gotVals = append(gotVals, p.Child.GrandChild)
 		}
-		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(child: %q) = %v; want = %v", "child/grandchild", got, tc.want)
+		if !reflect.DeepEqual(tc.wantKeys, gotKeys) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, "child/grandchild", gotKeys, tc.wantKeys)
+		}
+		if !reflect.DeepEqual(tc.want, gotVals) {
+			t.Errorf("[%d] GetOrdered(child: %q) = %v; want = %v", idx, "child/grandchild", gotVals, tc.want)
 		}
 	}
 	checkAllRequests(t, mock.Reqs, reqs)
@@ -551,8 +567,8 @@ func TestKeyQueryGetOrdered(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var result []person
-	if err := testref.OrderByKey().GetOrdered(context.Background(), &result); err != nil {
+	result, err := testref.OrderByKey().GetOrdered(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 	req := &testReq{
@@ -561,14 +577,22 @@ func TestKeyQueryGetOrdered(t *testing.T) {
 		Query:  map[string]string{"orderBy": "\"$key\""},
 	}
 
-	var got []string
+	var gotKeys, gotVals []string
 	for _, r := range result {
-		got = append(got, r.Name)
+		var p person
+		if err := r.Unmarshal(&p); err != nil {
+			t.Fatal(err)
+		}
+		gotKeys = append(gotKeys, r.Key())
+		gotVals = append(gotVals, p.Name)
 	}
 
 	want := []string{"alice", "bob", "charlie", "dave", "ernie"}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("GetOrdered(key) = %v; want = %v", got, want)
+	if !reflect.DeepEqual(want, gotKeys) {
+		t.Errorf("GetOrdered(key) = %v; want = %v", gotKeys, want)
+	}
+	if !reflect.DeepEqual(want, gotVals) {
+		t.Errorf("GetOrdered(key) = %v; want = %v", gotVals, want)
 	}
 	checkOnlyRequest(t, mock.Reqs, req)
 }
@@ -579,11 +603,11 @@ func TestValueQueryGetOrdered(t *testing.T) {
 	defer srv.Close()
 
 	var reqs []*testReq
-	for _, tc := range sortableValuesResp {
+	for idx, tc := range sortableValuesResp {
 		mock.Resp = tc.resp
 
-		var got []interface{}
-		if err := testref.OrderByValue().GetOrdered(context.Background(), &got); err != nil {
+		result, err := testref.OrderByValue().GetOrdered(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -592,8 +616,22 @@ func TestValueQueryGetOrdered(t *testing.T) {
 			Query:  map[string]string{"orderBy": "\"$value\""},
 		})
 
-		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
+		var gotKeys []string
+		var gotVals []interface{}
+		for _, r := range result {
+			var v interface{}
+			if err := r.Unmarshal(&v); err != nil {
+				t.Fatal(err)
+			}
+			gotKeys = append(gotKeys, r.Key())
+			gotVals = append(gotVals, v)
+		}
+
+		if !reflect.DeepEqual(tc.wantKeys, gotKeys) {
+			t.Errorf("[%d] GetOrdered(value) = %v; want = %v", idx, gotKeys, tc.wantKeys)
+		}
+		if !reflect.DeepEqual(tc.want, gotVals) {
+			t.Errorf("[%d] GetOrdered(value) = %v; want = %v", idx, gotVals, tc.want)
 		}
 	}
 	checkAllRequests(t, mock.Reqs, reqs)
@@ -601,36 +639,44 @@ func TestValueQueryGetOrdered(t *testing.T) {
 
 func TestValueQueryGetOrderedWithList(t *testing.T) {
 	cases := []struct {
-		resp []interface{}
-		want []interface{}
+		resp     []interface{}
+		want     []interface{}
+		wantKeys []string
 	}{
 		{
-			resp: []interface{}{1, 2, 3},
-			want: []interface{}{1.0, 2.0, 3.0},
+			resp:     []interface{}{1, 2, 3},
+			want:     []interface{}{1.0, 2.0, 3.0},
+			wantKeys: []string{"0", "1", "2"},
 		},
 		{
-			resp: []interface{}{3, 2, 1},
-			want: []interface{}{1.0, 2.0, 3.0},
+			resp:     []interface{}{3, 2, 1},
+			want:     []interface{}{1.0, 2.0, 3.0},
+			wantKeys: []string{"2", "1", "0"},
 		},
 		{
-			resp: []interface{}{1, 3, 2},
-			want: []interface{}{1.0, 2.0, 3.0},
+			resp:     []interface{}{1, 3, 2},
+			want:     []interface{}{1.0, 2.0, 3.0},
+			wantKeys: []string{"0", "2", "1"},
 		},
 		{
-			resp: []interface{}{1, 3, 3},
-			want: []interface{}{1.0, 3.0, 3.0},
+			resp:     []interface{}{1, 3, 3},
+			want:     []interface{}{1.0, 3.0, 3.0},
+			wantKeys: []string{"0", "1", "2"},
 		},
 		{
-			resp: []interface{}{1, 2, 1},
-			want: []interface{}{1.0, 1.0, 2.0},
+			resp:     []interface{}{1, 2, 1},
+			want:     []interface{}{1.0, 1.0, 2.0},
+			wantKeys: []string{"0", "2", "1"},
 		},
 		{
-			resp: []interface{}{"foo", "bar", "baz"},
-			want: []interface{}{"bar", "baz", "foo"},
+			resp:     []interface{}{"foo", "bar", "baz"},
+			want:     []interface{}{"bar", "baz", "foo"},
+			wantKeys: []string{"1", "2", "0"},
 		},
 		{
-			resp: []interface{}{"foo", 1, false, nil, 0, true},
-			want: []interface{}{nil, false, true, 0.0, 1.0, "foo"},
+			resp:     []interface{}{"foo", 1, false, nil, 0, true},
+			want:     []interface{}{nil, false, true, 0.0, 1.0, "foo"},
+			wantKeys: []string{"3", "2", "5", "4", "1", "0"},
 		},
 	}
 
@@ -642,8 +688,8 @@ func TestValueQueryGetOrderedWithList(t *testing.T) {
 	for _, tc := range cases {
 		mock.Resp = tc.resp
 
-		var got []interface{}
-		if err := testref.OrderByValue().GetOrdered(context.Background(), &got); err != nil {
+		result, err := testref.OrderByValue().GetOrdered(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 		reqs = append(reqs, &testReq{
@@ -652,8 +698,22 @@ func TestValueQueryGetOrderedWithList(t *testing.T) {
 			Query:  map[string]string{"orderBy": "\"$value\""},
 		})
 
-		if !reflect.DeepEqual(tc.want, got) {
-			t.Errorf("GetOrdered(value) = %v; want = %v", got, tc.want)
+		var gotKeys []string
+		var gotVals []interface{}
+		for _, r := range result {
+			var v interface{}
+			if err := r.Unmarshal(&v); err != nil {
+				t.Fatal(err)
+			}
+			gotKeys = append(gotKeys, r.Key())
+			gotVals = append(gotVals, v)
+		}
+
+		if !reflect.DeepEqual(tc.wantKeys, gotKeys) {
+			t.Errorf("GetOrdered(value) = %v; want = %v", gotKeys, tc.wantKeys)
+		}
+		if !reflect.DeepEqual(tc.want, gotVals) {
+			t.Errorf("GetOrdered(value) = %v; want = %v", gotVals, tc.want)
 		}
 	}
 	checkAllRequests(t, mock.Reqs, reqs)
@@ -664,12 +724,12 @@ func TestGetOrderedWithNilResult(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got []interface{}
-	if err := testref.OrderByChild("child").GetOrdered(context.Background(), &got); err != nil {
+	result, err := testref.OrderByChild("child").GetOrdered(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got != nil {
-		t.Errorf("GetOrdered(value) = %v; want = nil", got)
+	if result != nil {
+		t.Errorf("GetOrdered(value) = %v; want = nil", result)
 	}
 }
 
@@ -678,14 +738,23 @@ func TestGetOrderedWithLeafNode(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	var got []interface{}
-	if err := testref.OrderByChild("child").GetOrdered(context.Background(), &got); err != nil {
+	result, err := testref.OrderByChild("child").GetOrdered(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
+	if len(result) != 1 {
+		t.Fatalf("GetOrdered(chid) = %d; want = 1", len(result))
+	}
+	if result[0].Key() != "0" {
+		t.Errorf("GetOrdered(value).Key() = %v; want = %q", result[0].Key(), 0)
+	}
 
-	want := []interface{}{"foo"}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("GetOrdered(value) = %v; want = %v", got, want)
+	var v interface{}
+	if err := result[0].Unmarshal(&v); err != nil {
+		t.Fatal(err)
+	}
+	if v != "foo" {
+		t.Errorf("GetOrdered(value) = %v; want = %v", v, "foo")
 	}
 }
 
@@ -695,12 +764,11 @@ func TestQueryHttpError(t *testing.T) {
 	defer srv.Close()
 
 	want := "http error status: 500; reason: test error"
-	var got []string
-	err := testref.OrderByChild("child").GetOrdered(context.Background(), &got)
+	result, err := testref.OrderByChild("child").GetOrdered(context.Background())
 	if err == nil || err.Error() != want {
 		t.Errorf("GetOrdered() = %v; want = %v", err, want)
 	}
-	if got != nil {
-		t.Errorf("GetOrdered() = %v; want = nil", got)
+	if result != nil {
+		t.Errorf("GetOrdered() = %v; want = nil", result)
 	}
 }
