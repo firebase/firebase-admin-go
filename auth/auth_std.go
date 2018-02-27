@@ -16,7 +16,7 @@
 
 package auth
 
-import "golang.org/x/net/context"
+import "context"
 
 func newSigner(ctx context.Context) (signer, error) {
 	return serviceAcctSigner{}, nil

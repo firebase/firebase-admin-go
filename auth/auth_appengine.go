@@ -17,7 +17,7 @@
 package auth
 
 import (
-	"golang.org/x/net/context"
+	"context"
 
 	"google.golang.org/appengine"
 )

@@ -15,12 +15,14 @@
 package firebase
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -32,9 +34,6 @@ import (
 
 	"encoding/json"
 
-	"reflect"
-
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )

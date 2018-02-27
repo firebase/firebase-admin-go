@@ -16,6 +16,7 @@
 package iid
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,8 +24,6 @@ import (
 	"google.golang.org/api/transport"
 
 	"firebase.google.com/go/internal"
-
-	"golang.org/x/net/context"
 )
 
 const iidEndpoint = "https://console.firebase.google.com/v1"
