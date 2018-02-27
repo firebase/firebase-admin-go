@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,6 +26,12 @@ import (
 
 	"golang.org/x/net/context"
 )
+
+// QueryNode represents a data node retrieved from an ordered query.
+type QueryNode interface {
+	Key() string
+	Unmarshal(v interface{}) error
+}
 
 // Query represents a complex query that can be executed on a Ref.
 //
@@ -112,40 +117,23 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 	return resp.Unmarshal(http.StatusOK, v)
 }
 
-// GetOrdered executes the Query and provides the results as an ordered list.
-//
-// v must be a pointer to an array or a slice. Only the child values returned by the query are
-// unmarshalled into v. Top-level keys are not returned. Although if the Query was created using
-// OrderByKey(), the returned values will still be ordered based on their keys.
-func (q *Query) GetOrdered(ctx context.Context, v interface{}) error {
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return fmt.Errorf("nil or not a pointer")
-	}
-	if rv.Elem().Kind() != reflect.Slice && rv.Elem().Kind() != reflect.Array {
-		return fmt.Errorf("non-array non-slice pointer")
-	}
-
+// GetOrdered executes the Query and returns the results as an ordered slice.
+func (q *Query) GetOrdered(ctx context.Context) ([]QueryNode, error) {
 	var temp interface{}
 	if err := q.Get(ctx, &temp); err != nil {
-		return err
+		return nil, err
 	}
-
 	if temp == nil {
-		return nil
+		return nil, nil
 	}
-	sr := newSortableQueryResult(temp, q.order)
-	sort.Sort(sr)
 
-	var values []interface{}
-	for _, val := range sr {
-		values = append(values, val.Value)
+	sn := newSortableNodes(temp, q.order)
+	sort.Sort(sn)
+	result := make([]QueryNode, len(sn))
+	for i, v := range sn {
+		result[i] = v
 	}
-	b, err := json.Marshal(values)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, v)
+	return result, nil
 }
 
 // OrderByChild returns a Query that orders data by child values before applying filters.
@@ -307,14 +295,30 @@ func newComparableKey(v interface{}) *comparableKey {
 	return &comparableKey{Num: &f}
 }
 
-type queryResult struct {
-	Key       *comparableKey
+type queryNodeImpl struct {
+	CompKey   *comparableKey
 	Value     interface{}
 	Index     interface{}
 	IndexType int
 }
 
-func newQueryResult(key, val interface{}, order orderBy) *queryResult {
+func (q *queryNodeImpl) Key() string {
+	if q.CompKey.Str != nil {
+		return *q.CompKey.Str
+	}
+	// Numeric keys in queryNodeImpl are always array indices, and can be safely coverted into int.
+	return strconv.Itoa(int(*q.CompKey.Num))
+}
+
+func (q *queryNodeImpl) Unmarshal(v interface{}) error {
+	b, err := json.Marshal(q.Value)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
+}
+
+func newQueryNode(key, val interface{}, order orderBy) *queryNodeImpl {
 	var index interface{}
 	if prop, ok := order.(orderByProperty); ok {
 		if prop == "$value" {
@@ -326,25 +330,25 @@ func newQueryResult(key, val interface{}, order orderBy) *queryResult {
 		path := order.(orderByChild)
 		index = extractChildValue(val, string(path))
 	}
-	return &queryResult{
-		Key:       newComparableKey(key),
+	return &queryNodeImpl{
+		CompKey:   newComparableKey(key),
 		Value:     val,
 		Index:     index,
 		IndexType: getIndexType(index),
 	}
 }
 
-type sortableQueryResult []*queryResult
+type sortableNodes []*queryNodeImpl
 
-func (s sortableQueryResult) Len() int {
+func (s sortableNodes) Len() int {
 	return len(s)
 }
 
-func (s sortableQueryResult) Swap(i, j int) {
+func (s sortableNodes) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s sortableQueryResult) Less(i, j int) bool {
+func (s sortableNodes) Less(i, j int) bool {
 	a, b := s[i], s[j]
 	var aKey, bKey *comparableKey
 	if a.IndexType == b.IndexType {
@@ -353,7 +357,7 @@ func (s sortableQueryResult) Less(i, j int) bool {
 		if (a.IndexType == typeNumeric || a.IndexType == typeString) && a.Index != b.Index {
 			aKey, bKey = newComparableKey(a.Index), newComparableKey(b.Index)
 		} else {
-			aKey, bKey = a.Key, b.Key
+			aKey, bKey = a.CompKey, b.CompKey
 		}
 	} else {
 		// If the indices are of different types, use the type ordering of Firebase.
@@ -363,18 +367,18 @@ func (s sortableQueryResult) Less(i, j int) bool {
 	return aKey.Compare(bKey) < 0
 }
 
-func newSortableQueryResult(values interface{}, order orderBy) sortableQueryResult {
-	var entries sortableQueryResult
+func newSortableNodes(values interface{}, order orderBy) sortableNodes {
+	var entries sortableNodes
 	if m, ok := values.(map[string]interface{}); ok {
 		for key, val := range m {
-			entries = append(entries, newQueryResult(key, val, order))
+			entries = append(entries, newQueryNode(key, val, order))
 		}
 	} else if l, ok := values.([]interface{}); ok {
 		for key, val := range l {
-			entries = append(entries, newQueryResult(key, val, order))
+			entries = append(entries, newQueryNode(key, val, order))
 		}
 	} else {
-		entries = append(entries, newQueryResult(0, values, order))
+		entries = append(entries, newQueryNode(0, values, order))
 	}
 	return entries
 }
