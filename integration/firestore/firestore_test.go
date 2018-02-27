@@ -15,13 +15,12 @@
 package firestore
 
 import (
+	"context"
 	"log"
 	"reflect"
 	"testing"
 
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 func TestFirestore(t *testing.T) {
