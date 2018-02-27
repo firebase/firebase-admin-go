@@ -156,7 +156,7 @@ func initRules() {
 	if err != nil {
 		log.Fatalln(err)
 	} else if resp.StatusCode != http.StatusOK {
-		log.Fatalln("failed to update rules: %q", string(b))
+		log.Fatalln("failed to update rules:", string(b))
 	}
 }
 
