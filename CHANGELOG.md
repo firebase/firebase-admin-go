@@ -1,6 +1,7 @@
 # Unreleased
 
--
+- [changed] Improved error handling in FCM by mapping more server-side
+  errors to client-side error codes.
 
 # v2.5.0
 
