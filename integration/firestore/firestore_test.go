@@ -29,7 +29,7 @@ func TestFirestore(t *testing.T) {
 		return
 	}
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

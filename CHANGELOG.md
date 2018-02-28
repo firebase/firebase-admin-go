@@ -1,6 +1,6 @@
 # Unreleased
 
--
+- [added] Added the `db` package for interacting with the Firebase database.
 
 # v2.5.0
 

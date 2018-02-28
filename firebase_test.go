@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -227,6 +228,48 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+func TestDatabase(t *testing.T) {
+	ctx := context.Background()
+	conf := &Config{DatabaseURL: "https://mock-db.firebaseio.com"}
+	app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if app.authOverride == nil || len(app.authOverride) != 0 {
+		t.Errorf("AuthOverrides = %v; want = empty map", app.authOverride)
+	}
+	if c, err := app.Database(ctx); c == nil || err != nil {
+		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+	}
+}
+
+func TestDatabaseAuthOverrides(t *testing.T) {
+	cases := []map[string]interface{}{
+		nil,
+		map[string]interface{}{},
+		map[string]interface{}{"uid": "user1"},
+	}
+	for _, tc := range cases {
+		ctx := context.Background()
+		conf := &Config{
+			AuthOverride: &tc,
+			DatabaseURL:  "https://mock-db.firebaseio.com",
+		}
+		app, err := NewApp(ctx, conf, option.WithCredentialsFile("testdata/service_account.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(app.authOverride, tc) {
+			t.Errorf("AuthOverrides = %v; want = %v", app.authOverride, tc)
+		}
+		if c, err := app.Database(ctx); c == nil || err != nil {
+			t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+		}
+	}
+}
+
 func TestStorage(t *testing.T) {
 	ctx := context.Background()
 	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
@@ -360,7 +403,10 @@ func TestVersion(t *testing.T) {
 		}
 	}
 }
+
 func TestAutoInit(t *testing.T) {
+	var nullMap map[string]interface{}
+	uidMap := map[string]interface{}{"uid": "test"}
 	tests := []struct {
 		name          string
 		optionsConfig string
@@ -378,6 +424,7 @@ func TestAutoInit(t *testing.T) {
 			"testdata/firebase_config.json",
 			nil,
 			&Config{
+				DatabaseURL:   "https://auto-init.database.url",
 				ProjectID:     "auto-init-project-id",
 				StorageBucket: "auto-init.storage.bucket",
 			},
@@ -385,11 +432,13 @@ func TestAutoInit(t *testing.T) {
 		{
 			"<env=string,opts=nil>",
 			`{
+				"databaseURL": "https://auto-init.database.url",
 				"projectId": "auto-init-project-id",
 				"storageBucket": "auto-init.storage.bucket"
 			  }`,
 			nil,
 			&Config{
+				DatabaseURL:   "https://auto-init.database.url",
 				ProjectID:     "auto-init-project-id",
 				StorageBucket: "auto-init.storage.bucket",
 			},
@@ -454,6 +503,34 @@ func TestAutoInit(t *testing.T) {
 			&Config{
 				ProjectID:     "mock-project-id",
 				StorageBucket: "auto-init.storage.bucket",
+			},
+		},
+		{
+			"<env=string_null_auth_override,opts=nil>",
+			`{
+				"databaseURL": "https://auto-init.database.url",
+				"projectId": "auto-init-project-id",
+				"databaseAuthVariableOverride": null
+			}`,
+			nil,
+			&Config{
+				DatabaseURL:  "https://auto-init.database.url",
+				ProjectID:    "auto-init-project-id",
+				AuthOverride: &nullMap,
+			},
+		},
+		{
+			"<env=string_auth_override,opts=nil>",
+			`{
+				"databaseURL": "https://auto-init.database.url",
+				"projectId": "auto-init-project-id",
+				"databaseAuthVariableOverride": {"uid": "test"}
+			}`,
+			nil,
+			&Config{
+				DatabaseURL:  "https://auto-init.database.url",
+				ProjectID:    "auto-init-project-id",
+				AuthOverride: &uidMap,
 			},
 		},
 	}
@@ -523,6 +600,16 @@ func (t *testTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func compareConfig(got *App, want *Config, t *testing.T) {
+	if got.dbURL != want.DatabaseURL {
+		t.Errorf("app.dbURL = %q; want = %q", got.dbURL, want.DatabaseURL)
+	}
+	if want.AuthOverride != nil {
+		if !reflect.DeepEqual(got.authOverride, *want.AuthOverride) {
+			t.Errorf("app.ao = %#v; want = %#v", got.authOverride, *want.AuthOverride)
+		}
+	} else if !reflect.DeepEqual(got.authOverride, defaultAuthOverrides) {
+		t.Errorf("app.ao = %#v; want = nil", got.authOverride)
+	}
 	if got.projectID != want.ProjectID {
 		t.Errorf("app.projectID = %q; want = %q", got.projectID, want.ProjectID)
 	}

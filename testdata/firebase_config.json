@@ -1,4 +1,5 @@
 {
+  "databaseURL": "https://auto-init.database.url",
   "projectId": "auto-init-project-id",
   "storageBucket": "auto-init.storage.bucket"
 }

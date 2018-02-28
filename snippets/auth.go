@@ -93,10 +93,8 @@ func verifyIDToken(app *firebase.App, idToken string) *auth.Token {
 // https://firebase.google.com/docs/auth/admin/manage-sessions
 // ==================================================================
 
-func revokeRefreshTokens(app *firebase.App, uid string) {
-
+func revokeRefreshTokens(ctx context.Context, app *firebase.App, uid string) {
 	// [START revoke_tokens_golang]
-	ctx := context.Background()
 	client, err := app.Auth(ctx)
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
@@ -114,8 +112,7 @@ func revokeRefreshTokens(app *firebase.App, uid string) {
 	// [END revoke_tokens_golang]
 }
 
-func verifyIDTokenAndCheckRevoked(app *firebase.App, idToken string) *auth.Token {
-	ctx := context.Background()
+func verifyIDTokenAndCheckRevoked(ctx context.Context, app *firebase.App, idToken string) *auth.Token {
 	// [START verify_id_token_and_check_revoked_golang]
 	client, err := app.Auth(ctx)
 	if err != nil {
@@ -144,7 +141,7 @@ func getUser(ctx context.Context, app *firebase.App) *auth.UserRecord {
 
 	// [START get_user_golang]
 	// Get an auth client from the firebase.App
-	client, err := app.Auth(context.Background())
+	client, err := app.Auth(ctx)
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -192,7 +189,7 @@ func createUser(ctx context.Context, client *auth.Client) *auth.UserRecord {
 		DisplayName("John Doe").
 		PhotoURL("http://www.example.com/12345678/photo.png").
 		Disabled(false)
-	u, err := client.CreateUser(context.Background(), params)
+	u, err := client.CreateUser(ctx, params)
 	if err != nil {
 		log.Fatalf("error creating user: %v\n", err)
 	}
@@ -208,7 +205,7 @@ func createUserWithUID(ctx context.Context, client *auth.Client) *auth.UserRecor
 		UID(uid).
 		Email("user@example.com").
 		PhoneNumber("+15555550100")
-	u, err := client.CreateUser(context.Background(), params)
+	u, err := client.CreateUser(ctx, params)
 	if err != nil {
 		log.Fatalf("error creating user: %v\n", err)
 	}
@@ -228,7 +225,7 @@ func updateUser(ctx context.Context, client *auth.Client) {
 		DisplayName("John Doe").
 		PhotoURL("http://www.example.com/12345678/photo.png").
 		Disabled(true)
-	u, err := client.UpdateUser(context.Background(), uid, params)
+	u, err := client.UpdateUser(ctx, uid, params)
 	if err != nil {
 		log.Fatalf("error updating user: %v\n", err)
 	}
@@ -239,7 +236,7 @@ func updateUser(ctx context.Context, client *auth.Client) {
 func deleteUser(ctx context.Context, client *auth.Client) {
 	uid := "d"
 	// [START delete_user_golang]
-	err := client.DeleteUser(context.Background(), uid)
+	err := client.DeleteUser(ctx, uid)
 	if err != nil {
 		log.Fatalf("error deleting user: %v\n", err)
 	}
@@ -251,14 +248,14 @@ func customClaimsSet(ctx context.Context, app *firebase.App) {
 	uid := "uid"
 	// [START set_custom_user_claims_golang]
 	// Get an auth client from the firebase.App
-	client, err := app.Auth(context.Background())
+	client, err := app.Auth(ctx)
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
 
 	// Set admin privilege on the user corresponding to uid.
 	claims := map[string]interface{}{"admin": true}
-	err = client.SetCustomUserClaims(context.Background(), uid, claims)
+	err = client.SetCustomUserClaims(ctx, uid, claims)
 	if err != nil {
 		log.Fatalf("error setting custom claims %v\n", err)
 	}
@@ -350,7 +347,7 @@ func customClaimsIncremental(ctx context.Context, client *auth.Client) {
 func listUsers(ctx context.Context, client *auth.Client) {
 	// [START list_all_users_golang]
 	// Note, behind the scenes, the Users() iterator will retrive 1000 Users at a time through the API
-	iter := client.Users(context.Background(), "")
+	iter := client.Users(ctx, "")
 	for {
 		user, err := iter.Next()
 		if err == iterator.Done {
@@ -365,7 +362,7 @@ func listUsers(ctx context.Context, client *auth.Client) {
 	// Iterating by pages 100 users at a time.
 	// Note that using both the Next() function on an iterator and the NextPage()
 	// on a Pager wrapping that same iterator will result in an error.
-	pager := iterator.NewPager(client.Users(context.Background(), ""), 100, "")
+	pager := iterator.NewPager(client.Users(ctx, ""), 100, "")
 	for {
 		var users []*auth.ExportedUserRecord
 		nextPageToken, err := pager.NextPage(&users)
