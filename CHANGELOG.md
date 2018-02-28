@@ -1,5 +1,7 @@
 # Unreleased
 
+- [changed] Improved error handling in FCM by mapping more server-side
+  errors to client-side error codes.
 - [added] Added the `db` package for interacting with the Firebase database.
 
 # v2.5.0

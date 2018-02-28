@@ -633,6 +633,10 @@ func TestSendError(t *testing.T) {
 			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
 		},
 		{
+			resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered",
+		},
+		{
 			resp: "not json",
 			want: "http error status: 500; reason: server responded with an unknown error; response: not json",
 		},
