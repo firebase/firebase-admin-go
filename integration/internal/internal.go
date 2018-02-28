@@ -16,16 +16,18 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"go/build"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/net/context"
-
 	firebase "firebase.google.com/go"
+	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 const certPath = "integration_cert.json"
@@ -42,15 +44,8 @@ func Resource(name string) string {
 // NewTestApp looks for a service account JSON file named integration_cert.json
 // in the testdata directory. This file is used to initialize the newly created
 // App instance.
-func NewTestApp(ctx context.Context) (*firebase.App, error) {
-	pid, err := ProjectID()
-	if err != nil {
-		return nil, err
-	}
-	config := &firebase.Config{
-		StorageBucket: pid + ".appspot.com",
-	}
-	return firebase.NewApp(ctx, config, option.WithCredentialsFile(Resource(certPath)))
+func NewTestApp(ctx context.Context, conf *firebase.Config) (*firebase.App, error) {
+	return firebase.NewApp(ctx, conf, option.WithCredentialsFile(Resource(certPath)))
 }
 
 // APIKey fetches a Firebase API key for integration tests.
@@ -78,4 +73,15 @@ func ProjectID() (string, error) {
 		return "", err
 	}
 	return serviceAccount.ProjectID, nil
+}
+
+// NewHTTPClient creates an HTTP client for making authorized requests during tests.
+func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, error) {
+	opts = append(
+		opts,
+		option.WithCredentialsFile(Resource(certPath)),
+		option.WithScopes(internal.FirebaseScopes...),
+	)
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	return hc, err
 }

@@ -18,6 +18,7 @@
 package firebase
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -26,36 +27,30 @@ import (
 	"cloud.google.com/go/firestore"
 
 	"firebase.google.com/go/auth"
+	"firebase.google.com/go/db"
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/messaging"
 	"firebase.google.com/go/storage"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
-var firebaseScopes = []string{
-	"https://www.googleapis.com/auth/cloud-platform",
-	"https://www.googleapis.com/auth/datastore",
-	"https://www.googleapis.com/auth/devstorage.full_control",
-	"https://www.googleapis.com/auth/firebase",
-	"https://www.googleapis.com/auth/identitytoolkit",
-	"https://www.googleapis.com/auth/userinfo.email",
-	"https://www.googleapis.com/auth/firebase.messaging",
-}
+var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.5.0"
+const Version = "2.6.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
 
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
+	authOverride  map[string]interface{}
 	creds         *google.DefaultCredentials
+	dbURL         string
 	projectID     string
 	storageBucket string
 	opts          []option.ClientOption
@@ -63,8 +58,10 @@ type App struct {
 
 // Config represents the configuration used to initialize an App.
 type Config struct {
-	ProjectID     string `json:"projectId"`
-	StorageBucket string `json:"storageBucket"`
+	AuthOverride  *map[string]interface{} `json:"databaseAuthVariableOverride"`
+	DatabaseURL   string                  `json:"databaseURL"`
+	ProjectID     string                  `json:"projectId"`
+	StorageBucket string                  `json:"storageBucket"`
 }
 
 // Auth returns an instance of auth.Client.
@@ -76,6 +73,17 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 		Version:   Version,
 	}
 	return auth.NewClient(ctx, conf)
+}
+
+// Database returns an instance of db.Client.
+func (a *App) Database(ctx context.Context) (*db.Client, error) {
+	conf := &internal.DatabaseConfig{
+		AuthOverride: a.authOverride,
+		URL:          a.dbURL,
+		Opts:         a.opts,
+		Version:      Version,
+	}
+	return db.NewClient(ctx, conf)
 }
 
 // Storage returns a new instance of storage.Client.
@@ -124,7 +132,7 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 // `FIREBASE_CONFIG` environment variable. If the value in it starts with a `{` it is parsed as a
 // JSON object, otherwise it is assumed to be the name of the JSON file containing the options.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
-	o := []option.ClientOption{option.WithScopes(firebaseScopes...)}
+	o := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
 	o = append(o, opts...)
 	creds, err := transport.Creds(ctx, o...)
 	if err != nil {
@@ -145,8 +153,15 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		pid = os.Getenv("GCLOUD_PROJECT")
 	}
 
+	ao := defaultAuthOverrides
+	if config.AuthOverride != nil {
+		ao = *config.AuthOverride
+	}
+
 	return &App{
+		authOverride:  ao,
 		creds:         creds,
+		dbURL:         config.DatabaseURL,
 		projectID:     pid,
 		storageBucket: config.StorageBucket,
 		opts:          o,
@@ -170,6 +185,19 @@ func getConfigDefaults() (*Config, error) {
 			return nil, err
 		}
 	}
-	err := json.Unmarshal(dat, fbc)
-	return fbc, err
+	if err := json.Unmarshal(dat, fbc); err != nil {
+		return nil, err
+	}
+
+	// Some special handling necessary for db auth overrides
+	var m map[string]interface{}
+	if err := json.Unmarshal(dat, &m); err != nil {
+		return nil, err
+	}
+	if ao, ok := m["databaseAuthVariableOverride"]; ok && ao == nil {
+		// Auth overrides are explicitly set to null
+		var nullMap map[string]interface{}
+		fbc.AuthOverride = &nullMap
+	}
+	return fbc, nil
 }

@@ -15,13 +15,12 @@
 package messaging
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
 	"regexp"
 	"testing"
-
-	"golang.org/x/net/context"
 
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/messaging"
@@ -45,7 +44,7 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}

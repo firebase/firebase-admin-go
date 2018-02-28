@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
@@ -25,7 +26,6 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/transport"
 )
@@ -78,7 +78,7 @@ type signer interface {
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
-// the Auth service through firebase.App.
+// Auth service through firebase.App.
 func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	var (
 		err   error

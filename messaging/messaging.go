@@ -17,6 +17,7 @@
 package messaging
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,8 +25,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -42,13 +41,20 @@ var (
 	topicNamePattern = regexp.MustCompile("^(/topics/)?(private/)?[a-zA-Z0-9-_.~%]+$")
 
 	fcmErrorCodes = map[string]string{
-		"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
-		"UNREGISTERED":       "app instance has been unregistered; code: registration-token-not-registered",
-		"SENDER_ID_MISMATCH": "sender id does not match regisration token; code: authentication-error",
-		"QUOTA_EXCEEDED":     "messaging service quota exceeded; code: message-rate-exceeded",
-		"APNS_AUTH_ERROR":    "apns certificate or auth key was invalid; code: authentication-error",
-		"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
+		// FCM v1 canonical error codes
+		"NOT_FOUND":          "app instance has been unregistered; code: registration-token-not-registered",
+		"PERMISSION_DENIED":  "sender id does not match regisration token; code: mismatched-credential",
+		"RESOURCE_EXHAUSTED": "messaging service quota exceeded; code: message-rate-exceeded",
+		"UNAUTHENTICATED":    "apns certificate or auth key was invalid; code: invalid-apns-credentials",
+
+		// FCM v1 new error codes
+		"APNS_AUTH_ERROR":    "apns certificate or auth key was invalid; code: invalid-apns-credentials",
 		"INTERNAL":           "back servers encountered an unknown internl error; code: internal-error",
+		"INVALID_ARGUMENT":   "request contains an invalid argument; code: invalid-argument",
+		"SENDER_ID_MISMATCH": "sender id does not match regisration token; code: mismatched-credential",
+		"QUOTA_EXCEEDED":     "messaging service quota exceeded; code: message-rate-exceeded",
+		"UNAVAILABLE":        "backend servers are temporarily unavailable; code: server-unavailable",
+		"UNREGISTERED":       "app instance has been unregistered; code: registration-token-not-registered",
 	}
 
 	iidErrorCodes = map[string]string{

@@ -25,9 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/api/option"
-
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/option"
 )
 
 const testMessageID = "projects/test-project/messages/msg_id"
@@ -632,6 +631,10 @@ func TestSendError(t *testing.T) {
 		{
 			resp: "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
 			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+		},
+		{
+			resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered",
 		},
 		{
 			resp: "not json",

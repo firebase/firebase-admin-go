@@ -17,6 +17,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -29,8 +30,6 @@ import (
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
@@ -45,7 +44,7 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}

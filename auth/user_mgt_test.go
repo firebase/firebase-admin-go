@@ -16,6 +16,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -28,7 +29,6 @@ import (
 
 	"firebase.google.com/go/internal"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
@@ -167,9 +167,9 @@ func TestListUsers(t *testing.T) {
 	defer s.Close()
 
 	want := []*ExportedUserRecord{
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
-		&ExportedUserRecord{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
+		{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
+		{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
+		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
 	testIterator := func(iter *UserIterator, token string, req map[string]interface{}) {
@@ -574,9 +574,9 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 func TestSetCustomClaims(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
-		map[string]interface{}{},
-		map[string]interface{}{"admin": true},
-		map[string]interface{}{"admin": true, "package": "gold"},
+		{},
+		{"admin": true},
+		{"admin": true, "package": "gold"},
 	}
 
 	resp := `{
