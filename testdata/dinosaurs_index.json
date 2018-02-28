@@ -1,0 +1,29 @@
+{
+    "rules": {
+        "_adminsdk": {
+            "go": {
+                "dinodb": {
+                    "dinosaurs": {
+                        ".indexOn": ["height", "ratings/pos"]
+                    },
+                    "scores": {
+                        ".indexOn": ".value"
+                    }
+                },
+                "protected": {
+                    "$uid": {
+                        ".read": "auth != null",
+                        ".write": "$uid === auth.uid"
+                    }
+                },
+                "admin": {
+                    ".read": "false",
+                    ".write": "false"
+                },
+                "public": {
+                    ".read": "true"
+                }
+            }
+        }
+    }
+}
