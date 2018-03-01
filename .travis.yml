@@ -26,5 +26,6 @@ install:
 
 script:
     - golint -set_exit_status $(go list ./...)
+    - ./.travis.gofmt.sh
     - go test -v -race -test.short ./...        # Run tests with the race detector.
     - go vet -v ./...                           # Run Go static analyzer.
