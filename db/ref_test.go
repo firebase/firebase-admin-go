@@ -265,12 +265,12 @@ func TestGetIfChanged(t *testing.T) {
 	}
 
 	checkAllRequests(t, mock.Reqs, []*testReq{
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"If-None-Match": []string{"old-etag"}},
 		},
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"If-None-Match": []string{"new-etag"}},
@@ -513,7 +513,7 @@ func TestInvalidUpdate(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
 		make(map[string]interface{}),
-		map[string]interface{}{"foo": func() {}},
+		{"foo": func() {}},
 	}
 	for _, tc := range cases {
 		if err := testref.Update(context.Background(), tc); err == nil {
@@ -542,12 +542,12 @@ func TestTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
 		},
-		&testReq{
+		{
 			Method: "PUT",
 			Path:   "/peter.json",
 			Body: serialize(map[string]interface{}{
@@ -591,12 +591,12 @@ func TestTransactionRetry(t *testing.T) {
 		t.Errorf("Transaction() retries = %d; want = %d", cnt, 2)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
 		},
-		&testReq{
+		{
 			Method: "PUT",
 			Path:   "/peter.json",
 			Body: serialize(map[string]interface{}{
@@ -605,7 +605,7 @@ func TestTransactionRetry(t *testing.T) {
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag1"}},
 		},
-		&testReq{
+		{
 			Method: "PUT",
 			Path:   "/peter.json",
 			Body: serialize(map[string]interface{}{
@@ -650,12 +650,12 @@ func TestTransactionError(t *testing.T) {
 		t.Errorf("Transaction() retries = %d; want = %d", cnt, 1)
 	}
 	checkAllRequests(t, mock.Reqs, []*testReq{
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
 		},
-		&testReq{
+		{
 			Method: "PUT",
 			Path:   "/peter.json",
 			Body: serialize(map[string]interface{}{
@@ -694,7 +694,7 @@ func TestTransactionAbort(t *testing.T) {
 		t.Errorf("Transaction() = nil; want error")
 	}
 	wanted := []*testReq{
-		&testReq{
+		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
