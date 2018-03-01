@@ -247,8 +247,8 @@ func TestDatabase(t *testing.T) {
 func TestDatabaseAuthOverrides(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
-		map[string]interface{}{},
-		map[string]interface{}{"uid": "user1"},
+		{},
+		{"uid": "user1"},
 	}
 	for _, tc := range cases {
 		ctx := context.Background()
