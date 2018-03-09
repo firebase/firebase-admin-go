@@ -15,6 +15,7 @@
 package iid
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +24,6 @@ import (
 	"google.golang.org/api/option"
 
 	"firebase.google.com/go/internal"
-
-	"golang.org/x/net/context"
 )
 
 var testIIDConfig = &internal.InstanceIDConfig{

@@ -15,13 +15,12 @@
 package firestore
 
 import (
+	"context"
 	"log"
 	"reflect"
 	"testing"
 
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 func TestFirestore(t *testing.T) {
@@ -30,7 +29,7 @@ func TestFirestore(t *testing.T) {
 		return
 	}
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

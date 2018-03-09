@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -22,10 +23,11 @@ import (
 	"os"
 	"testing"
 
+	"firebase.google.com/go"
+
 	gcs "cloud.google.com/go/storage"
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/storage"
-	"golang.org/x/net/context"
 )
 
 var ctx context.Context
@@ -38,8 +40,15 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
+	pid, err := internal.ProjectID()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	ctx = context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, &firebase.Config{
+		StorageBucket: fmt.Sprintf("%s.appspot.com", pid),
+	})
 	if err != nil {
 		log.Fatalln(err)
 	}

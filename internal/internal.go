@@ -21,6 +21,16 @@ import (
 	"google.golang.org/api/option"
 )
 
+// FirebaseScopes is the set of OAuth2 scopes used by the Admin SDK.
+var FirebaseScopes = []string{
+	"https://www.googleapis.com/auth/cloud-platform",
+	"https://www.googleapis.com/auth/datastore",
+	"https://www.googleapis.com/auth/devstorage.full_control",
+	"https://www.googleapis.com/auth/firebase",
+	"https://www.googleapis.com/auth/identitytoolkit",
+	"https://www.googleapis.com/auth/userinfo.email",
+}
+
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
 	Opts      []option.ClientOption
@@ -35,6 +45,14 @@ type InstanceIDConfig struct {
 	ProjectID string
 }
 
+// DatabaseConfig represents the configuration of Firebase Database service.
+type DatabaseConfig struct {
+	Opts         []option.ClientOption
+	URL          string
+	Version      string
+	AuthOverride map[string]interface{}
+}
+
 // StorageConfig represents the configuration of Google Cloud Storage service.
 type StorageConfig struct {
 	Opts   []option.ClientOption
@@ -44,6 +62,13 @@ type StorageConfig struct {
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string
+}
+
+// MessagingConfig represents the configuration of Firebase Cloud Messaging service.
+type MessagingConfig struct {
+	Opts      []option.ClientOption
+	ProjectID string
+	Version   string
 }
 
 // Token returns the test token associated with the TokenSource.

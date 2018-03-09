@@ -16,6 +16,7 @@
 package iid
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -23,8 +24,6 @@ import (
 
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/integration/internal"
-
-	"golang.org/x/net/context"
 )
 
 var client *iid.Client
@@ -37,7 +36,7 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx)
+	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -54,10 +53,10 @@ func TestNonExisting(t *testing.T) {
 	// legal instance IDs are /[cdef][A-Za-z0-9_-]{9}[AEIMQUYcgkosw048]/
 	err := client.DeleteInstanceID(context.Background(), "fictive-ID0")
 	if err == nil {
-		t.Errorf("DeleteInstanceID(\"dnon-existY\") = nil; want error")
+		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
 	want := `instance id "fictive-ID0": failed to find the instance id`
 	if err.Error() != want {
-		t.Errorf("DeleteInstanceID(\"dnon-existY\") = %v; want = %v", err, want)
+		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}
 }

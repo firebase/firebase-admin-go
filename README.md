@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/firebase/firebase-admin-go.svg?branch=master)](https://travis-ci.org/firebase/firebase-admin-go)
 [![GoDoc](https://godoc.org/firebase.google.com/go?status.svg)](https://godoc.org/firebase.google.com/go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/firebase/firebase-admin-go)](https://goreportcard.com/report/github.com/firebase/firebase-admin-go)
 
 # Firebase Admin Go SDK
 
@@ -38,11 +39,19 @@ Please refer to the [CONTRIBUTING page](./CONTRIBUTING.md) for more information
 about how you can contribute to this project. We welcome bug reports, feature
 requests, code review feedback, and also pull requests. 
 
+## Supported Go Versions
+
+We support Go v1.7 and higher.
+[Continuous integration](https://travis-ci.org/firebase/firebase-admin-go) system
+tests the code on Go v1.7 through v1.10.
 
 ## Documentation
 
 * [Setup Guide](https://firebase.google.com/docs/admin/setup/)
 * [Authentication Guide](https://firebase.google.com/docs/auth/admin/)
+* [Cloud Firestore](https://firebase.google.com/docs/firestore/)
+* [Cloud Messaging Guide](https://firebase.google.com/docs/cloud-messaging/admin/)
+* [Storage Guide](https://firebase.google.com/docs/storage/admin/start)
 * [API Reference](https://godoc.org/firebase.google.com/go)
 * [Release Notes](https://firebase.google.com/support/release-notes/admin/go)
 

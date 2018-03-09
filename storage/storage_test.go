@@ -15,12 +15,12 @@
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"google.golang.org/api/option"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 )
 
 var opts = []option.ClientOption{

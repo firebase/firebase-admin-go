@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
@@ -25,7 +26,6 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/transport"
 )
@@ -78,7 +78,7 @@ type signer interface {
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
-// the Auth service through firebase.App.
+// Auth service through firebase.App.
 func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	var (
 		err   error
@@ -106,7 +106,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	if email != "" && pk != nil {
 		snr = serviceAcctSigner{email: email, pk: pk}
 	} else {
-		snr, err = newSigner()
+		snr, err = newSigner(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -177,6 +177,18 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	return encodeToken(ctx, c.snr, defaultHeader(), payload)
 }
 
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
+//
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
+func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+}
+
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
@@ -184,6 +196,7 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
+// This does not check whether or not the token has been revoked. See `VerifyIDTokenAndCheckRevoked` below.
 func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -234,6 +247,27 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, err
 	}
 	p.UID = p.Subject
+	return p, nil
+}
+
+// VerifyIDTokenAndCheckRevoked verifies the provided ID token and checks it has not been revoked.
+//
+// VerifyIDTokenAndCheckRevoked verifies the signature and payload of the provided ID token and
+// checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
+func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
+	p, err := c.VerifyIDToken(ctx, idToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := c.GetUser(ctx, p.UID)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
+		return nil, fmt.Errorf("ID token has been revoked")
+	}
 	return p, nil
 }
 

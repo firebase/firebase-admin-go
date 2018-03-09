@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 
 	"google.golang.org/api/option"
@@ -41,7 +41,6 @@ var ctx context.Context
 var testIDToken string
 var testGetUserResponse []byte
 var testListUsersResponse []byte
-
 var defaultTestOpts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
@@ -190,6 +189,52 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 	token, err = s.CustomTokenWithClaims(ctx, "user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
+	}
+}
+
+func TestVerifyIDTokenAndCheckRevokedValid(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, testIDToken)
+	if err != nil {
+		t.Error(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenAndCheckRevokedDoNotCheck(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
+
+	ft, err := s.Client.VerifyIDToken(tok)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
+
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
+	we := "ID token has been revoked"
+	if p != nil || err == nil || err.Error() != we {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
 	}
 }
 
