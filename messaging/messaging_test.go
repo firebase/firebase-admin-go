@@ -15,7 +15,6 @@
 package messaging
 
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -24,6 +23,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"

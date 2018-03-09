@@ -15,10 +15,11 @@
 package firestore
 
 import (
-	"context"
 	"log"
 	"reflect"
 	"testing"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/integration/internal"
 )

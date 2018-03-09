@@ -17,7 +17,6 @@ package auth
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -27,6 +26,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"

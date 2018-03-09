@@ -15,11 +15,12 @@
 package iid
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"golang.org/x/net/context"
 
 	"google.golang.org/api/option"
 

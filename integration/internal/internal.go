@@ -16,13 +16,14 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"go/build"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/net/context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"

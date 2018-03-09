@@ -16,11 +16,12 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"google.golang.org/api/iterator"
 
