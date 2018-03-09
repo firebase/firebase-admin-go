@@ -240,7 +240,7 @@ func deleteUser(ctx context.Context, client *auth.Client) {
 	if err != nil {
 		log.Fatalf("error deleting user: %v\n", err)
 	}
-	log.Printf("Successfully deleted user: %s\n", uid)
+	log.Printf("Successfully deleted user: %q\n", uid)
 	// [END delete_user_golang]
 }
 
@@ -354,7 +354,7 @@ func listUsers(ctx context.Context, client *auth.Client) {
 			break
 		}
 		if err != nil {
-			log.Fatalf("error listing users: %s\n", err)
+			log.Fatalf("error listing users: %q\n", err)
 		}
 		log.Printf("read user user: %v\n", user)
 	}

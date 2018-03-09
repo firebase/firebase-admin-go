@@ -162,7 +162,7 @@ func testUserIterator(t *testing.T) {
 	// verify that all the expected users are present
 	for _, uid := range testFixtures.uidList {
 		if _, ok := uids[uid]; !ok {
-			t.Errorf("Users() missing uid: %s", uid)
+			t.Errorf("Users() missing uid: %q", uid)
 		}
 	}
 }
