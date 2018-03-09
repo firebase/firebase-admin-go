@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"golang.org/x/net/context/ctxhttp"
+
 	"golang.org/x/net/context"
 )
 
@@ -44,7 +46,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 
-	resp, err := c.Client.Do(req.WithContext(ctx))
+	resp, err := ctxhttp.Do(ctx, c.Client, req)
 	if err != nil {
 		return nil, err
 	}
