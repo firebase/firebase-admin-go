@@ -423,9 +423,9 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	msg := fcmErrorCodes[fe.Error.Status]
 	if msg == "" {
-		msg = fmt.Sprintf("server responded with an unknown error; response: %s", string(resp.Body))
+		msg = fmt.Sprintf("server responded with an unknown error; response: %q", string(resp.Body))
 	}
-	return "", fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
+	return "", fmt.Errorf("http error status: %d; reason: %q", resp.Status, msg)
 }
 
 func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest) (*TopicManagementResponse, error) {
@@ -475,7 +475,7 @@ func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest
 	json.Unmarshal(resp.Body, &ie) // ignore any json parse errors at this level
 	msg := iidErrorCodes[ie.Error]
 	if msg == "" {
-		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
+		msg = fmt.Sprintf("client encountered an unknown error; response: %q", string(resp.Body))
 	}
-	return nil, fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
+	return nil, fmt.Errorf("http error status: %d; reason: %q", resp.Status, msg)
 }

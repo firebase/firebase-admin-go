@@ -117,7 +117,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 
 	// Does not return error for revoked token.
 	if _, err = client.VerifyIDToken(idt); err != nil {
-		t.Errorf("VerifyIDToken(); err = %s; want err = <nil>", err)
+		t.Errorf("VerifyIDToken(); err = %q; want err = <nil>", err)
 	}
 
 	// Sign in after revocation.
@@ -126,7 +126,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	}
 
 	if _, err = client.VerifyIDTokenAndCheckRevoked(ctx, idt); err != nil {
-		t.Errorf("VerifyIDTokenAndCheckRevoked(); err = %s; want err = <nil>", err)
+		t.Errorf("VerifyIDTokenAndCheckRevoked(); err = %q; want err = <nil>", err)
 	}
 
 	err = client.DeleteUser(ctx, uid)

@@ -140,7 +140,7 @@ func (r *Response) CheckStatus(want int) error {
 	if msg == "" {
 		msg = string(r.Body)
 	}
-	return fmt.Errorf("http error status: %d; reason: %s", r.Status, msg)
+	return fmt.Errorf("http error status: %d; reason: %q", r.Status, msg)
 }
 
 // Unmarshal checks if the Response has the given HTTP status code, and if so unmarshals the

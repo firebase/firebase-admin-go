@@ -530,7 +530,7 @@ func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 
 	we := "uid must not be empty"
 	if err := s.Client.RevokeRefreshTokens(context.Background(), ""); err == nil || err.Error() != we {
-		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
+		t.Errorf("RevokeRefreshTokens(); err = %q; want err = %q", err.Error(), we)
 	}
 }
 
@@ -563,7 +563,7 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 	for _, tc := range cases {
 		err := client.SetCustomUserClaims(context.Background(), "uid", tc.cc)
 		if err == nil {
-			t.Errorf("SetCustomUserClaims() = nil; want error: %s", tc.want)
+			t.Errorf("SetCustomUserClaims() = nil; want error: %q", tc.want)
 		}
 		if err.Error() != tc.want {
 			t.Errorf("SetCustomUserClaims() = %q; want = %q", err.Error(), tc.want)
