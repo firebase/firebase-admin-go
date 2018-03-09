@@ -530,7 +530,7 @@ func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 
 	we := "uid must not be empty"
 	if err := s.Client.RevokeRefreshTokens(context.Background(), ""); err == nil || err.Error() != we {
-		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
+		t.Errorf("RevokeRefreshTokens(); err = %q; want err = %q", err.Error(), we)
 	}
 }
 

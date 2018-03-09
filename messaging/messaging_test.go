@@ -868,6 +868,6 @@ func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
 		t.Errorf("ErrorInfo.Index = %d; want = %d", e.Index, 1)
 	}
 	if e.Reason != "unknown-error" {
-		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "unknown-error")
+		t.Errorf("ErrorInfo.Reason = %q; want = %q", e.Reason, "unknown-error")
 	}
 }
