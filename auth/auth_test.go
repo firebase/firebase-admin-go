@@ -213,7 +213,7 @@ func TestVerifyIDTokenAndCheckRevokedDoNotCheck(t *testing.T) {
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
-	ft, err := s.Client.VerifyIDToken(tok)
+	ft, err := s.Client.VerifyIDToken(ctx, tok)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,7 +35,6 @@ import (
 const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
 
 var client *auth.Client
-var ctx context.Context
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -58,7 +57,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCustomToken(t *testing.T) {
-	ct, err := client.CustomToken(ctx, "user1")
+	ct, err := client.CustomToken(context.Background(), "user1")
 
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +67,7 @@ func TestCustomToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(ctx, idt)
+	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +81,7 @@ func TestCustomToken(t *testing.T) {
 
 func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	uid := "user_revoked"
-	ct, err := client.CustomToken(ctx, uid)
+	ct, err := client.CustomToken(context.Background(), uid)
 
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +136,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims(ctx, "user1", map[string]interface{}{
+	ct, err := client.CustomTokenWithClaims(context.Background(), "user1", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})
@@ -150,7 +149,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(ctx, idt)
+	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}
