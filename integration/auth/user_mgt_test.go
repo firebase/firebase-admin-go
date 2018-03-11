@@ -124,9 +124,7 @@ func testGetUserByPhoneNumber(t *testing.T) {
 	want := testFixtures.sampleUserWithData
 	u, err := client.GetUserByPhoneNumber(context.Background(), want.PhoneNumber)
 	if err != nil {
-		t.Errorf("-- %#v -- \n%#v", want.PhoneNumber, want.UserInfo)
 		t.Fatalf("error getting user %s", err)
-
 	}
 	if !reflect.DeepEqual(u, want) {
 		t.Errorf("GetUserByPhoneNumber(%q) = %#v; want = %#v", want.PhoneNumber, u, want)
