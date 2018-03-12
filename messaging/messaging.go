@@ -364,7 +364,7 @@ func (c *Client) UnsubscribeFromTopic(ctx context.Context, tokens []string, topi
 	req := &iidRequest{
 		Topic:  topic,
 		Tokens: tokens,
-		op:     iidSubscribe,
+		op:     iidUnsubscribe,
 	}
 	return c.makeTopicManagementRequest(ctx, req)
 }
