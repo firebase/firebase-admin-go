@@ -51,11 +51,10 @@ func TestUserManagement(t *testing.T) {
 		{"Delete test users", testDeleteUsers},
 	}
 	// The tests are meant to be run in sequence. A failure in creating the users
-	// should be fatal so non of the other tests run. However calling Fatal from a
-	// subtest does not prevent the other subtests from running, hence we check the
-	// success of each subtest before proceeding.
+	// should be fatal so none of the other tests run.
 	for _, run := range orderedRuns {
-		if ok := t.Run(run.name, run.testFunc); !ok {
+		run.testFunc(t)
+		if t.Failed() {
 			t.Fatalf("Failed run %v", run.name)
 		}
 	}
