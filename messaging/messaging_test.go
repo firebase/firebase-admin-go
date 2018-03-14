@@ -730,7 +730,7 @@ func TestUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkIIDRequest(t, b, tr, iidSubscribe)
+	checkIIDRequest(t, b, tr, iidUnsubscribe)
 	checkTopicMgtResponse(t, resp)
 }
 
