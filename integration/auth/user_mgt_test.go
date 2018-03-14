@@ -414,27 +414,3 @@ func testDeleteUsers(t *testing.T) {
 		}
 	}
 }
-
-func TestGetUserInvalidId(t *testing.T) {
-	we := "cannot find user given params: id:[idbad], phone:[], email: []"
-	_, err := client.GetUser(context.Background(), "idbad")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUser(), got error %q, wanted %q", err, we)
-	}
-}
-
-func TestGetUserByEmailInvalid(t *testing.T) {
-	we := "cannot find user given params: id:[], phone:[], email: [foo@bar.bad]"
-	_, err := client.GetUserByEmail(context.Background(), "foo@bar.bad")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUserByEmail(), got error %q wanted: %q", err, we)
-	}
-}
-
-func TestGetUserByPhoneInvalid(t *testing.T) {
-	we := "cannot find user given params: id:[], phone:[+12345678901], email: []"
-	_, err := client.GetUserByPhoneNumber(context.Background(), "+12345678901")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUserByPhone(), got error %q wanted: %q", err, we)
-	}
-}
