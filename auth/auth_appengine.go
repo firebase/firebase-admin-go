@@ -25,7 +25,7 @@ import (
 type aeSigner struct {
 }
 
-func newSigner() (signer, error) {
+func newSigner(ctx context.Context) (signer, error) {
 	return aeSigner{}, nil
 }
 

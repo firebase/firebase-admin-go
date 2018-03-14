@@ -136,7 +136,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims(context.Background(), "user1", map[string]interface{}{
+	ct, err := client.CustomTokenWithClaims(context.Background(), "user2", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})
