@@ -40,8 +40,6 @@ func TestUserManagement(t *testing.T) {
 	}{
 		{"Create test users", testCreateUsers},
 		{"Get user", testGetUser},
-		{"Get user by phone", testGetUserByPhoneNumber},
-		{"Get user by email", testGetUserByEmail},
 		{"Iterate users", testUserIterator},
 		{"Paged iteration", testPager},
 		{"Disable user account", testDisableUser},
@@ -98,8 +96,7 @@ func testCreateUsers(t *testing.T) {
 		UID(uid).
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
-		Password("password").
-		PhoneNumber("+12223334444")
+		Password("password")
 
 	if u, err = client.CreateUser(context.Background(), params); err != nil {
 		t.Fatal(err)
@@ -124,9 +121,7 @@ func testGetUserByPhoneNumber(t *testing.T) {
 	want := testFixtures.sampleUserWithData
 	u, err := client.GetUserByPhoneNumber(context.Background(), want.PhoneNumber)
 	if err != nil {
-		t.Errorf("-- %#v -- \n%#v", want.PhoneNumber, want.UserInfo)
 		t.Fatalf("error getting user %s", err)
-
 	}
 	if !reflect.DeepEqual(u, want) {
 		t.Errorf("GetUserByPhoneNumber(%q) = %#v; want = %#v", want.PhoneNumber, u, want)
@@ -414,29 +409,5 @@ func testDeleteUsers(t *testing.T) {
 		if u != nil || err == nil {
 			t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", u, err)
 		}
-	}
-}
-
-func TestGetUserInvalidId(t *testing.T) {
-	we := "cannot find user given params: id:[idbad], phone:[], email: []"
-	_, err := client.GetUser(context.Background(), "idbad")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUser(), got error %q, wanted %q", err, we)
-	}
-}
-
-func TestGetUserByEmailInvalid(t *testing.T) {
-	we := "cannot find user given params: id:[], phone:[], email: [foo@bar.bad]"
-	_, err := client.GetUserByEmail(context.Background(), "foo@bar.bad")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUserByEmail(), got error %q wanted: %q", err, we)
-	}
-}
-
-func TestGetUserByPhoneInvalid(t *testing.T) {
-	we := "cannot find user given params: id:[], phone:[+12345678901], email: []"
-	_, err := client.GetUserByPhoneNumber(context.Background(), "+12345678901")
-	if err == nil || err.Error() != we {
-		t.Errorf("GetUserByPhone(), got error %q wanted: %q", err, we)
 	}
 }
