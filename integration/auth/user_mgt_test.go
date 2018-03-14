@@ -40,6 +40,8 @@ func TestUserManagement(t *testing.T) {
 	}{
 		{"Create test users", testCreateUsers},
 		{"Get user", testGetUser},
+		{"Get user by phone", testGetUserByPhoneNumber},
+		{"Get user by email", testGetUserByEmail},
 		{"Iterate users", testUserIterator},
 		{"Paged iteration", testPager},
 		{"Disable user account", testDisableUser},
@@ -96,7 +98,8 @@ func testCreateUsers(t *testing.T) {
 		UID(uid).
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
-		Password("password")
+		Password("password").
+		PhoneNumber("+12223334444")
 
 	if u, err = client.CreateUser(context.Background(), params); err != nil {
 		t.Fatal(err)
