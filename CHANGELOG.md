@@ -1,6 +1,6 @@
 # Unreleased
 
--
+- [added] Added support for Go 1.6.
 
 # v2.6.0
 
