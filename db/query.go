@@ -306,7 +306,7 @@ func (q *queryNodeImpl) Key() string {
 	if q.CompKey.Str != nil {
 		return *q.CompKey.Str
 	}
-	// Numeric keys in queryNodeImpl are always array indices, and can be safely coverted into int.
+	// Numeric keys in queryNodeImpl are always array indices, and can be safely converted into int.
 	return strconv.Itoa(int(*q.CompKey.Num))
 }
 

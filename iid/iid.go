@@ -16,10 +16,11 @@
 package iid
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
+
+	"golang.org/x/net/context"
 
 	"google.golang.org/api/transport"
 

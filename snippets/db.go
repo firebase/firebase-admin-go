@@ -16,9 +16,10 @@ package snippets
 
 // [START authenticate_db_imports]
 import (
-	"context"
 	"fmt"
 	"log"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/db"
 
@@ -153,11 +154,11 @@ func setValue(ctx context.Context, ref *db.Ref) {
 	// [START set_value]
 	usersRef := ref.Child("users")
 	err := usersRef.Set(ctx, map[string]*User{
-		"alanisawesome": &User{
+		"alanisawesome": {
 			DateOfBirth: "June 23, 1912",
 			FullName:    "Alan Turing",
 		},
-		"gracehop": &User{
+		"gracehop": {
 			DateOfBirth: "December 9, 1906",
 			FullName:    "Grace Hopper",
 		},

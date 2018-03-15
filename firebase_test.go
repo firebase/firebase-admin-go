@@ -15,8 +15,6 @@
 package firebase
 
 import (
-	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,6 +25,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"golang.org/x/oauth2/google"
 
@@ -247,8 +247,8 @@ func TestDatabase(t *testing.T) {
 func TestDatabaseAuthOverrides(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
-		map[string]interface{}{},
-		map[string]interface{}{"uid": "user1"},
+		{},
+		{"uid": "user1"},
 	}
 	for _, tc := range cases {
 		ctx := context.Background()
@@ -539,15 +539,13 @@ func TestAutoInit(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("NewApp(%s)", test.name), func(t *testing.T) {
-			overwriteEnv(firebaseEnvName, test.optionsConfig)
-			app, err := NewApp(context.Background(), test.initOptions)
-			if err != nil {
-				t.Error(err)
-			} else {
-				compareConfig(app, test.wantOptions, t)
-			}
-		})
+		overwriteEnv(firebaseEnvName, test.optionsConfig)
+		app, err := NewApp(context.Background(), test.initOptions)
+		if err != nil {
+			t.Errorf("NewApp(%s): %v", test.name, err)
+		} else {
+			compareConfig(app, test.wantOptions, t)
+		}
 	}
 }
 
@@ -577,13 +575,11 @@ func TestAutoInitInvalidFiles(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			overwriteEnv(firebaseEnvName, test.filename)
-			_, err := NewApp(context.Background(), nil)
-			if err == nil || err.Error() != test.wantError {
-				t.Errorf("got error = %s; want = %s", err, test.wantError)
-			}
-		})
+		overwriteEnv(firebaseEnvName, test.filename)
+		_, err := NewApp(context.Background(), nil)
+		if err == nil || err.Error() != test.wantError {
+			t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
+		}
 	}
 }
 

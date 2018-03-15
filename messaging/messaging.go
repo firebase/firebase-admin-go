@@ -17,7 +17,6 @@
 package messaging
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +24,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -364,7 +365,7 @@ func (c *Client) UnsubscribeFromTopic(ctx context.Context, tokens []string, topi
 	req := &iidRequest{
 		Topic:  topic,
 		Tokens: tokens,
-		op:     iidSubscribe,
+		op:     iidUnsubscribe,
 	}
 	return c.makeTopicManagementRequest(ctx, req)
 }

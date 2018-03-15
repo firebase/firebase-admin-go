@@ -16,11 +16,12 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"google.golang.org/api/iterator"
 
@@ -40,6 +41,8 @@ func TestUserManagement(t *testing.T) {
 	}{
 		{"Create test users", testCreateUsers},
 		{"Get user", testGetUser},
+		{"Get user by phone", testGetUserByPhoneNumber},
+		{"Get user by email", testGetUserByEmail},
 		{"Iterate users", testUserIterator},
 		{"Paged iteration", testPager},
 		{"Disable user account", testDisableUser},
@@ -50,11 +53,10 @@ func TestUserManagement(t *testing.T) {
 		{"Delete test users", testDeleteUsers},
 	}
 	// The tests are meant to be run in sequence. A failure in creating the users
-	// should be fatal so non of the other tests run. However calling Fatal from a
-	// subtest does not prevent the other subtests from running, hence we check the
-	// success of each subtest before proceeding.
+	// should be fatal so none of the other tests run.
 	for _, run := range orderedRuns {
-		if ok := t.Run(run.name, run.testFunc); !ok {
+		run.testFunc(t)
+		if t.Failed() {
 			t.Fatalf("Failed run %v", run.name)
 		}
 	}
@@ -96,7 +98,8 @@ func testCreateUsers(t *testing.T) {
 		UID(uid).
 		Email(uid + "email@test.com").
 		DisplayName("display_name").
-		Password("password")
+		Password("password").
+		PhoneNumber("+12223334444")
 
 	if u, err = client.CreateUser(context.Background(), params); err != nil {
 		t.Fatal(err)

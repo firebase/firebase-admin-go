@@ -1,6 +1,14 @@
 # Unreleased
 
--
+# v2.6.1
+
+- [added] Added support for Go 1.6.
+- [changed] Fixed a bug in the
+  [`UnsubscribeFromTopic()`](https://godoc.org/firebase.google.com/go/messaging#Client.UnsubscribeFromTopic)
+  function.
+- [changed] Improved the error message returned by `GetUser()`,
+  `GetUserByEmail()` and `GetUserByPhoneNumber()` APIs in
+  [`auth`](https://godoc.org/firebase.google.com/go/auth) package.
 
 # v2.6.0
 

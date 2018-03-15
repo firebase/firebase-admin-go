@@ -107,7 +107,7 @@ func TestNewClient(t *testing.T) {
 func TestNewClientAuthOverrides(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
-		map[string]interface{}{"uid": "user1"},
+		{"uid": "user1"},
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{

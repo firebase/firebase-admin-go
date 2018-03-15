@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
@@ -567,7 +568,7 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 		return nil, err
 	}
 	if len(resp.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user from params: %v", request)
+		return nil, fmt.Errorf("cannot find user given params: id:%v, phone:%v, email: %v", request.LocalId, request.PhoneNumber, request.Email)
 	}
 
 	eu, err := makeExportedUser(resp.Users[0])

@@ -16,7 +16,6 @@ package auth
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +25,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 
@@ -148,17 +149,24 @@ func TestGetNonExistingUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	user, err := s.Client.GetUser(context.Background(), "ignored_id")
-	if user != nil || err == nil {
-		t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", user, err)
+	want := "cannot find user given params: id:[%s], phone:[%s], email: [%s]"
+
+	we := fmt.Sprintf(want, "id-nonexisting", "", "")
+	user, err := s.Client.GetUser(context.Background(), "id-nonexisting")
+	if user != nil || err == nil || err.Error() != we {
+		t.Errorf("GetUser(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
-	user, err = s.Client.GetUserByEmail(context.Background(), "test@email.com")
-	if user != nil || err == nil {
-		t.Errorf("GetUserByEmail(non-existing) = (%v, %v); want = (nil, error)", user, err)
+
+	we = fmt.Sprintf(want, "", "", "foo@bar.nonexisting")
+	user, err = s.Client.GetUserByEmail(context.Background(), "foo@bar.nonexisting")
+	if user != nil || err == nil || err.Error() != we {
+		t.Errorf("GetUserByEmail(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
-	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+1234567890")
-	if user != nil || err == nil {
-		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %v); want = (nil, error)", user, err)
+
+	we = fmt.Sprintf(want, "", "+12345678901", "")
+	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+12345678901")
+	if user != nil || err == nil || err.Error() != we {
+		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 }
 

@@ -37,8 +37,13 @@ go get firebase.google.com/go
 
 Please refer to the [CONTRIBUTING page](./CONTRIBUTING.md) for more information
 about how you can contribute to this project. We welcome bug reports, feature
-requests, code review feedback, and also pull requests. 
+requests, code review feedback, and also pull requests.
 
+## Supported Go Versions
+
+We support Go v1.6 and higher.
+[Continuous integration](https://travis-ci.org/firebase/firebase-admin-go) system
+tests the code on Go v1.6 through v1.10.
 
 ## Documentation
 
