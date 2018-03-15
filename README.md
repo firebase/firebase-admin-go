@@ -20,6 +20,8 @@ Admin Go SDK enables access to Firebase services from privileged environments
 (such as servers or cloud) in Go. Currently this SDK provides
 Firebase custom authentication support.
 
+Go versions >= 1.6 are supported.
+
 For more information, visit the
 [Firebase Admin SDK setup guide](https://firebase.google.com/docs/admin/setup/).
 
