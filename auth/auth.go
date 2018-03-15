@@ -62,7 +62,6 @@ type Token struct {
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	hc        *internal.HTTPClient
 	is        *identitytoolkit.Service
 	ks        keySource
 	projectID string
@@ -123,7 +122,6 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	}
 
 	return &Client{
-		hc:        &internal.HTTPClient{Client: hc},
 		is:        is,
 		ks:        newHTTPKeySource(googleCertURL, hc),
 		projectID: c.ProjectID,
