@@ -89,7 +89,7 @@ func TestSend(t *testing.T) {
 	}
 	name, err := client.SendDryRun(context.Background(), msg)
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatal(err)
 	}
 	const pattern = "^projects/.*/messages/.*$"
 	if !regexp.MustCompile(pattern).MatchString(name) {
