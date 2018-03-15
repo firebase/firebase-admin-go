@@ -690,11 +690,11 @@ func protectedRef(t *testing.T, p string) string {
 }
 
 type Dinosaur struct {
-	Appeared int     `json:"appeared"`
+	Appeared float64 `json:"appeared"`
 	Height   float64 `json:"height"`
 	Length   float64 `json:"length"`
 	Order    string  `json:"order"`
-	Vanished int     `json:"vanished"`
+	Vanished float64 `json:"vanished"`
 	Weight   int     `json:"weight"`
 	Ratings  Ratings `json:"ratings"`
 }

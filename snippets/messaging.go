@@ -15,10 +15,11 @@
 package snippets
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/messaging"

@@ -18,11 +18,12 @@
 package firebase
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
+
+	"golang.org/x/net/context"
 
 	"cloud.google.com/go/firestore"
 

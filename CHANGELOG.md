@@ -1,5 +1,6 @@
 # Unreleased
 
+- [added] Added support for Go 1.6.
 - [changed] Fixed a bug in the
   [`UnsubscribeFromTopic()`](https://godoc.org/firebase.google.com/go/messaging#Client.UnsubscribeFromTopic)
   function.
