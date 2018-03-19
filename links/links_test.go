@@ -66,7 +66,7 @@ func TestCreateEventStatsMarshal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if string(m) != `{"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":4}` {
+	if string(m) != `{"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":"4"}` {
 		t.Errorf(`Marshal(%v) = %v, expecting: {"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":4}`,
 			es, string(m))
 	}
