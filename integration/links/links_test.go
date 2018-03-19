@@ -85,8 +85,11 @@ func TestE2EGetLinkStats(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(ls.EventStats) >= 0 {
-		t.Errorf("expecting results, perhaps you need to wait, see %s", e2eWarning)
+	if len(ls.EventStats) == 0 {
+		t.Fatalf("expecting results, perhaps you need to wait, see %s", e2eWarning)
+	}
+	if ls.EventStats[0].Count == 0 {
+		t.Errorf("expecting non zero count %v", ls.EventStats[0])
 	}
 
 }
