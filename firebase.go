@@ -31,6 +31,7 @@ import (
 	"firebase.google.com/go/db"
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
+	"firebase.google.com/go/links"
 	"firebase.google.com/go/messaging"
 	"firebase.google.com/go/storage"
 
@@ -87,13 +88,9 @@ func (a *App) Database(ctx context.Context) (*db.Client, error) {
 	return db.NewClient(ctx, conf)
 }
 
-// Storage returns a new instance of storage.Client.
-func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
-	conf := &internal.StorageConfig{
-		Opts:   a.opts,
-		Bucket: a.storageBucket,
-	}
-	return storage.NewClient(ctx, conf)
+// DynamicLinks returns a new instance of links.Client.
+func (a *App) DynamicLinks(ctx context.Context) (*links.Client, error) {
+	return links.NewClient(ctx, a.opts...)
 }
 
 // Firestore returns a new firestore.Client instance from the https://godoc.org/cloud.google.com/go/firestore
@@ -122,6 +119,15 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 		Version:   Version,
 	}
 	return messaging.NewClient(ctx, conf)
+}
+
+// Storage returns a new instance of storage.Client.
+func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
+	conf := &internal.StorageConfig{
+		Opts:   a.opts,
+		Bucket: a.storageBucket,
+	}
+	return storage.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
