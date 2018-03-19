@@ -16,6 +16,7 @@ package links
 
 import (
 	"encoding/json"
+	"firebase.google.com/go/internal"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -42,8 +43,11 @@ var client *Client
 var ctx context.Context
 var testLinkStatsResponse []byte
 var defaultTestOpts = []option.ClientOption{
-	option.WithCredentialsFile("../testdata/service_account.json"),
-}
+	option.WithTokenSource(&internal.MockTokenSource{
+		AccessToken: "test-token",
+	})}
+
+//	option.WithCredentialsFile("../testdata/service_account.json"),
 
 func TestMain(m *testing.M) {
 	var err error
@@ -103,21 +107,9 @@ func TestGetLinks(t *testing.T) {
 	}))
 	defer ts.Close()
 	ctx := context.Background()
-	client, err := NewClient(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if client == nil {
-		t.Fatalf("Client is nil ")
-	}
-	if ts == nil {
-		t.Fatalf("ts is nil")
-	}
+
 	client.linksEndPoint = ts.URL
 
-	if err != nil {
-		t.Fatal(err)
-	}
 	ls, err := client.LinkStats(ctx, "https://mock", StatOptions{DurationDays: 7})
 	if err != nil {
 		t.Fatal(err)
@@ -139,13 +131,10 @@ func TestGetLinksServerError(t *testing.T) {
 	}))
 	defer ts.Close()
 	ctx := context.Background()
-	client, err := NewClient(ctx)
+
 	client.linksEndPoint = ts.URL
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = client.LinkStats(ctx, "https://mock", StatOptions{DurationDays: 7})
+	_, err := client.LinkStats(ctx, "https://mock", StatOptions{DurationDays: 7})
 	we := "http error status: 500; reason: intentional error"
 	if err == nil || err.Error() != we {
 		t.Fatalf("got error: %q, want: %q", err, we)
