@@ -16,7 +16,6 @@
 package links
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/net/context"
@@ -24,12 +23,13 @@ import (
 	"google.golang.org/api/transport"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"firebase.google.com/go/internal"
 )
 
 const (
-	linksEndPoint     = "https://firebasedynamiclinks.googleapis.com/v1/"
+	linksEndPoint     = "https://firebasedynamiclinks.googleapis.com/v1"
 	linksStatsRequest = "%s/linkStats?durationDays=%d"
 )
 
@@ -56,41 +56,38 @@ const (
 	ANDROID
 )
 
-var platformID = map[Platform]string{
-
+var platformByID = map[Platform]string{
 	DESKTOP: "DESKTOP",
 	IOS:     "IOS",
 	ANDROID: "ANDROID",
 }
 
-var platformName = map[string]Platform{
+var platformByName = map[string]Platform{
 	"DESKTOP": DESKTOP,
 	"IOS":     IOS,
 	"ANDROID": ANDROID,
 }
 
 func (p Platform) String() string {
-	return platformID[p]
+	return platformByID[p]
 }
 
 // MarshalJSON makes the "enum" usable in marshalling json
 func (p *Platform) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(platformID[*p])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
+	return []byte(`"` + platformByID[*p] + `"`), nil
 }
 
 // UnmarshalJSON is used to read the json files into the "enum"
 func (p *Platform) UnmarshalJSON(b []byte) error {
-	// unmarshal as string
 	var s string
 	err := json.Unmarshal(b, &s)
 	if err != nil {
 		return err
 	}
-	// lookup value
-	*p = platformName[s]
+	var ok bool
+	if *p, ok = platformByName[s]; !ok {
+		return fmt.Errorf("unknown platform %q", s)
+	}
 	return nil
 }
 
@@ -107,7 +104,7 @@ const (
 	AppREOPEN
 )
 
-var eventTypesID = map[EventType]string{
+var eventTypesByID = map[EventType]string{
 	CLICK:        "CLICK",
 	REDIRECT:     "REDIRECT",
 	AppINSTALL:   "APP_INSTALL",
@@ -115,7 +112,7 @@ var eventTypesID = map[EventType]string{
 	AppREOPEN:    "APP_RE_OPEN",
 }
 
-var eventTypesName = map[string]EventType{
+var eventTypesByName = map[string]EventType{
 	"CLICK":          CLICK,
 	"REDIRECT":       REDIRECT,
 	"APP_INSTALL":    AppINSTALL,
@@ -124,27 +121,25 @@ var eventTypesName = map[string]EventType{
 }
 
 func (e EventType) String() string {
-	return eventTypesID[e]
+	return eventTypesByID[e]
 }
 
 // MarshalJSON makes the "enum" usable in marshalling json
 func (e *EventType) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(eventTypesID[*e])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
+	return []byte(`"` + eventTypesByID[*e] + `"`), nil
 }
 
 // UnmarshalJSON is used to read the json files into the "enum"
 func (e *EventType) UnmarshalJSON(b []byte) error {
-	// unmarshal as string
 	var s string
 	err := json.Unmarshal(b, &s)
 	if err != nil {
 		return err
 	}
-	// lookup value
-	*e = eventTypesName[s]
+	var ok bool
+	if *e, ok = eventTypesByName[s]; !ok {
+		return fmt.Errorf("unknown event type %q", s)
+	}
 	return nil
 }
 
@@ -192,20 +187,34 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 		URL:    c.makeURLForLinkStats(shortLink, statOptions),
 	}
 
-	_ = request
-	return nil, nil
+	resp, err := c.hc.Do(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
+		return nil, err
+	}
+	var result LinkStats
+	err = json.Unmarshal(resp.Body, &result)
+	return &result, err
 }
 
 func (c *Client) makeURLForLinkStats(shortLink string, statOptions StatOptions) string {
-	return fmt.Sprintf(c.linksEndPoint+c.linksStatsRequest,
+	return fmt.Sprintf(c.linksEndPoint+"/"+c.linksStatsRequest,
 		url.QueryEscape(shortLink),
 		statOptions.DurationDays)
 }
 
 func validateShortLink(shortLink string) error {
+	if ok := strings.HasPrefix(shortLink, "https://"); !ok {
+		return fmt.Errorf("short link must start with `https://`")
+	}
 	return nil
 }
 
 func validateStatOptions(statOptions StatOptions) error {
+	if ok := statOptions.DurationDays > 0; !ok {
+		return fmt.Errorf("durationDays must be > 0")
+	}
 	return nil
 }
