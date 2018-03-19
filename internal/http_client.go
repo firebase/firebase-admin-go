@@ -135,7 +135,6 @@ func (r *Response) CheckStatus(want int) error {
 	if r.Status == want {
 		return nil
 	}
-
 	var msg string
 	if r.errParser != nil {
 		msg = r.errParser(r.Body)

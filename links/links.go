@@ -42,7 +42,7 @@ type LinkStats struct {
 type EventStats struct {
 	Platform Platform  `json:"platform"`
 	ET       EventType `json:"event"`
-	Count    int       `json:"count"`
+	Count    int32     `json:"count,string"`
 }
 
 // Platform constant "enum" for the event

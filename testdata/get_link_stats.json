@@ -2,37 +2,37 @@
     "linkEventStats": [
       {
         "platform": "ANDROID",
-        "count": 123,
+        "count": "123",
         "event": "CLICK"
       },
       {
         "platform": "IOS",
-        "count": 123,
+        "count": "123",
         "event": "CLICK"
       },
       {
         "platform": "DESKTOP",
-        "count": 456,
+        "count": "456",
         "event": "CLICK"
       },
       {
         "platform": "ANDROID",
-        "count": 99,
+        "count": "99",
         "event": "APP_INSTALL"
       },
       {
         "platform": "ANDROID",
-        "count": 42,
+        "count": "42",
         "event": "APP_FIRST_OPEN"
       },
       {
         "platform": "ANDROID",
-        "count": 142,
+        "count": "142",
         "event": "APP_RE_OPEN"
       },
       {
         "platform": "IOS",
-        "count": 124,
+        "count": "124",
         "event": "REDIRECT"
       }
     ]
