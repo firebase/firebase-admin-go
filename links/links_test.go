@@ -40,19 +40,18 @@ import (
 )
 
 var client *Client
-var ctx context.Context
 var testLinkStatsResponse []byte
-var defaultTestOpts = []option.ClientOption{
-	option.WithTokenSource(&internal.MockTokenSource{
-		AccessToken: "test-token",
-	})}
 
 //	option.WithCredentialsFile("../testdata/service_account.json"),
 
 func TestMain(m *testing.M) {
-	var err error
+	defaultTestOpts := []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{
+			AccessToken: "test-token",
+		})}
 
-	client, err = NewClient(ctx, defaultTestOpts...)
+	var err error
+	client, err = NewClient(context.Background(), defaultTestOpts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -98,10 +97,8 @@ func TestReadJSON(t *testing.T) {
 
 func TestGetLinks(t *testing.T) {
 	var tr *http.Request
-	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(testLinkStatsResponse))
 	}))
@@ -117,14 +114,14 @@ func TestGetLinks(t *testing.T) {
 	if len(ls.EventStats) != 7 {
 		t.Errorf("read %d event stats from the json input expecting: %d", len(ls.EventStats), 7)
 	}
+	want := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
+	if tr.RequestURI != want {
+		t.Errorf("expecting RequestURI: %q, got %q", tr.RequestURI, want)
+	}
 }
 
 func TestGetLinksServerError(t *testing.T) {
-	var tr *http.Request
-	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
 		w.Write([]byte("intentional error"))
