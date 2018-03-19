@@ -104,6 +104,15 @@ func TestGetLinks(t *testing.T) {
 	defer ts.Close()
 	ctx := context.Background()
 	client, err := NewClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client == nil {
+		t.Fatalf("Client is nil ")
+	}
+	if ts == nil {
+		t.Fatalf("ts is nil")
+	}
 	client.linksEndPoint = ts.URL
 
 	if err != nil {
