@@ -51,7 +51,7 @@ type Platform int
 
 // There are 3 possible values for the platforms "enum" in the platform
 const (
-	UNKNOWNPLATFORM Platform = iota
+	_ Platform = iota
 	DESKTOP
 	IOS
 	ANDROID
@@ -97,7 +97,7 @@ type EventType int
 
 // There are 5 possible values for the event type "enum" in the event_stats
 const (
-	UNKNOWNEVENT EventType = iota
+	_ EventType = iota
 	CLICK
 	REDIRECT
 	AppINSTALL
@@ -177,11 +177,11 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error
 
 // LinkStats returns the link stats given a url, and the duration (inside the StatOptions)
 func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
-	if err := validateShortLink(shortLink); err != nil {
-		return nil, err
+	if ok := strings.HasPrefix(shortLink, "https://"); !ok {
+		return nil, fmt.Errorf("short link must start with `https://`")
 	}
-	if err := validateStatOptions(statOptions); err != nil {
-		return nil, err
+	if ok := statOptions.DurationDays > 0; !ok {
+		return nil, fmt.Errorf("durationDays must be > 0")
 	}
 	request := &internal.Request{
 		Method: http.MethodGet,
@@ -204,18 +204,4 @@ func (c *Client) makeURLForLinkStats(shortLink string, statOptions StatOptions) 
 	return fmt.Sprintf(c.linksEndPoint+"/"+c.linksStatsRequest,
 		url.QueryEscape(shortLink),
 		statOptions.DurationDays)
-}
-
-func validateShortLink(shortLink string) error {
-	if ok := strings.HasPrefix(shortLink, "https://"); !ok {
-		return fmt.Errorf("short link must start with `https://`")
-	}
-	return nil
-}
-
-func validateStatOptions(statOptions StatOptions) error {
-	if ok := statOptions.DurationDays > 0; !ok {
-		return fmt.Errorf("durationDays must be > 0")
-	}
-	return nil
 }
