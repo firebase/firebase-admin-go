@@ -52,21 +52,21 @@ type Platform int
 // There are 3 possible values for the platforms "enum" in the platform
 const (
 	_ Platform = iota
-	DESKTOP
+	Desktop
 	IOS
-	ANDROID
+	Android
 )
 
 var platformByID = map[Platform]string{
-	DESKTOP: "DESKTOP",
+	Desktop: "DESKTOP",
 	IOS:     "IOS",
-	ANDROID: "ANDROID",
+	Android: "ANDROID",
 }
 
 var platformByName = map[string]Platform{
-	"DESKTOP": DESKTOP,
+	"DESKTOP": Desktop,
 	"IOS":     IOS,
-	"ANDROID": ANDROID,
+	"ANDROID": Android,
 }
 
 func (p Platform) String() string {
@@ -98,27 +98,27 @@ type EventType int
 // There are 5 possible values for the event type "enum" in the event_stats
 const (
 	_ EventType = iota
-	CLICK
-	REDIRECT
-	AppINSTALL
-	AppFIRSTOPEN
-	AppREOPEN
+	Click
+	Redirect
+	AppInstall
+	AppFirstOpen
+	AppReOpen
 )
 
 var eventTypesByID = map[EventType]string{
-	CLICK:        "CLICK",
-	REDIRECT:     "REDIRECT",
-	AppINSTALL:   "APP_INSTALL",
-	AppFIRSTOPEN: "APP_FIRST_OPEN",
-	AppREOPEN:    "APP_RE_OPEN",
+	Click:        "CLICK",
+	Redirect:     "REDIRECT",
+	AppInstall:   "APP_INSTALL",
+	AppFirstOpen: "APP_FIRST_OPEN",
+	AppReOpen:    "APP_RE_OPEN",
 }
 
 var eventTypesByName = map[string]EventType{
-	"CLICK":          CLICK,
-	"REDIRECT":       REDIRECT,
-	"APP_INSTALL":    AppINSTALL,
-	"APP_FIRST_OPEN": AppFIRSTOPEN,
-	"APP_RE_OPEN":    AppREOPEN,
+	"CLICK":          Click,
+	"REDIRECT":       Redirect,
+	"APP_INSTALL":    AppInstall,
+	"APP_FIRST_OPEN": AppFirstOpen,
+	"APP_RE_OPEN":    AppReOpen,
 }
 
 func (e EventType) String() string {
@@ -144,7 +144,8 @@ func (e *EventType) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// StatOptions are used in the request for GetLinkStats
+// StatOptions are used in the request for GetLinkStats, it is used to request data
+// going back DurationDays days.
 type StatOptions struct {
 	DurationDays int
 }
@@ -176,6 +177,12 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error
 }
 
 // LinkStats returns the link stats given a url, and the duration (inside the StatOptions)
+// Returns a LinkStats object which contains a list of EventStats.
+// The service account with which the firebase_app is validated must be associated with the project
+// for which the stats are requested.
+// If the URI prefix for the shortlink belongs to the project but the link suffix has either not
+// been created or has no data in the requested period, the LinkStats object will contain an
+// empty list of EventStats.
 func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
 	if ok := strings.HasPrefix(shortLink, "https://"); !ok {
 		return nil, fmt.Errorf("short link must start with `https://`")

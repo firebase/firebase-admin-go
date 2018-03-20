@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCreateEventStatsMarshal(t *testing.T) {
-	es := &EventStats{Platform: DESKTOP, ET: AppFIRSTOPEN, Count: 4}
+	es := &EventStats{Platform: Desktop, ET: AppFirstOpen, Count: 4}
 	m, err := json.Marshal(es)
 	if err != nil {
 		t.Error(err)
@@ -67,7 +67,7 @@ func TestCreateEventStatsMarshal(t *testing.T) {
 }
 
 func TestCreateEventStatsString(t *testing.T) {
-	es := EventStats{Platform: IOS, ET: AppREOPEN, Count: 4}
+	es := EventStats{Platform: IOS, ET: AppReOpen, Count: 4}
 
 	want := "{IOS APP_RE_OPEN 4}"
 	if str := fmt.Sprintf("%v", es); str != want {
