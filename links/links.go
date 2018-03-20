@@ -18,14 +18,15 @@ package links
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/net/context"
-	"google.golang.org/api/option"
-	"google.golang.org/api/transport"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/context"
+
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 const (

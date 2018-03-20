@@ -1,5 +1,7 @@
 # Unreleased
 
+- [added] The `links` module with the `LinksStats()` API.
+
 # v2.6.1
 
 - [added] Added support for Go 1.6.

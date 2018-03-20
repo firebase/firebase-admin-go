@@ -16,27 +16,18 @@ package links
 
 import (
 	"encoding/json"
-	"firebase.google.com/go/internal"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	//	"strings"
-	/*	"encoding/json"
-		"errors"/
-	"fmt"*/
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
-	//	"strings"
 	"testing"
 
 	"golang.org/x/net/context"
 
+	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
-	//	"google.golang.org/api/transport"
-	//	"google.golang.org/appengine"
-	//	"google.golang.org/appengine/aetest"
-	//	"firebase.google.com/go/internal"
 )
 
 var client *Client
