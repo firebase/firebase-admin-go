@@ -138,6 +138,18 @@ go test firebase.google.com/go/...
 
 This will execute both unit and integration test suites.
 
+### End to end testing for dynamic links.
+
+To run end to end tests for Firebase dynamic follow these steps:
+
+1. From the firebase console, create a short link under "Grow > Dynamic Links".
+2. From your broser or phone, go to that short link and see that it redirects as desired.
+3. Wait up to 36 hours for stats to show up on the console.
+4. Create a file named dynamic_links_e2e_url.txt under tests/data/.
+5. Populate that file with the short link you created in #1 
+   e.g. $ echo 'https://your1.app.goo.gl/suff' > tests/data/dynamic_links_e2e_url.txt
+
+
 ### Test Coverage
 
 Coverage can be measured per package by passing the `-cover` flag to the test invocation:
