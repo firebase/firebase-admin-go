@@ -34,8 +34,6 @@ import (
 var client *Client
 var testLinkStatsResponse []byte
 
-//	option.WithCredentialsFile("../testdata/service_account.json"),
-
 func TestMain(m *testing.M) {
 	defaultTestOpts := []option.ClientOption{
 		option.WithTokenSource(&internal.MockTokenSource{

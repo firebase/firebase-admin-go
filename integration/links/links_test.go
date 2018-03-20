@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package auth contains integration tests for the firebase.google.com/go/auth package.
-package auth
+// Package links contains integration tests for the firebase.google.com/go/links package.
+package links
 
 import (
 	"flag"
@@ -38,7 +38,7 @@ var e2eWarning = "End to end tests not set up, see CONTRIBUTING.md file."
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		log.Println("skipping auth integration tests in short mode.")
+		log.Println("skipping links integration tests in short mode.")
 		os.Exit(0)
 	}
 
@@ -47,8 +47,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
+	// End to end tests take some setting up, and once they have it might take another 36 hours
+	// to get the desired results, therefore if they haven't been set up we do not want to fail.
 	dynamicLinksE2EURL, _ = ioutil.ReadFile(internal.Resource("dynamic_links_e2e_url.txt"))
+
 	client, err = app.DynamicLinks(ctx)
 	if err != nil {
 		log.Fatalln(err)

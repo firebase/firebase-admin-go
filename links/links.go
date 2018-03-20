@@ -159,10 +159,10 @@ type Client struct {
 	linksStatsRequest string
 }
 
-// NewClient creates a new instance of the Firebase Auth Client.
+// NewClient creates a new instance of the Firebase Dynamic Links Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
-// Auth service through firebase.App.
+// Dynamic Links service through firebase.App.
 func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
 	hc, _, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
