@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -81,15 +82,35 @@ func TestReadJSON(t *testing.T) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if len(ls.EventStats) != 7 {
-		t.Errorf("read %d event stats from the json input expecting: %d", len(ls.EventStats), 7)
+	want := getWantedStatResult()
+	if !reflect.DeepEqual(ls, want) {
+		t.Errorf("read json file, got %#v, want: %#v", ls, want)
 	}
 }
 
-func TestGetLinks(t *testing.T) {
+func TestGetLinksRequest(t *testing.T) {
 	var tr *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(testLinkStatsResponse))
+	}))
+	defer ts.Close()
+
+	client.linksEndPoint = ts.URL
+
+	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantRequestURI := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
+	if tr.RequestURI != wantRequestURI {
+		t.Errorf("expecting RequestURI: %q, got %q", tr.RequestURI, wantRequestURI)
+	}
+}
+func TestGetLinksStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(testLinkStatsResponse))
 	}))
@@ -101,16 +122,14 @@ func TestGetLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ls.EventStats) != 7 {
-		t.Errorf("read %d event stats from the json input expecting: %d", len(ls.EventStats), 7)
-	}
-	want := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
-	if tr.RequestURI != want {
-		t.Errorf("expecting RequestURI: %q, got %q", tr.RequestURI, want)
+	wantLinkStats := getWantedStatResult()
+
+	if !reflect.DeepEqual(ls, wantLinkStats) {
+		t.Errorf("read json file, got %#v, want: %#v", ls, wantLinkStats)
 	}
 }
 
-func TestGetLinksServerError(t *testing.T) {
+func TestGetLinksStatsServerError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
@@ -126,7 +145,7 @@ func TestGetLinksServerError(t *testing.T) {
 		t.Fatalf("got error: %q, want: %q", err, we)
 	}
 }
-func TestInvalidUrl(t *testing.T) {
+func TestInvalidShortLink(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "asdf", StatOptions{DurationDays: 2})
 	we := "short link must start with `https://`"
 	if err == nil || err.Error() != we {
@@ -161,5 +180,46 @@ func TestEventUnmarshalError(t *testing.T) {
 	we := `unknown event type "bla"`
 	if err := e.UnmarshalJSON([]byte(`"bla"`)); err == nil || err.Error() != we {
 		t.Errorf("Unmarshall(bla):%q; want:%q", err, we)
+	}
+}
+func getWantedStatResult() LinkStats {
+	return LinkStats{
+		EventStats: []EventStats{
+			{
+				Platform: Android,
+				Count:    123,
+				ET:       Click,
+			},
+			{
+				Platform: IOS,
+				Count:    123,
+				ET:       Click,
+			},
+			{
+				Platform: Desktop,
+				Count:    456,
+				ET:       Click,
+			},
+			{
+				Platform: Android,
+				Count:    99,
+				ET:       AppInstall,
+			},
+			{
+				Platform: Android,
+				Count:    42,
+				ET:       AppFirstOpen,
+			},
+			{
+				Platform: Android,
+				Count:    142,
+				ET:       AppReOpen,
+			},
+			{
+				Platform: IOS,
+				Count:    124,
+				ET:       Redirect,
+			},
+		},
 	}
 }

@@ -176,7 +176,7 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error
 	}, nil
 }
 
-// LinkStats returns the link stats given a url, and the duration (inside the StatOptions)
+// LinkStats returns the link stats given a shortLink, and the duration (days, inside the StatOptions)
 // Returns a LinkStats object which contains a list of EventStats.
 // The service account with which the firebase_app is validated must be associated with the project
 // for which the stats are requested.
