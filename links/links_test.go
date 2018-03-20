@@ -122,8 +122,8 @@ func TestGetLinksStats(t *testing.T) {
 	}
 	wantLinkStats := getWantedStatResult()
 
-	if !reflect.DeepEqual(ls, wantLinkStats) {
-		t.Errorf("read json file, got %#v, want: %#v", ls, wantLinkStats)
+	if !reflect.DeepEqual(*ls, wantLinkStats) {
+		t.Errorf("read json file, got %#v, want: %#v", *ls, wantLinkStats)
 	}
 }
 
