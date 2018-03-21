@@ -32,6 +32,45 @@ import (
 
 var client *Client
 var testLinkStatsResponse []byte
+var wantedStatResult = &LinkStats{
+	EventStats: []EventStats{
+		{
+			Platform: Android,
+			Count:    123,
+			ET:       Click,
+		},
+		{
+			Platform: IOS,
+			Count:    123,
+			ET:       Click,
+		},
+		{
+			Platform: Desktop,
+			Count:    456,
+			ET:       Click,
+		},
+		{
+			Platform: Android,
+			Count:    99,
+			ET:       AppInstall,
+		},
+		{
+			Platform: Android,
+			Count:    42,
+			ET:       AppFirstOpen,
+		},
+		{
+			Platform: Android,
+			Count:    142,
+			ET:       AppReOpen,
+		},
+		{
+			Platform: IOS,
+			Count:    124,
+			ET:       Redirect,
+		},
+	},
+}
 
 func TestMain(m *testing.M) {
 	defaultTestConf := &internal.LinksConfig{
@@ -72,9 +111,9 @@ func TestReadJSON(t *testing.T) {
 	if err := json.Unmarshal(testLinkStatsResponse, &ls); err != nil {
 		log.Fatalln(err)
 	}
-	want := getWantedStatResult()
-	if !reflect.DeepEqual(ls, want) {
-		t.Errorf("read json file, got %#v, want: %#v", ls, want)
+
+	if !reflect.DeepEqual(ls, *wantedStatResult) {
+		t.Errorf("read json file, got %#v, want: %#v", ls, *wantedStatResult)
 	}
 }
 
@@ -99,9 +138,8 @@ func TestGetLinks(t *testing.T) {
 		t.Errorf("RequestURI = %q; want %q", tr.RequestURI, wantRequestURI)
 	}
 
-	wantLinkStats := getWantedStatResult()
-	if !reflect.DeepEqual(*ls, wantLinkStats) {
-		t.Errorf("read json file, got %#v, want: %#v", *ls, wantLinkStats)
+	if !reflect.DeepEqual(ls, wantedStatResult) {
+		t.Errorf("read json file, got %#v, want: %#v", ls, wantedStatResult)
 	}
 }
 
@@ -134,47 +172,5 @@ func TestInvalidDurationDays(t *testing.T) {
 	we := "durationDays must be > 0"
 	if err == nil || err.Error() != we {
 		t.Errorf("LinkStats(<invalid durationDays) err = %q, wanted err = %q", err, we)
-	}
-}
-
-func getWantedStatResult() LinkStats {
-	return LinkStats{
-		EventStats: []EventStats{
-			{
-				Platform: Android,
-				Count:    123,
-				ET:       Click,
-			},
-			{
-				Platform: IOS,
-				Count:    123,
-				ET:       Click,
-			},
-			{
-				Platform: Desktop,
-				Count:    456,
-				ET:       Click,
-			},
-			{
-				Platform: Android,
-				Count:    99,
-				ET:       AppInstall,
-			},
-			{
-				Platform: Android,
-				Count:    42,
-				ET:       AppFirstOpen,
-			},
-			{
-				Platform: Android,
-				Count:    142,
-				ET:       AppReOpen,
-			},
-			{
-				Platform: IOS,
-				Count:    124,
-				ET:       Redirect,
-			},
-		},
 	}
 }
