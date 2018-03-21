@@ -16,7 +16,6 @@ package links
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -35,13 +34,16 @@ var client *Client
 var testLinkStatsResponse []byte
 
 func TestMain(m *testing.M) {
-	defaultTestOpts := []option.ClientOption{
-		option.WithTokenSource(&internal.MockTokenSource{
-			AccessToken: "test-token",
-		})}
+	defaultTestConf := &internal.LinksConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&internal.MockTokenSource{
+				AccessToken: "test-token",
+			}),
+		},
+	}
 
 	var err error
-	client, err = NewClient(context.Background(), defaultTestOpts...)
+	client, err = NewClient(context.Background(), defaultTestConf)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -59,25 +61,15 @@ func TestCreateEventStatsMarshal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if string(m) != `{"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":"4"}` {
-		t.Errorf(`Marshal(%v) = %v, expecting: {"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":4}`,
-			es, string(m))
-	}
-}
-
-func TestCreateEventStatsString(t *testing.T) {
-	es := EventStats{Platform: IOS, ET: AppReOpen, Count: 4}
-
-	want := "{IOS APP_RE_OPEN 4}"
-	if str := fmt.Sprintf("%v", es); str != want {
-		t.Errorf("String representation of EventStats, got: %q, want: %q", str, want)
+	want := `{"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":"4"}`
+	if string(m) != want {
+		t.Errorf(`Marshal(%v) = %v, want: "%s"`, es, string(m), want)
 	}
 }
 
 func TestReadJSON(t *testing.T) {
 	var ls LinkStats
-	err := json.Unmarshal(testLinkStatsResponse, &ls)
-	if err != nil {
+	if err := json.Unmarshal(testLinkStatsResponse, &ls); err != nil {
 		log.Fatalln(err)
 	}
 	want := getWantedStatResult()
@@ -86,29 +78,10 @@ func TestReadJSON(t *testing.T) {
 	}
 }
 
-func TestGetLinksRequest(t *testing.T) {
+func TestGetLinks(t *testing.T) {
 	var tr *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(testLinkStatsResponse))
-	}))
-	defer ts.Close()
-
-	client.linksEndpoint = ts.URL
-
-	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wantRequestURI := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
-	if tr.RequestURI != wantRequestURI {
-		t.Errorf("expecting RequestURI: %q, got %q", tr.RequestURI, wantRequestURI)
-	}
-}
-func TestGetLinksStats(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(testLinkStatsResponse))
 	}))
@@ -120,8 +93,13 @@ func TestGetLinksStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantLinkStats := getWantedStatResult()
 
+	wantRequestURI := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
+	if tr.RequestURI != wantRequestURI {
+		t.Errorf("RequestURI = %q; want %q", tr.RequestURI, wantRequestURI)
+	}
+
+	wantLinkStats := getWantedStatResult()
 	if !reflect.DeepEqual(*ls, wantLinkStats) {
 		t.Errorf("read json file, got %#v, want: %#v", *ls, wantLinkStats)
 	}
@@ -159,27 +137,6 @@ func TestInvalidDurationDays(t *testing.T) {
 	}
 }
 
-func TestPlatformUnmarshalError(t *testing.T) {
-	var p Platform
-	if err := p.UnmarshalJSON([]byte("")); err == nil {
-		t.Errorf("expecting Unmarshall failure ")
-	}
-	we := `unknown platform "bla"`
-	if err := p.UnmarshalJSON([]byte(`"bla"`)); err == nil || err.Error() != we {
-		t.Errorf("Unmarshall(bla):%q; want:%q", err, we)
-	}
-
-}
-func TestEventUnmarshalError(t *testing.T) {
-	var e EventType
-	if err := e.UnmarshalJSON([]byte("")); err == nil {
-		t.Errorf("expecting Unmarshall failure ")
-	}
-	we := `unknown event type "bla"`
-	if err := e.UnmarshalJSON([]byte(`"bla"`)); err == nil || err.Error() != we {
-		t.Errorf("Unmarshall(bla):%q; want:%q", err, we)
-	}
-}
 func getWantedStatResult() LinkStats {
 	return LinkStats{
 		EventStats: []EventStats{

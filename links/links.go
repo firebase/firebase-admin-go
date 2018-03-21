@@ -47,36 +47,28 @@ type EventStats struct {
 }
 
 // Platform constant "enum" for the event
-type Platform int
+type Platform string
 
 // There are 3 possible values for the platforms "enum" in the platform
 const (
-	_ Platform = iota
-	Desktop
-	IOS
-	Android
+	Desktop Platform = "DESKTOP"
+	IOS     Platform = "IOS"
+	Android Platform = "ANDROID"
 )
 
-var platformByID = map[Platform]string{
-	Desktop: "DESKTOP",
-	IOS:     "IOS",
-	Android: "ANDROID",
-}
-
+/*
 var platformByName = map[string]Platform{
 	"DESKTOP": Desktop,
 	"IOS":     IOS,
 	"ANDROID": Android,
 }
-
-func (p Platform) String() string {
-	return platformByID[p]
-}
-
+*/
+/*
 // MarshalJSON makes the "enum" usable in marshalling json
 func (p *Platform) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + platformByID[*p] + `"`), nil
 }
+*
 
 // UnmarshalJSON is used to read the json files into the "enum"
 func (p *Platform) UnmarshalJSON(b []byte) error {
@@ -91,28 +83,20 @@ func (p *Platform) UnmarshalJSON(b []byte) error {
 	}
 	return nil
 }
-
+*/
 // EventType constant for the event stats
-type EventType int
+type EventType string
 
 // There are 5 possible values for the event type "enum" in the event_stats
 const (
-	_ EventType = iota
-	Click
-	Redirect
-	AppInstall
-	AppFirstOpen
-	AppReOpen
+	Click        EventType = "CLICK"
+	Redirect     EventType = "REDIRECT"
+	AppInstall   EventType = "APP_INSTALL"
+	AppFirstOpen EventType = "APP_FIRST_OPEN"
+	AppReOpen    EventType = "APP_RE_OPEN"
 )
 
-var eventTypesByID = map[EventType]string{
-	Click:        "CLICK",
-	Redirect:     "REDIRECT",
-	AppInstall:   "APP_INSTALL",
-	AppFirstOpen: "APP_FIRST_OPEN",
-	AppReOpen:    "APP_RE_OPEN",
-}
-
+/*
 var eventTypesByName = map[string]EventType{
 	"CLICK":          Click,
 	"REDIRECT":       Redirect,
@@ -141,7 +125,7 @@ func (e *EventType) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("unknown event type %q", s)
 	}
 	return nil
-}
+}*/
 
 // StatOptions are used in the request for GetLinkStats. It is used to request data
 // covering the last DurationDays days.
