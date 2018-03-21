@@ -90,7 +90,10 @@ func (a *App) Database(ctx context.Context) (*db.Client, error) {
 
 // DynamicLinks returns a new instance of links.Client.
 func (a *App) DynamicLinks(ctx context.Context) (*links.Client, error) {
-	return links.NewClient(ctx, a.opts...)
+	conf := &internal.LinksConfig{
+		Opts: a.opts,
+	}
+	return links.NewClient(ctx, conf)
 }
 
 // Firestore returns a new firestore.Client instance from the https://godoc.org/cloud.google.com/go/firestore

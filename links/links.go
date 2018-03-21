@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package links contains the dynamic links sdks. Specifically get link stats.
+// Package links contains a function for retrieving the stats for a short
+// dynamic link.
 package links
 
 import (
@@ -25,12 +26,11 @@ import (
 	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
-	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
 const (
-	linksEndPoint     = "https://firebasedynamiclinks.googleapis.com/v1"
+	linksEndpoint     = "https://firebasedynamiclinks.googleapis.com/v1"
 	linksStatsRequest = "%s/linkStats?durationDays=%d"
 )
 
@@ -133,8 +133,7 @@ func (e *EventType) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON is used to read the json files into the "enum"
 func (e *EventType) UnmarshalJSON(b []byte) error {
 	var s string
-	err := json.Unmarshal(b, &s)
-	if err != nil {
+	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
 	var ok bool
@@ -144,8 +143,8 @@ func (e *EventType) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// StatOptions are used in the request for GetLinkStats, it is used to request data
-// going back DurationDays days.
+// StatOptions are used in the request for GetLinkStats. It is used to request data
+// covering the last DurationDays days.
 type StatOptions struct {
 	DurationDays int
 }
@@ -155,7 +154,7 @@ type StatOptions struct {
 // Client is the entry point to the dynamic links functions
 type Client struct {
 	hc                *internal.HTTPClient
-	linksEndPoint     string
+	linksEndpoint     string
 	linksStatsRequest string
 }
 
@@ -163,31 +162,32 @@ type Client struct {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // Dynamic Links service through firebase.App.
-func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
+	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
 		hc:                &internal.HTTPClient{Client: hc},
-		linksEndPoint:     linksEndPoint,
+		linksEndpoint:     linksEndpoint,
 		linksStatsRequest: linksStatsRequest,
 	}, nil
 }
 
 // LinkStats returns the link stats given a shortLink, and the duration (days, inside the StatOptions)
+//
 // Returns a LinkStats object which contains a list of EventStats.
-// The service account with which the firebase_app is validated must be associated with the project
+// The credential with which the firebase.App is initialized must be associated with the project
 // for which the stats are requested.
 // If the URI prefix for the shortlink belongs to the project but the link suffix has either not
 // been created or has no data in the requested period, the LinkStats object will contain an
 // empty list of EventStats.
 func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
-	if ok := strings.HasPrefix(shortLink, "https://"); !ok {
+	if !strings.HasPrefix(shortLink, "https://") {
 		return nil, fmt.Errorf("short link must start with `https://`")
 	}
-	if ok := statOptions.DurationDays > 0; !ok {
+	if statOptions.DurationDays <= 0 {
 		return nil, fmt.Errorf("durationDays must be > 0")
 	}
 	request := &internal.Request{
@@ -203,12 +203,14 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 		return nil, err
 	}
 	var result LinkStats
-	err = json.Unmarshal(resp.Body, &result)
+	if err = json.Unmarshal(resp.Body, &result); err != nil {
+		return nil, err
+	}
 	return &result, err
 }
 
 func (c *Client) makeURLForLinkStats(shortLink string, statOptions StatOptions) string {
-	return fmt.Sprintf(c.linksEndPoint+"/"+c.linksStatsRequest,
+	return fmt.Sprintf(c.linksEndpoint+"/"+c.linksStatsRequest,
 		url.QueryEscape(shortLink),
 		statOptions.DurationDays)
 }

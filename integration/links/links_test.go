@@ -33,7 +33,7 @@ var client *links.Client
 var ctx context.Context
 var dynamicLinksE2EURL []byte
 
-var e2eWarning = "End to end tests not set up, see CONTRIBUTING.md file."
+var e2eWarning = "End-to-end tests not set up, see CONTRIBUTING.md file."
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// End to end tests take some setting up, and once they have it might take another 36 hours
+	// End-to-end tests take some setting up, and once they have it might take another 36 hours
 	// to get the desired results, therefore if they haven't been set up we do not want to fail.
 	dynamicLinksE2EURL, _ = ioutil.ReadFile(internal.Resource("dynamic_links_e2e_url.txt"))
 

@@ -53,6 +53,11 @@ type DatabaseConfig struct {
 	AuthOverride map[string]interface{}
 }
 
+// LinksConfig represents the configuration of Firebase Dynamic Links service.
+type LinksConfig struct {
+	Opts []option.ClientOption
+}
+
 // StorageConfig represents the configuration of Google Cloud Storage service.
 type StorageConfig struct {
 	Opts   []option.ClientOption

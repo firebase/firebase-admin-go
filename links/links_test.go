@@ -95,7 +95,7 @@ func TestGetLinksRequest(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client.linksEndPoint = ts.URL
+	client.linksEndpoint = ts.URL
 
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
 	if err != nil {
@@ -114,7 +114,7 @@ func TestGetLinksStats(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client.linksEndPoint = ts.URL
+	client.linksEndpoint = ts.URL
 
 	ls, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
 	if err != nil {
@@ -135,7 +135,7 @@ func TestGetLinksStatsServerError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client.linksEndPoint = ts.URL
+	client.linksEndpoint = ts.URL
 
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
 	we := "http error status: 500; reason: intentional error"

@@ -1,6 +1,6 @@
 # Unreleased
 
-- [added] The `links` module with the `LinksStats()` API.
+- [added] The `links` package with the `LinksStats()` API.
 
 # v2.6.1
 
