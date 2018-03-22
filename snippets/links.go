@@ -17,27 +17,26 @@ package snippets
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"golang.org/x/net/context"
 
-	"firebase.google.com/go"
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/links"
 )
 
-func testLinkStats() {
+func testLinkStats(ctx context.Context, app *firebase.App) {
 	// [START get_link_stats]
 	client, err := app.DynamicLinks(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	stats, err := client.LinkStats(ctx, "https://abc.app.goo.gl/abc12",
-		&StatOptions{lastNDays: 7})
+		links.StatOptions{LastNDays: 7})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	for _, stat := range stats {
-		if stat.Platform == links.Android && stat.EventType == links.Client {
+	for _, stat := range stats.EventStats {
+		if stat.Platform == links.Android && stat.EventType == links.Click {
 			fmt.Printf("There were %v clicks on Android in the last 7 days", stat.Count)
 		}
 	}
