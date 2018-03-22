@@ -69,9 +69,9 @@ const (
 )
 
 // StatOptions are used in the request for GetLinkStats. It is used to request data
-// covering the last DurationDays days.
+// covering the last LastNDays days.
 type StatOptions struct {
-	DurationDays int
+	LastNDays int
 }
 
 // Client is the interface for the Firebase dynamics links service.
@@ -100,7 +100,7 @@ func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
 	}, nil
 }
 
-// LinkStats returns the stats given a shortLink, and the duration (days, inside the StatOptions)
+// LinkStats returns the stats given a shortLink and the duration (last ndays, inside the StatOptions)
 //
 // Returns a LinkStats object which contains a list of EventStats.
 // The credential with which the firebase.App is initialized must be associated with the project
@@ -112,8 +112,8 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 	if !strings.HasPrefix(shortLink, "https://") {
 		return nil, fmt.Errorf("short link must start with `https://`")
 	}
-	if statOptions.DurationDays <= 0 {
-		return nil, fmt.Errorf("durationDays must be > 0")
+	if statOptions.LastNDays <= 0 {
+		return nil, fmt.Errorf("LastNDays must be > 0")
 	}
 	request := &internal.Request{
 		Method: http.MethodGet,
@@ -137,5 +137,5 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 func (c *Client) makeURLForLinkStats(shortLink string, statOptions StatOptions) string {
 	return fmt.Sprintf(c.linksEndpoint+"/"+c.linksStatsRequest,
 		url.QueryEscape(shortLink),
-		statOptions.DurationDays)
+		statOptions.LastNDays)
 }

@@ -64,7 +64,7 @@ func TestE2EGetLinkStats(t *testing.T) {
 		return
 	}
 	shortLink := strings.Trim(string(dynamicLinksE2EURL), "\n ")
-	ls, err := client.LinkStats(ctx, shortLink, links.StatOptions{DurationDays: 4000})
+	ls, err := client.LinkStats(ctx, shortLink, links.StatOptions{LastNDays: 4000})
 	if err != nil {
 		t.Error(err)
 	}
@@ -78,7 +78,7 @@ func TestE2EGetLinkStats(t *testing.T) {
 }
 
 func TestGetLinkStats(t *testing.T) {
-	_, err := client.LinkStats(ctx, "https://fake1.app.gpp.gl/fake", links.StatOptions{DurationDays: 3})
+	_, err := client.LinkStats(ctx, "https://fake1.app.gpp.gl/fake", links.StatOptions{LastNDays: 3})
 	ws := "http error status: 403"
 	if err == nil || !strings.Contains(err.Error(), ws) {
 		t.Fatalf("accessing data for someone else's short link, err: %q, want substring: %q", err, ws)
