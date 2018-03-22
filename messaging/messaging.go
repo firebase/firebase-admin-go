@@ -219,7 +219,7 @@ type Aps struct {
 	Badge            *int
 	Sound            string
 	ContentAvailable bool
-	ContentMutable   bool
+	MutableContent   bool
 	Category         string
 	ThreadID         string
 	CustomFields     map[string]interface{}
@@ -235,8 +235,8 @@ func (a *Aps) standardFields() map[string]interface{} {
 	if a.ContentAvailable {
 		m["content-available"] = 1
 	}
-	if a.ContentMutable {
-		m["content-mutable"] = 1
+	if a.MutableContent {
+		m["mutable-content"] = 1
 	}
 	if a.Badge != nil {
 		m["badge"] = *a.Badge
