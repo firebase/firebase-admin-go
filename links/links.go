@@ -41,9 +41,9 @@ type LinkStats struct {
 
 // EventStats will contain the counts for the aggregations for the requested period
 type EventStats struct {
-	Platform Platform  `json:"platform"`
-	EventType       EventType `json:"event"`
-	Count    int32     `json:"count,string"`
+	Platform  Platform  `json:"platform"`
+	EventType EventType `json:"event"`
+	Count     int32     `json:"count,string"`
 }
 
 // Platform constant "enum" for the event
@@ -56,34 +56,6 @@ const (
 	Android Platform = "ANDROID"
 )
 
-/*
-var platformByName = map[string]Platform{
-	"DESKTOP": Desktop,
-	"IOS":     IOS,
-	"ANDROID": Android,
-}
-*/
-/*
-// MarshalJSON makes the "enum" usable in marshalling json
-func (p *Platform) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + platformByID[*p] + `"`), nil
-}
-*
-
-// UnmarshalJSON is used to read the json files into the "enum"
-func (p *Platform) UnmarshalJSON(b []byte) error {
-	var s string
-	err := json.Unmarshal(b, &s)
-	if err != nil {
-		return err
-	}
-	var ok bool
-	if *p, ok = platformByName[s]; !ok {
-		return fmt.Errorf("unknown platform %q", s)
-	}
-	return nil
-}
-*/
 // EventType constant for the event stats
 type EventType string
 
@@ -95,37 +67,6 @@ const (
 	AppFirstOpen EventType = "APP_FIRST_OPEN"
 	AppReOpen    EventType = "APP_RE_OPEN"
 )
-
-/*
-var eventTypesByName = map[string]EventType{
-	"CLICK":          Click,
-	"REDIRECT":       Redirect,
-	"APP_INSTALL":    AppInstall,
-	"APP_FIRST_OPEN": AppFirstOpen,
-	"APP_RE_OPEN":    AppReOpen,
-}
-
-func (e EventType) String() string {
-	return eventTypesByID[e]
-}
-
-// MarshalJSON makes the "enum" usable in marshalling json
-func (e *EventType) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + eventTypesByID[*e] + `"`), nil
-}
-
-// UnmarshalJSON is used to read the json files into the "enum"
-func (e *EventType) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	var ok bool
-	if *e, ok = eventTypesByName[s]; !ok {
-		return fmt.Errorf("unknown event type %q", s)
-	}
-	return nil
-}*/
 
 // StatOptions are used in the request for GetLinkStats. It is used to request data
 // covering the last DurationDays days.
@@ -159,7 +100,7 @@ func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
 	}, nil
 }
 
-// LinkStats returns the link stats given a shortLink, and the duration (days, inside the StatOptions)
+// LinkStats returns the stats given a shortLink, and the duration (days, inside the StatOptions)
 //
 // Returns a LinkStats object which contains a list of EventStats.
 // The credential with which the firebase.App is initialized must be associated with the project

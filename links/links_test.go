@@ -35,39 +35,39 @@ var testLinkStatsResponse []byte
 var wantedStatResult = &LinkStats{
 	EventStats: []EventStats{
 		{
-			Platform: Android,
-			Count:    123,
-			EventType:       Click,
+			Platform:  Android,
+			Count:     123,
+			EventType: Click,
 		},
 		{
-			Platform: IOS,
-			Count:    123,
-			EventType:       Click,
+			Platform:  IOS,
+			Count:     123,
+			EventType: Click,
 		},
 		{
-			Platform: Desktop,
-			Count:    456,
-			EventType:       Click,
+			Platform:  Desktop,
+			Count:     456,
+			EventType: Click,
 		},
 		{
-			Platform: Android,
-			Count:    99,
-			EventType:       AppInstall,
+			Platform:  Android,
+			Count:     99,
+			EventType: AppInstall,
 		},
 		{
-			Platform: Android,
-			Count:    42,
-			EventType:       AppFirstOpen,
+			Platform:  Android,
+			Count:     42,
+			EventType: AppFirstOpen,
 		},
 		{
-			Platform: Android,
-			Count:    142,
-			EventType:       AppReOpen,
+			Platform:  Android,
+			Count:     142,
+			EventType: AppReOpen,
 		},
 		{
-			Platform: IOS,
-			Count:    124,
-			EventType:       Redirect,
+			Platform:  IOS,
+			Count:     124,
+			EventType: Redirect,
 		},
 	},
 }
@@ -102,7 +102,7 @@ func TestCreateEventStatsMarshal(t *testing.T) {
 	}
 	want := `{"platform":"DESKTOP","event":"APP_FIRST_OPEN","count":"4"}`
 	if string(m) != want {
-		t.Errorf(`Marshal(%v) = %v, want: "%s"`, es, string(m), want)
+		t.Errorf(`Marshal(%v) = %v; want: "%s"`, es, string(m), want)
 	}
 }
 
@@ -113,7 +113,7 @@ func TestReadJSON(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(ls, *wantedStatResult) {
-		t.Errorf("read json file, got %#v, want: %#v", ls, *wantedStatResult)
+		t.Errorf("read json file, got %#v; want: %#v", ls, *wantedStatResult)
 	}
 }
 
@@ -139,7 +139,7 @@ func TestGetLinks(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(ls, wantedStatResult) {
-		t.Errorf("read json file, got %#v, want: %#v", ls, wantedStatResult)
+		t.Errorf("read json file, got %#v; want: %#v", ls, wantedStatResult)
 	}
 }
 
@@ -156,14 +156,14 @@ func TestGetLinksStatsServerError(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: 7})
 	we := "http error status: 500; reason: intentional error"
 	if err == nil || err.Error() != we {
-		t.Fatalf("got error: %q, want: %q", err, we)
+		t.Fatalf("got error: %q; want: %q", err, we)
 	}
 }
 func TestInvalidShortLink(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "asdf", StatOptions{DurationDays: 2})
 	we := "short link must start with `https://`"
 	if err == nil || err.Error() != we {
-		t.Errorf("LinkStats(<invalid short link>) err = %q, wanted err = %q", err, we)
+		t.Errorf("LinkStats(<invalid short link>) err: %q; want: %q", err, we)
 	}
 }
 
@@ -171,6 +171,6 @@ func TestInvalidDurationDays(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{DurationDays: -1})
 	we := "durationDays must be > 0"
 	if err == nil || err.Error() != we {
-		t.Errorf("LinkStats(<invalid durationDays) err = %q, wanted err = %q", err, we)
+		t.Errorf("LinkStats(<invalid durationDays) err: %q; want: %q", err, we)
 	}
 }
