@@ -42,7 +42,7 @@ type LinkStats struct {
 // EventStats will contain the counts for the aggregations for the requested period
 type EventStats struct {
 	Platform Platform  `json:"platform"`
-	ET       EventType `json:"event"`
+	EventType       EventType `json:"event"`
 	Count    int32     `json:"count,string"`
 }
 

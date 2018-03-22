@@ -37,37 +37,37 @@ var wantedStatResult = &LinkStats{
 		{
 			Platform: Android,
 			Count:    123,
-			ET:       Click,
+			EventType:       Click,
 		},
 		{
 			Platform: IOS,
 			Count:    123,
-			ET:       Click,
+			EventType:       Click,
 		},
 		{
 			Platform: Desktop,
 			Count:    456,
-			ET:       Click,
+			EventType:       Click,
 		},
 		{
 			Platform: Android,
 			Count:    99,
-			ET:       AppInstall,
+			EventType:       AppInstall,
 		},
 		{
 			Platform: Android,
 			Count:    42,
-			ET:       AppFirstOpen,
+			EventType:       AppFirstOpen,
 		},
 		{
 			Platform: Android,
 			Count:    142,
-			ET:       AppReOpen,
+			EventType:       AppReOpen,
 		},
 		{
 			Platform: IOS,
 			Count:    124,
-			ET:       Redirect,
+			EventType:       Redirect,
 		},
 	},
 }
@@ -95,7 +95,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCreateEventStatsMarshal(t *testing.T) {
-	es := &EventStats{Platform: Desktop, ET: AppFirstOpen, Count: 4}
+	es := &EventStats{Platform: Desktop, EventType: AppFirstOpen, Count: 4}
 	m, err := json.Marshal(es)
 	if err != nil {
 		t.Error(err)
