@@ -69,10 +69,10 @@ func TestE2EGetLinkStats(t *testing.T) {
 		t.Error(err)
 	}
 	if len(ls.EventStats) == 0 {
-		t.Fatalf("expecting results. %s", e2eWarning)
+		t.Fatalf("empty EventStats, want, non-empty. %s", e2eWarning)
 	}
 	if ls.EventStats[0].Count == 0 {
-		t.Errorf("expecting non zero count %v", ls.EventStats[0])
+		t.Errorf("EventStat.Count = 0; want = non zero count %v", ls.EventStats[0])
 	}
 
 }
@@ -81,6 +81,7 @@ func TestGetLinkStats(t *testing.T) {
 	_, err := client.LinkStats(ctx, "https://fake1.app.gpp.gl/fake", links.StatOptions{LastNDays: 3})
 	ws := "http error status: 403"
 	if err == nil || !strings.Contains(err.Error(), ws) {
-		t.Fatalf("accessing data for someone else's short link, err: %q, want substring: %q", err, ws)
+		t.Fatalf("LinkStats(<short link in some other project>) err = %q, want(substring of) = %q",
+			err, ws)
 	}
 }

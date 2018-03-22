@@ -30,8 +30,7 @@ import (
 )
 
 const (
-	linksEndpoint     = "https://firebasedynamiclinks.googleapis.com/v1"
-	linksStatsRequest = "%s/linkStats?durationDays=%d"
+	linksEndpoint = "https://firebasedynamiclinks.googleapis.com/v1"
 )
 
 // LinkStats is returned from the GetLinkStats, contains an array of Event Stats
@@ -78,9 +77,8 @@ type StatOptions struct {
 //
 // Client is the entry point to the dynamic links functions
 type Client struct {
-	hc                *internal.HTTPClient
-	linksEndpoint     string
-	linksStatsRequest string
+	hc            *internal.HTTPClient
+	linksEndpoint string
 }
 
 // NewClient creates a new instance of the Firebase Dynamic Links Client.
@@ -94,13 +92,12 @@ func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
 	}
 
 	return &Client{
-		hc:                &internal.HTTPClient{Client: hc},
-		linksEndpoint:     linksEndpoint,
-		linksStatsRequest: linksStatsRequest,
+		hc:            &internal.HTTPClient{Client: hc},
+		linksEndpoint: linksEndpoint,
 	}, nil
 }
 
-// LinkStats returns the stats given a shortLink and the duration (last ndays, inside the StatOptions)
+// LinkStats returns the stats given a shortLink and the duration (last ndays, inside the StatOptions).
 //
 // Returns a LinkStats object which contains a list of EventStats.
 // The credential with which the firebase.App is initialized must be associated with the project
@@ -117,7 +114,7 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 	}
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    c.makeURLForLinkStats(shortLink, statOptions),
+		URL:    c.linksEndpoint + c.makeLinkStatsRequestString(shortLink, statOptions),
 	}
 
 	resp, err := c.hc.Do(ctx, request)
@@ -131,11 +128,11 @@ func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions St
 	if err = json.Unmarshal(resp.Body, &result); err != nil {
 		return nil, err
 	}
-	return &result, err
+	return &result, nil
 }
 
-func (c *Client) makeURLForLinkStats(shortLink string, statOptions StatOptions) string {
-	return fmt.Sprintf(c.linksEndpoint+"/"+c.linksStatsRequest,
+func (c *Client) makeLinkStatsRequestString(shortLink string, statOptions StatOptions) string {
+	return fmt.Sprintf("/%s/linkStats?durationDays=%d",
 		url.QueryEscape(shortLink),
 		statOptions.LastNDays)
 }

@@ -113,7 +113,7 @@ func TestReadJSON(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(ls, *wantedStatResult) {
-		t.Errorf("read json file, got %#v; want: %#v", ls, *wantedStatResult)
+		t.Errorf("Unmarshal(ReadFile()) = %#v; want = %#v", ls, *wantedStatResult)
 	}
 }
 
@@ -135,11 +135,11 @@ func TestGetLinks(t *testing.T) {
 
 	wantRequestURI := "/https%3A%2F%2Fmock/linkStats?durationDays=7"
 	if tr.RequestURI != wantRequestURI {
-		t.Errorf("RequestURI = %q; want %q", tr.RequestURI, wantRequestURI)
+		t.Errorf("RequestURI = %q; want = %q", tr.RequestURI, wantRequestURI)
 	}
 
 	if !reflect.DeepEqual(ls, wantedStatResult) {
-		t.Errorf("read json file, got %#v; want: %#v", ls, wantedStatResult)
+		t.Errorf("LinkStats() = %#v; want = %#v", ls, wantedStatResult)
 	}
 }
 
@@ -156,14 +156,14 @@ func TestGetLinksStatsServerError(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{LastNDays: 7})
 	we := "http error status: 500; reason: intentional error"
 	if err == nil || err.Error() != we {
-		t.Fatalf("got error: %q; want: %q", err, we)
+		t.Fatalf("LinkStats() error = %q; want = %q", err, we)
 	}
 }
 func TestInvalidShortLink(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "asdf", StatOptions{LastNDays: 2})
 	we := "short link must start with `https://`"
 	if err == nil || err.Error() != we {
-		t.Errorf("LinkStats(<invalid short link>) err: %q; want: %q", err, we)
+		t.Errorf("LinkStats(<invalid short link>) err = %q; want = %q", err, we)
 	}
 }
 
@@ -171,6 +171,6 @@ func TestInvalidLastNDays(t *testing.T) {
 	_, err := client.LinkStats(context.Background(), "https://mock", StatOptions{LastNDays: -1})
 	we := "LastNDays must be > 0"
 	if err == nil || err.Error() != we {
-		t.Errorf("LinkStats(<invalid LastNDays) err: %q; want: %q", err, we)
+		t.Errorf("LinkStats(<invalid LastNDays) err = %q; want = %q", err, we)
 	}
 }
