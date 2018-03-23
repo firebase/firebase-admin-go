@@ -140,7 +140,7 @@ This will execute both unit and integration test suites.
 
 ### End-to-End Testing for Firebase Dynamic Links.
 
-To run end to end tests for Firebase Dynamic Links follow these steps:
+To run end-to-end tests for Firebase Dynamic Links follow these steps:
 
 1. From the [`Firebase Console`](https://firebase.corp.google.com/), create a short link in your project under "`Grow` > `Dynamic Links`".
 2. From your browser or phone, go to that short link and see that it redirects as desired.
