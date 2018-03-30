@@ -381,7 +381,11 @@ type fcmResponse struct {
 
 type fcmError struct {
 	Error struct {
-		Status string `json:"status"`
+		Status  string `json:"status"`
+		Details []struct {
+			Type      string `json:"@type"`
+			ErrorCode string `json:"errorCode"`
+		}
 	} `json:"error"`
 }
 
@@ -422,7 +426,17 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 
 	var fe fcmError
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
-	msg := fcmErrorCodes[fe.Error.Status]
+	var code string
+	for _, d := range fe.Error.Details {
+		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode" {
+			code = d.ErrorCode
+			break
+		}
+	}
+	if code == "" {
+		code = fe.Error.Status
+	}
+	msg := fcmErrorCodes[code]
 	if msg == "" {
 		msg = fmt.Sprintf("server responded with an unknown error; response: %s", string(resp.Body))
 	}
