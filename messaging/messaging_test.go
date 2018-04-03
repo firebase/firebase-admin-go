@@ -627,16 +627,18 @@ func TestSendError(t *testing.T) {
 		},
 		{
 			resp: "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument; details: test error",
 		},
 		{
 			resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered",
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+				"details: test error",
 		},
 		{
 			resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
 				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode", "errorCode": "UNREGISTERED"}]}}`,
-			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered",
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+				"details: test error",
 		},
 		{
 			resp: "not json",
