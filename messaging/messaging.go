@@ -382,6 +382,7 @@ type fcmResponse struct {
 type fcmError struct {
 	Error struct {
 		Status  string `json:"status"`
+		Message string `json:"message"`
 		Details []struct {
 			Type      string `json:"@type"`
 			ErrorCode string `json:"errorCode"`
@@ -439,6 +440,8 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	msg := fcmErrorCodes[code]
 	if msg == "" {
 		msg = fmt.Sprintf("server responded with an unknown error; response: %s", string(resp.Body))
+	} else if fe.Error.Message != "" {
+		msg += "; details: " + fe.Error.Message
 	}
 	return "", fmt.Errorf("http error status: %d; reason: %s", resp.Status, msg)
 }
