@@ -225,6 +225,7 @@ type Aps struct {
 	CustomData       map[string]interface{}
 }
 
+// standardFields creates a map containing all the fields except the custom data.
 func (a *Aps) standardFields() map[string]interface{} {
 	m := make(map[string]interface{})
 	if a.Alert != nil {
