@@ -291,7 +291,7 @@ var validMessages = []struct {
 						ThreadID:         "t",
 						ContentAvailable: true,
 						MutableContent:   true,
-						CustomFields:     map[string]interface{}{"k1": "v1", "k2": 1},
+						CustomData:       map[string]interface{}{"k1": "v1", "k2": 1},
 					},
 				},
 			},
@@ -484,8 +484,8 @@ var invalidMessages = []struct {
 			APNS: &APNSConfig{
 				Payload: &APNSPayload{
 					Aps: &Aps{
-						Category:     "category",
-						CustomFields: map[string]interface{}{"category": "category"},
+						Category:   "category",
+						CustomData: map[string]interface{}{"category": "category"},
 					},
 				},
 			},

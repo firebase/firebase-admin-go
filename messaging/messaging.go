@@ -222,7 +222,7 @@ type Aps struct {
 	MutableContent   bool
 	Category         string
 	ThreadID         string
-	CustomFields     map[string]interface{}
+	CustomData       map[string]interface{}
 }
 
 func (a *Aps) standardFields() map[string]interface{} {
@@ -256,7 +256,7 @@ func (a *Aps) standardFields() map[string]interface{} {
 // MarshalJSON marshals an Aps into JSON (for internal use only).
 func (a *Aps) MarshalJSON() ([]byte, error) {
 	m := a.standardFields()
-	for k, v := range a.CustomFields {
+	for k, v := range a.CustomData {
 		m[k] = v
 	}
 	return json.Marshal(m)

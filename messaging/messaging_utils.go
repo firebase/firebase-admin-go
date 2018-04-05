@@ -103,7 +103,7 @@ func validateAps(aps *Aps) error {
 			return fmt.Errorf("multiple alert specifications")
 		}
 		m := aps.standardFields()
-		for k := range aps.CustomFields {
+		for k := range aps.CustomData {
 			if _, contains := m[k]; contains {
 				return fmt.Errorf("multiple specifications for the key %q", k)
 			}
