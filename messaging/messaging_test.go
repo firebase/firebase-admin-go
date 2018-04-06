@@ -249,6 +249,7 @@ var validMessages = []struct {
 						Sound:            "s",
 						ThreadID:         "t",
 						ContentAvailable: true,
+						MutableContent:   true,
 					},
 					CustomData: map[string]interface{}{
 						"k1": "v1",
@@ -269,6 +270,7 @@ var validMessages = []struct {
 						"sound":             "s",
 						"thread-id":         "t",
 						"content-available": float64(1),
+						"mutable-content":   float64(1),
 					},
 					"k1": "v1",
 					"k2": true,
@@ -288,6 +290,8 @@ var validMessages = []struct {
 						Sound:            "s",
 						ThreadID:         "t",
 						ContentAvailable: true,
+						MutableContent:   true,
+						CustomData:       map[string]interface{}{"k1": "v1", "k2": 1},
 					},
 				},
 			},
@@ -302,6 +306,9 @@ var validMessages = []struct {
 						"sound":             "s",
 						"thread-id":         "t",
 						"content-available": float64(1),
+						"mutable-content":   float64(1),
+						"k1":                "v1",
+						"k2":                float64(1),
 					},
 				},
 			},
@@ -470,6 +477,21 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "multiple alert specifications",
+	},
+	{
+		name: "APNSMultipleFieldSpecifications",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Category:   "category",
+						CustomData: map[string]interface{}{"category": "category"},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: `multiple specifications for the key "category"`,
 	},
 	{
 		name: "InvalidAPNSTitleLocArgs",

@@ -214,36 +214,53 @@ func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 // Alert may be specified as a string (via the AlertString field), or as a struct (via the Alert
 // field).
 type Aps struct {
-	AlertString      string    `json:"-"`
-	Alert            *ApsAlert `json:"-"`
-	Badge            *int      `json:"badge,omitempty"`
-	Sound            string    `json:"sound,omitempty"`
-	ContentAvailable bool      `json:"-"`
-	Category         string    `json:"category,omitempty"`
-	ThreadID         string    `json:"thread-id,omitempty"`
+	AlertString      string
+	Alert            *ApsAlert
+	Badge            *int
+	Sound            string
+	ContentAvailable bool
+	MutableContent   bool
+	Category         string
+	ThreadID         string
+	CustomData       map[string]interface{}
+}
+
+// standardFields creates a map containing all the fields except the custom data.
+func (a *Aps) standardFields() map[string]interface{} {
+	m := make(map[string]interface{})
+	if a.Alert != nil {
+		m["alert"] = a.Alert
+	} else if a.AlertString != "" {
+		m["alert"] = a.AlertString
+	}
+	if a.ContentAvailable {
+		m["content-available"] = 1
+	}
+	if a.MutableContent {
+		m["mutable-content"] = 1
+	}
+	if a.Badge != nil {
+		m["badge"] = *a.Badge
+	}
+	if a.Sound != "" {
+		m["sound"] = a.Sound
+	}
+	if a.Category != "" {
+		m["category"] = a.Category
+	}
+	if a.ThreadID != "" {
+		m["thread-id"] = a.ThreadID
+	}
+	return m
 }
 
 // MarshalJSON marshals an Aps into JSON (for internal use only).
 func (a *Aps) MarshalJSON() ([]byte, error) {
-	type apsAlias Aps
-	s := &struct {
-		Alert            interface{} `json:"alert,omitempty"`
-		ContentAvailable *int        `json:"content-available,omitempty"`
-		*apsAlias
-	}{
-		apsAlias: (*apsAlias)(a),
+	m := a.standardFields()
+	for k, v := range a.CustomData {
+		m[k] = v
 	}
-
-	if a.Alert != nil {
-		s.Alert = a.Alert
-	} else if a.AlertString != "" {
-		s.Alert = a.AlertString
-	}
-	if a.ContentAvailable {
-		one := 1
-		s.ContentAvailable = &one
-	}
-	return json.Marshal(s)
+	return json.Marshal(m)
 }
 
 // ApsAlert is the alert payload that can be included in an Aps.
