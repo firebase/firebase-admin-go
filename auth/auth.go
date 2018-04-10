@@ -265,7 +265,7 @@ func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken strin
 	}
 
 	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return nil, fmt.Errorf("ID token has been revoked")
+		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
 	}
 	return p, nil
 }
