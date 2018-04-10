@@ -436,12 +436,13 @@ var serverError = map[string]string{
 	"PROJECT_NOT_FOUND":       projectNotFound,
 }
 
-func handleServerError(err error) *internal.FirebaseError {
-	var serverCode string
+func handleServerError(err error) error {
 	gerr, ok := err.(*googleapi.Error)
-	if ok {
-		serverCode = gerr.Message
+	if !ok {
+		// Not a back-end error
+		return err
 	}
+	serverCode := gerr.Message
 	clientCode, ok := serverError[serverCode]
 	if !ok {
 		clientCode = unknown

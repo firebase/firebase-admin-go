@@ -97,18 +97,6 @@ func Errorf(code string, msg string, args ...interface{}) *FirebaseError {
 	return Error(code, fmt.Sprintf(msg, args...))
 }
 
-// Code extracts the error code from the given error.
-//
-// If the error does not contain an error code, this function returns an empty string. Use this
-// internal function for unit tests in packages that cannot directly import the root firebase
-// package.
-func Code(err error) string {
-	if fe, ok := err.(*FirebaseError); ok {
-		return fe.Code
-	}
-	return ""
-}
-
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string
