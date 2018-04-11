@@ -14,7 +14,7 @@
 
 // Package messaging contains functions for sending messages and managing
 // device subscriptions with Firebase Cloud Messaging (FCM).
-package messaging
+package messaging // import "firebase.google.com/go/messaging"
 
 import (
 	"encoding/json"
