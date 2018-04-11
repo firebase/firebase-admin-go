@@ -102,6 +102,12 @@ func validateAps(aps *Aps) error {
 		if aps.Alert != nil && aps.AlertString != "" {
 			return fmt.Errorf("multiple alert specifications")
 		}
+		m := aps.standardFields()
+		for k := range aps.CustomData {
+			if _, contains := m[k]; contains {
+				return fmt.Errorf("multiple specifications for the key %q", k)
+			}
+		}
 		return validateApsAlert(aps.Alert)
 	}
 	return nil

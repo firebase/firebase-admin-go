@@ -1,5 +1,13 @@
 # Unreleased
 
+- [added] Added several new functions for testing errors
+  (e.g. `auth.IsUserNotFound()`).
+- [added] Added support for setting the `mutable-content` property on
+  FCM messages sent via APNS.
+- [changed] Updated the error messages returned by the `messaging`
+  package. These errors now contain the full details sent by the
+  back-end server.
+
 # v2.6.1
 
 - [added] Added support for Go 1.6.
