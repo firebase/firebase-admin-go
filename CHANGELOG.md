@@ -1,5 +1,9 @@
 # Unreleased
 
+-
+
+# v2.7.0
+
 - [added] Added several new functions for testing errors
   (e.g. `auth.IsUserNotFound()`).
 - [added] Added support for setting the `mutable-content` property on
