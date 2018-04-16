@@ -16,8 +16,9 @@ package snippets
 
 // [START admin_import_golang]
 import (
-	"context"
 	"log"
+
+	"golang.org/x/net/context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"

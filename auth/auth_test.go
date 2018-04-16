@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"golang.org/x/oauth2/google"
 
@@ -232,7 +233,7 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
 	we := "ID token has been revoked"
-	if p != nil || err == nil || err.Error() != we {
+	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}

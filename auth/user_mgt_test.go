@@ -16,7 +16,6 @@ package auth
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +25,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 
@@ -148,17 +149,22 @@ func TestGetNonExistingUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	user, err := s.Client.GetUser(context.Background(), "ignored_id")
-	if user != nil || err == nil {
-		t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", user, err)
+	we := `cannot find user from uid: "id-nonexisting"`
+	user, err := s.Client.GetUser(context.Background(), "id-nonexisting")
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
+		t.Errorf("GetUser(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
-	user, err = s.Client.GetUserByEmail(context.Background(), "test@email.com")
-	if user != nil || err == nil {
-		t.Errorf("GetUserByEmail(non-existing) = (%v, %v); want = (nil, error)", user, err)
+
+	we = `cannot find user from email: "foo@bar.nonexisting"`
+	user, err = s.Client.GetUserByEmail(context.Background(), "foo@bar.nonexisting")
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
+		t.Errorf("GetUserByEmail(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
-	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+1234567890")
-	if user != nil || err == nil {
-		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %v); want = (nil, error)", user, err)
+
+	we = `cannot find user from phone number: "+12345678901"`
+	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+12345678901")
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
+		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 }
 
@@ -634,7 +640,6 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-
 	rur := &identitytoolkit.UserInfo{
 		LocalId:          "testuser",
 		Email:            "testuser@example.com",
@@ -696,8 +701,36 @@ func TestHTTPError(t *testing.T) {
 	}
 
 	want := `googleapi: got HTTP response code 500 with body: {"error":"test"}`
-	if err.Error() != want {
+	if err.Error() != want || !IsUnknown(err) {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
+	}
+}
+
+func TestHTTPErrorWithCode(t *testing.T) {
+	errorCodes := map[string]func(error) bool{
+		"CONFIGURATION_NOT_FOUND": IsProjectNotFound,
+		"DUPLICATE_EMAIL":         IsEmailAlreadyExists,
+		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
+		"EMAIL_EXISTS":            IsEmailAlreadyExists,
+		"INSUFFICIENT_PERMISSION": IsInsufficientPermission,
+		"PHONE_NUMBER_EXISTS":     IsPhoneNumberAlreadyExists,
+		"PROJECT_NOT_FOUND":       IsProjectNotFound,
+	}
+	s := echoServer(nil, t)
+	defer s.Close()
+	s.Status = http.StatusInternalServerError
+
+	for code, check := range errorCodes {
+		s.Resp = []byte(fmt.Sprintf(`{"error":{"message":"%s"}}`, code))
+		u, err := s.Client.GetUser(context.Background(), "some uid")
+		if u != nil || err == nil {
+			t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
+		}
+
+		want := fmt.Sprintf("googleapi: Error 500: %s", code)
+		if err.Error() != want || !check(err) {
+			t.Errorf("GetUser() = %v; want = %q", err, want)
+		}
 	}
 }
 

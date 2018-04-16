@@ -16,11 +16,12 @@
 package iid
 
 import (
-	"context"
 	"flag"
 	"log"
 	"os"
 	"testing"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/integration/internal"

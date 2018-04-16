@@ -13,11 +13,12 @@
 // limitations under the License.
 
 // Package storage provides functions for accessing Google Cloud Storge buckets.
-package storage
+package storage // import "firebase.google.com/go/storage"
 
 import (
-	"context"
 	"errors"
+
+	"golang.org/x/net/context"
 
 	"cloud.google.com/go/storage"
 	"firebase.google.com/go/internal"

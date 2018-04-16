@@ -15,7 +15,6 @@
 package messaging
 
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -24,6 +23,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
@@ -248,6 +249,7 @@ var validMessages = []struct {
 						Sound:            "s",
 						ThreadID:         "t",
 						ContentAvailable: true,
+						MutableContent:   true,
 					},
 					CustomData: map[string]interface{}{
 						"k1": "v1",
@@ -268,6 +270,7 @@ var validMessages = []struct {
 						"sound":             "s",
 						"thread-id":         "t",
 						"content-available": float64(1),
+						"mutable-content":   float64(1),
 					},
 					"k1": "v1",
 					"k2": true,
@@ -287,6 +290,8 @@ var validMessages = []struct {
 						Sound:            "s",
 						ThreadID:         "t",
 						ContentAvailable: true,
+						MutableContent:   true,
+						CustomData:       map[string]interface{}{"k1": "v1", "k2": 1},
 					},
 				},
 			},
@@ -301,6 +306,9 @@ var validMessages = []struct {
 						"sound":             "s",
 						"thread-id":         "t",
 						"content-available": float64(1),
+						"mutable-content":   float64(1),
+						"k1":                "v1",
+						"k2":                float64(1),
 					},
 				},
 			},
@@ -471,6 +479,21 @@ var invalidMessages = []struct {
 		want: "multiple alert specifications",
 	},
 	{
+		name: "APNSMultipleFieldSpecifications",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Category:   "category",
+						CustomData: map[string]interface{}{"category": "category"},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: `multiple specifications for the key "category"`,
+	},
+	{
 		name: "InvalidAPNSTitleLocArgs",
 		req: &Message{
 			APNS: &APNSConfig{
@@ -565,13 +588,11 @@ func TestSend(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		t.Run(tc.name, func(t *testing.T) {
-			name, err := client.Send(ctx, tc.req)
-			if name != testMessageID || err != nil {
-				t.Errorf("Send() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
-			}
-			checkFCMRequest(t, b, tr, tc.want, false)
-		})
+		name, err := client.Send(ctx, tc.req)
+		if name != testMessageID || err != nil {
+			t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+		}
+		checkFCMRequest(t, b, tr, tc.want, false)
 	}
 }
 
@@ -594,13 +615,11 @@ func TestSendDryRun(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		t.Run(tc.name, func(t *testing.T) {
-			name, err := client.SendDryRun(ctx, tc.req)
-			if name != testMessageID || err != nil {
-				t.Errorf("SendDryRun() = (%q, %v); want = (%q, nil)", name, err, testMessageID)
-			}
-			checkFCMRequest(t, b, tr, tc.want, true)
-		})
+		name, err := client.SendDryRun(ctx, tc.req)
+		if name != testMessageID || err != nil {
+			t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+		}
+		checkFCMRequest(t, b, tr, tc.want, true)
 	}
 }
 
@@ -621,30 +640,72 @@ func TestSendError(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	cases := []struct {
-		resp string
-		want string
+		resp, want string
+		check      func(error) bool
 	}{
 		{
-			resp: "{}",
-			want: "http error status: 500; reason: server responded with an unknown error; response: {}",
+			resp:  "{}",
+			want:  "http error status: 500; reason: server responded with an unknown error; response: {}",
+			check: IsUnknown,
 		},
 		{
-			resp: "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+			resp:  "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
+			want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument; details: test error",
+			check: IsInvalidArgument,
 		},
 		{
 			resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered",
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+				"details: test error",
+			check: IsRegistrationTokenNotRegistered,
 		},
 		{
-			resp: "not json",
-			want: "http error status: 500; reason: server responded with an unknown error; response: not json",
+			resp: "{\"error\": {\"status\": \"QUOTA_EXCEEDED\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: messaging service quota exceeded; code: message-rate-exceeded; " +
+				"details: test error",
+			check: IsMessageRateExceeded,
+		},
+		{
+			resp: "{\"error\": {\"status\": \"UNAVAILABLE\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: backend servers are temporarily unavailable; code: server-unavailable; " +
+				"details: test error",
+			check: IsServerUnavailable,
+		},
+		{
+			resp: "{\"error\": {\"status\": \"INTERNAL\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: backend servers encountered an unknown internl error; code: internal-error; " +
+				"details: test error",
+			check: IsInternal,
+		},
+		{
+			resp: "{\"error\": {\"status\": \"APNS_AUTH_ERROR\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: apns certificate or auth key was invalid; code: invalid-apns-credentials; " +
+				"details: test error",
+			check: IsInvalidAPNSCredentials,
+		},
+		{
+			resp: "{\"error\": {\"status\": \"SENDER_ID_MISMATCH\", \"message\": \"test error\"}}",
+			want: "http error status: 500; reason: sender id does not match regisration token; code: mismatched-credential; " +
+				"details: test error",
+			check: IsMismatchedCredential,
+		},
+		{
+			resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
+				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode", "errorCode": "UNREGISTERED"}]}}`,
+			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+				"details: test error",
+			check: IsRegistrationTokenNotRegistered,
+		},
+		{
+			resp:  "not json",
+			want:  "http error status: 500; reason: server responded with an unknown error; response: not json",
+			check: IsUnknown,
 		},
 	}
 	for _, tc := range cases {
 		resp = tc.resp
 		name, err := client.Send(ctx, &Message{Topic: "topic"})
-		if err == nil || err.Error() != tc.want {
+		if err == nil || err.Error() != tc.want || !tc.check(err) {
 			t.Errorf("Send() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
 		}
 	}
@@ -657,12 +718,10 @@ func TestInvalidMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidMessages {
-		t.Run(tc.name, func(t *testing.T) {
-			name, err := client.Send(ctx, tc.req)
-			if err == nil || err.Error() != tc.want {
-				t.Errorf("Send() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
-			}
-		})
+		name, err := client.Send(ctx, tc.req)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("Send(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+		}
 	}
 }
 
@@ -699,12 +758,10 @@ func TestInvalidSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		t.Run(tc.name, func(t *testing.T) {
-			name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
-			if err == nil || err.Error() != tc.want {
-				t.Errorf("SubscribeToTopic() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
-			}
-		})
+		name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("SubscribeToTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+		}
 	}
 }
 
@@ -730,7 +787,7 @@ func TestUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkIIDRequest(t, b, tr, iidSubscribe)
+	checkIIDRequest(t, b, tr, iidUnsubscribe)
 	checkTopicMgtResponse(t, resp)
 }
 
@@ -741,12 +798,10 @@ func TestInvalidUnsubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		t.Run(tc.name, func(t *testing.T) {
-			name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
-			if err == nil || err.Error() != tc.want {
-				t.Errorf("UnsubscribeFromTopic() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
-			}
-		})
+		name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("UnsubscribeFromTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+		}
 	}
 }
 
@@ -767,26 +822,34 @@ func TestTopicManagementError(t *testing.T) {
 	client.iidEndpoint = ts.URL
 
 	cases := []struct {
-		resp string
-		want string
+		resp, want string
+		check      func(error) bool
 	}{
 		{
-			resp: "{}",
-			want: "http error status: 500; reason: client encountered an unknown error; response: {}",
+			resp:  "{}",
+			want:  "http error status: 500; reason: client encountered an unknown error; response: {}",
+			check: IsUnknown,
 		},
 		{
-			resp: "{\"error\": \"INVALID_ARGUMENT\"}",
-			want: "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+			resp:  "{\"error\": \"INVALID_ARGUMENT\"}",
+			want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
+			check: IsInvalidArgument,
 		},
 		{
-			resp: "not json",
-			want: "http error status: 500; reason: client encountered an unknown error; response: not json",
+			resp:  "{\"error\": \"TOO_MANY_TOPICS\"}",
+			want:  "http error status: 500; reason: client exceeded the number of allowed topics; code: too-many-topics",
+			check: IsTooManyTopics,
+		},
+		{
+			resp:  "not json",
+			want:  "http error status: 500; reason: client encountered an unknown error; response: not json",
+			check: IsUnknown,
 		},
 	}
 	for _, tc := range cases {
 		resp = tc.resp
 		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
-		if err == nil || err.Error() != tc.want {
+		if err == nil || err.Error() != tc.want || !tc.check(err) {
 			t.Errorf("SubscribeToTopic() = (%q, %v); want = (%q, %q)", tmr, err, "", tc.want)
 		}
 	}
