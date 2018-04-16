@@ -15,11 +15,12 @@
 package auth
 
 import (
-	"context"
 	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func TestEncodeToken(t *testing.T) {

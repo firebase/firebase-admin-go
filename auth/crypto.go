@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -31,6 +30,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // publicKey represents a parsed RSA public key along with its unique key ID.
