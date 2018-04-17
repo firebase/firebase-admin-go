@@ -32,7 +32,7 @@ type jwtHeader struct {
 }
 
 type jwtPayload interface {
-	decode(s string) error
+	decodeFrom(s string) error
 }
 
 type customToken struct {
@@ -45,38 +45,11 @@ type customToken struct {
 	Claims map[string]interface{} `json:"claims,omitempty"`
 }
 
-func (p *customToken) decode(s string) error {
+func (p *customToken) decodeFrom(s string) error {
 	return decode(s, p)
 }
 
-func (t *Token) decode(s string) error {
-	claims := make(map[string]interface{})
-	if err := decode(s, &claims); err != nil {
-		return err
-	}
-	if err := decode(s, t); err != nil {
-		return err
-	}
-
-	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
-		delete(claims, r)
-	}
-	t.Claims = claims
-	return nil
-}
-
-func defaultHeader() jwtHeader {
-	return jwtHeader{Algorithm: "RS256", Type: "JWT"}
-}
-
-func encode(i interface{}) (string, error) {
-	b, err := json.Marshal(i)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
+// decode accepts a JWT segment, and decodes it into the given interface.
 func decode(s string, i interface{}) error {
 	decoded, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
@@ -86,6 +59,13 @@ func decode(s string, i interface{}) error {
 }
 
 func encodeToken(ctx context.Context, s signer, h jwtHeader, p jwtPayload) (string, error) {
+	encode := func(i interface{}) (string, error) {
+		b, err := json.Marshal(i)
+		if err != nil {
+			return "", err
+		}
+		return base64.RawURLEncoding.EncodeToString(b), nil
+	}
 	header, err := encode(h)
 	if err != nil {
 		return "", err
@@ -112,7 +92,7 @@ func decodeToken(ctx context.Context, token string, ks keySource, h *jwtHeader, 
 	if err := decode(s[0], h); err != nil {
 		return err
 	}
-	if err := p.decode(s[1]); err != nil {
+	if err := p.decodeFrom(s[1]); err != nil {
 		return err
 	}
 
