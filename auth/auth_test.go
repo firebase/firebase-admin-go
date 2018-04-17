@@ -37,11 +37,14 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-var client *Client
-var ctx context.Context
-var testIDToken string
-var testGetUserResponse []byte
-var testListUsersResponse []byte
+var (
+	client                *Client
+	ctx                   context.Context
+	testIDToken           string
+	testGetUserResponse   []byte
+	testListUsersResponse []byte
+)
+
 var defaultTestOpts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
