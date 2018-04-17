@@ -31,6 +31,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context/ctxhttp"
+
 	"golang.org/x/net/context"
 )
 
@@ -111,27 +113,25 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	resp, err := k.HTTPClient.Do(req.WithContext(ctx))
 
+	resp, err := ctxhttp.Do(ctx, k.HTTPClient, req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-
 	newKeys, err := parsePublicKeys(contents)
 	if err != nil {
 		return err
 	}
-
 	maxAge, err := findMaxAge(resp)
 	if err != nil {
 		return err
 	}
-
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil
