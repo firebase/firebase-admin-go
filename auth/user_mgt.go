@@ -23,8 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
 )
@@ -215,8 +217,10 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 
 	call := c.is.Relyingparty.DeleteAccount(request)
 	c.setHeader(call)
-	_, err := call.Context(ctx).Do()
-	return err
+	if _, err := call.Context(ctx).Do(); err != nil {
+		return handleServerError(err)
+	}
+	return nil
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -279,7 +283,7 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 	it.client.setHeader(call)
 	resp, err := call.Context(it.ctx).Do()
 	if err != nil {
-		return "", err
+		return "", handleServerError(err)
 	}
 
 	for _, u := range resp.Users {
@@ -345,10 +349,7 @@ func processClaims(p map[string]interface{}) error {
 		return nil
 	}
 
-	claims, ok := cc.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("unexpected type for custom claims")
-	}
+	claims := cc.(map[string]interface{})
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
 			return fmt.Errorf("claim %q is reserved and must not be set", key)
@@ -370,6 +371,83 @@ func processClaims(p map[string]interface{}) error {
 	p["customAttributes"] = s
 	delete(p, "customClaims")
 	return nil
+}
+
+// Error handlers.
+
+const (
+	emailAlredyExists        = "email-already-exists"
+	idTokenRevoked           = "id-token-revoked"
+	insufficientPermission   = "insufficient-permission"
+	phoneNumberAlreadyExists = "phone-number-already-exists"
+	projectNotFound          = "project-not-found"
+	uidAlreadyExists         = "uid-already-exists"
+	unknown                  = "unknown-error"
+	userNotFound             = "user-not-found"
+)
+
+// IsEmailAlreadyExists checks if the given error was due to a duplicate email.
+func IsEmailAlreadyExists(err error) bool {
+	return internal.HasErrorCode(err, emailAlredyExists)
+}
+
+// IsIDTokenRevoked checks if the given error was due to a revoked ID token.
+func IsIDTokenRevoked(err error) bool {
+	return internal.HasErrorCode(err, idTokenRevoked)
+}
+
+// IsInsufficientPermission checks if the given error was due to insufficient permissions.
+func IsInsufficientPermission(err error) bool {
+	return internal.HasErrorCode(err, insufficientPermission)
+}
+
+// IsPhoneNumberAlreadyExists checks if the given error was due to a duplicate phone number.
+func IsPhoneNumberAlreadyExists(err error) bool {
+	return internal.HasErrorCode(err, phoneNumberAlreadyExists)
+}
+
+// IsProjectNotFound checks if the given error was due to a non-existing project.
+func IsProjectNotFound(err error) bool {
+	return internal.HasErrorCode(err, projectNotFound)
+}
+
+// IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
+func IsUIDAlreadyExists(err error) bool {
+	return internal.HasErrorCode(err, uidAlreadyExists)
+}
+
+// IsUnknown checks if the given error was due to a unknown server error.
+func IsUnknown(err error) bool {
+	return internal.HasErrorCode(err, unknown)
+}
+
+// IsUserNotFound checks if the given error was due to non-existing user.
+func IsUserNotFound(err error) bool {
+	return internal.HasErrorCode(err, userNotFound)
+}
+
+var serverError = map[string]string{
+	"CONFIGURATION_NOT_FOUND": projectNotFound,
+	"DUPLICATE_EMAIL":         emailAlredyExists,
+	"DUPLICATE_LOCAL_ID":      uidAlreadyExists,
+	"EMAIL_EXISTS":            emailAlredyExists,
+	"INSUFFICIENT_PERMISSION": insufficientPermission,
+	"PHONE_NUMBER_EXISTS":     phoneNumberAlreadyExists,
+	"PROJECT_NOT_FOUND":       projectNotFound,
+}
+
+func handleServerError(err error) error {
+	gerr, ok := err.(*googleapi.Error)
+	if !ok {
+		// Not a back-end error
+		return err
+	}
+	serverCode := gerr.Message
+	clientCode, ok := serverError[serverCode]
+	if !ok {
+		clientCode = unknown
+	}
+	return internal.Error(clientCode, err.Error())
 }
 
 // Validators.
@@ -532,7 +610,7 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 	c.setHeader(call)
 	resp, err := call.Context(ctx).Do()
 	if err != nil {
-		return "", err
+		return "", handleServerError(err)
 	}
 
 	return resp.LocalId, nil
@@ -555,9 +633,10 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 
 	call := c.is.Relyingparty.SetAccountInfo(request)
 	c.setHeader(call)
-	_, err := call.Context(ctx).Do()
-
-	return err
+	if _, err := call.Context(ctx).Do(); err != nil {
+		return handleServerError(err)
+	}
+	return nil
 }
 
 func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
@@ -565,10 +644,18 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 	c.setHeader(call)
 	resp, err := call.Context(ctx).Do()
 	if err != nil {
-		return nil, err
+		return nil, handleServerError(err)
 	}
 	if len(resp.Users) == 0 {
-		return nil, fmt.Errorf("cannot find user given params: id:%v, phone:%v, email: %v", request.LocalId, request.PhoneNumber, request.Email)
+		var msg string
+		if len(request.LocalId) == 1 {
+			msg = fmt.Sprintf("cannot find user from uid: %q", request.LocalId[0])
+		} else if len(request.Email) == 1 {
+			msg = fmt.Sprintf("cannot find user from email: %q", request.Email[0])
+		} else {
+			msg = fmt.Sprintf("cannot find user from phone number: %q", request.PhoneNumber[0])
+		}
+		return nil, internal.Error(userNotFound, msg)
 	}
 
 	eu, err := makeExportedUser(resp.Users[0])
@@ -581,8 +668,7 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) {
 	var cc map[string]interface{}
 	if r.CustomAttributes != "" {
-		err := json.Unmarshal([]byte(r.CustomAttributes), &cc)
-		if err != nil {
+		if err := json.Unmarshal([]byte(r.CustomAttributes), &cc); err != nil {
 			return nil, err
 		}
 		if len(cc) == 0 {

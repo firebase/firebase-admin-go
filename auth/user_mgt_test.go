@@ -149,23 +149,21 @@ func TestGetNonExistingUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	want := "cannot find user given params: id:[%s], phone:[%s], email: [%s]"
-
-	we := fmt.Sprintf(want, "id-nonexisting", "", "")
+	we := `cannot find user from uid: "id-nonexisting"`
 	user, err := s.Client.GetUser(context.Background(), "id-nonexisting")
-	if user != nil || err == nil || err.Error() != we {
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUser(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 
-	we = fmt.Sprintf(want, "", "", "foo@bar.nonexisting")
+	we = `cannot find user from email: "foo@bar.nonexisting"`
 	user, err = s.Client.GetUserByEmail(context.Background(), "foo@bar.nonexisting")
-	if user != nil || err == nil || err.Error() != we {
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUserByEmail(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 
-	we = fmt.Sprintf(want, "", "+12345678901", "")
+	we = `cannot find user from phone number: "+12345678901"`
 	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+12345678901")
-	if user != nil || err == nil || err.Error() != we {
+	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 }
@@ -642,7 +640,6 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-
 	rur := &identitytoolkit.UserInfo{
 		LocalId:          "testuser",
 		Email:            "testuser@example.com",
@@ -704,8 +701,36 @@ func TestHTTPError(t *testing.T) {
 	}
 
 	want := `googleapi: got HTTP response code 500 with body: {"error":"test"}`
-	if err.Error() != want {
+	if err.Error() != want || !IsUnknown(err) {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
+	}
+}
+
+func TestHTTPErrorWithCode(t *testing.T) {
+	errorCodes := map[string]func(error) bool{
+		"CONFIGURATION_NOT_FOUND": IsProjectNotFound,
+		"DUPLICATE_EMAIL":         IsEmailAlreadyExists,
+		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
+		"EMAIL_EXISTS":            IsEmailAlreadyExists,
+		"INSUFFICIENT_PERMISSION": IsInsufficientPermission,
+		"PHONE_NUMBER_EXISTS":     IsPhoneNumberAlreadyExists,
+		"PROJECT_NOT_FOUND":       IsProjectNotFound,
+	}
+	s := echoServer(nil, t)
+	defer s.Close()
+	s.Status = http.StatusInternalServerError
+
+	for code, check := range errorCodes {
+		s.Resp = []byte(fmt.Sprintf(`{"error":{"message":"%s"}}`, code))
+		u, err := s.Client.GetUser(context.Background(), "some uid")
+		if u != nil || err == nil {
+			t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
+		}
+
+		want := fmt.Sprintf("googleapi: Error 500: %s", code)
+		if err.Error() != want || !check(err) {
+			t.Errorf("GetUser() = %v; want = %q", err, want)
+		}
 	}
 }
 
