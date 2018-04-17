@@ -16,12 +16,13 @@ package auth
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 type jwtHeader struct {
