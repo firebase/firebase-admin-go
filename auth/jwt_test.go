@@ -24,7 +24,7 @@ import (
 )
 
 func TestEncodeToken(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": "value"}
 	s, err := encodeToken(ctx, &mockSigner{}, h, p)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestEncodeToken(t *testing.T) {
 }
 
 func TestEncodeSignError(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": "value"}
 	signer := &mockSigner{
 		err: errors.New("sign error"),
@@ -68,7 +68,7 @@ func TestEncodeSignError(t *testing.T) {
 }
 
 func TestEncodeInvalidPayload(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": func() {}}
 	if s, err := encodeToken(ctx, &mockSigner{}, h, p); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)

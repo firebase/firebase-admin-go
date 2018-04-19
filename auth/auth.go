@@ -17,9 +17,7 @@ package auth
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,10 +29,12 @@ import (
 	"google.golang.org/api/transport"
 )
 
-const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const issuerPrefix = "https://securetoken.google.com/"
-const tokenExpSeconds = 3600
+const (
+	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	idTokenCertURL   = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+	issuerPrefix     = "https://securetoken.google.com/"
+	tokenExpSeconds  = 3600
+)
 
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
@@ -56,6 +56,24 @@ type Token struct {
 	Subject  string                 `json:"sub,omitempty"`
 	UID      string                 `json:"uid,omitempty"`
 	Claims   map[string]interface{} `json:"-"`
+}
+
+func (t *Token) decodeFrom(s string) error {
+	// Decode into a regular map to access custom claims.
+	claims := make(map[string]interface{})
+	if err := decode(s, &claims); err != nil {
+		return err
+	}
+	// Now decode into Token to access the standard claims.
+	if err := decode(s, t); err != nil {
+		return err
+	}
+
+	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
+		delete(claims, r)
+	}
+	t.Claims = claims
+	return nil
 }
 
 // Client is the interface for the Firebase auth service.
@@ -94,7 +112,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 		if svcAcct.PrivateKey != "" {
-			pk, err = parseKey(svcAcct.PrivateKey)
+			pk, err = parsePrivateKey(svcAcct.PrivateKey)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +142,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 
 	return &Client{
 		is:        is,
-		ks:        newHTTPKeySource(googleCertURL, hc),
+		ks:        newHTTPKeySource(idTokenCertURL, hc),
 		projectID: c.ProjectID,
 		snr:       snr,
 		version:   "Go/Admin/" + c.Version,
@@ -164,6 +182,7 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	}
 
 	now := clk.Now().Unix()
+	header := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	payload := &customToken{
 		Iss:    iss,
 		Sub:    iss,
@@ -173,7 +192,7 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-	return encodeToken(ctx, c.snr, defaultHeader(), payload)
+	return encodeToken(ctx, c.snr, header, payload)
 }
 
 // RevokeRefreshTokens revokes all refresh tokens issued to a user.
@@ -201,7 +220,7 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, errors.New("project id not available")
 	}
 	if idToken == "" {
-		return nil, fmt.Errorf("ID token must be a non-empty string")
+		return nil, fmt.Errorf("id token must be a non-empty string")
 	}
 
 	h := &jwtHeader{}
@@ -210,36 +229,36 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, err
 	}
 
-	projectIDMsg := "Make sure the ID token comes from the same Firebase project as the credential used to" +
-		" authenticate this SDK."
-	verifyTokenMsg := "See https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
-		"retrieve a valid ID token."
+	projectIDMsg := "make sure the ID token comes from the same Firebase project as the credential used to" +
+		" authenticate this SDK"
+	verifyTokenMsg := "see https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
+		"retrieve a valid ID token"
 	issuer := issuerPrefix + c.projectID
 
 	var err error
 	if h.KeyID == "" {
 		if p.Audience == firebaseAudience {
-			err = fmt.Errorf("VerifyIDToken() expects an ID token, but was given a custom token")
+			err = fmt.Errorf("expected an ID token but got a custom token")
 		} else {
 			err = fmt.Errorf("ID token has no 'kid' header")
 		}
 	} else if h.Algorithm != "RS256" {
-		err = fmt.Errorf("ID token has invalid incorrect algorithm. Expected 'RS256' but got %q. %s",
+		err = fmt.Errorf("ID token has invalid algorithm; expected 'RS256' but got %q; %s",
 			h.Algorithm, verifyTokenMsg)
 	} else if p.Audience != c.projectID {
-		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected %q but got %q. %s %s",
+		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim; expected %q but got %q; %s; %s",
 			c.projectID, p.Audience, projectIDMsg, verifyTokenMsg)
 	} else if p.Issuer != issuer {
-		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
+		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
 	} else if p.IssuedAt > clk.Now().Unix() {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
-		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)
+		err = fmt.Errorf("ID token has expired at: %d", p.Expires)
 	} else if p.Subject == "" {
-		err = fmt.Errorf("ID token has empty 'sub' (subject) claim. %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has empty 'sub' (subject) claim; %s", verifyTokenMsg)
 	} else if len(p.Subject) > 128 {
-		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters. %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters; %s", verifyTokenMsg)
 	}
 
 	if err != nil {
@@ -265,27 +284,7 @@ func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken strin
 	}
 
 	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
+		return nil, internal.Error(idTokenRevoked, "id token has been revoked")
 	}
 	return p, nil
-}
-
-func parseKey(key string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(key))
-	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %v", key)
-	}
-	k := block.Bytes
-	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
-		}
-	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private key is not an RSA key")
-	}
-	return parsed, nil
 }

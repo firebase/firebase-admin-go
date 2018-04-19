@@ -37,11 +37,14 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-var client *Client
-var ctx context.Context
-var testIDToken string
-var testGetUserResponse []byte
-var testListUsersResponse []byte
+var (
+	client                *Client
+	ctx                   context.Context
+	testIDToken           string
+	testGetUserResponse   []byte
+	testListUsersResponse []byte
+)
+
 var defaultTestOpts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
@@ -232,7 +235,7 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
-	we := "ID token has been revoked"
+	we := "id token has been revoked"
 	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
@@ -371,7 +374,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	for k, v := range p {
 		pCopy[k] = v
 	}
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	h.KeyID = kid
 	token, err := encodeToken(ctx, client.snr, h, pCopy)
 	if err != nil {
@@ -382,7 +385,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 
 type mockIDTokenPayload map[string]interface{}
 
-func (p mockIDTokenPayload) decode(s string) error {
+func (p mockIDTokenPayload) decodeFrom(s string) error {
 	return decode(s, &p)
 }
 
