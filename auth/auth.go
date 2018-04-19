@@ -69,6 +69,7 @@ func (t *Token) decodeFrom(s string) error {
 		return err
 	}
 
+	// Delete standard claims from the custom claims maps.
 	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
 		delete(claims, r)
 	}
