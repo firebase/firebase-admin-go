@@ -59,10 +59,12 @@ type Token struct {
 }
 
 func (t *Token) decodeFrom(s string) error {
+	// Decode into a regular map to access custom claims.
 	claims := make(map[string]interface{})
 	if err := decode(s, &claims); err != nil {
 		return err
 	}
+	// Now decode into Token to access the standard claims.
 	if err := decode(s, t); err != nil {
 		return err
 	}
@@ -227,36 +229,36 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, err
 	}
 
-	projectIDMsg := "make sure the id token comes from the same Firebase project as the credential used to" +
-		" authenticate this SDK."
+	projectIDMsg := "make sure the ID token comes from the same Firebase project as the credential used to" +
+		" authenticate this SDK"
 	verifyTokenMsg := "see https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
-		"retrieve a valid id token."
+		"retrieve a valid ID token"
 	issuer := issuerPrefix + c.projectID
 
 	var err error
 	if h.KeyID == "" {
 		if p.Audience == firebaseAudience {
-			err = fmt.Errorf("expected an id token but got a custom token")
+			err = fmt.Errorf("expected an ID token but got a custom token")
 		} else {
-			err = fmt.Errorf("id token has no 'kid' header")
+			err = fmt.Errorf("ID token has no 'kid' header")
 		}
 	} else if h.Algorithm != "RS256" {
-		err = fmt.Errorf("id token has invalid algorithm; expected 'RS256' but got %q; %s",
+		err = fmt.Errorf("ID token has invalid algorithm; expected 'RS256' but got %q; %s",
 			h.Algorithm, verifyTokenMsg)
 	} else if p.Audience != c.projectID {
-		err = fmt.Errorf("id token has invalid 'aud' (audience) claim; expected %q but got %q; %s; %s",
+		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim; expected %q but got %q; %s; %s",
 			c.projectID, p.Audience, projectIDMsg, verifyTokenMsg)
 	} else if p.Issuer != issuer {
-		err = fmt.Errorf("id token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
+		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
 	} else if p.IssuedAt > clk.Now().Unix() {
-		err = fmt.Errorf("id token issued at future timestamp: %d", p.IssuedAt)
+		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
-		err = fmt.Errorf("id token has expired at: %d", p.Expires)
+		err = fmt.Errorf("ID token has expired at: %d", p.Expires)
 	} else if p.Subject == "" {
-		err = fmt.Errorf("id token has empty 'sub' (subject) claim; %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has empty 'sub' (subject) claim; %s", verifyTokenMsg)
 	} else if len(p.Subject) > 128 {
-		err = fmt.Errorf("id token has a 'sub' (subject) claim longer than 128 characters; %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters; %s", verifyTokenMsg)
 	}
 
 	if err != nil {
