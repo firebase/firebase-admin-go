@@ -135,24 +135,22 @@ func (u *UserToImport) validatedUserInfo() (*identitytoolkit.UserInfo, error) {
 			return nil, err
 		}
 	}
-	if info.PhotoUrl != "" {
-		if err := validatePhotoURL(info.PhotoUrl); err != nil {
-			return nil, err
-		}
-	}
 	if info.PhoneNumber != "" {
 		if err := validatePhone(info.PhoneNumber); err != nil {
 			return nil, err
 		}
 	}
-	cc, err := marshalCustomClaims(u.claims)
-	if err != nil {
-		return nil, err
+	if len(u.claims) > 0 {
+		cc, err := marshalCustomClaims(u.claims)
+		if err != nil {
+			return nil, err
+		}
+		info.CustomAttributes = cc
 	}
-	info.CustomAttributes = cc
+
 	for _, p := range info.ProviderUserInfo {
 		if p.RawId == "" {
-			return nil, fmt.Errorf("user provdier must specify a UID")
+			return nil, fmt.Errorf("user provdier must specify a uid")
 		}
 		if p.ProviderId == "" {
 			return nil, fmt.Errorf("user provider must specify a provider ID")
@@ -192,7 +190,7 @@ func (u *UserToImport) PhoneNumber(phoneNumber string) *UserToImport {
 }
 
 // Metadata setter.
-func (u *UserToImport) Metadata(metadata UserMetadata) *UserToImport {
+func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
 	info := u.userInfo()
 	info.CreatedAt = metadata.CreationTimestamp
 	info.LastLoginAt = metadata.LastLogInTimestamp
@@ -200,7 +198,7 @@ func (u *UserToImport) Metadata(metadata UserMetadata) *UserToImport {
 }
 
 // ProviderData setter.
-func (u *UserToImport) ProviderData(providers []UserProvider) *UserToImport {
+func (u *UserToImport) ProviderData(providers []*UserProvider) *UserToImport {
 	var providerUserInfo []*identitytoolkit.UserInfoProviderUserInfo
 	for _, p := range providers {
 		providerUserInfo = append(providerUserInfo, &identitytoolkit.UserInfoProviderUserInfo{
@@ -284,6 +282,7 @@ func (w withHash) applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUpload
 	if err != nil {
 		return err
 	}
+	req.HashAlgorithm = conf.HashAlgorithm
 	req.SignerKey = conf.SignerKey
 	req.SaltSeparator = conf.SaltSeparator
 	req.Rounds = conf.Rounds
@@ -635,7 +634,7 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 	}
 	s := string(b)
 	if s == "null" {
-		s = "{}"
+		s = "{}" // claims map has been explicitly set to nil for deletion.
 	}
 	if len(s) > maxLenPayloadCC {
 		return "", fmt.Errorf("serialized custom claims must not exceed %d characters", maxLenPayloadCC)
