@@ -371,11 +371,20 @@ func TestInvalidUpdateUser(t *testing.T) {
 			&UserToUpdate{},
 			"update parameters must not be nil or empty",
 		}, {
+			(&UserToUpdate{}).Email(""),
+			"email must not be empty",
+		}, {
+			(&UserToUpdate{}).Email("invalid"),
+			`malformed email string: "invalid"`,
+		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
 			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
 			"serialized custom claims must not exceed 1000 characters",
+		}, {
+			(&UserToUpdate{}).Password("short"),
+			"password must be a string at least 6 characters long",
 		},
 	}
 

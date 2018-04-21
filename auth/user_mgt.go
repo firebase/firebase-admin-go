@@ -253,6 +253,11 @@ func (u *UserToUpdate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyi
 		}
 		req.CustomAttributes = cc
 	}
+	if req.Password != "" {
+		if err := validatePassword(req.Password); err != nil {
+			return nil, err
+		}
+	}
 	return req, nil
 }
 
