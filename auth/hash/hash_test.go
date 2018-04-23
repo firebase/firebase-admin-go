@@ -47,6 +47,13 @@ var validHashes = []struct {
 			MemoryCost:    14,
 		},
 	},
+	{
+		alg: &HMACSHA512{signerKey},
+		want: internal.HashConfig{
+			HashAlgorithm: "HMAC_SHA512",
+			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
+		},
+	},
 }
 
 var invalidHashes = []struct {
@@ -94,6 +101,10 @@ var invalidHashes = []struct {
 			Rounds:        8,
 			MemoryCost:    15,
 		},
+	},
+	{
+		name: "HMAC_SHA512: no signer key",
+		alg:  &HMACSHA512{},
 	},
 }
 

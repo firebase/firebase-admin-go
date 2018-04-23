@@ -50,3 +50,23 @@ func (s *Scrypt) Config() (*internal.HashConfig, error) {
 		MemoryCost:    int64(s.MemoryCost),
 	}, nil
 }
+
+// HMACSHA512 represents the HMAC SHA512 hash algorithm.
+type HMACSHA512 struct {
+	Key []byte
+}
+
+// Config returns the validated hash configuration.
+func (h *HMACSHA512) Config() (*internal.HashConfig, error) {
+	return hmacConfig("HMAC_SHA512", h.Key)
+}
+
+func hmacConfig(name string, key []byte) (*internal.HashConfig, error) {
+	if len(key) == 0 {
+		return nil, errors.New("signer key not specified")
+	}
+	return &internal.HashConfig{
+		HashAlgorithm: name,
+		SignerKey:     base64.RawURLEncoding.EncodeToString(key),
+	}, nil
+}
