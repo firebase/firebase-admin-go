@@ -97,7 +97,7 @@ type UserIterator struct {
 
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
-	_req        *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
+	createReq   *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
 	uid         bool
 	displayName bool
 	email       bool
@@ -106,10 +106,10 @@ type UserToCreate struct {
 }
 
 func (u *UserToCreate) request() *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest {
-	if u._req == nil {
-		u._req = &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
+	if u.createReq == nil {
+		u.createReq = &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
 	}
-	return u._req
+	return u.createReq
 }
 
 func (u *UserToCreate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest, error) {
@@ -210,7 +210,7 @@ func (u *UserToCreate) UID(uid string) *UserToCreate {
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
-	_req         *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest
+	updateReq    *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest
 	claims       map[string]interface{}
 	displayName  bool
 	email        bool
@@ -220,18 +220,18 @@ type UserToUpdate struct {
 }
 
 func (u *UserToUpdate) request() *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest {
-	if u._req == nil {
-		u._req = &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
+	if u.updateReq == nil {
+		u.updateReq = &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
 	}
-	return u._req
+	return u.updateReq
 }
 
 func (u *UserToUpdate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest, error) {
-	if u._req == nil {
+	if u.updateReq == nil {
 		// update without any parameters is never allowed
 		return nil, fmt.Errorf("update parameters must not be nil or empty")
 	}
-	req := u._req
+	req := u.updateReq
 	if u.email {
 		if err := validateEmail(req.Email); err != nil {
 			return nil, err
@@ -591,7 +591,7 @@ func validatePhotoURL(val string) error {
 
 func validateEmail(email string) error {
 	if email == "" {
-		return fmt.Errorf("email must not be empty")
+		return fmt.Errorf("email must be a non-empty string")
 	}
 	if parts := strings.Split(email, "@"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return fmt.Errorf("malformed email string: %q", email)
@@ -608,7 +608,7 @@ func validatePassword(val string) error {
 
 func validateUID(uid string) error {
 	if uid == "" {
-		return fmt.Errorf("uid must not be empty")
+		return fmt.Errorf("uid must be a non-empty string")
 	}
 	if len(uid) > 128 {
 		return fmt.Errorf("uid string must not be longer than 128 characters")
@@ -618,7 +618,7 @@ func validateUID(uid string) error {
 
 func validatePhone(phone string) error {
 	if phone == "" {
-		return fmt.Errorf("phone number must not be empty")
+		return fmt.Errorf("phone number must be a non-empty string")
 	}
 	if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
 		return fmt.Errorf("phone number must be a valid, E.164 compliant identifier")
