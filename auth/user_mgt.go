@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -31,20 +30,11 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const maxReturnedResults = 1000
-const maxLenPayloadCC = 1000
-
-const defaultProviderID = "firebase"
-
-var commonValidators = map[string]func(interface{}) error{
-	"displayName": validateDisplayName,
-	"email":       validateEmail,
-	"phoneNumber": validatePhone,
-	"password":    validatePassword,
-	"photoUrl":    validatePhotoURL,
-	"localId":     validateUID,
-	"validSince":  func(interface{}) error { return nil }, // Needed for preparePayload.
-}
+const (
+	maxReturnedResults = 1000
+	maxLenPayloadCC    = 1000
+	defaultProviderID  = "firebase"
+)
 
 // Create a new interface
 type identitytoolkitCall interface {
@@ -107,83 +97,240 @@ type UserIterator struct {
 
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
-	params map[string]interface{}
+	createReq   *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
+	uid         bool
+	displayName bool
+	email       bool
+	photoURL    bool
+	phoneNumber bool
 }
 
-func (u *UserToCreate) set(key string, value interface{}) {
-	if u.params == nil {
-		u.params = make(map[string]interface{})
+func (u *UserToCreate) request() *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest {
+	if u.createReq == nil {
+		u.createReq = &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
 	}
-	u.params[key] = value
+	return u.createReq
+}
+
+func (u *UserToCreate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest, error) {
+	req := u.request() // creating a user without any parameters is allowed
+	if u.uid {
+		if err := validateUID(req.LocalId); err != nil {
+			return nil, err
+		}
+	}
+	if u.displayName {
+		if err := validateDisplayName(req.DisplayName); err != nil {
+			return nil, err
+		}
+	}
+	if u.email {
+		if err := validateEmail(req.Email); err != nil {
+			return nil, err
+		}
+	}
+	if u.phoneNumber {
+		if err := validatePhone(req.PhoneNumber); err != nil {
+			return nil, err
+		}
+	}
+	if u.photoURL {
+		if err := validatePhotoURL(req.PhotoUrl); err != nil {
+			return nil, err
+		}
+	}
+	if req.Password != "" {
+		if err := validatePassword(req.Password); err != nil {
+			return nil, err
+		}
+	}
+	return req, nil
 }
 
 // Disabled setter.
-func (u *UserToCreate) Disabled(d bool) *UserToCreate { u.set("disabled", d); return u }
+func (u *UserToCreate) Disabled(disabled bool) *UserToCreate {
+	req := u.request()
+	req.Disabled = disabled
+	if !disabled {
+		req.ForceSendFields = append(req.ForceSendFields, "Disabled")
+	}
+	return u
+}
 
 // DisplayName setter.
-func (u *UserToCreate) DisplayName(dn string) *UserToCreate { u.set("displayName", dn); return u }
+func (u *UserToCreate) DisplayName(name string) *UserToCreate {
+	u.request().DisplayName = name
+	u.displayName = true
+	return u
+}
 
 // Email setter.
-func (u *UserToCreate) Email(e string) *UserToCreate { u.set("email", e); return u }
+func (u *UserToCreate) Email(email string) *UserToCreate {
+	u.request().Email = email
+	u.email = true
+	return u
+}
 
 // EmailVerified setter.
-func (u *UserToCreate) EmailVerified(ev bool) *UserToCreate { u.set("emailVerified", ev); return u }
+func (u *UserToCreate) EmailVerified(verified bool) *UserToCreate {
+	req := u.request()
+	req.EmailVerified = verified
+	if !verified {
+		req.ForceSendFields = append(req.ForceSendFields, "EmailVerified")
+	}
+	return u
+}
 
 // Password setter.
-func (u *UserToCreate) Password(pw string) *UserToCreate { u.set("password", pw); return u }
+func (u *UserToCreate) Password(pw string) *UserToCreate {
+	u.request().Password = pw
+	return u
+}
 
 // PhoneNumber setter.
-func (u *UserToCreate) PhoneNumber(phone string) *UserToCreate { u.set("phoneNumber", phone); return u }
+func (u *UserToCreate) PhoneNumber(phone string) *UserToCreate {
+	u.request().PhoneNumber = phone
+	u.phoneNumber = true
+	return u
+}
 
 // PhotoURL setter.
-func (u *UserToCreate) PhotoURL(url string) *UserToCreate { u.set("photoUrl", url); return u }
+func (u *UserToCreate) PhotoURL(url string) *UserToCreate {
+	u.request().PhotoUrl = url
+	u.photoURL = true
+	return u
+}
 
 // UID setter.
-func (u *UserToCreate) UID(uid string) *UserToCreate { u.set("localId", uid); return u }
+func (u *UserToCreate) UID(uid string) *UserToCreate {
+	u.request().LocalId = uid
+	u.uid = true
+	return u
+}
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
-	params map[string]interface{}
+	updateReq    *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest
+	claims       map[string]interface{}
+	displayName  bool
+	email        bool
+	phoneNumber  bool
+	photoURL     bool
+	customClaims bool
 }
 
-func (u *UserToUpdate) set(key string, value interface{}) {
-	if u.params == nil {
-		u.params = make(map[string]interface{})
+func (u *UserToUpdate) request() *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest {
+	if u.updateReq == nil {
+		u.updateReq = &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
 	}
-	u.params[key] = value
+	return u.updateReq
+}
+
+func (u *UserToUpdate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest, error) {
+	if u.updateReq == nil {
+		// update without any parameters is never allowed
+		return nil, fmt.Errorf("update parameters must not be nil or empty")
+	}
+	req := u.updateReq
+	if u.email {
+		if err := validateEmail(req.Email); err != nil {
+			return nil, err
+		}
+	}
+	if u.displayName && req.DisplayName == "" {
+		req.DeleteAttribute = append(req.DeleteAttribute, "DISPLAY_NAME")
+	}
+	if u.photoURL && req.PhotoUrl == "" {
+		req.DeleteAttribute = append(req.DeleteAttribute, "PHOTO_URL")
+	}
+	if u.phoneNumber {
+		if req.PhoneNumber == "" {
+			req.DeleteProvider = append(req.DeleteProvider, "phone")
+		} else if err := validatePhone(req.PhoneNumber); err != nil {
+			return nil, err
+		}
+	}
+	if u.customClaims {
+		cc, err := marshalCustomClaims(u.claims)
+		if err != nil {
+			return nil, err
+		}
+		req.CustomAttributes = cc
+	}
+	if req.Password != "" {
+		if err := validatePassword(req.Password); err != nil {
+			return nil, err
+		}
+	}
+	return req, nil
 }
 
 // CustomClaims setter.
-func (u *UserToUpdate) CustomClaims(cc map[string]interface{}) *UserToUpdate {
-	u.set("customClaims", cc)
+func (u *UserToUpdate) CustomClaims(claims map[string]interface{}) *UserToUpdate {
+	u.request() // force initialization of the request for later use
+	u.claims = claims
+	u.customClaims = true
 	return u
 }
 
 // Disabled setter.
-func (u *UserToUpdate) Disabled(d bool) *UserToUpdate { u.set("disableUser", d); return u }
+func (u *UserToUpdate) Disabled(disabled bool) *UserToUpdate {
+	req := u.request()
+	req.DisableUser = disabled
+	if !disabled {
+		req.ForceSendFields = append(req.ForceSendFields, "DisableUser")
+	}
+	return u
+}
 
 // DisplayName setter.
-func (u *UserToUpdate) DisplayName(dn string) *UserToUpdate { u.set("displayName", dn); return u }
+func (u *UserToUpdate) DisplayName(name string) *UserToUpdate {
+	u.request().DisplayName = name
+	u.displayName = true
+	return u
+}
 
 // Email setter.
-func (u *UserToUpdate) Email(e string) *UserToUpdate { u.set("email", e); return u }
+func (u *UserToUpdate) Email(email string) *UserToUpdate {
+	u.request().Email = email
+	u.email = true
+	return u
+}
 
 // EmailVerified setter.
-func (u *UserToUpdate) EmailVerified(ev bool) *UserToUpdate { u.set("emailVerified", ev); return u }
+func (u *UserToUpdate) EmailVerified(verified bool) *UserToUpdate {
+	req := u.request()
+	req.EmailVerified = verified
+	if !verified {
+		req.ForceSendFields = append(req.ForceSendFields, "EmailVerified")
+	}
+	return u
+}
 
 // Password setter.
-func (u *UserToUpdate) Password(pw string) *UserToUpdate { u.set("password", pw); return u }
+func (u *UserToUpdate) Password(pw string) *UserToUpdate {
+	u.request().Password = pw
+	return u
+}
 
 // PhoneNumber setter.
-func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate { u.set("phoneNumber", phone); return u }
+func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
+	u.request().PhoneNumber = phone
+	u.phoneNumber = true
+	return u
+}
 
 // PhotoURL setter.
-func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate { u.set("photoUrl", url); return u }
+func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate {
+	u.request().PhotoUrl = url
+	u.photoURL = true
+	return u
+}
 
 // revokeRefreshTokens revokes all refresh tokens for a user by setting the validSince property
 // to the present in epoch seconds.
 func (u *UserToUpdate) revokeRefreshTokens() *UserToUpdate {
-	u.set("validSince", time.Now().Unix())
+	u.request().ValidSince = time.Now().Unix()
 	return u
 }
 
@@ -328,49 +475,25 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 }
 
-func processDeletion(p map[string]interface{}, field, listKey, listVal string) {
-	if dn, ok := p[field]; ok && len(dn.(string)) == 0 {
-		addToListParam(p, listKey, listVal)
-		delete(p, field)
-	}
-}
-
-func addToListParam(p map[string]interface{}, listname, param string) {
-	if _, ok := p[listname]; ok {
-		p[listname] = append(p[listname].([]string), param)
-	} else {
-		p[listname] = []string{param}
-	}
-}
-
-func processClaims(p map[string]interface{}) error {
-	cc, ok := p["customClaims"]
-	if !ok {
-		return nil
-	}
-
-	claims := cc.(map[string]interface{})
+func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
-			return fmt.Errorf("claim %q is reserved and must not be set", key)
+			return "", fmt.Errorf("claim %q is reserved and must not be set", key)
 		}
 	}
 
 	b, err := json.Marshal(claims)
 	if err != nil {
-		return fmt.Errorf("custom claims marshaling error: %v", err)
+		return "", fmt.Errorf("custom claims marshaling error: %v", err)
 	}
 	s := string(b)
 	if s == "null" {
 		s = "{}"
 	}
 	if len(s) > maxLenPayloadCC {
-		return fmt.Errorf("serialized custom claims must not exceed %d characters", maxLenPayloadCC)
+		return "", fmt.Errorf("serialized custom claims must not exceed %d characters", maxLenPayloadCC)
 	}
-
-	p["customAttributes"] = s
-	delete(p, "customClaims")
-	return nil
+	return s, nil
 }
 
 // Error handlers.
@@ -452,142 +575,54 @@ func handleServerError(err error) error {
 
 // Validators.
 
-func validateDisplayName(val interface{}) error {
-	if len(val.(string)) == 0 {
+func validateDisplayName(val string) error {
+	if val == "" {
 		return fmt.Errorf("display name must be a non-empty string")
 	}
 	return nil
 }
 
-func validatePhotoURL(val interface{}) error {
-	if len(val.(string)) == 0 {
+func validatePhotoURL(val string) error {
+	if val == "" {
 		return fmt.Errorf("photo url must be a non-empty string")
 	}
 	return nil
 }
 
-func validateEmail(val interface{}) error {
-	email := val.(string)
+func validateEmail(email string) error {
 	if email == "" {
-		return fmt.Errorf("email must not be empty")
+		return fmt.Errorf("email must be a non-empty string")
 	}
-	if parts := strings.Split(email, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+	if parts := strings.Split(email, "@"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return fmt.Errorf("malformed email string: %q", email)
 	}
 	return nil
 }
 
-func validatePassword(val interface{}) error {
-	if len(val.(string)) < 6 {
+func validatePassword(val string) error {
+	if len(val) < 6 {
 		return fmt.Errorf("password must be a string at least 6 characters long")
 	}
 	return nil
 }
 
-func validateUID(val interface{}) error {
-	uid := val.(string)
+func validateUID(uid string) error {
 	if uid == "" {
-		return fmt.Errorf("uid must not be empty")
+		return fmt.Errorf("uid must be a non-empty string")
 	}
-	if len(val.(string)) > 128 {
+	if len(uid) > 128 {
 		return fmt.Errorf("uid string must not be longer than 128 characters")
 	}
 	return nil
 }
 
-func validatePhone(val interface{}) error {
-	phone := val.(string)
+func validatePhone(phone string) error {
 	if phone == "" {
-		return fmt.Errorf("phone number must not be empty")
+		return fmt.Errorf("phone number must be a non-empty string")
 	}
 	if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
 		return fmt.Errorf("phone number must be a valid, E.164 compliant identifier")
 	}
-	return nil
-}
-
-func (u *UserToCreate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest) error {
-	params := map[string]interface{}{}
-	if u.params == nil {
-		return nil
-	}
-
-	for k, v := range u.params {
-		params[k] = v
-	}
-	for key, validate := range commonValidators {
-		if v, ok := params[key]; ok {
-			if err := validate(v); err != nil {
-				return err
-			}
-			reflect.ValueOf(user).Elem().FieldByName(strings.Title(key)).SetString(params[key].(string))
-		}
-	}
-	if params["disabled"] != nil {
-		user.Disabled = params["disabled"].(bool)
-		if !user.Disabled {
-			user.ForceSendFields = append(user.ForceSendFields, "Disabled")
-		}
-	}
-	if params["emailVerified"] != nil {
-		user.EmailVerified = params["emailVerified"].(bool)
-		if !user.EmailVerified {
-			user.ForceSendFields = append(user.ForceSendFields, "EmailVerified")
-		}
-	}
-
-	return nil
-}
-
-func (u *UserToUpdate) preparePayload(user *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest) error {
-	params := map[string]interface{}{}
-	for k, v := range u.params {
-		params[k] = v
-	}
-	processDeletion(params, "displayName", "deleteAttribute", "DISPLAY_NAME")
-	processDeletion(params, "photoUrl", "deleteAttribute", "PHOTO_URL")
-	processDeletion(params, "phoneNumber", "deleteProvider", "phone")
-
-	if err := processClaims(params); err != nil {
-		return err
-	}
-
-	if params["customAttributes"] != nil {
-		user.CustomAttributes = params["customAttributes"].(string)
-	}
-
-	for key, validate := range commonValidators {
-		if v, ok := params[key]; ok {
-			if err := validate(v); err != nil {
-				return err
-			}
-			f := reflect.ValueOf(user).Elem().FieldByName(strings.Title(key))
-			if f.Kind() == reflect.String {
-				f.SetString(params[key].(string))
-			} else if f.Kind() == reflect.Int64 {
-				f.SetInt(params[key].(int64))
-			}
-		}
-	}
-	if params["disableUser"] != nil {
-		user.DisableUser = params["disableUser"].(bool)
-		if !user.DisableUser {
-			user.ForceSendFields = append(user.ForceSendFields, "DisableUser")
-		}
-	}
-	if params["emailVerified"] != nil {
-		user.EmailVerified = params["emailVerified"].(bool)
-		if !user.EmailVerified {
-			user.ForceSendFields = append(user.ForceSendFields, "EmailVerified")
-		}
-	}
-	if params["deleteAttribute"] != nil {
-		user.DeleteAttribute = params["deleteAttribute"].([]string)
-	}
-	if params["deleteProvider"] != nil {
-		user.DeleteProvider = params["deleteProvider"].([]string)
-	}
-
 	return nil
 }
 
@@ -600,19 +635,16 @@ func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, er
 		user = &UserToCreate{}
 	}
 
-	request := &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
-
-	if err := user.preparePayload(request); err != nil {
+	request, err := user.validatedRequest()
+	if err != nil {
 		return "", err
 	}
-
 	call := c.is.Relyingparty.SignupNewUser(request)
 	c.setHeader(call)
 	resp, err := call.Context(ctx).Do()
 	if err != nil {
 		return "", handleServerError(err)
 	}
-
 	return resp.LocalId, nil
 }
 
@@ -620,17 +652,14 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	if err := validateUID(uid); err != nil {
 		return err
 	}
-	if user == nil || user.params == nil {
+	if user == nil {
 		return fmt.Errorf("update parameters must not be nil or empty")
 	}
-	request := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{
-		LocalId: uid,
-	}
-
-	if err := user.preparePayload(request); err != nil {
+	request, err := user.validatedRequest()
+	if err != nil {
 		return err
 	}
-
+	request.LocalId = uid
 	call := c.is.Relyingparty.SetAccountInfo(request)
 	c.setHeader(call)
 	if _, err := call.Context(ctx).Do(); err != nil {
