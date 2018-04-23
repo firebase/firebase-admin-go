@@ -29,7 +29,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"firebase.google.com/go/auth/hash"
 	"firebase.google.com/go/internal"
 
 	"golang.org/x/oauth2"
@@ -888,6 +887,21 @@ func TestImportUsersError(t *testing.T) {
 	}
 }
 
+type mockHash struct {
+	key, saltSep       string
+	rounds, memoryCost int64
+}
+
+func (h *mockHash) Config() (*internal.HashConfig, error) {
+	return &internal.HashConfig{
+		HashAlgorithm: "MOCKHASH",
+		SignerKey:     h.key,
+		SaltSeparator: h.saltSep,
+		Rounds:        h.rounds,
+		MemoryCost:    h.memoryCost,
+	}, nil
+}
+
 func TestImportUsersWithHash(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
@@ -895,11 +909,11 @@ func TestImportUsersWithHash(t *testing.T) {
 		(&UserToImport{}).UID("user1").PasswordHash([]byte("password")),
 		(&UserToImport{}).UID("user2"),
 	}
-	result, err := s.Client.ImportUsers(context.Background(), users, WithHash(&hash.Scrypt{
-		Key:           []byte("key"),
-		SaltSeparator: []byte(","),
-		Rounds:        8,
-		MemoryCost:    14,
+	result, err := s.Client.ImportUsers(context.Background(), users, WithHash(&mockHash{
+		key:        "key",
+		saltSep:    ",",
+		rounds:     8,
+		memoryCost: 14,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -912,9 +926,9 @@ func TestImportUsersWithHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"hashAlgorithm": "SCRYPT",
-		"signerKey":     base64.RawURLEncoding.EncodeToString([]byte("key")),
-		"saltSeparator": base64.RawURLEncoding.EncodeToString([]byte(",")),
+		"hashAlgorithm": "MOCKHASH",
+		"signerKey":     "key",
+		"saltSeparator": ",",
 		"rounds":        float64(8),
 		"memoryCost":    float64(14),
 	}
