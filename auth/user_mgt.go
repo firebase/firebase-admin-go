@@ -97,10 +97,12 @@ type UserIterator struct {
 
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
-	_req   *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
-	fields struct {
-		UID, DisplayName, Email, PhotoURL, PhoneNumber bool
-	}
+	_req        *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
+	uid         bool
+	displayName bool
+	email       bool
+	photoURL    bool
+	phoneNumber bool
 }
 
 func (u *UserToCreate) request() *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest {
@@ -111,28 +113,28 @@ func (u *UserToCreate) request() *identitytoolkit.IdentitytoolkitRelyingpartySig
 }
 
 func (u *UserToCreate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest, error) {
-	req := u.request() // it is allowed to create a user without any parameters
-	if u.fields.UID {
+	req := u.request() // creating a user without any parameters is allowed
+	if u.uid {
 		if err := validateUID(req.LocalId); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.DisplayName {
+	if u.displayName {
 		if err := validateDisplayName(req.DisplayName); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.Email {
+	if u.email {
 		if err := validateEmail(req.Email); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.PhoneNumber {
+	if u.phoneNumber {
 		if err := validatePhone(req.PhoneNumber); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.PhotoURL {
+	if u.photoURL {
 		if err := validatePhotoURL(req.PhotoUrl); err != nil {
 			return nil, err
 		}
@@ -158,14 +160,14 @@ func (u *UserToCreate) Disabled(disabled bool) *UserToCreate {
 // DisplayName setter.
 func (u *UserToCreate) DisplayName(name string) *UserToCreate {
 	u.request().DisplayName = name
-	u.fields.DisplayName = true
+	u.displayName = true
 	return u
 }
 
 // Email setter.
 func (u *UserToCreate) Email(email string) *UserToCreate {
 	u.request().Email = email
-	u.fields.Email = true
+	u.email = true
 	return u
 }
 
@@ -188,31 +190,33 @@ func (u *UserToCreate) Password(pw string) *UserToCreate {
 // PhoneNumber setter.
 func (u *UserToCreate) PhoneNumber(phone string) *UserToCreate {
 	u.request().PhoneNumber = phone
-	u.fields.PhoneNumber = true
+	u.phoneNumber = true
 	return u
 }
 
 // PhotoURL setter.
 func (u *UserToCreate) PhotoURL(url string) *UserToCreate {
 	u.request().PhotoUrl = url
-	u.fields.PhotoURL = true
+	u.photoURL = true
 	return u
 }
 
 // UID setter.
 func (u *UserToCreate) UID(uid string) *UserToCreate {
 	u.request().LocalId = uid
-	u.fields.UID = true
+	u.uid = true
 	return u
 }
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
 type UserToUpdate struct {
-	_req   *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest
-	claims map[string]interface{}
-	fields struct {
-		DisplayName, Email, PhoneNumber, PhotoURL, CustomClaims bool
-	}
+	_req         *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest
+	claims       map[string]interface{}
+	displayName  bool
+	email        bool
+	phoneNumber  bool
+	photoURL     bool
+	customClaims bool
 }
 
 func (u *UserToUpdate) request() *identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest {
@@ -228,25 +232,25 @@ func (u *UserToUpdate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyi
 		return nil, fmt.Errorf("update parameters must not be nil or empty")
 	}
 	req := u._req
-	if u.fields.Email {
+	if u.email {
 		if err := validateEmail(req.Email); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.DisplayName && req.DisplayName == "" {
+	if u.displayName && req.DisplayName == "" {
 		req.DeleteAttribute = append(req.DeleteAttribute, "DISPLAY_NAME")
 	}
-	if u.fields.PhotoURL && req.PhotoUrl == "" {
+	if u.photoURL && req.PhotoUrl == "" {
 		req.DeleteAttribute = append(req.DeleteAttribute, "PHOTO_URL")
 	}
-	if u.fields.PhoneNumber {
+	if u.phoneNumber {
 		if req.PhoneNumber == "" {
 			req.DeleteProvider = append(req.DeleteProvider, "phone")
 		} else if err := validatePhone(req.PhoneNumber); err != nil {
 			return nil, err
 		}
 	}
-	if u.fields.CustomClaims {
+	if u.customClaims {
 		cc, err := marshalCustomClaims(u.claims)
 		if err != nil {
 			return nil, err
@@ -265,7 +269,7 @@ func (u *UserToUpdate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyi
 func (u *UserToUpdate) CustomClaims(claims map[string]interface{}) *UserToUpdate {
 	u.request() // force initialization of the request for later use
 	u.claims = claims
-	u.fields.CustomClaims = true
+	u.customClaims = true
 	return u
 }
 
@@ -282,14 +286,14 @@ func (u *UserToUpdate) Disabled(disabled bool) *UserToUpdate {
 // DisplayName setter.
 func (u *UserToUpdate) DisplayName(name string) *UserToUpdate {
 	u.request().DisplayName = name
-	u.fields.DisplayName = true
+	u.displayName = true
 	return u
 }
 
 // Email setter.
 func (u *UserToUpdate) Email(email string) *UserToUpdate {
 	u.request().Email = email
-	u.fields.Email = true
+	u.email = true
 	return u
 }
 
@@ -312,14 +316,14 @@ func (u *UserToUpdate) Password(pw string) *UserToUpdate {
 // PhoneNumber setter.
 func (u *UserToUpdate) PhoneNumber(phone string) *UserToUpdate {
 	u.request().PhoneNumber = phone
-	u.fields.PhoneNumber = true
+	u.phoneNumber = true
 	return u
 }
 
 // PhotoURL setter.
 func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate {
 	u.request().PhotoUrl = url
-	u.fields.PhotoURL = true
+	u.photoURL = true
 	return u
 }
 
@@ -572,14 +576,14 @@ func handleServerError(err error) error {
 // Validators.
 
 func validateDisplayName(val string) error {
-	if len(val) == 0 {
+	if val == "" {
 		return fmt.Errorf("display name must be a non-empty string")
 	}
 	return nil
 }
 
 func validatePhotoURL(val string) error {
-	if len(val) == 0 {
+	if val == "" {
 		return fmt.Errorf("photo url must be a non-empty string")
 	}
 	return nil
@@ -589,7 +593,7 @@ func validateEmail(email string) error {
 	if email == "" {
 		return fmt.Errorf("email must not be empty")
 	}
-	if parts := strings.Split(email, "@"); len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+	if parts := strings.Split(email, "@"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return fmt.Errorf("malformed email string: %q", email)
 	}
 	return nil
