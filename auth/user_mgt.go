@@ -256,6 +256,25 @@ func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord,
 	return c.getUser(ctx, request)
 }
 
+// GetUsersByEmail gets the users data corresponding to the specified emails.
+func (c *Client) GetUsersByEmail(ctx context.Context, emails []string) ([]*UserRecord, error) {
+	var userRecords []*UserRecord
+	for _, email := range emails {
+		if err := validateEmail(email); err != nil {
+			return nil, err
+		}
+		request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
+			Email: []string{email},
+		}
+		UserRec, err := c.getUser(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		userRecords = append(userRecords, UserRec)
+	}
+	return userRecords, nil
+}
+
 // Users returns an iterator over Users.
 //
 // If nextPageToken is empty, the iterator will start at the beginning.
