@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCustomToken(t *testing.T) {
-	ct, err := client.CustomToken("user1")
+	ct, err := client.CustomToken(context.Background(), "user1")
 
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func TestCustomToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(idt)
+	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestCustomToken(t *testing.T) {
 
 func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	uid := "user_revoked"
-	ct, err := client.CustomToken(uid)
+	ct, err := client.CustomToken(context.Background(), uid)
 
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +117,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	}
 
 	// Does not return error for revoked token.
-	if _, err = client.VerifyIDToken(idt); err != nil {
+	if _, err = client.VerifyIDToken(ctx, idt); err != nil {
 		t.Errorf("VerifyIDToken(); err = %s; want err = <nil>", err)
 	}
 
@@ -137,7 +137,7 @@ func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims("user2", map[string]interface{}{
+	ct, err := client.CustomTokenWithClaims(context.Background(), "user2", map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})
@@ -150,7 +150,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err := client.VerifyIDToken(idt)
+	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}

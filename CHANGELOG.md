@@ -1,4 +1,5 @@
 # Unreleased
+- All functions that make network calls take context as an argument.
 
 -
 

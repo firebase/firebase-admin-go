@@ -114,7 +114,7 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 	hc, _ := newTestHTTPClient([]byte(""))
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(); keys != nil || err == nil {
+	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -122,7 +122,7 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
 	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(); keys != nil || err == nil {
+	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -134,7 +134,7 @@ func TestHTTPKeySourceTransportError(t *testing.T) {
 		},
 	}
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(); keys != nil || err == nil {
+	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -207,10 +207,10 @@ func TestParsePublicKeysError(t *testing.T) {
 
 func TestDefaultServiceAcctSigner(t *testing.T) {
 	signer := &serviceAcctSigner{}
-	if email, err := signer.Email(); email != "" || err == nil {
+	if email, err := signer.Email(ctx); email != "" || err == nil {
 		t.Errorf("Email() = (%v, %v); want = ('', error)", email, err)
 	}
-	if sig, err := signer.Sign([]byte("")); sig != nil || err == nil {
+	if sig, err := signer.Sign(ctx, []byte("")); sig != nil || err == nil {
 		t.Errorf("Sign() = (%v, %v); want = ('', error)", sig, err)
 	}
 }
@@ -221,7 +221,7 @@ func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
 
 	exp := time.Unix(100, 0)
 	for i := 0; i <= 100; i++ {
-		keys, err := ks.Keys()
+		keys, err := ks.Keys(ctx)
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,7 @@ func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
 	}
 
 	mc.now = time.Unix(101, 0)
-	keys, err := ks.Keys()
+	keys, err := ks.Keys(ctx)
 	if err != nil {
 		return err
 	}

@@ -232,7 +232,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			"password must be a string at least 6 characters long",
 		}, {
 			(&UserToCreate{}).PhoneNumber(""),
-			"phone number must not be empty",
+			"phone number must be a non-empty string",
 		}, {
 			(&UserToCreate{}).PhoneNumber("1234"),
 			"phone number must be a valid, E.164 compliant identifier",
@@ -241,7 +241,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToCreate{}).UID(""),
-			"uid must not be empty",
+			"uid must be a non-empty string",
 		}, {
 			(&UserToCreate{}).UID(strings.Repeat("a", 129)),
 			"uid string must not be longer than 128 characters",
@@ -253,7 +253,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			"photo url must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email(""),
-			"email must not be empty",
+			"email must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email("a"),
 			`malformed email string: "a"`,
@@ -371,11 +371,20 @@ func TestInvalidUpdateUser(t *testing.T) {
 			&UserToUpdate{},
 			"update parameters must not be nil or empty",
 		}, {
+			(&UserToUpdate{}).Email(""),
+			"email must be a non-empty string",
+		}, {
+			(&UserToUpdate{}).Email("invalid"),
+			`malformed email string: "invalid"`,
+		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
 			"phone number must be a valid, E.164 compliant identifier",
 		}, {
 			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 993)}),
 			"serialized custom claims must not exceed 1000 characters",
+		}, {
+			(&UserToUpdate{}).Password("short"),
+			"password must be a string at least 6 characters long",
 		},
 	}
 
@@ -534,7 +543,7 @@ func TestRevokeRefreshTokensInvalidUID(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	we := "uid must not be empty"
+	we := "uid must be a non-empty string"
 	if err := s.Client.RevokeRefreshTokens(context.Background(), ""); err == nil || err.Error() != we {
 		t.Errorf("RevokeRefreshTokens(); err = %s; want err = %s", err.Error(), we)
 	}
