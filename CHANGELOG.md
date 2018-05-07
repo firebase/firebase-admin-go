@@ -1,7 +1,8 @@
 # Unreleased
-- All functions that make network calls take context as an argument.
 
--
+# v3.0.0
+
+- All functions that make network calls now take context as an argument.
 
 # v2.7.0
 
