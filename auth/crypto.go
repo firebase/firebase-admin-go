@@ -24,12 +24,17 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context/ctxhttp"
+
+	"golang.org/x/net/context"
 )
 
 // publicKey represents a parsed RSA public key along with its unique key ID.
@@ -60,7 +65,7 @@ func (m *mockClock) Now() time.Time {
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
 // signatures.
 type keySource interface {
-	Keys() ([]*publicKey, error)
+	Keys(context.Context) ([]*publicKey, error)
 }
 
 // httpKeySource fetches RSA public keys from a remote HTTP server, and caches them in
@@ -86,11 +91,11 @@ func newHTTPKeySource(uri string, hc *http.Client) *httpKeySource {
 
 // Keys returns the RSA Public Keys hosted at this key source's URI. Refreshes the data if
 // the cache is stale.
-func (k *httpKeySource) Keys() ([]*publicKey, error) {
+func (k *httpKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 	k.Mutex.Lock()
 	defer k.Mutex.Unlock()
 	if len(k.CachedKeys) == 0 || k.hasExpired() {
-		err := k.refreshKeys()
+		err := k.refreshKeys(ctx)
 		if err != nil && len(k.CachedKeys) == 0 {
 			return nil, err
 		}
@@ -103,28 +108,31 @@ func (k *httpKeySource) hasExpired() bool {
 	return k.Clock.Now().After(k.ExpiryTime)
 }
 
-func (k *httpKeySource) refreshKeys() error {
+func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	k.CachedKeys = nil
-	resp, err := k.HTTPClient.Get(k.KeyURI)
+	req, err := http.NewRequest("GET", k.KeyURI, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := ctxhttp.Do(ctx, k.HTTPClient, req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-
 	newKeys, err := parsePublicKeys(contents)
 	if err != nil {
 		return err
 	}
-
 	maxAge, err := findMaxAge(resp)
 	if err != nil {
 		return err
 	}
-
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil
@@ -178,6 +186,26 @@ func parsePublicKey(kid string, key []byte) (*publicKey, error) {
 	return &publicKey{kid, pk}, nil
 }
 
+func parsePrivateKey(key string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, fmt.Errorf("no private key data found in: %v", key)
+	}
+	k := block.Bytes
+	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
+	if err != nil {
+		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
+		if err != nil {
+			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
+		}
+	}
+	parsed, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("private key is not an RSA key")
+	}
+	return parsed, nil
+}
+
 func verifySignature(parts []string, k *publicKey) error {
 	content := parts[0] + "." + parts[1]
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
@@ -195,14 +223,14 @@ type serviceAcctSigner struct {
 	pk    *rsa.PrivateKey
 }
 
-func (s serviceAcctSigner) Email() (string, error) {
+func (s serviceAcctSigner) Email(ctx context.Context) (string, error) {
 	if s.email == "" {
 		return "", errors.New("service account email not available")
 	}
 	return s.email, nil
 }
 
-func (s serviceAcctSigner) Sign(ss []byte) ([]byte, error) {
+func (s serviceAcctSigner) Sign(ctx context.Context, ss []byte) ([]byte, error) {
 	if s.pk == nil {
 		return nil, errors.New("private key not available")
 	}

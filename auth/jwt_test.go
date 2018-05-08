@@ -19,12 +19,14 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func TestEncodeToken(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": "value"}
-	s, err := encodeToken(&mockSigner{}, h, p)
+	s, err := encodeToken(ctx, &mockSigner{}, h, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,20 +57,20 @@ func TestEncodeToken(t *testing.T) {
 }
 
 func TestEncodeSignError(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": "value"}
 	signer := &mockSigner{
 		err: errors.New("sign error"),
 	}
-	if s, err := encodeToken(signer, h, p); s != "" || err == nil {
+	if s, err := encodeToken(ctx, signer, h, p); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }
 
 func TestEncodeInvalidPayload(t *testing.T) {
-	h := defaultHeader()
+	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	p := mockIDTokenPayload{"key": func() {}}
-	if s, err := encodeToken(&mockSigner{}, h, p); s != "" || err == nil {
+	if s, err := encodeToken(ctx, &mockSigner{}, h, p); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }
@@ -77,11 +79,11 @@ type mockSigner struct {
 	err error
 }
 
-func (s *mockSigner) Email() (string, error) {
+func (s *mockSigner) Email(ctx context.Context) (string, error) {
 	return "", nil
 }
 
-func (s *mockSigner) Sign(b []byte) ([]byte, error) {
+func (s *mockSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

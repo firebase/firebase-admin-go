@@ -28,14 +28,14 @@ import (
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens
 // ==================================================================
 
-func createCustomToken(app *firebase.App) string {
+func createCustomToken(ctx context.Context, app *firebase.App) string {
 	// [START create_custom_token_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
 
-	token, err := client.CustomToken("some-uid")
+	token, err := client.CustomToken(ctx, "some-uid")
 	if err != nil {
 		log.Fatalf("error minting custom token: %v\n", err)
 	}
@@ -46,7 +46,7 @@ func createCustomToken(app *firebase.App) string {
 	return token
 }
 
-func createCustomTokenWithClaims(app *firebase.App) string {
+func createCustomTokenWithClaims(ctx context.Context, app *firebase.App) string {
 	// [START create_custom_token_claims_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
@@ -57,7 +57,7 @@ func createCustomTokenWithClaims(app *firebase.App) string {
 		"premiumAccount": true,
 	}
 
-	token, err := client.CustomTokenWithClaims("some-uid", claims)
+	token, err := client.CustomTokenWithClaims(ctx, "some-uid", claims)
 	if err != nil {
 		log.Fatalf("error minting custom token: %v\n", err)
 	}
@@ -72,14 +72,14 @@ func createCustomTokenWithClaims(app *firebase.App) string {
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens
 // ==================================================================
 
-func verifyIDToken(app *firebase.App, idToken string) *auth.Token {
+func verifyIDToken(ctx context.Context, app *firebase.App, idToken string) *auth.Token {
 	// [START verify_id_token_golang]
 	client, err := app.Auth(context.Background())
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
 
-	token, err := client.VerifyIDToken(idToken)
+	token, err := client.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		log.Fatalf("error verifying ID token: %v\n", err)
 	}
@@ -270,7 +270,7 @@ func customClaimsVerify(ctx context.Context, client *auth.Client) {
 	idToken := "token"
 	// [START verify_custom_claims_golang]
 	// Verify the ID token first.
-	token, err := client.VerifyIDToken(idToken)
+	token, err := client.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		log.Fatal(err)
 	}

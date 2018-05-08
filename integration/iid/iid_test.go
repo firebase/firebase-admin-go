@@ -52,6 +52,7 @@ func TestMain(m *testing.M) {
 
 func TestNonExisting(t *testing.T) {
 	// legal instance IDs are /[cdef][A-Za-z0-9_-]{9}[AEIMQUYcgkosw048]/
+	// "fictive-ID0" is match for that.
 	err := client.DeleteInstanceID(context.Background(), "fictive-ID0")
 	if err == nil {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")

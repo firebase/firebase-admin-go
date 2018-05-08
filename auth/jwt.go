@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 type jwtHeader struct {
@@ -30,7 +32,7 @@ type jwtHeader struct {
 }
 
 type jwtPayload interface {
-	decode(s string) error
+	decodeFrom(s string) error
 }
 
 type customToken struct {
@@ -43,38 +45,11 @@ type customToken struct {
 	Claims map[string]interface{} `json:"claims,omitempty"`
 }
 
-func (p *customToken) decode(s string) error {
+func (p *customToken) decodeFrom(s string) error {
 	return decode(s, p)
 }
 
-func (t *Token) decode(s string) error {
-	claims := make(map[string]interface{})
-	if err := decode(s, &claims); err != nil {
-		return err
-	}
-	if err := decode(s, t); err != nil {
-		return err
-	}
-
-	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
-		delete(claims, r)
-	}
-	t.Claims = claims
-	return nil
-}
-
-func defaultHeader() jwtHeader {
-	return jwtHeader{Algorithm: "RS256", Type: "JWT"}
-}
-
-func encode(i interface{}) (string, error) {
-	b, err := json.Marshal(i)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
+// decode accepts a JWT segment, and decodes it into the given interface.
 func decode(s string, i interface{}) error {
 	decoded, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
@@ -83,7 +58,14 @@ func decode(s string, i interface{}) error {
 	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
 }
 
-func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {
+func encodeToken(ctx context.Context, s signer, h jwtHeader, p jwtPayload) (string, error) {
+	encode := func(i interface{}) (string, error) {
+		b, err := json.Marshal(i)
+		if err != nil {
+			return "", err
+		}
+		return base64.RawURLEncoding.EncodeToString(b), nil
+	}
 	header, err := encode(h)
 	if err != nil {
 		return "", err
@@ -94,14 +76,14 @@ func encodeToken(s signer, h jwtHeader, p jwtPayload) (string, error) {
 	}
 
 	ss := fmt.Sprintf("%s.%s", header, payload)
-	sig, err := s.Sign([]byte(ss))
+	sig, err := s.Sign(ctx, []byte(ss))
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%s.%s", ss, base64.RawURLEncoding.EncodeToString(sig)), nil
 }
 
-func decodeToken(token string, ks keySource, h *jwtHeader, p jwtPayload) error {
+func decodeToken(ctx context.Context, token string, ks keySource, h *jwtHeader, p jwtPayload) error {
 	s := strings.Split(token, ".")
 	if len(s) != 3 {
 		return errors.New("incorrect number of segments")
@@ -110,11 +92,11 @@ func decodeToken(token string, ks keySource, h *jwtHeader, p jwtPayload) error {
 	if err := decode(s[0], h); err != nil {
 		return err
 	}
-	if err := p.decode(s[1]); err != nil {
+	if err := p.decodeFrom(s[1]); err != nil {
 		return err
 	}
 
-	keys, err := ks.Keys()
+	keys, err := ks.Keys(ctx)
 	if err != nil {
 		return err
 	}
