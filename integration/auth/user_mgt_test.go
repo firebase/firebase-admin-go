@@ -444,12 +444,16 @@ func testImportUsers(t *testing.T) {
 }
 
 func testImportUsersWithPassword(t *testing.T) {
-	rawScryptKey := "jxspr8Ki0RYycVU8zykbdLGjFQ3McFUH0uiiTvC8pVMXAn210wjLNmdZJzxUECKbm0QsEmYUSDzZvpjeJ9WmXA=="
+	const (
+		rawScryptKey    = "jxspr8Ki0RYycVU8zykbdLGjFQ3McFUH0uiiTvC8pVMXAn210wjLNmdZJzxUECKbm0QsEmYUSDzZvpjeJ9WmXA=="
+		rawPasswordHash = "V358E8LdWJXAO7muq0CufVpEOXaj8aFiC7T/rcaGieN04q/ZPJ08WhJEHGjj9lz/2TT+/86N5VjVoc5DdBhBiw=="
+		rawSeparator    = "Bw=="
+	)
 	scryptKey, err := base64.StdEncoding.DecodeString(rawScryptKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	saltSeparator, err := base64.StdEncoding.DecodeString("Bw==")
+	saltSeparator, err := base64.StdEncoding.DecodeString(rawSeparator)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,12 +466,15 @@ func testImportUsersWithPassword(t *testing.T) {
 
 	randomUID := randomString(24)
 	randomEmail := strings.ToLower("test" + randomUID[:12] + "@example." + randomUID[12:] + ".com")
-	rawPasswordHash := "V358E8LdWJXAO7muq0CufVpEOXaj8aFiC7T/rcaGieN04q/ZPJ08WhJEHGjj9lz/2TT+/86N5VjVoc5DdBhBiw=="
 	passwordHash, err := base64.StdEncoding.DecodeString(rawPasswordHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	user := (&auth.UserToImport{}).UID(randomUID).Email(randomEmail).PasswordHash(passwordHash).PasswordSalt([]byte("NaCl"))
+	user := (&auth.UserToImport{}).
+		UID(randomUID).
+		Email(randomEmail).
+		PasswordHash(passwordHash).
+		PasswordSalt([]byte("NaCl"))
 	result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user}, auth.WithHash(scrypt))
 	if err != nil {
 		t.Fatal(err)
