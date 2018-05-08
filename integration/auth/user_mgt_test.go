@@ -17,7 +17,9 @@ package auth
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,12 +51,14 @@ func TestUserManagement(t *testing.T) {
 		{"Update user", testUpdateUser},
 		{"Remove user attributes", testRemovePhonePhotoName},
 		{"Remove custom claims", testRemoveCustomClaims},
+		{"Import users", testImportUsers},
 		{"Add custom claims", testAddCustomClaims},
 		{"Delete test users", testDeleteUsers},
 	}
 	// The tests are meant to be run in sequence. A failure in creating the users
 	// should be fatal so none of the other tests run.
 	for _, run := range orderedRuns {
+		t.Log(run.name)
 		run.testFunc(t)
 		if t.Failed() {
 			t.Fatalf("Failed run %v", run.name)
@@ -403,8 +407,7 @@ func testAddCustomClaims(t *testing.T) {
 
 func testDeleteUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
-		err := client.DeleteUser(context.Background(), id)
-		if err != nil {
+		if err := client.DeleteUser(context.Background(), id); err != nil {
 			t.Errorf("DeleteUser(%q) = %v; want = nil", id, err)
 		}
 
@@ -413,4 +416,38 @@ func testDeleteUsers(t *testing.T) {
 			t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", u, err)
 		}
 	}
+}
+
+func testImportUsers(t *testing.T) {
+	randomUID := randomString(24)
+	randomEmail := strings.ToLower("test" + randomUID[:12] + "@example." + randomUID[12:] + ".com")
+	user := (&auth.UserToImport{}).UID(randomUID).Email(randomEmail)
+	result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 1 || result.FailureCount != 0 {
+		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 0}", result)
+	}
+	testFixtures.uidList = append(testFixtures.uidList, randomUID)
+
+	savedUser, err := client.GetUser(context.Background(), randomUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if savedUser.Email != randomEmail {
+		t.Errorf("GetUser() = %q; want = %q", savedUser.Email, randomEmail)
+	}
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func randomString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
