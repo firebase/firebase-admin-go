@@ -1,5 +1,7 @@
 # Unreleased
-- All functions that make network calls take context as an argument.
+
+- [added] Implemented the `auth.ImportUsers()` function for importing
+  users into Firebase Auth in bulk.
 
 # v3.0.0
 
