@@ -276,6 +276,10 @@ func (w withHash) applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUpload
 	req.SaltSeparator = conf.SaltSeparator
 	req.Rounds = conf.Rounds
 	req.MemoryCost = conf.MemoryCost
+	req.DkLen = conf.DerivedKeyLength
+	req.Parallelization = conf.Parallelization
+	req.BlockSize = conf.BlockSize
+	req.ForceSendFields = conf.ForceSendFields
 	return nil
 }
 

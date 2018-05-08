@@ -23,7 +23,37 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-// Scrypt represents the SCRYPT hash algorithm.
+// Bcrypt represents the BCRYPT hash algorithm.
+type Bcrypt struct{}
+
+// Config returns the validated hash configuration.
+func (b *Bcrypt) Config() (*internal.HashConfig, error) {
+	return &internal.HashConfig{HashAlgorithm: "BCRYPT"}, nil
+}
+
+// StandardScrypt represents the standard scrypt hash algorithm.
+type StandardScrypt struct {
+	BlockSize        int
+	DerivedKeyLength int
+	MemoryCost       int
+	Parallelization  int
+}
+
+// Config returns the validated hash configuration.
+func (s *StandardScrypt) Config() (*internal.HashConfig, error) {
+	return &internal.HashConfig{
+		HashAlgorithm:    "STANDARD_SCRYPT",
+		DerivedKeyLength: int64(s.DerivedKeyLength),
+		BlockSize:        int64(s.BlockSize),
+		Parallelization:  int64(s.Parallelization),
+		MemoryCost:       int64(s.MemoryCost),
+		ForceSendFields:  []string{"BlockSize", "Parallelization", "MemoryCost", "DkLen"},
+	}, nil
+}
+
+// Scrypt represents the scrypt hash algorithm.
+//
+// This is the modified scrypt used by Firebase Auth (https://github.com/firebase/scrypt).
 type Scrypt struct {
 	Key           []byte
 	SaltSeparator []byte
@@ -51,6 +81,36 @@ func (s *Scrypt) Config() (*internal.HashConfig, error) {
 	}, nil
 }
 
+// HMACMD5 represents the HMAC SHA512 hash algorithm.
+type HMACMD5 struct {
+	Key []byte
+}
+
+// Config returns the validated hash configuration.
+func (h *HMACMD5) Config() (*internal.HashConfig, error) {
+	return hmacConfig("HMAC_MD5", h.Key)
+}
+
+// HMACSHA1 represents the HMAC SHA512 hash algorithm.
+type HMACSHA1 struct {
+	Key []byte
+}
+
+// Config returns the validated hash configuration.
+func (h *HMACSHA1) Config() (*internal.HashConfig, error) {
+	return hmacConfig("HMAC_SHA1", h.Key)
+}
+
+// HMACSHA256 represents the HMAC SHA512 hash algorithm.
+type HMACSHA256 struct {
+	Key []byte
+}
+
+// Config returns the validated hash configuration.
+func (h *HMACSHA256) Config() (*internal.HashConfig, error) {
+	return hmacConfig("HMAC_SHA256", h.Key)
+}
+
 // HMACSHA512 represents the HMAC SHA512 hash algorithm.
 type HMACSHA512 struct {
 	Key []byte
@@ -61,6 +121,66 @@ func (h *HMACSHA512) Config() (*internal.HashConfig, error) {
 	return hmacConfig("HMAC_SHA512", h.Key)
 }
 
+// MD5 represents the MD5 hash algorithm.
+type MD5 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *MD5) Config() (*internal.HashConfig, error) {
+	return basicConfig("MD5", h.Rounds)
+}
+
+// PBKDF2SHA256 represents the PBKDF2SHA256 hash algorithm.
+type PBKDF2SHA256 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *PBKDF2SHA256) Config() (*internal.HashConfig, error) {
+	return basicConfig("PBKDF2_SHA256", h.Rounds)
+}
+
+// PBKDFSHA1 represents the PBKDFSHA1 hash algorithm.
+type PBKDFSHA1 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *PBKDFSHA1) Config() (*internal.HashConfig, error) {
+	return basicConfig("PBKDF_SHA1", h.Rounds)
+}
+
+// SHA1 represents the SHA1 hash algorithm.
+type SHA1 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *SHA1) Config() (*internal.HashConfig, error) {
+	return basicConfig("SHA1", h.Rounds)
+}
+
+// SHA256 represents the SHA256 hash algorithm.
+type SHA256 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *SHA256) Config() (*internal.HashConfig, error) {
+	return basicConfig("SHA256", h.Rounds)
+}
+
+// SHA512 represents the SHA512 hash algorithm.
+type SHA512 struct {
+	Rounds int
+}
+
+// Config returns the validated hash configuration.
+func (h *SHA512) Config() (*internal.HashConfig, error) {
+	return basicConfig("SHA512", h.Rounds)
+}
+
 func hmacConfig(name string, key []byte) (*internal.HashConfig, error) {
 	if len(key) == 0 {
 		return nil, errors.New("signer key not specified")
@@ -68,5 +188,16 @@ func hmacConfig(name string, key []byte) (*internal.HashConfig, error) {
 	return &internal.HashConfig{
 		HashAlgorithm: name,
 		SignerKey:     base64.RawURLEncoding.EncodeToString(key),
+	}, nil
+}
+
+func basicConfig(name string, rounds int) (*internal.HashConfig, error) {
+	if rounds < 0 || rounds > 120000 {
+		return nil, errors.New("rounds must be between 0 and 120000")
+	}
+	return &internal.HashConfig{
+		HashAlgorithm:   name,
+		Rounds:          int64(rounds),
+		ForceSendFields: []string{"Rounds"},
 	}, nil
 }
