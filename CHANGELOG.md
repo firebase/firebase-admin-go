@@ -1,8 +1,11 @@
 # Unreleased
 
+- [fixed] `auth.UpdateUser()` and `auth.DeleteUser()` returns the expected
+  `UserNotFound` errors when called with a non-existing uid.
+
 # v3.0.0
 
-- All functions that make network calls now take context as an argument.
+- [changed] All functions that make network calls now take context as an argument.
 
 # v2.7.0
 
