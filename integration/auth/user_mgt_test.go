@@ -457,7 +457,7 @@ func testImportUsersWithPassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scrypt := &hash.Scrypt{
+	scrypt := hash.Scrypt{
 		Key:           scryptKey,
 		SaltSeparator: saltSeparator,
 		Rounds:        8,

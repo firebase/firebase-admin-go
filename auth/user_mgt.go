@@ -17,6 +17,7 @@ package auth
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -694,7 +695,7 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 // password, a UserImportHash must be specified as an option.
 func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ...UserImportOption) (*UserImportResult, error) {
 	if len(users) == 0 {
-		return nil, fmt.Errorf("users list must not be empty")
+		return nil, errors.New("users list must not be empty")
 	}
 	if len(users) > maxImportUsers {
 		return nil, fmt.Errorf("users list must not contain more than %d elements", maxImportUsers)
@@ -719,7 +720,7 @@ func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ..
 		}
 	}
 	if hashRequired && req.HashAlgorithm == "" {
-		return nil, fmt.Errorf("hash algorithm option is required to import users with passwords")
+		return nil, errors.New("hash algorithm option is required to import users with passwords")
 	}
 
 	call := c.is.Relyingparty.UploadAccount(req)

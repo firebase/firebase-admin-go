@@ -34,11 +34,11 @@ var validHashes = []struct {
 	want internal.HashConfig
 }{
 	{
-		alg:  &Bcrypt{},
+		alg:  Bcrypt{},
 		want: internal.HashConfig{HashAlgorithm: "BCRYPT"},
 	},
 	{
-		alg: &StandardScrypt{
+		alg: StandardScrypt{
 			BlockSize:        1,
 			DerivedKeyLength: 2,
 			Parallelization:  3,
@@ -54,7 +54,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &Scrypt{
+		alg: Scrypt{
 			Key:           signerKey,
 			SaltSeparator: saltSeparator,
 			Rounds:        8,
@@ -69,35 +69,35 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &HMACMD5{signerKey},
+		alg: HMACMD5{signerKey},
 		want: internal.HashConfig{
 			HashAlgorithm: "HMAC_MD5",
 			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: &HMACSHA1{signerKey},
+		alg: HMACSHA1{signerKey},
 		want: internal.HashConfig{
 			HashAlgorithm: "HMAC_SHA1",
 			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: &HMACSHA256{signerKey},
+		alg: HMACSHA256{signerKey},
 		want: internal.HashConfig{
 			HashAlgorithm: "HMAC_SHA256",
 			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: &HMACSHA512{signerKey},
+		alg: HMACSHA512{signerKey},
 		want: internal.HashConfig{
 			HashAlgorithm: "HMAC_SHA512",
 			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: &MD5{42},
+		alg: MD5{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "MD5",
 			Rounds:          42,
@@ -105,7 +105,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &SHA1{42},
+		alg: SHA1{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "SHA1",
 			Rounds:          42,
@@ -113,7 +113,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &SHA256{42},
+		alg: SHA256{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "SHA256",
 			Rounds:          42,
@@ -121,7 +121,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &SHA512{42},
+		alg: SHA512{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "SHA512",
 			Rounds:          42,
@@ -129,7 +129,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &PBKDFSHA1{42},
+		alg: PBKDFSHA1{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "PBKDF_SHA1",
 			Rounds:          42,
@@ -137,7 +137,7 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: &PBKDF2SHA256{42},
+		alg: PBKDF2SHA256{42},
 		want: internal.HashConfig{
 			HashAlgorithm:   "PBKDF2_SHA256",
 			Rounds:          42,
@@ -152,7 +152,7 @@ var invalidHashes = []struct {
 }{
 	{
 		name: "SCRYPT: no signer key",
-		alg: &Scrypt{
+		alg: Scrypt{
 			SaltSeparator: saltSeparator,
 			Rounds:        8,
 			MemoryCost:    14,
@@ -160,7 +160,7 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "SCRYPT: low rounds",
-		alg: &Scrypt{
+		alg: Scrypt{
 			Key:           signerKey,
 			SaltSeparator: saltSeparator,
 			MemoryCost:    14,
@@ -168,7 +168,7 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "SCRYPT: high rounds",
-		alg: &Scrypt{
+		alg: Scrypt{
 			Key:           signerKey,
 			SaltSeparator: saltSeparator,
 			Rounds:        9,
@@ -177,7 +177,7 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "SCRYPT: low memory cost",
-		alg: &Scrypt{
+		alg: Scrypt{
 			Key:           signerKey,
 			SaltSeparator: saltSeparator,
 			Rounds:        8,
@@ -185,7 +185,7 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "SCRYPT: high memory cost",
-		alg: &Scrypt{
+		alg: Scrypt{
 			Key:           signerKey,
 			SaltSeparator: saltSeparator,
 			Rounds:        8,
@@ -194,67 +194,67 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "HMAC_MD5: no signer key",
-		alg:  &HMACMD5{},
+		alg:  HMACMD5{},
 	},
 	{
 		name: "HMAC_SHA1: no signer key",
-		alg:  &HMACSHA1{},
+		alg:  HMACSHA1{},
 	},
 	{
 		name: "HMAC_SHA256: no signer key",
-		alg:  &HMACSHA256{},
+		alg:  HMACSHA256{},
 	},
 	{
 		name: "HMAC_SHA512: no signer key",
-		alg:  &HMACSHA512{},
+		alg:  HMACSHA512{},
 	},
 	{
 		name: "MD5: rounds too low",
-		alg:  &MD5{-1},
+		alg:  MD5{-1},
 	},
 	{
 		name: "SHA1: rounds too low",
-		alg:  &SHA1{-1},
+		alg:  SHA1{-1},
 	},
 	{
 		name: "SHA256: rounds too low",
-		alg:  &SHA256{-1},
+		alg:  SHA256{-1},
 	},
 	{
 		name: "SHA512: rounds too low",
-		alg:  &SHA512{-1},
+		alg:  SHA512{-1},
 	},
 	{
 		name: "PBKDFSHA1: rounds too low",
-		alg:  &PBKDFSHA1{-1},
+		alg:  PBKDFSHA1{-1},
 	},
 	{
 		name: "PBKDF2SHA256: rounds too low",
-		alg:  &PBKDF2SHA256{-1},
+		alg:  PBKDF2SHA256{-1},
 	},
 	{
 		name: "MD5: rounds too high",
-		alg:  &MD5{120001},
+		alg:  MD5{120001},
 	},
 	{
 		name: "SHA1: rounds too high",
-		alg:  &SHA1{120001},
+		alg:  SHA1{120001},
 	},
 	{
 		name: "SHA256: rounds too high",
-		alg:  &SHA256{120001},
+		alg:  SHA256{120001},
 	},
 	{
 		name: "SHA512: rounds too high",
-		alg:  &SHA512{120001},
+		alg:  SHA512{120001},
 	},
 	{
 		name: "PBKDFSHA1: rounds too high",
-		alg:  &PBKDFSHA1{120001},
+		alg:  PBKDFSHA1{120001},
 	},
 	{
 		name: "PBKDF2SHA256: rounds too high",
-		alg:  &PBKDF2SHA256{120001},
+		alg:  PBKDF2SHA256{120001},
 	},
 }
 

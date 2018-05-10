@@ -901,7 +901,7 @@ type mockHash struct {
 	rounds, memoryCost int64
 }
 
-func (h *mockHash) Config() (*internal.HashConfig, error) {
+func (h mockHash) Config() (*internal.HashConfig, error) {
 	return &internal.HashConfig{
 		HashAlgorithm: "MOCKHASH",
 		SignerKey:     h.key,
@@ -918,7 +918,7 @@ func TestImportUsersWithHash(t *testing.T) {
 		(&UserToImport{}).UID("user1").PasswordHash([]byte("password")),
 		(&UserToImport{}).UID("user2"),
 	}
-	result, err := s.Client.ImportUsers(context.Background(), users, WithHash(&mockHash{
+	result, err := s.Client.ImportUsers(context.Background(), users, WithHash(mockHash{
 		key:        "key",
 		saltSep:    ",",
 		rounds:     8,
