@@ -33,7 +33,10 @@ import (
 	"firebase.google.com/go/integration/internal"
 )
 
-const apiURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
+const (
+	verifyCustomTokenURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken?key=%s"
+	verifyPasswordURL    = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=%s"
+)
 
 var client *auth.Client
 
@@ -181,7 +184,33 @@ func signInWithCustomToken(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := postRequest(fmt.Sprintf(apiURL, apiKey), req)
+	resp, err := postRequest(fmt.Sprintf(verifyCustomTokenURL, apiKey), req)
+	if err != nil {
+		return "", err
+	}
+	var respBody struct {
+		IDToken string `json:"idToken"`
+	}
+	if err := json.Unmarshal(resp, &respBody); err != nil {
+		return "", err
+	}
+	return respBody.IDToken, err
+}
+
+func signInWithPassword(email, password string) (string, error) {
+	req, err := json.Marshal(map[string]interface{}{
+		"email":    email,
+		"password": password,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	apiKey, err := internal.APIKey()
+	if err != nil {
+		return "", err
+	}
+	resp, err := postRequest(fmt.Sprintf(verifyPasswordURL, apiKey), req)
 	if err != nil {
 		return "", err
 	}

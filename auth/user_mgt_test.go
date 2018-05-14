@@ -16,6 +16,7 @@ package auth
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -626,6 +627,338 @@ func TestSetCustomClaims(t *testing.T) {
 		if !reflect.DeepEqual(s.Rbody, want) {
 			t.Errorf("SetCustomUserClaims() = %v; want = %v", string(s.Rbody), string(want))
 		}
+	}
+}
+
+func TestUserToImport(t *testing.T) {
+	cases := []struct {
+		user *UserToImport
+		want *identitytoolkit.UserInfo
+	}{
+		{
+			user: (&UserToImport{}).UID("test"),
+			want: &identitytoolkit.UserInfo{
+				LocalId: "test",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").DisplayName("name"),
+			want: &identitytoolkit.UserInfo{
+				LocalId:     "test",
+				DisplayName: "name",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").Email("test@example.com"),
+			want: &identitytoolkit.UserInfo{
+				LocalId: "test",
+				Email:   "test@example.com",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").PhotoURL("https://test.com/user.png"),
+			want: &identitytoolkit.UserInfo{
+				LocalId:  "test",
+				PhotoUrl: "https://test.com/user.png",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").PhoneNumber("+1234567890"),
+			want: &identitytoolkit.UserInfo{
+				LocalId:     "test",
+				PhoneNumber: "+1234567890",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").Metadata(&UserMetadata{
+				CreationTimestamp:  int64(100),
+				LastLogInTimestamp: int64(150),
+			}),
+			want: &identitytoolkit.UserInfo{
+				LocalId:     "test",
+				CreatedAt:   int64(100),
+				LastLoginAt: int64(150),
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").PasswordHash([]byte("password")),
+			want: &identitytoolkit.UserInfo{
+				LocalId:      "test",
+				PasswordHash: base64.RawURLEncoding.EncodeToString([]byte("password")),
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").PasswordSalt([]byte("nacl")),
+			want: &identitytoolkit.UserInfo{
+				LocalId: "test",
+				Salt:    base64.RawURLEncoding.EncodeToString([]byte("nacl")),
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").CustomClaims(map[string]interface{}{"admin": true}),
+			want: &identitytoolkit.UserInfo{
+				LocalId:          "test",
+				CustomAttributes: `{"admin":true}`,
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").CustomClaims(map[string]interface{}{}),
+			want: &identitytoolkit.UserInfo{
+				LocalId: "test",
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").ProviderData([]*UserProvider{
+				{
+					ProviderID: "google.com",
+					UID:        "test",
+				},
+			}),
+			want: &identitytoolkit.UserInfo{
+				LocalId: "test",
+				ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
+					{
+						ProviderId: "google.com",
+						RawId:      "test",
+					},
+				},
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").EmailVerified(true),
+			want: &identitytoolkit.UserInfo{
+				LocalId:       "test",
+				EmailVerified: true,
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").EmailVerified(false),
+			want: &identitytoolkit.UserInfo{
+				LocalId:         "test",
+				EmailVerified:   false,
+				ForceSendFields: []string{"EmailVerified"},
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").Disabled(true),
+			want: &identitytoolkit.UserInfo{
+				LocalId:  "test",
+				Disabled: true,
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").Disabled(false),
+			want: &identitytoolkit.UserInfo{
+				LocalId:         "test",
+				Disabled:        false,
+				ForceSendFields: []string{"Disabled"},
+			},
+		},
+	}
+
+	for idx, tc := range cases {
+		got, err := tc.user.validatedUserInfo()
+		if err != nil {
+			t.Errorf("[%d] invalid user: %v", idx, err)
+		}
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("[%d] UserToImport = %#v; want = %#v", idx, got, tc.want)
+		}
+	}
+}
+
+func TestUserToImportError(t *testing.T) {
+	cases := []struct {
+		user *UserToImport
+		want string
+	}{
+		{
+			&UserToImport{},
+			"no parameters are set on the user to import",
+		},
+		{
+			(&UserToImport{}).UID(""),
+			"uid must be a non-empty string",
+		},
+		{
+			(&UserToImport{}).UID(strings.Repeat("a", 129)),
+			"uid string must not be longer than 128 characters",
+		},
+		{
+			(&UserToImport{}).UID("test").Email("not-an-email"),
+			`malformed email string: "not-an-email"`,
+		},
+		{
+			(&UserToImport{}).UID("test").PhoneNumber("not-a-phone"),
+			"phone number must be a valid, E.164 compliant identifier",
+		},
+		{
+			(&UserToImport{}).UID("test").CustomClaims(map[string]interface{}{"key": strings.Repeat("a", 1000)}),
+			"serialized custom claims must not exceed 1000 characters",
+		},
+		{
+			(&UserToImport{}).UID("test").ProviderData([]*UserProvider{
+				{
+					UID: "test",
+				},
+			}),
+			"user provider must specify a provider ID",
+		},
+		{
+			(&UserToImport{}).UID("test").ProviderData([]*UserProvider{
+				{
+					ProviderID: "google.com",
+				},
+			}),
+			"user provdier must specify a uid",
+		},
+	}
+
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	for idx, tc := range cases {
+		_, err := s.Client.ImportUsers(context.Background(), []*UserToImport{tc.user})
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("[%d] UserToImport = %v; want = %q", idx, err, tc.want)
+		}
+	}
+}
+
+func TestInvalidImportUsers(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	result, err := s.Client.ImportUsers(context.Background(), nil)
+	if result != nil || err == nil {
+		t.Errorf("ImportUsers(nil) = (%v, %v); want = (nil, error)", result, err)
+	}
+
+	result, err = s.Client.ImportUsers(context.Background(), []*UserToImport{})
+	if result != nil || err == nil {
+		t.Errorf("ImportUsers([]) = (%v, %v); want = (nil, error)", result, err)
+	}
+
+	var users []*UserToImport
+	for i := 0; i < 1001; i++ {
+		users = append(users, (&UserToImport{}).UID(fmt.Sprintf("user%d", i)))
+	}
+	result, err = s.Client.ImportUsers(context.Background(), users)
+	if result != nil || err == nil {
+		t.Errorf("ImportUsers(len > 1000) = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestImportUsers(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	users := []*UserToImport{
+		(&UserToImport{}).UID("user1"),
+		(&UserToImport{}).UID("user2"),
+	}
+	result, err := s.Client.ImportUsers(context.Background(), users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 2 || result.FailureCount != 0 {
+		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
+	}
+}
+
+func TestImportUsersError(t *testing.T) {
+	resp := `{
+		"error": [
+      {"index": 0, "message": "Some error occurred in user1"},
+      {"index": 2, "message": "Another error occurred in user3"}
+    ]
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	users := []*UserToImport{
+		(&UserToImport{}).UID("user1"),
+		(&UserToImport{}).UID("user2"),
+		(&UserToImport{}).UID("user3"),
+	}
+	result, err := s.Client.ImportUsers(context.Background(), users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 1 || result.FailureCount != 2 || len(result.Errors) != 2 {
+		t.Fatalf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 2}", result)
+	}
+	want := []ErrorInfo{
+		{Index: 0, Reason: "Some error occurred in user1"},
+		{Index: 2, Reason: "Another error occurred in user3"},
+	}
+	for idx, we := range want {
+		if *result.Errors[idx] != we {
+			t.Errorf("[%d] Error = %#v; want = %#v", idx, result.Errors[idx], we)
+		}
+	}
+}
+
+type mockHash struct {
+	key, saltSep       string
+	rounds, memoryCost int64
+}
+
+func (h mockHash) Config() (*internal.HashConfig, error) {
+	return &internal.HashConfig{
+		HashAlgorithm: "MOCKHASH",
+		SignerKey:     h.key,
+		SaltSeparator: h.saltSep,
+		Rounds:        h.rounds,
+		MemoryCost:    h.memoryCost,
+	}, nil
+}
+
+func TestImportUsersWithHash(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	users := []*UserToImport{
+		(&UserToImport{}).UID("user1").PasswordHash([]byte("password")),
+		(&UserToImport{}).UID("user2"),
+	}
+	result, err := s.Client.ImportUsers(context.Background(), users, WithHash(mockHash{
+		key:        "key",
+		saltSep:    ",",
+		rounds:     8,
+		memoryCost: 14,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 2 || result.FailureCount != 0 {
+		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
+	}
+	var got map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]interface{}{
+		"hashAlgorithm": "MOCKHASH",
+		"signerKey":     "key",
+		"saltSeparator": ",",
+		"rounds":        float64(8),
+		"memoryCost":    float64(14),
+	}
+	for k, v := range want {
+		gv, ok := got[k]
+		if !ok || gv != v {
+			t.Errorf("ImportUsers() request(%q) = %v; want = %v", k, gv, v)
+		}
+	}
+}
+
+func TestImportUsersMissingRequiredHash(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	users := []*UserToImport{
+		(&UserToImport{}).UID("user1").PasswordHash([]byte("password")),
+		(&UserToImport{}).UID("user2"),
+	}
+	result, err := s.Client.ImportUsers(context.Background(), users)
+	if result != nil || err == nil {
+		t.Fatalf("ImportUsers() = (%v, %v); want = (nil, error)", result, err)
 	}
 }
 

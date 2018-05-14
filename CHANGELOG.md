@@ -1,5 +1,8 @@
 # Unreleased
 
+- [added] Implemented the `auth.ImportUsers()` function for importing
+  users into Firebase Auth in bulk.
+
 # v3.0.0
 
 - All functions that make network calls now take context as an argument.

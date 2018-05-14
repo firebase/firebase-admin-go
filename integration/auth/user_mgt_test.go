@@ -16,8 +16,11 @@
 package auth
 
 import (
+	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +29,7 @@ import (
 	"google.golang.org/api/iterator"
 
 	"firebase.google.com/go/auth"
+	"firebase.google.com/go/auth/hash"
 )
 
 var testFixtures = struct {
@@ -49,15 +53,18 @@ func TestUserManagement(t *testing.T) {
 		{"Update user", testUpdateUser},
 		{"Remove user attributes", testRemovePhonePhotoName},
 		{"Remove custom claims", testRemoveCustomClaims},
+		{"Import users", testImportUsers},
+		{"Import users with password", testImportUsersWithPassword},
 		{"Add custom claims", testAddCustomClaims},
 		{"Delete test users", testDeleteUsers},
 	}
 	// The tests are meant to be run in sequence. A failure in creating the users
 	// should be fatal so none of the other tests run.
 	for _, run := range orderedRuns {
+		t.Log(run.name)
 		run.testFunc(t)
 		if t.Failed() {
-			t.Fatalf("Failed run %v", run.name)
+			t.Errorf("Failed run %v", run.name)
 		}
 	}
 }
@@ -403,8 +410,7 @@ func testAddCustomClaims(t *testing.T) {
 
 func testDeleteUsers(t *testing.T) {
 	for _, id := range testFixtures.uidList {
-		err := client.DeleteUser(context.Background(), id)
-		if err != nil {
+		if err := client.DeleteUser(context.Background(), id); err != nil {
 			t.Errorf("DeleteUser(%q) = %v; want = nil", id, err)
 		}
 
@@ -413,4 +419,95 @@ func testDeleteUsers(t *testing.T) {
 			t.Errorf("GetUser(non-existing) = (%v, %v); want = (nil, error)", u, err)
 		}
 	}
+}
+
+func testImportUsers(t *testing.T) {
+	randomUID := randomString(24)
+	randomEmail := strings.ToLower("test" + randomUID[:12] + "@example." + randomUID[12:] + ".com")
+	user := (&auth.UserToImport{}).UID(randomUID).Email(randomEmail)
+	result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 1 || result.FailureCount != 0 {
+		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 0}", result)
+	}
+	testFixtures.uidList = append(testFixtures.uidList, randomUID)
+
+	savedUser, err := client.GetUser(context.Background(), randomUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if savedUser.Email != randomEmail {
+		t.Errorf("GetUser() = %q; want = %q", savedUser.Email, randomEmail)
+	}
+}
+
+func testImportUsersWithPassword(t *testing.T) {
+	const (
+		rawScryptKey    = "jxspr8Ki0RYycVU8zykbdLGjFQ3McFUH0uiiTvC8pVMXAn210wjLNmdZJzxUECKbm0QsEmYUSDzZvpjeJ9WmXA=="
+		rawPasswordHash = "V358E8LdWJXAO7muq0CufVpEOXaj8aFiC7T/rcaGieN04q/ZPJ08WhJEHGjj9lz/2TT+/86N5VjVoc5DdBhBiw=="
+		rawSeparator    = "Bw=="
+	)
+	scryptKey, err := base64.StdEncoding.DecodeString(rawScryptKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saltSeparator, err := base64.StdEncoding.DecodeString(rawSeparator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scrypt := hash.Scrypt{
+		Key:           scryptKey,
+		SaltSeparator: saltSeparator,
+		Rounds:        8,
+		MemoryCost:    14,
+	}
+
+	randomUID := randomString(24)
+	randomEmail := strings.ToLower("test" + randomUID[:12] + "@example." + randomUID[12:] + ".com")
+	passwordHash, err := base64.StdEncoding.DecodeString(rawPasswordHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := (&auth.UserToImport{}).
+		UID(randomUID).
+		Email(randomEmail).
+		PasswordHash(passwordHash).
+		PasswordSalt([]byte("NaCl"))
+	result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user}, auth.WithHash(scrypt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessCount != 1 || result.FailureCount != 0 {
+		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 0}", result)
+	}
+	testFixtures.uidList = append(testFixtures.uidList, randomUID)
+
+	savedUser, err := client.GetUser(context.Background(), randomUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if savedUser.Email != randomEmail {
+		t.Errorf("GetUser() = %q; want = %q", savedUser.Email, randomEmail)
+	}
+	idToken, err := signInWithPassword(randomEmail, "password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idToken == "" {
+		t.Errorf("ID Token = empty; want = non-empty")
+	}
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func randomString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
