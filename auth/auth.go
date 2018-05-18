@@ -57,32 +57,13 @@ type Token struct {
 	Claims   map[string]interface{} `json:"-"`
 }
 
-func (t *Token) decodeFrom(s string) error {
-	// Decode into a regular map to access custom claims.
-	claims := make(map[string]interface{})
-	if err := decode(s, &claims); err != nil {
-		return err
-	}
-	// Now decode into Token to access the standard claims.
-	if err := decode(s, t); err != nil {
-		return err
-	}
-
-	// Delete standard claims from the custom claims maps.
-	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
-		delete(claims, r)
-	}
-	t.Claims = claims
-	return nil
-}
-
 // Client is the interface for the Firebase auth service.
 //
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
 	is        *identitytoolkit.Service
-	ks        keySource
+	keySource keySource
 	projectID string
 	signer    cryptoSigner
 	version   string
@@ -100,16 +81,13 @@ type signer interface {
 func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	var signer cryptoSigner
 	if c.Creds != nil && len(c.Creds.JSON) > 0 {
-		var sa struct {
-			PrivateKey  string `json:"private_key"`
-			ClientEmail string `json:"client_email"`
-		}
+		var sa serviceAccount
 		if err := json.Unmarshal(c.Creds.JSON, &sa); err != nil {
 			return nil, err
 		}
 		if sa.PrivateKey != "" && sa.ClientEmail != "" {
 			var err error
-			signer, err = newServiceAccountSigner(sa.PrivateKey, sa.ClientEmail)
+			signer, err = newServiceAccountSigner(sa)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +109,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 
 	return &Client{
 		is:        is,
-		ks:        newHTTPKeySource(idTokenCertURL, hc),
+		keySource: newHTTPKeySource(idTokenCertURL, hc),
 		projectID: c.ProjectID,
 		signer:    signer,
 		version:   "Go/Admin/" + c.Version,
@@ -214,7 +192,7 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, fmt.Errorf("id token must be a non-empty string")
 	}
 
-	if err := verifyToken(ctx, idToken, c.ks); err != nil {
+	if err := verifyToken(ctx, idToken, c.keySource); err != nil {
 		return nil, err
 	}
 	segments := strings.Split(idToken, ".")

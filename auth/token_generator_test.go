@@ -16,7 +16,9 @@ package auth
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"strings"
 	"testing"
 
@@ -79,6 +81,30 @@ func TestEncodeInvalidPayload(t *testing.T) {
 	s, err := info.Token(ctx, &mockSigner{})
 	if s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
+	}
+}
+
+func TestServiceAccountSigner(t *testing.T) {
+	b, err := ioutil.ReadFile("../testdata/service_account.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sa serviceAccount
+	if err := json.Unmarshal(b, &sa); err != nil {
+		t.Fatal(err)
+	}
+	signer, err := newServiceAccountSigner(sa)
+	if err != nil {
+		t.Fatal(err)
+	}
+	email, err := signer.Email(ctx)
+	if email != sa.ClientEmail || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, sa.ClientEmail)
+	}
+	sign, err := signer.Sign(ctx, []byte("test"))
+	if sign == nil || err != nil {
+		t.Errorf("Sign() = (%v, %v); want = (bytes, nil)", email, err)
 	}
 }
 

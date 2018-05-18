@@ -1151,7 +1151,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	}
 
 	authClient, err := NewClient(ctx, conf)
-	authClient.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	authClient.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
 	}

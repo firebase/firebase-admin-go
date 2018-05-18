@@ -86,7 +86,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client.ks = ks
+	client.keySource = ks
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
@@ -292,6 +292,29 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
+	var payload mockIDTokenPayload
+	segments := strings.Split(testIDToken, ".")
+	if err := decode(segments[1], &payload); err != nil {
+		t.Fatal(err)
+	}
+	info := &jwtInfo{
+		header: jwtHeader{
+			Algorithm: "HS256",
+			Type:      "JWT",
+			KeyID:     "mock-key-id-1",
+		},
+		payload: payload,
+	}
+	token, err := info.Token(ctx, client.signer)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if _, err := client.VerifyIDToken(ctx, token); err == nil {
+		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
+	}
+}
+
 func TestNoProjectID(t *testing.T) {
 	// AuthConfig with empty ProjectID
 	conf := &internal.AuthConfig{Opts: defaultTestOpts}
@@ -299,7 +322,7 @@ func TestNoProjectID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.ks = client.ks
+	c.keySource = client.keySource
 	if _, err := c.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
@@ -317,10 +340,10 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	ks := client.ks
-	client.ks = &mockKeySource{nil, errors.New("mock error")}
+	ks := client.keySource
+	client.keySource = &mockKeySource{nil, errors.New("mock error")}
 	defer func() {
-		client.ks = ks
+		client.keySource = ks
 	}()
 	if _, err := client.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
@@ -328,7 +351,7 @@ func TestCertificateRequestError(t *testing.T) {
 }
 
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
-	if err := verifyToken(ctx, token, client.ks); err != nil {
+	if err := verifyToken(ctx, token, client.keySource); err != nil {
 		t.Fatal(err)
 	}
 	var (

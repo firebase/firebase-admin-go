@@ -1,3 +1,17 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package auth
 
 import (
@@ -14,8 +28,6 @@ import (
 
 	"golang.org/x/net/context"
 )
-
-var errNotServiceAccount = errors.New("credential is not a service account")
 
 type jwtHeader struct {
 	Algorithm string `json:"alg"`
@@ -63,6 +75,11 @@ func (info *jwtInfo) Token(ctx context.Context, signer cryptoSigner) (string, er
 	return fmt.Sprintf("%s.%s", tokenData, base64.RawURLEncoding.EncodeToString(sig)), nil
 }
 
+type serviceAccount struct {
+	PrivateKey  string `json:"private_key"`
+	ClientEmail string `json:"client_email"`
+}
+
 // cryptoSigner is used to cryptographically sign data, and query the identity of the signer.
 type cryptoSigner interface {
 	Sign(context.Context, []byte) ([]byte, error)
@@ -74,10 +91,10 @@ type serviceAccountSigner struct {
 	clientEmail string
 }
 
-func newServiceAccountSigner(privateKey, clientEmail string) (*serviceAccountSigner, error) {
-	block, _ := pem.Decode([]byte(privateKey))
+func newServiceAccountSigner(sa serviceAccount) (*serviceAccountSigner, error) {
+	block, _ := pem.Decode([]byte(sa.PrivateKey))
 	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %q", privateKey)
+		return nil, fmt.Errorf("no private key data found in: %q", sa.PrivateKey)
 	}
 	parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
@@ -92,7 +109,7 @@ func newServiceAccountSigner(privateKey, clientEmail string) (*serviceAccountSig
 	}
 	return &serviceAccountSigner{
 		privateKey:  rsaKey,
-		clientEmail: clientEmail,
+		clientEmail: sa.ClientEmail,
 	}, nil
 }
 
