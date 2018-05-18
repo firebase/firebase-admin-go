@@ -328,32 +328,41 @@ func TestCertificateRequestError(t *testing.T) {
 }
 
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
-	h := &jwtHeader{}
-	p := &customToken{}
-	if err := decodeToken(ctx, token, client.ks, h, p); err != nil {
+	if err := verifyToken(ctx, token, client.ks); err != nil {
+		t.Fatal(err)
+	}
+	var (
+		header  jwtHeader
+		payload customToken
+	)
+	segments := strings.Split(token, ".")
+	if err := decode(segments[0], &header); err != nil {
+		t.Fatal(err)
+	}
+	if err := decode(segments[1], &payload); err != nil {
 		t.Fatal(err)
 	}
 
-	email, err := client.snr.Email(ctx)
+	email, err := client.signer.Email(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if h.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
-	} else if h.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", h.Type)
-	} else if p.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
-	} else if p.Iss != email {
-		t.Errorf("Issuer: %q; want: %q", p.Iss, email)
-	} else if p.Sub != email {
-		t.Errorf("Subject: %q; want: %q", p.Sub, email)
+	if header.Algorithm != "RS256" {
+		t.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
+	} else if header.Type != "JWT" {
+		t.Errorf("Type: %q; want: 'JWT'", header.Type)
+	} else if payload.Aud != firebaseAudience {
+		t.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
+	} else if payload.Iss != email {
+		t.Errorf("Issuer: %q; want: %q", payload.Iss, email)
+	} else if payload.Sub != email {
+		t.Errorf("Subject: %q; want: %q", payload.Sub, email)
 	}
 
 	for k, v := range expected {
-		if p.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
+		if payload.Claims[k] != v {
+			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
 	}
 }
@@ -374,9 +383,16 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	for k, v := range p {
 		pCopy[k] = v
 	}
-	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	h.KeyID = kid
-	token, err := encodeToken(ctx, client.snr, h, pCopy)
+
+	info := &jwtInfo{
+		header: jwtHeader{
+			Algorithm: "RS256",
+			Type:      "JWT",
+			KeyID:     kid,
+		},
+		payload: pCopy,
+	}
+	token, err := info.Token(ctx, client.signer)
 	if err != nil {
 		log.Fatalln(err)
 	}

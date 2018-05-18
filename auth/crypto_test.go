@@ -205,16 +205,6 @@ func TestParsePublicKeysError(t *testing.T) {
 	}
 }
 
-func TestDefaultServiceAcctSigner(t *testing.T) {
-	signer := &serviceAcctSigner{}
-	if email, err := signer.Email(ctx); email != "" || err == nil {
-		t.Errorf("Email() = (%v, %v); want = ('', error)", email, err)
-	}
-	if sig, err := signer.Sign(ctx, []byte("")); sig != nil || err == nil {
-		t.Errorf("Sign() = (%v, %v); want = ('', error)", sig, err)
-	}
-}
-
 func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
 	mc := &mockClock{now: time.Unix(0, 0)}
 	ks.Clock = mc

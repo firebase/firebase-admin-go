@@ -24,9 +24,11 @@ import (
 )
 
 func TestEncodeToken(t *testing.T) {
-	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	p := mockIDTokenPayload{"key": "value"}
-	s, err := encodeToken(ctx, &mockSigner{}, h, p)
+	info := &jwtInfo{
+		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		payload: mockIDTokenPayload{"key": "value"},
+	}
+	s, err := info.Token(ctx, &mockSigner{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,15 +40,15 @@ func TestEncodeToken(t *testing.T) {
 	var header jwtHeader
 	if err := decode(parts[0], &header); err != nil {
 		t.Fatal(err)
-	} else if h != header {
-		t.Errorf("decode(header) = %v; want = %v", header, h)
+	} else if info.header != header {
+		t.Errorf("decode(header) = %v; want = %v", header, info.header)
 	}
 
 	payload := make(mockIDTokenPayload)
 	if err := decode(parts[1], &payload); err != nil {
 		t.Fatal(err)
 	} else if len(payload) != 1 || payload["key"] != "value" {
-		t.Errorf("decode(payload) = %v; want = %v", payload, p)
+		t.Errorf("decode(payload) = %v; want = %v", payload, info.payload)
 	}
 
 	if sig, err := base64.RawURLEncoding.DecodeString(parts[2]); err != nil {
@@ -57,20 +59,25 @@ func TestEncodeToken(t *testing.T) {
 }
 
 func TestEncodeSignError(t *testing.T) {
-	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	p := mockIDTokenPayload{"key": "value"}
 	signer := &mockSigner{
 		err: errors.New("sign error"),
 	}
-	if s, err := encodeToken(ctx, signer, h, p); s != "" || err == nil {
+	info := &jwtInfo{
+		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		payload: mockIDTokenPayload{"key": "value"},
+	}
+	if s, err := info.Token(ctx, signer); s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }
 
 func TestEncodeInvalidPayload(t *testing.T) {
-	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	p := mockIDTokenPayload{"key": func() {}}
-	if s, err := encodeToken(ctx, &mockSigner{}, h, p); s != "" || err == nil {
+	info := &jwtInfo{
+		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		payload: mockIDTokenPayload{"key": func() {}},
+	}
+	s, err := info.Token(ctx, &mockSigner{})
+	if s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
 }
