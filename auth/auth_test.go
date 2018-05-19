@@ -38,11 +38,10 @@ import (
 )
 
 var (
-	client                *Client
-	ctx                   context.Context
-	testIDToken           string
-	testGetUserResponse   []byte
-	testListUsersResponse []byte
+	client              *Client
+	ctx                 context.Context
+	testIDToken         string
+	testGetUserResponse []byte
 )
 
 var defaultTestOpts = []option.ClientOption{
@@ -93,18 +92,34 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
-	testListUsersResponse, err = ioutil.ReadFile("../testdata/list_users.json")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
 }
 
+func TestNewClientServiceAccountSigner(t *testing.T) {
+	if _, ok := client.signer.(*serviceAccountSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = serviceAccountSigner", client.signer)
+	}
+}
+
+func TestNewClientIAMSigner(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+	}
+	c, err := NewClient(ctx, conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+	if _, ok := c.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+}
+
 func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
-		JSON: []byte("foo"),
+		JSON: []byte("not json"),
 	}
 	conf := &internal.AuthConfig{Creds: creds}
 	if c, err := NewClient(ctx, conf); c != nil || err == nil {
@@ -315,7 +330,7 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 	}
 }
 
-func TestNoProjectID(t *testing.T) {
+func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	// AuthConfig with empty ProjectID
 	conf := &internal.AuthConfig{Opts: defaultTestOpts}
 	c, err := NewClient(ctx, conf)

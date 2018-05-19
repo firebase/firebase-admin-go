@@ -74,8 +74,8 @@ func TestEncodeSignError(t *testing.T) {
 		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: mockIDTokenPayload{"key": "value"},
 	}
-	if s, err := info.Token(ctx, signer); s != "" || err == nil {
-		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
+	if s, err := info.Token(ctx, signer); s != "" || err != signer.err {
+		t.Errorf("encodeToken() = (%v, %v); want = ('', %v)", s, err, signer.err)
 	}
 }
 
@@ -117,7 +117,8 @@ func TestServiceAccountSigner(t *testing.T) {
 func TestIAMSigner(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"})},
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
 		ServiceAccount: "test-service-account",
 	}
 	signer, err := newIAMSigner(ctx, conf)
@@ -170,7 +171,7 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	}
 }
 
-func TestIAMSignerWithoutServiceAccount(t *testing.T) {
+func TestIAMSignerWithMetadataService(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"}),
@@ -212,7 +213,7 @@ func TestIAMSignerWithoutServiceAccount(t *testing.T) {
 	}
 }
 
-func TestNoMetadataService(t *testing.T) {
+func TestIAMSignerNoMetadataService(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"}),

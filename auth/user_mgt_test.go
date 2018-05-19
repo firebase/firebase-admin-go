@@ -170,6 +170,10 @@ func TestGetNonExistingUser(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
+	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := echoServer(testListUsersResponse, t)
 	defer s.Close()
 

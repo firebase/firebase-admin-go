@@ -56,6 +56,7 @@ type jwtInfo struct {
 	payload interface{}
 }
 
+// Token encodes the data in the jwtInfo into a signed JSON web token.
 func (info *jwtInfo) Token(ctx context.Context, signer cryptoSigner) (string, error) {
 	encode := func(i interface{}) (string, error) {
 		b, err := json.Marshal(i)
@@ -92,6 +93,7 @@ type cryptoSigner interface {
 	Email(context.Context) (string, error)
 }
 
+// serviceAccountSigner is a cryptoSigner that signs data using service account credentials.
 type serviceAccountSigner struct {
 	privateKey  *rsa.PrivateKey
 	clientEmail string
@@ -129,6 +131,13 @@ func (s serviceAccountSigner) Email(ctx context.Context) (string, error) {
 	return s.clientEmail, nil
 }
 
+// iamSigner is a cryptoSigner that signs data by sending them to the remote IAM service. See
+// https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob for details.
+//
+// The IAM service requires the identity of a service account. This can be specified explicitly
+// at initialization. If not specified iamSigner will attempt to discover a service account
+// identity by calling the local metadata service (works in environments like Google Compute
+// Engine).
 type iamSigner struct {
 	mutex        *sync.Mutex
 	httpClient   *internal.HTTPClient
