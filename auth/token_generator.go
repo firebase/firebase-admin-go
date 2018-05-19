@@ -132,12 +132,12 @@ func (s serviceAccountSigner) Email(ctx context.Context) (string, error) {
 }
 
 // iamSigner is a cryptoSigner that signs data by sending them to the remote IAM service. See
-// https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob for details.
+// https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob for details
+// regarding the REST API.
 //
 // The IAM service requires the identity of a service account. This can be specified explicitly
-// at initialization. If not specified iamSigner will attempt to discover a service account
-// identity by calling the local metadata service (works in environments like Google Compute
-// Engine).
+// at initialization. If not specified iamSigner attempts to discover a service account identity by
+// calling the local metadata service (works in environments like Google Compute Engine).
 type iamSigner struct {
 	mutex        *sync.Mutex
 	httpClient   *internal.HTTPClient
@@ -177,14 +177,35 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	resp, err := s.httpClient.Do(ctx, req)
 	if err != nil {
 		return nil, err
+	} else if resp.Status == http.StatusOK {
+		var signResponse struct {
+			Signature string `json:"signature"`
+		}
+		if err := json.Unmarshal(resp.Body, &signResponse); err != nil {
+			return nil, err
+		}
+		return base64.StdEncoding.DecodeString(signResponse.Signature)
 	}
-	var signResponse struct {
-		Signature string `json:"signature"`
+	var signError struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		} `json:"error"`
 	}
-	if err := resp.Unmarshal(http.StatusOK, &signResponse); err != nil {
-		return nil, err
+	json.Unmarshal(resp.Body, &signError) // ignore any json parse errors at this level
+	var (
+		clientCode, msg string
+		ok              bool
+	)
+	clientCode, ok = serverError[signError.Error.Status]
+	if !ok {
+		clientCode = unknown
 	}
-	return base64.StdEncoding.DecodeString(signResponse.Signature)
+	msg = signError.Error.Message
+	if msg == "" {
+		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
+	}
+	return nil, internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
 }
 
 func (s iamSigner) Email(ctx context.Context) (string, error) {

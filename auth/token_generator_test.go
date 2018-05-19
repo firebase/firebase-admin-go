@@ -159,15 +159,44 @@ func TestIAMSignerHTTPError(t *testing.T) {
 		defer r.Body.Close()
 		w.WriteHeader(http.StatusForbidden)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error": {"error": {"message": "test reason"}}}`))
+		w.Write([]byte(`{"error": {"status": "PERMISSION_DENIED", "message": "test reason"}}`))
 	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	signer.iamHost = server.URL
 
+	want := "http error status: 403; reason: test reason"
 	_, err = signer.Sign(ctx, []byte("input"))
-	if err == nil {
-		t.Fatal("Sign() = nil; want = error")
+	if err == nil || !IsInsufficientPermission(err) || err.Error() != want {
+		t.Errorf("Sign() = %v; want = %q", err, want)
+	}
+}
+
+func TestIAMSignerUnknownHTTPError(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"})},
+		ServiceAccount: "test-service-account",
+	}
+	signer, err := newIAMSigner(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.WriteHeader(http.StatusForbidden)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`not json`))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	signer.iamHost = server.URL
+
+	want := "http error status: 403; reason: client encountered an unknown error; response: not json"
+	_, err = signer.Sign(ctx, []byte("input"))
+	if err == nil || !IsUnknown(err) || err.Error() != want {
+		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
 
