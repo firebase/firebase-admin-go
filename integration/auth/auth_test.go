@@ -27,8 +27,13 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/api/option"
+
+	"golang.org/x/oauth2/google"
+
 	"golang.org/x/net/context"
 
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
 )
@@ -62,10 +67,41 @@ func TestMain(m *testing.M) {
 
 func TestCustomToken(t *testing.T) {
 	ct, err := client.CustomToken(context.Background(), "user1")
-
 	if err != nil {
 		t.Fatal(err)
 	}
+	verifyCustomToken(t, ct)
+}
+
+func TestCustomTokenWithoutServiceAccount(t *testing.T) {
+	b, err := ioutil.ReadFile(internal.Resource("integration_cert.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwtConfig, err := google.JWTConfigFromJSON(b, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appConfig := &firebase.Config{
+		ServiceAccount: jwtConfig.Email,
+	}
+	opt := option.WithTokenSource(jwtConfig.TokenSource(context.Background()))
+	app, err := firebase.NewApp(context.Background(), appConfig, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherClient, err := app.Auth(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct, err := otherClient.CustomToken(context.Background(), "user1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyCustomToken(t, ct)
+}
+
+func verifyCustomToken(t *testing.T, ct string) {
 	idt, err := signInWithCustomToken(ct)
 	if err != nil {
 		t.Fatal(err)

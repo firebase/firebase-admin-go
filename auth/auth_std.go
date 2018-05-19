@@ -16,8 +16,11 @@
 
 package auth // import "firebase.google.com/go/auth"
 
-import "golang.org/x/net/context"
+import (
+	"firebase.google.com/go/internal"
+	"golang.org/x/net/context"
+)
 
-func newCryptoSigner(ctx context.Context) cryptoSigner {
-	return iamSigner{}
+func newCryptoSigner(ctx context.Context, conf *internal.AuthConfig) (cryptoSigner, error) {
+	return newIAMSigner(ctx, conf)
 }

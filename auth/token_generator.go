@@ -25,6 +25,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+
+	"firebase.google.com/go/internal"
+	"google.golang.org/api/transport"
 
 	"golang.org/x/net/context"
 )
@@ -123,12 +129,88 @@ func (s serviceAccountSigner) Email(ctx context.Context) (string, error) {
 	return s.clientEmail, nil
 }
 
-type iamSigner struct{}
+type iamSigner struct {
+	mutex        *sync.Mutex
+	httpClient   *internal.HTTPClient
+	serviceAcct  string
+	metadataHost string
+	iamHost      string
+}
+
+func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner, error) {
+	hc, _, err := transport.NewHTTPClient(ctx, config.Opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &iamSigner{
+		mutex:        &sync.Mutex{},
+		httpClient:   &internal.HTTPClient{Client: hc},
+		serviceAcct:  config.ServiceAccount,
+		metadataHost: "http://metadata",
+		iamHost:      "https://iam.googleapis.com",
+	}, nil
+}
 
 func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
-	return nil, errors.New("not implemented")
+	account, err := s.Email(ctx)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:signBlob", s.iamHost, account)
+	body := map[string]interface{}{
+		"bytesToSign": base64.StdEncoding.EncodeToString(b),
+	}
+	req := &internal.Request{
+		Method: "POST",
+		URL:    url,
+		Body:   internal.NewJSONEntity(body),
+	}
+	resp, err := s.httpClient.Do(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	var signResponse struct {
+		Signature string `json:"signature"`
+	}
+	if err := resp.Unmarshal(http.StatusOK, &signResponse); err != nil {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(signResponse.Signature)
 }
 
 func (s iamSigner) Email(ctx context.Context) (string, error) {
-	return "", errors.New("not implemented")
+	if s.serviceAcct != "" {
+		return s.serviceAcct, nil
+	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	result, err := s.callMetadataService(ctx)
+	if err != nil {
+		msg := "failed to determine service account; initialize the SDK with a service " +
+			"account credential or specify a service account with iam.serviceAccounts.signBlob" +
+			"permission; "
+		return "", fmt.Errorf("%s; %v", msg, err)
+	}
+	return result, nil
+}
+
+func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
+	url := fmt.Sprintf("%s/computeMetadata/v1/instance/service-accounts/default/email", s.metadataHost)
+	req := &internal.Request{
+		Method: "GET",
+		URL:    url,
+	}
+	resp, err := s.httpClient.Do(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
+		return "", err
+	}
+	result := strings.TrimSpace(string(resp.Body))
+	if result == "" {
+		return "", errors.New("unexpected response from metadata service")
+	}
+	s.serviceAcct = result
+	return result, nil
 }

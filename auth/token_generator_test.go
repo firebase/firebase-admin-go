@@ -18,9 +18,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"firebase.google.com/go/internal"
+	"google.golang.org/api/option"
 
 	"golang.org/x/net/context"
 )
@@ -108,6 +114,127 @@ func TestServiceAccountSigner(t *testing.T) {
 	}
 }
 
+func TestIAMSigner(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"})},
+		ServiceAccount: "test-service-account",
+	}
+	signer, err := newIAMSigner(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	email, err := signer.Email(ctx)
+	if email != conf.ServiceAccount || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccount)
+	}
+
+	wantSignature := "test-signature"
+	server := iamServer(t, email, wantSignature)
+	defer server.Close()
+	signer.iamHost = server.URL
+
+	signature, err := signer.Sign(ctx, []byte("input"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(signature) != wantSignature {
+		t.Errorf("Sign() = %q; want = %q", string(signature), wantSignature)
+	}
+}
+
+func TestIAMSignerHTTPError(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"})},
+		ServiceAccount: "test-service-account",
+	}
+	signer, err := newIAMSigner(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.WriteHeader(http.StatusForbidden)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"error": {"error": {"message": "test reason"}}}`))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	signer.iamHost = server.URL
+
+	_, err = signer.Sign(ctx, []byte("input"))
+	if err == nil {
+		t.Fatal("Sign() = nil; want = error")
+	}
+}
+
+func TestIAMSignerWithoutServiceAccount(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+	}
+
+	signer, err := newIAMSigner(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// start mock metadata service and test Email()
+	serviceAcct := "discovered-service-account"
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/text")
+		w.Write([]byte(serviceAcct))
+	})
+	metadata := httptest.NewServer(handler)
+	defer metadata.Close()
+	signer.metadataHost = metadata.URL
+	email, err := signer.Email(ctx)
+	if email != serviceAcct || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, serviceAcct)
+	}
+
+	// start mock IAM service and test Sign()
+	wantSignature := "test-signature"
+	server := iamServer(t, email, wantSignature)
+	defer server.Close()
+	signer.iamHost = server.URL
+
+	signature, err := signer.Sign(ctx, []byte("input"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(signature) != wantSignature {
+		t.Errorf("Sign() = %q; want = %q", string(signature), wantSignature)
+	}
+}
+
+func TestNoMetadataService(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+	}
+
+	signer, err := newIAMSigner(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = signer.Email(ctx)
+	if err == nil {
+		t.Errorf("Email() = nil; want = error")
+	}
+
+	_, err = signer.Sign(ctx, []byte("input"))
+	if err == nil {
+		t.Errorf("Sign() = nil; want = error")
+	}
+}
+
 type mockSigner struct {
 	err error
 }
@@ -121,4 +248,36 @@ func (s *mockSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 		return nil, s.err
 	}
 	return []byte("signature"), nil
+}
+
+func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
+	resp := map[string]interface{}{
+		"signature": base64.StdEncoding.EncodeToString([]byte(signature)),
+	}
+	wantPath := fmt.Sprintf("/v1/projects/-/serviceAccounts/%s:signBlob", serviceAcct)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal(reqBody, &m); err != nil {
+			t.Fatal(err)
+		}
+		if m["bytesToSign"] == "" {
+			t.Fatal("BytesToSign = empty; want = non-empty")
+		}
+		if r.URL.Path != wantPath {
+			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		b, err := json.Marshal(resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write(b)
+	})
+	return httptest.NewServer(handler)
 }

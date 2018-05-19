@@ -78,11 +78,14 @@ type signer interface {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // Auth service through firebase.App.
-func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
-	var signer cryptoSigner
-	if c.Creds != nil && len(c.Creds.JSON) > 0 {
+func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
+	var (
+		signer cryptoSigner
+		err    error
+	)
+	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
 		var sa serviceAccount
-		if err := json.Unmarshal(c.Creds.JSON, &sa); err != nil {
+		if err = json.Unmarshal(conf.Creds.JSON, &sa); err != nil {
 			return nil, err
 		}
 		if sa.PrivateKey != "" && sa.ClientEmail != "" {
@@ -94,10 +97,13 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		}
 	}
 	if signer == nil {
-		signer = newCryptoSigner(ctx)
+		signer, err = newCryptoSigner(ctx, conf)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +116,9 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 	return &Client{
 		is:        is,
 		keySource: newHTTPKeySource(idTokenCertURL, hc),
-		projectID: c.ProjectID,
+		projectID: conf.ProjectID,
 		signer:    signer,
-		version:   "Go/Admin/" + c.Version,
+		version:   "Go/Admin/" + conf.Version,
 	}, nil
 }
 
