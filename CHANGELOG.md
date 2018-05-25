@@ -2,6 +2,8 @@
 
 - [fixed] `auth.UpdateUser()` and `auth.DeleteUser()` returns the expected
   `UserNotFound` errors when called with a non-existing uid.
+- [added] Implemented the `auth.ImportUsers()` function for importing
+  users into Firebase Auth in bulk.
 
 # v3.0.0
 
