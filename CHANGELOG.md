@@ -1,5 +1,7 @@
 # Unreleased
 
+- [added] Added new functions for testing errors in the `iid` package
+  (e.g. `iid.IsNotFound()`).
 - [added] Implemented the `auth.ImportUsers()` function for importing
   users into Firebase Auth in bulk.
 
