@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"testing"
@@ -57,6 +58,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }
 

@@ -38,6 +38,189 @@ var testFixtures = struct {
 	sampleUserWithData *auth.UserRecord
 }{}
 
+func randomUID() string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	b := make([]rune, 32)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func randomPhoneNumber() string {
+	var letters = []rune("0123456789")
+	b := make([]rune, 10)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return "+1" + string(b)
+}
+
+func newUserWithParams(t *testing.T) *auth.UserRecord {
+	uid := randomUID()
+	email := fmt.Sprintf("%s@example.%s.com", uid[:12], uid[12:])
+	phone := randomPhoneNumber()
+	params := (&auth.UserToCreate{}).
+		UID(uid).
+		Email(email).
+		PhoneNumber(phone).
+		DisplayName("Random User").
+		PhotoURL("https://example.com/photo.png").
+		EmailVerified(true).
+		Password("password")
+	user, err := client.CreateUser(context.Background(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return user
+}
+
+func deleteUser(uid string) {
+	client.DeleteUser(context.Background(), uid)
+}
+
+func TestGetUser(t *testing.T) {
+	newUser := newUserWithParams(t)
+	defer deleteUser(newUser.UID)
+	user, err := client.GetUser(context.Background(), newUser.UID)
+	if err != nil || !reflect.DeepEqual(*newUser.UserInfo, *user.UserInfo) {
+		t.Errorf("GetUser() = (%#v, %v); want = (%#v, nil)", user.UserInfo, err, newUser.UserInfo)
+	}
+
+	user, err = client.GetUserByEmail(context.Background(), newUser.Email)
+	if err != nil || !reflect.DeepEqual(*newUser.UserInfo, *user.UserInfo) {
+		t.Errorf("GetUserByEmail() = (%#v, %v); want = (%#v, nil)", user.UserInfo, err, newUser.UserInfo)
+	}
+
+	user, err = client.GetUserByPhoneNumber(context.Background(), newUser.PhoneNumber)
+	if err != nil || !reflect.DeepEqual(*newUser.UserInfo, *user.UserInfo) {
+		t.Errorf("GetUserByPhoneNumber() = (%#v, %v); want = (%#v, nil)", user.UserInfo, err, newUser.UserInfo)
+	}
+}
+
+func TestListUsers(t *testing.T) {
+	newUsers := map[string]bool{}
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	newUsers[user.UID] = true
+
+	user = newUserWithParams(t)
+	defer deleteUser(user.UID)
+	newUsers[user.UID] = true
+
+	user = newUserWithParams(t)
+	defer deleteUser(user.UID)
+	newUsers[user.UID] = true
+
+	iter := client.Users(context.Background(), "")
+	count := 0
+	for {
+		u, err := iter.Next()
+		if err == iterator.Done {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := newUsers[u.UID]; ok {
+			count++
+			if u.PasswordHash == "" {
+				t.Errorf("Users() PasswordHash = empty; want = non-empty")
+			}
+		}
+	}
+	if count < 3 {
+		t.Errorf("Users() = %d;  want >= 3", count)
+	}
+
+	iter = client.Users(context.Background(), "")
+	pager := iterator.NewPager(iter, 2, "")
+	count = 0
+	pageCount := 0
+	for {
+		pageCount++
+		var users []*auth.ExportedUserRecord
+		nextPageToken, err := pager.NextPage(&users)
+		if err != nil {
+			t.Fatalf("NextPage() =  %v", err)
+		}
+		count += len(users)
+		if nextPageToken == "" {
+			break
+		}
+	}
+	if count < 3 {
+		t.Errorf("Users() = %d;  want >= 3", count)
+	}
+	if pageCount < 2 {
+		t.Errorf("NewPager() = %d;  want >= 2", pageCount)
+	}
+}
+
+func TestCreateUser(t *testing.T) {
+	user, err := client.CreateUser(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteUser(user.UID)
+	want := auth.UserRecord{
+		UserInfo: &auth.UserInfo{
+			UID:        user.UID,
+			ProviderID: "firebase",
+		},
+		UserMetadata: &auth.UserMetadata{
+			CreationTimestamp: user.UserMetadata.CreationTimestamp,
+		},
+		TokensValidAfterMillis: user.TokensValidAfterMillis,
+	}
+	if !reflect.DeepEqual(*user, want) {
+		t.Errorf("CreateUser() = %#v; want = %#v", *user, want)
+	}
+
+	user, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(user.UID))
+	if err == nil || user != nil || !auth.IsUIDAlreadyExists(err) {
+		t.Errorf("CreateUser() = (%#v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestUpdateUser(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+
+	randomID := randomUID()
+	newEmail := strings.ToLower(fmt.Sprintf("%s@example.%s.com", randomID[:12], randomID[12:]))
+	newPhone := randomPhoneNumber()
+	params := (&auth.UserToUpdate{}).
+		Email(newEmail).
+		PhoneNumber(newPhone).
+		DisplayName("Updated Name").
+		PhotoURL("https://example.com/updated.png").
+		EmailVerified(true).
+		Password("newpassowrd")
+	user, err := client.UpdateUser(context.Background(), user.UID, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := auth.UserRecord{
+		UserInfo: &auth.UserInfo{
+			UID:         user.UID,
+			Email:       newEmail,
+			PhoneNumber: newPhone,
+			DisplayName: "Updated Name",
+			ProviderID:  "firebase",
+			PhotoURL:    "https://example.com/updated.png",
+		},
+		UserMetadata: &auth.UserMetadata{
+			CreationTimestamp: user.UserMetadata.CreationTimestamp,
+		},
+		ProviderUserInfo:       user.ProviderUserInfo,
+		EmailVerified:          true,
+		TokensValidAfterMillis: user.TokensValidAfterMillis,
+	}
+	if !reflect.DeepEqual(*user, want) {
+		t.Errorf("UpdateUser() = %#v; want = %#v", *user, want)
+	}
+}
+
 func TestUserManagement(t *testing.T) {
 	orderedRuns := []struct {
 		name     string
