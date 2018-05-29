@@ -59,11 +59,39 @@ func TestGetUser(t *testing.T) {
 			},
 		},
 	}
+
 	for _, tc := range cases {
 		got, err := tc.getOp(context.Background())
 		if err != nil || !reflect.DeepEqual(*got, *want) {
 			t.Errorf("%s = (%#v, %v); want = (%#v, nil)", tc.name, got, err, want)
 		}
+	}
+}
+
+func TestGetNonExistingUser(t *testing.T) {
+	user, err := client.GetUser(context.Background(), "non.existing")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	user, err = client.GetUserByEmail(context.Background(), "non.existing@definitely.non.existing")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUserByEmail(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestUpdateNonExistingUser(t *testing.T) {
+	update := (&auth.UserToUpdate{}).Email("test@example.com")
+	user, err := client.UpdateUser(context.Background(), "non.existing", update)
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("UpdateUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestDeleteNonExistingUser(t *testing.T) {
+	err := client.DeleteUser(context.Background(), "non.existing")
+	if !auth.IsUserNotFound(err) {
+		t.Errorf("DeleteUser(non.existing) = %v; want = error", err)
 	}
 }
 
