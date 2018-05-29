@@ -69,6 +69,33 @@ func TestUserManagement(t *testing.T) {
 	}
 }
 
+func TestGetNonExistingUser(t *testing.T) {
+	user, err := client.GetUser(context.Background(), "non.existing")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	user, err = client.GetUserByEmail(context.Background(), "non.existing@definitely.non.existing")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUserByEmail(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestUpdateNonExistingUser(t *testing.T) {
+	update := (&auth.UserToUpdate{}).Email("test@example.com")
+	user, err := client.UpdateUser(context.Background(), "non.existing", update)
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("UpdateUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+func TestDeleteNonExistingUser(t *testing.T) {
+	err := client.DeleteUser(context.Background(), "non.existing")
+	if !auth.IsUserNotFound(err) {
+		t.Errorf("DeleteUser(non.existing) = %v; want = error", err)
+	}
+}
+
 // N.B if the tests are failing due to inability to create existing users, manual
 // cleanup of the previus test run might be required, delete the unwanted users via:
 // https://console.firebase.google.com/u/0/project/<project-id>/authentication/users
