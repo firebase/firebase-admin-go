@@ -160,21 +160,13 @@ func TestUpdateUser(t *testing.T) {
 	uid := randomUID()
 	newEmail := randomEmail(uid)
 	newPhone := randomPhoneNumber()
-	want := auth.UserRecord{
-		UserInfo: &auth.UserInfo{
-			UID:         user.UID,
-			Email:       newEmail,
-			PhoneNumber: newPhone,
-			DisplayName: "Updated Name",
-			ProviderID:  "firebase",
-			PhotoURL:    "https://example.com/updated.png",
-		},
-		UserMetadata: &auth.UserMetadata{
-			CreationTimestamp: user.UserMetadata.CreationTimestamp,
-		},
-		ProviderUserInfo:       user.ProviderUserInfo,
-		EmailVerified:          true,
-		TokensValidAfterMillis: user.TokensValidAfterMillis,
+	want := auth.UserInfo{
+		UID:         user.UID,
+		Email:       newEmail,
+		PhoneNumber: newPhone,
+		DisplayName: "Updated Name",
+		ProviderID:  "firebase",
+		PhotoURL:    "https://example.com/updated.png",
 	}
 	params := (&auth.UserToUpdate{}).
 		Email(newEmail).
@@ -184,8 +176,14 @@ func TestUpdateUser(t *testing.T) {
 		EmailVerified(true).
 		Password("newpassowrd")
 	got, err := client.UpdateUser(context.Background(), user.UID, params)
-	if err != nil || !reflect.DeepEqual(*user, want) {
-		t.Errorf("UpdateUser() = (%#v, %v); want = (%#v, nil)", *got, err, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*got.UserInfo, want) {
+		t.Errorf("UpdateUser().UserInfo = (%#v, %v); want = (%#v, nil)", *got.UserInfo, err, want)
+	}
+	if !got.EmailVerified {
+		t.Error("UpdateUser().EmailVerified = false; want = true")
 	}
 }
 
