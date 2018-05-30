@@ -15,12 +15,14 @@
 package snippets
 
 import (
+	"encoding/base64"
 	"log"
 
 	"golang.org/x/net/context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
+	"firebase.google.com/go/auth/hash"
 	"google.golang.org/api/iterator"
 )
 
@@ -378,4 +380,197 @@ func listUsers(ctx context.Context, client *auth.Client) {
 		}
 	}
 	// [END list_all_users_golang]
+}
+
+func importUsers(ctx context.Context, app *firebase.App) {
+	// [START build_user_list]
+	// Up to 1000 users can be imported at once.
+	var users []*auth.UserToImport
+	users = append(users, (&auth.UserToImport{}).
+		UID("uid1").
+		Email("user1@example.com").
+		PasswordHash([]byte("passwordHash1")).
+		PasswordSalt([]byte("salt1")))
+	users = append(users, (&auth.UserToImport{}).
+		UID("uid2").
+		Email("user2@example.com").
+		PasswordHash([]byte("passwordHash2")).
+		PasswordSalt([]byte("salt2")))
+	// [END build_user_list]
+
+	// [START import_users]
+	client, err := app.Auth(ctx)
+	if err != nil {
+		log.Fatalln("Error initializing Auth client", err)
+	}
+
+	h := hash.HMACSHA256{
+		Key: []byte("secretKey"),
+	}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Unrecoverable error prevented the operation from running", err)
+	}
+
+	log.Printf("Successfully imported %d users\n", result.SuccessCount)
+	log.Printf("Failed to import %d users\n", result.FailureCount)
+	for _, e := range result.Errors {
+		log.Printf("Failed to import user at index: %d due to error: %s\n", e.Index, e.Reason)
+	}
+	// [END import_users]
+}
+
+func importWithHMAC(ctx context.Context, client *auth.Client) {
+	// [START import_with_hmac]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash([]byte("password-hash")).
+			PasswordSalt([]byte("salt")),
+	}
+	h := hash.HMACSHA256{
+		Key: []byte("secret"),
+	}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_hmac]
+}
+
+func importWithPBKDF(ctx context.Context, client *auth.Client) {
+	// [START import_with_pbkdf]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash([]byte("password-hash")).
+			PasswordSalt([]byte("salt")),
+	}
+	h := hash.PBKDF2SHA256{
+		Rounds: 100000,
+	}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_pbkdf]
+}
+
+func importWithStandardScrypt(ctx context.Context, client *auth.Client) {
+	// [START import_with_standard_scrypt]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash([]byte("password-hash")).
+			PasswordSalt([]byte("salt")),
+	}
+	h := hash.StandardScrypt{
+		MemoryCost:       1024,
+		Parallelization:  16,
+		BlockSize:        8,
+		DerivedKeyLength: 64,
+	}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_standard_scrypt]
+}
+
+func importWithBcrypt(ctx context.Context, client *auth.Client) {
+	// [START import_with_bcrypt]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash([]byte("password-hash")).
+			PasswordSalt([]byte("salt")),
+	}
+	h := hash.Bcrypt{}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_bcrypt]
+}
+
+func importWithScrypt(ctx context.Context, client *auth.Client) {
+	// [START import_with_scrypt]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash([]byte("password-hash")).
+			PasswordSalt([]byte("salt")),
+	}
+	b64decode := func(s string) []byte {
+		b, err := base64.StdEncoding.DecodeString(s)
+		if err != nil {
+			log.Fatalln("Failed to decode string", err)
+		}
+		return b
+	}
+
+	// All the parameters below can be obtained from the Firebase Console's "Users"
+	// section. Base64 encoded parameters must be decoded into raw bytes.
+	h := hash.Scrypt{
+		Key:           b64decode("base64-secret"),
+		SaltSeparator: b64decode("base64-salt-separator"),
+		Rounds:        8,
+		MemoryCost:    14,
+	}
+	result, err := client.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_scrypt]
+}
+
+func importWithoutPassword(ctx context.Context, client *auth.Client) {
+	// [START import_without_password]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			DisplayName("John Doe").
+			Email("johndoe@gmail.com").
+			PhotoURL("http://www.example.com/12345678/photo.png").
+			EmailVerified(true).
+			PhoneNumber("+11234567890").
+			CustomClaims(map[string]interface{}{"admin": true}). // set this user as admin
+			ProviderData([]*auth.UserProvider{                   // user with Google provider
+				{
+					UID:         "google-uid",
+					Email:       "johndoe@gmail.com",
+					DisplayName: "John Doe",
+					PhotoURL:    "http://www.example.com/12345678/photo.png",
+					ProviderID:  "google.com",
+				},
+			}),
+	}
+	result, err := client.ImportUsers(ctx, users)
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_without_password]
 }
