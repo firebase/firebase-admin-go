@@ -84,6 +84,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		err    error
 	)
 	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
+		// If the SDK was initialized with a service account, use it to sign bytes.
 		var sa serviceAccount
 		if err = json.Unmarshal(conf.Creds.JSON, &sa); err != nil {
 			return nil, err
@@ -97,9 +98,20 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 	if signer == nil {
-		signer, err = newCryptoSigner(ctx, conf)
-		if err != nil {
-			return nil, err
+		if conf.ServiceAccount != "" {
+			// If the SDK was initialized with a service account email, use it with the IAM service
+			// to sign bytes.
+			signer, err = newIAMSigner(ctx, conf)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Use GAE signing capabilities if available. Otherwise, obtain a service account email
+			// from the local Metadata service, and fallback to the IAM service.
+			signer, err = newCryptoSigner(ctx, conf)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

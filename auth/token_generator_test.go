@@ -254,13 +254,10 @@ func TestIAMSignerNoMetadataService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = signer.Email(ctx)
-	if err == nil {
+	if _, err = signer.Email(ctx); err == nil {
 		t.Errorf("Email() = nil; want = error")
 	}
-
-	_, err = signer.Sign(ctx, []byte("input"))
-	if err == nil {
+	if _, err = signer.Sign(ctx, []byte("input")); err == nil {
 		t.Errorf("Sign() = nil; want = error")
 	}
 }

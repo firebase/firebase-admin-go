@@ -217,7 +217,7 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 	result, err := s.callMetadataService(ctx)
 	if err != nil {
 		msg := "failed to determine service account; initialize the SDK with a service " +
-			"account credential or specify a service account with iam.serviceAccounts.signBlob" +
+			"account credential or specify a service account with iam.serviceAccounts.signBlob " +
 			"permission; "
 		return "", fmt.Errorf("%s; %v", msg, err)
 	}

@@ -117,6 +117,26 @@ func TestNewClientIAMSigner(t *testing.T) {
 	}
 }
 
+func TestNewClientServiceAccountEmail(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+		ServiceAccount: "explicit-service-account",
+	}
+	c, err := NewClient(ctx, conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+	if _, ok := c.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+	email, err := c.signer.Email(ctx)
+	if email != conf.ServiceAccount || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccount)
+	}
+}
+
 func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
