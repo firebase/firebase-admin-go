@@ -556,7 +556,7 @@ func importWithoutPassword(ctx context.Context, client *auth.Client) {
 			PhoneNumber("+11234567890").
 			CustomClaims(map[string]interface{}{"admin": true}). // set this user as admin
 			ProviderData([]*auth.UserProvider{                   // user with Google provider
-				&auth.UserProvider{
+				{
 					UID:         "google-uid",
 					Email:       "johndoe@gmail.com",
 					DisplayName: "John Doe",
