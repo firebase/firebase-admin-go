@@ -837,6 +837,7 @@ var serverError = map[string]string{
 	"PERMISSION_DENIED":       insufficientPermission,
 	"PHONE_NUMBER_EXISTS":     phoneNumberAlreadyExists,
 	"PROJECT_NOT_FOUND":       projectNotFound,
+	"USER_NOT_FOUND":          userNotFound,
 }
 
 func handleServerError(err error) error {
