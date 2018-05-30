@@ -408,10 +408,10 @@ func randomUID() string {
 }
 
 func randomPhoneNumber() string {
-	var letters = []rune("0123456789")
+	var digits = []rune("0123456789")
 	b := make([]rune, 10)
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = digits[rand.Intn(len(digits))]
 	}
 	return "+1" + string(b)
 }

@@ -59,7 +59,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestCustomToken(t *testing.T) {
-	ct, err := client.CustomToken(context.Background(), "user1")
+	uid := randomUID()
+	ct, err := client.CustomToken(context.Background(), uid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,19 +68,20 @@ func TestCustomToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer deleteUser("user1")
+	defer deleteUser(uid)
 
 	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != "user1" {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, "user1")
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
 	}
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
-	ct, err := client.CustomTokenWithClaims(context.Background(), "user2", map[string]interface{}{
+	uid := randomUID()
+	ct, err := client.CustomTokenWithClaims(context.Background(), uid, map[string]interface{}{
 		"premium": true,
 		"package": "gold",
 	})
@@ -91,14 +93,14 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer deleteUser("user2")
+	defer deleteUser(uid)
 
 	vt, err := client.VerifyIDToken(context.Background(), idt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != "user2" {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, "user2")
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
 	}
 	if premium, ok := vt.Claims["premium"].(bool); !ok || !premium {
 		t.Errorf("Claims['premium'] = %v; want Claims['premium'] = true", vt.Claims["premium"])
@@ -224,6 +226,9 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
+// deleteUser makes a best effort attempt to delete the given user.
+//
+// Any errors encountered during the delete are ignored.
 func deleteUser(uid string) {
 	client.DeleteUser(context.Background(), uid)
 }
