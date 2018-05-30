@@ -228,7 +228,9 @@ func postRequest(url string, req []byte) ([]byte, error) {
 
 // deleteUser makes a best effort attempt to delete the given user.
 //
-// Any errors encountered during the delete are ignored.
+// Any errors encountered during the delete are logged and ignored.
 func deleteUser(uid string) {
-	client.DeleteUser(context.Background(), uid)
+	if err := client.DeleteUser(context.Background(), uid); err != nil {
+		log.Printf("WARN: Failed to delete user %q on tear down: %v", uid, err)
+	}
 }
