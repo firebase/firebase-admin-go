@@ -104,15 +104,22 @@ func TestDeleteInstanceIDError(t *testing.T) {
 	}
 	client.endpoint = ts.URL
 
-	for k, v := range errorCodes {
-		status = k
-		err := client.DeleteInstanceID(ctx, "test-iid")
-		if err == nil {
-			t.Fatal("DeleteInstanceID() = nil; want = error")
-		}
+	errorHandlers := map[int]func(error) bool{
+		http.StatusBadRequest:          IsInvalidArgument,
+		http.StatusUnauthorized:        IsInsufficientPermission,
+		http.StatusForbidden:           IsInsufficientPermission,
+		http.StatusNotFound:            IsNotFound,
+		http.StatusConflict:            IsAlreadyDeleted,
+		http.StatusTooManyRequests:     IsTooManyRequests,
+		http.StatusInternalServerError: IsInternal,
+		http.StatusServiceUnavailable:  IsServerUnavailable,
+	}
 
-		want := fmt.Sprintf("instance id %q: %s", "test-iid", v)
-		if err.Error() != want {
+	for code, check := range errorHandlers {
+		status = code
+		want := fmt.Sprintf("instance id %q: %s", "test-iid", errorCodes[code].message)
+		err := client.DeleteInstanceID(ctx, "test-iid")
+		if err == nil || !check(err) || err.Error() != want {
 			t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
 		}
 
@@ -149,13 +156,9 @@ func TestDeleteInstanceIDUnexpectedError(t *testing.T) {
 	}
 	client.endpoint = ts.URL
 
-	err = client.DeleteInstanceID(ctx, "test-iid")
-	if err == nil {
-		t.Fatal("DeleteInstanceID() = nil; want = error")
-	}
-
 	want := "http error status: 511; reason: {}"
-	if err.Error() != want {
+	err = client.DeleteInstanceID(ctx, "test-iid")
+	if err == nil || !IsUnknown(err) || err.Error() != want {
 		t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
 	}
 

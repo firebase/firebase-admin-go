@@ -58,7 +58,7 @@ func TestNonExisting(t *testing.T) {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
 	want := `instance id "fictive-ID0": failed to find the instance id`
-	if err.Error() != want {
+	if !iid.IsNotFound(err) || err.Error() != want {
 		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}
 }
