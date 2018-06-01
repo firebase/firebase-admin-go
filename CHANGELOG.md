@@ -1,5 +1,7 @@
 # Unreleased
 
+- [added] Added new functions for testing errors in the `iid` package
+  (e.g. `iid.IsNotFound()`).
 - [fixed] `auth.UpdateUser()` and `auth.DeleteUser()` return the expected
   `UserNotFound` error when called with a non-existing uid.
 - [added] Implemented the `auth.ImportUsers()` function for importing
