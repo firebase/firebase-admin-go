@@ -135,10 +135,25 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	}, nil
 }
 
-// CustomToken creates a signed custom authentication token with the specified user ID. The resulting
-// JWT can be used in a Firebase client SDK to trigger an authentication flow. See
+// CustomToken creates a signed custom authentication token with the specified user ID.
+//
+// The resulting JWT can be used in a Firebase client SDK to trigger an authentication flow. See
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
 // for more details on how to use custom tokens for client authentication.
+//
+// CustomToken follows the protocol outlined below to sign the generated tokens:
+//   - If the SDK was initialized with service account credentials, uses the private key present in
+//     the credentials to sign tokens locally.
+//   - If a service account email was specified during initialization (via firebase.Config struct),
+//     calls the IAM service with that email to sign tokens remotely. See
+//     https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob.
+//   - If the code is deployed in the Google App Engine standard environment, uses the App Identity
+//     service to sign tokens. See https://cloud.google.com/appengine/docs/standard/go/reference#SignBytes.
+//   - If the code is deployed in a different GCP-managed environment (e.g. Google Compute Engine),
+//     uses the local Metadata server to auto discover a service account email. This is used in
+//     conjunction with the IAM service to sign tokens remotely.
+//
+// CustomToken returns an error the SDK fails to discover a viable mechanism for signing tokens.
 func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
 	return c.CustomTokenWithClaims(ctx, uid, nil)
 }

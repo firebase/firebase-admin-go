@@ -108,7 +108,7 @@ func newServiceAccountSigner(sa serviceAccount) (*serviceAccountSigner, error) {
 	if err != nil {
 		parsedKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
+			return nil, fmt.Errorf("private key should be a PEM or plain PKCS1 or PKCS8; parse error: %v", err)
 		}
 	}
 	rsaKey, ok := parsedKey.(*rsa.PrivateKey)
@@ -216,10 +216,11 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 	defer s.mutex.Unlock()
 	result, err := s.callMetadataService(ctx)
 	if err != nil {
-		msg := "failed to determine service account; initialize the SDK with a service " +
-			"account credential or specify a service account with iam.serviceAccounts.signBlob " +
-			"permission "
-		return "", fmt.Errorf("%s: %v", msg, err)
+		msg := "failed to determine service account: %v; initialize the SDK with service " +
+			"account credentials or specify a service account with iam.serviceAccounts.signBlob " +
+			"permission; refer to https://firebase.google.com/docs/auth/admin/create-custom-tokens " +
+			"for more details on creating custom tokens"
+		return "", fmt.Errorf(msg, err)
 	}
 	return result, nil
 }
@@ -229,6 +230,9 @@ func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
 	req := &internal.Request{
 		Method: "GET",
 		URL:    url,
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("Metadata-Flavor", "Google"),
+		},
 	}
 	resp, err := s.httpClient.Do(ctx, req)
 	if err != nil {

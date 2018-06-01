@@ -216,6 +216,10 @@ func TestIAMSignerWithMetadataService(t *testing.T) {
 	serviceAcct := "discovered-service-account"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
+		flavor := r.Header.Get("Metadata-Flavor")
+		if flavor != "Google" {
+			t.Errorf("Header(Metadata-Flavor) = %q; want = %q", flavor, "Google")
+		}
 		w.Header().Set("Content-Type", "application/text")
 		w.Write([]byte(serviceAcct))
 	})
