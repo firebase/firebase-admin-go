@@ -218,8 +218,8 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 	if err != nil {
 		msg := "failed to determine service account; initialize the SDK with a service " +
 			"account credential or specify a service account with iam.serviceAccounts.signBlob " +
-			"permission; "
-		return "", fmt.Errorf("%s; %v", msg, err)
+			"permission "
+		return "", fmt.Errorf("%s: %v", msg, err)
 	}
 	return result, nil
 }
