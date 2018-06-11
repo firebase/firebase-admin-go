@@ -20,6 +20,7 @@ go_import_path: firebase.google.com/go
 
 before_install:
     # Golint requires Go 1.7 or later.
+    - echo "Golang version ${TRAVIS_GO_VERSION}"
     - if ! [[ "$TRAVIS_GO_VERSION" =~ ^1\.6\.[0-9]+$ ]]; then go get github.com/golang/lint/golint; fi
 
 install:
