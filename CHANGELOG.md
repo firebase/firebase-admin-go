@@ -1,5 +1,7 @@
 # Unreleased
 
+# v3.1.0
+
 - [added] Added new functions for testing errors in the `iid` package
   (e.g. `iid.IsNotFound()`).
 - [fixed] `auth.UpdateUser()` and `auth.DeleteUser()` return the expected
