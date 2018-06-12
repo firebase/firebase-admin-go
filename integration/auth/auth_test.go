@@ -175,6 +175,10 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	}
 }
 
+// verifyCustomToken verifies the given custom token by signing into a Firebase project with it.
+//
+// A successful sign in creates the user account in the Firebase back-end. This method ensures that
+// such user accounts are automatically deleted upon return.
 func verifyCustomToken(t *testing.T, ct, uid string) *auth.Token {
 	idt, err := signInWithCustomToken(ct)
 	if err != nil {
