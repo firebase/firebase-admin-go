@@ -3,6 +3,9 @@
 - [added] Implemented the ability to create custom tokens without
   service account credentials.
 - [added] Added the `ServiceAccount` field to the `firebase.Config` struct.
+
+# v3.1.0
+
 - [added] Added new functions for testing errors in the `iid` package
   (e.g. `iid.IsNotFound()`).
 - [fixed] `auth.UpdateUser()` and `auth.DeleteUser()` return the expected
