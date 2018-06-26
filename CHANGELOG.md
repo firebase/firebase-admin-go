@@ -1,5 +1,9 @@
 # Unreleased
 
+- [added] The Admin SDK can now read the Firebase/GCP project ID from
+  both `GCLOUD_PROJECT` and `GOOGLE_CLOUD_PROJECT` environment
+  variables.
+
 # v3.1.0
 
 - [added] Added new functions for testing errors in the `iid` package
