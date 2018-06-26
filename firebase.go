@@ -151,7 +151,10 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	} else if creds.ProjectID != "" {
 		pid = creds.ProjectID
 	} else {
-		pid = os.Getenv("GCLOUD_PROJECT")
+		pid = os.Getenv("GOOGLE_CLOUD_PROJECT")
+		if pid == "" {
+			pid = os.Getenv("GCLOUD_PROJECT")
+		}
 	}
 
 	ao := defaultAuthOverrides
