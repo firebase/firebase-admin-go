@@ -84,7 +84,7 @@ func TestCustomTokenWithoutServiceAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	appConfig := &firebase.Config{
-		ServiceAccount: jwtConfig.Email,
+		ServiceAccountID: jwtConfig.Email,
 	}
 	opt := option.WithTokenSource(jwtConfig.TokenSource(context.Background()))
 

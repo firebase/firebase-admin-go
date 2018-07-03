@@ -117,12 +117,12 @@ func TestNewClientIAMSigner(t *testing.T) {
 	}
 }
 
-func TestNewClientServiceAccountEmail(t *testing.T) {
+func TestNewClientServiceAccountID(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"}),
 		},
-		ServiceAccount: "explicit-service-account",
+		ServiceAccountID: "explicit-service-account",
 	}
 	c, err := NewClient(ctx, conf)
 	if err != nil {
@@ -132,8 +132,8 @@ func TestNewClientServiceAccountEmail(t *testing.T) {
 		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
 	}
 	email, err := c.signer.Email(ctx)
-	if email != conf.ServiceAccount || err != nil {
-		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccount)
+	if email != conf.ServiceAccountID || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
 	}
 }
 

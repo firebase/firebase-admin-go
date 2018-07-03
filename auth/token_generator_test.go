@@ -119,15 +119,15 @@ func TestIAMSigner(t *testing.T) {
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"}),
 		},
-		ServiceAccount: "test-service-account",
+		ServiceAccountID: "test-service-account",
 	}
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	email, err := signer.Email(ctx)
-	if email != conf.ServiceAccount || err != nil {
-		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccount)
+	if email != conf.ServiceAccountID || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
 	}
 
 	wantSignature := "test-signature"
@@ -148,7 +148,7 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"})},
-		ServiceAccount: "test-service-account",
+		ServiceAccountID: "test-service-account",
 	}
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {
@@ -176,7 +176,7 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&mockTokenSource{"test.token"})},
-		ServiceAccount: "test-service-account",
+		ServiceAccountID: "test-service-account",
 	}
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {

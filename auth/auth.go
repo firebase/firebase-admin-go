@@ -99,7 +99,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 	if signer == nil {
-		if conf.ServiceAccount != "" {
+		if conf.ServiceAccountID != "" {
 			// If the SDK was initialized with a service account email, use it with the IAM service
 			// to sign bytes.
 			signer, err = newIAMSigner(ctx, conf)
