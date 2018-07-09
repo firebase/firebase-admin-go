@@ -19,14 +19,15 @@ matrix:
 go_import_path: firebase.google.com/go
 
 before_install:
-    - go get github.com/golang/lint/golint # Golint requires Go 1.6 or later.
+    # Golint requires Go 1.7 or later.
+    - if ! [[ "$TRAVIS_GO_VERSION" =~ ^1\.6\.([0-9]+|x)$ ]]; then go get github.com/golang/lint/golint; fi
 
 install:
     # Prior to golang 1.8, this can trigger an error for packages containing only tests.
     - go get -t -v $(go list ./... | grep -v integration)
 
 script:
-    - golint -set_exit_status $(go list ./...)
+    - if ! [[ "$TRAVIS_GO_VERSION" =~ ^1\.6\.([0-9]+|x)+$ ]]; then golint -set_exit_status $(go list ./...); fi
     - ./.travis.gofmt.sh
     - go test -v -race -test.short ./...        # Run tests with the race detector.
     - go vet -v ./...                           # Run Go static analyzer.

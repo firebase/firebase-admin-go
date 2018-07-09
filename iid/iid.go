@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package iid contains functions for deleting instance IDs from Firebase projects.
-package iid
+package iid // import "firebase.google.com/go/iid"
 
 import (
 	"errors"
@@ -29,15 +29,77 @@ import (
 
 const iidEndpoint = "https://console.firebase.google.com/v1"
 
-var errorCodes = map[int]string{
-	http.StatusBadRequest:          "malformed instance id argument",
-	http.StatusUnauthorized:        "request not authorized",
-	http.StatusForbidden:           "project does not match instance ID or the client does not have sufficient privileges",
-	http.StatusNotFound:            "failed to find the instance id",
-	http.StatusConflict:            "already deleted",
-	http.StatusTooManyRequests:     "request throttled out by the backend server",
-	http.StatusInternalServerError: "internal server error",
-	http.StatusServiceUnavailable:  "backend servers are over capacity",
+const (
+	invalidArgument        = "invalid-argument"
+	unauthorized           = "unauthorized"
+	insufficientPermission = "insufficient-permission"
+	notFound               = "instance-id-not-found"
+	alreadyDeleted         = "instance-id-already-deleted"
+	tooManyRequests        = "too-many-requests"
+	internalError          = "internal-error"
+	serverUnavailable      = "server-unavailable"
+	unknown                = "unknown-error"
+)
+
+var errorCodes = map[int]struct {
+	code, message string
+}{
+	http.StatusBadRequest:   {invalidArgument, "malformed instance id argument"},
+	http.StatusUnauthorized: {insufficientPermission, "request not authorized"},
+	http.StatusForbidden: {
+		insufficientPermission,
+		"project does not match instance ID or the client does not have sufficient privileges",
+	},
+	http.StatusNotFound:            {notFound, "failed to find the instance id"},
+	http.StatusConflict:            {alreadyDeleted, "already deleted"},
+	http.StatusTooManyRequests:     {tooManyRequests, "request throttled out by the backend server"},
+	http.StatusInternalServerError: {internalError, "internal server error"},
+	http.StatusServiceUnavailable:  {serverUnavailable, "backend servers are over capacity"},
+}
+
+// IsInvalidArgument checks if the given error was due to an invalid instance ID argument.
+func IsInvalidArgument(err error) bool {
+	return internal.HasErrorCode(err, invalidArgument)
+}
+
+// IsInsufficientPermission checks if the given error was due to the request not having the
+// required authorization. This could be due to the client not having the required permission
+// or the specified instance ID not matching the target Firebase project.
+func IsInsufficientPermission(err error) bool {
+	return internal.HasErrorCode(err, insufficientPermission)
+}
+
+// IsNotFound checks if the given error was due to a non existing instance ID.
+func IsNotFound(err error) bool {
+	return internal.HasErrorCode(err, notFound)
+}
+
+// IsAlreadyDeleted checks if the given error was due to the instance ID being already deleted from
+// the project.
+func IsAlreadyDeleted(err error) bool {
+	return internal.HasErrorCode(err, alreadyDeleted)
+}
+
+// IsTooManyRequests checks if the given error was due to the client sending too many requests
+// causing a server quota to exceed.
+func IsTooManyRequests(err error) bool {
+	return internal.HasErrorCode(err, tooManyRequests)
+}
+
+// IsInternal checks if the given error was due to an internal server error.
+func IsInternal(err error) bool {
+	return internal.HasErrorCode(err, internalError)
+}
+
+// IsServerUnavailable checks if the given error was due to the backend server being temporarily
+// unavailable.
+func IsServerUnavailable(err error) bool {
+	return internal.HasErrorCode(err, serverUnavailable)
+}
+
+// IsUnknown checks if the given error was due to unknown error returned by the backend server.
+func IsUnknown(err error) bool {
+	return internal.HasErrorCode(err, unknown)
 }
 
 // Client is the interface for the Firebase Instance ID service.
@@ -84,8 +146,11 @@ func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
 		return err
 	}
 
-	if msg, ok := errorCodes[resp.Status]; ok {
-		return fmt.Errorf("instance id %q: %s", iid, msg)
+	if info, ok := errorCodes[resp.Status]; ok {
+		return internal.Errorf(info.code, "instance id %q: %s", iid, info.message)
 	}
-	return resp.CheckStatus(http.StatusOK)
+	if err := resp.CheckStatus(http.StatusOK); err != nil {
+		return internal.Error(unknown, err.Error())
+	}
+	return nil
 }

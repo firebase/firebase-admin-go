@@ -23,18 +23,17 @@ import (
 )
 
 type aeSigner struct {
-	ctx context.Context
 }
 
 func newSigner(ctx context.Context) (signer, error) {
-	return aeSigner{ctx}, nil
+	return aeSigner{}, nil
 }
 
-func (s aeSigner) Email() (string, error) {
-	return appengine.ServiceAccount(s.ctx)
+func (s aeSigner) Email(ctx context.Context) (string, error) {
+	return appengine.ServiceAccount(ctx)
 }
 
-func (s aeSigner) Sign(ss []byte) ([]byte, error) {
-	_, sig, err := appengine.SignBytes(s.ctx, ss)
+func (s aeSigner) Sign(ctx context.Context, ss []byte) ([]byte, error) {
+	_, sig, err := appengine.SignBytes(ctx, ss)
 	return sig, err
 }

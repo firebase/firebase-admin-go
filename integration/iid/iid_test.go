@@ -52,12 +52,13 @@ func TestMain(m *testing.M) {
 
 func TestNonExisting(t *testing.T) {
 	// legal instance IDs are /[cdef][A-Za-z0-9_-]{9}[AEIMQUYcgkosw048]/
+	// "fictive-ID0" is match for that.
 	err := client.DeleteInstanceID(context.Background(), "fictive-ID0")
 	if err == nil {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
 	want := `instance id "fictive-ID0": failed to find the instance id`
-	if err.Error() != want {
+	if !iid.IsNotFound(err) || err.Error() != want {
 		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}
 }

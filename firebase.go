@@ -15,7 +15,7 @@
 // Package firebase is the entry point to the Firebase Admin SDK. It provides functionality for initializing App
 // instances, which serve as the central entities that provide access to various other Firebase services exposed
 // from the SDK.
-package firebase
+package firebase // import "firebase.google.com/go"
 
 import (
 	"encoding/json"
@@ -43,7 +43,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "2.6.1"
+const Version = "3.1.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -160,7 +160,10 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 	} else if creds.ProjectID != "" {
 		pid = creds.ProjectID
 	} else {
-		pid = os.Getenv("GCLOUD_PROJECT")
+		pid = os.Getenv("GOOGLE_CLOUD_PROJECT")
+		if pid == "" {
+			pid = os.Getenv("GCLOUD_PROJECT")
+		}
 	}
 
 	ao := defaultAuthOverrides

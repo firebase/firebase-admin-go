@@ -17,9 +17,7 @@ package auth
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,10 +29,12 @@ import (
 	"google.golang.org/api/transport"
 )
 
-const firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-const googleCertURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-const issuerPrefix = "https://securetoken.google.com/"
-const tokenExpSeconds = 3600
+const (
+	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	idTokenCertURL   = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+	issuerPrefix     = "https://securetoken.google.com/"
+	tokenExpSeconds  = 3600
+)
 
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
@@ -58,6 +58,25 @@ type Token struct {
 	Claims   map[string]interface{} `json:"-"`
 }
 
+func (t *Token) decodeFrom(s string) error {
+	// Decode into a regular map to access custom claims.
+	claims := make(map[string]interface{})
+	if err := decode(s, &claims); err != nil {
+		return err
+	}
+	// Now decode into Token to access the standard claims.
+	if err := decode(s, t); err != nil {
+		return err
+	}
+
+	// Delete standard claims from the custom claims maps.
+	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
+		delete(claims, r)
+	}
+	t.Claims = claims
+	return nil
+}
+
 // Client is the interface for the Firebase auth service.
 //
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
@@ -71,8 +90,8 @@ type Client struct {
 }
 
 type signer interface {
-	Email() (string, error)
-	Sign(b []byte) ([]byte, error)
+	Email(ctx context.Context) (string, error)
+	Sign(ctx context.Context, b []byte) ([]byte, error)
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -94,7 +113,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 			return nil, err
 		}
 		if svcAcct.PrivateKey != "" {
-			pk, err = parseKey(svcAcct.PrivateKey)
+			pk, err = parsePrivateKey(svcAcct.PrivateKey)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +143,7 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 
 	return &Client{
 		is:        is,
-		ks:        newHTTPKeySource(googleCertURL, hc),
+		ks:        newHTTPKeySource(idTokenCertURL, hc),
 		projectID: c.ProjectID,
 		snr:       snr,
 		version:   "Go/Admin/" + c.Version,
@@ -135,14 +154,14 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 // JWT can be used in a Firebase client SDK to trigger an authentication flow. See
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
 // for more details on how to use custom tokens for client authentication.
-func (c *Client) CustomToken(uid string) (string, error) {
-	return c.CustomTokenWithClaims(uid, nil)
+func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
+	return c.CustomTokenWithClaims(ctx, uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
-func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interface{}) (string, error) {
-	iss, err := c.snr.Email()
+func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
+	iss, err := c.snr.Email(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -164,6 +183,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 	}
 
 	now := clk.Now().Unix()
+	header := jwtHeader{Algorithm: "RS256", Type: "JWT"}
 	payload := &customToken{
 		Iss:    iss,
 		Sub:    iss,
@@ -173,7 +193,7 @@ func (c *Client) CustomTokenWithClaims(uid string, devClaims map[string]interfac
 		Exp:    now + tokenExpSeconds,
 		Claims: devClaims,
 	}
-	return encodeToken(c.snr, defaultHeader(), payload)
+	return encodeToken(ctx, c.snr, header, payload)
 }
 
 // RevokeRefreshTokens revokes all refresh tokens issued to a user.
@@ -196,50 +216,50 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
 // This does not check whether or not the token has been revoked. See `VerifyIDTokenAndCheckRevoked` below.
-func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
+func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
 	}
 	if idToken == "" {
-		return nil, fmt.Errorf("ID token must be a non-empty string")
+		return nil, fmt.Errorf("id token must be a non-empty string")
 	}
 
 	h := &jwtHeader{}
 	p := &Token{}
-	if err := decodeToken(idToken, c.ks, h, p); err != nil {
+	if err := decodeToken(ctx, idToken, c.ks, h, p); err != nil {
 		return nil, err
 	}
 
-	projectIDMsg := "Make sure the ID token comes from the same Firebase project as the credential used to" +
-		" authenticate this SDK."
-	verifyTokenMsg := "See https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
-		"retrieve a valid ID token."
+	projectIDMsg := "make sure the ID token comes from the same Firebase project as the credential used to" +
+		" authenticate this SDK"
+	verifyTokenMsg := "see https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to " +
+		"retrieve a valid ID token"
 	issuer := issuerPrefix + c.projectID
 
 	var err error
 	if h.KeyID == "" {
 		if p.Audience == firebaseAudience {
-			err = fmt.Errorf("VerifyIDToken() expects an ID token, but was given a custom token")
+			err = fmt.Errorf("expected an ID token but got a custom token")
 		} else {
 			err = fmt.Errorf("ID token has no 'kid' header")
 		}
 	} else if h.Algorithm != "RS256" {
-		err = fmt.Errorf("ID token has invalid incorrect algorithm. Expected 'RS256' but got %q. %s",
+		err = fmt.Errorf("ID token has invalid algorithm; expected 'RS256' but got %q; %s",
 			h.Algorithm, verifyTokenMsg)
 	} else if p.Audience != c.projectID {
-		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim. Expected %q but got %q. %s %s",
+		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim; expected %q but got %q; %s; %s",
 			c.projectID, p.Audience, projectIDMsg, verifyTokenMsg)
 	} else if p.Issuer != issuer {
-		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim. Expected %q but got %q. %s %s",
+		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
 			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
 	} else if p.IssuedAt > clk.Now().Unix() {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
 	} else if p.Expires < clk.Now().Unix() {
-		err = fmt.Errorf("ID token has expired. Expired at: %d", p.Expires)
+		err = fmt.Errorf("ID token has expired at: %d", p.Expires)
 	} else if p.Subject == "" {
-		err = fmt.Errorf("ID token has empty 'sub' (subject) claim. %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has empty 'sub' (subject) claim; %s", verifyTokenMsg)
 	} else if len(p.Subject) > 128 {
-		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters. %s", verifyTokenMsg)
+		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters; %s", verifyTokenMsg)
 	}
 
 	if err != nil {
@@ -254,7 +274,7 @@ func (c *Client) VerifyIDToken(idToken string) (*Token, error) {
 // VerifyIDTokenAndCheckRevoked verifies the signature and payload of the provided ID token and
 // checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
 func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
-	p, err := c.VerifyIDToken(idToken)
+	p, err := c.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, err
 	}
@@ -265,27 +285,7 @@ func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken strin
 	}
 
 	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return nil, fmt.Errorf("ID token has been revoked")
+		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
 	}
 	return p, nil
-}
-
-func parseKey(key string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(key))
-	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %v", key)
-	}
-	k := block.Bytes
-	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
-		}
-	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private key is not an RSA key")
-	}
-	return parsed, nil
 }
