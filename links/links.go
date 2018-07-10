@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package links contains a function for retrieving the stats for a short
+// Package links contains a function for retrieving the statistics for a short
 // dynamic link.
 package links
 
@@ -106,9 +106,11 @@ func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
 // LinkStats returns the stats given a short link and a duration (last n days).
 //
 // If the URI prefix for the shortlink belongs to the project but the link suffix has either not
-// been created or has no data in the requested period, the returned LinkStats object will contain an
-// empty list of EventStats.
-func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
+// been created or has no data in the requested period, the returned LinkStats object will contain
+// an empty list of EventStats.
+func (c *Client) LinkStats(
+	ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
+
 	if !strings.HasPrefix(shortLink, "https://") {
 		return nil, errors.New("short link must start with https://")
 	}

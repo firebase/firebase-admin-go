@@ -46,8 +46,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// Integration tests need some setting up, and once they have it might take another 36 hours
-	// to get the desired results. Therefore if they haven't been set up we do not want to fail.
+	// Integration tests need some setting up. Once they're set up, it might take
+	// up to 36 hours to get the desired results. Therefore if they haven't been
+	// set up we do not want to fail.
 	b, err := ioutil.ReadFile(internal.Resource("integration_dynamic_links.txt"))
 	if err == nil {
 		dynamicLinksURL = strings.TrimSpace(string(b))
@@ -80,7 +81,8 @@ func TestLinkStats(t *testing.T) {
 }
 
 func TestLinkStatsInvalidLink(t *testing.T) {
-	_, err := client.LinkStats(context.Background(), "https://fake1.app.gpp.gl/fake", links.StatOptions{
+	const shortLink = "https://fake1.app.gpp.gl/fake"
+	_, err := client.LinkStats(context.Background(), shortLink, links.StatOptions{
 		LastNDays: 3,
 	})
 	ws := "http error status: 403"

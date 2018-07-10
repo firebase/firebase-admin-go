@@ -150,7 +150,6 @@ To run integration tests for Firebase Dynamic Links follow these steps:
 4. Create a file at `testdata/integration_dynamic_links.txt` containing the
    short link, e.g. `https://your1.app.goo.gl/suff`.
 
-
 ### Test Coverage
 
 Coverage can be measured per package by passing the `-cover` flag to the test invocation:
