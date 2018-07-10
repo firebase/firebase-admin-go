@@ -17,7 +17,7 @@
 package links
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,55 +29,61 @@ import (
 	"google.golang.org/api/transport"
 )
 
+// Platform constant "enum" for the event
+type Platform string
+
+// EventType constant for the event stats
+type EventType string
+
 const (
+	// Desktop platform type.
+	Desktop Platform = "DESKTOP"
+
+	// IOS platform type.
+	IOS Platform = "IOS"
+
+	// Android platform type.
+	Android Platform = "ANDROID"
+
+	// Click event type.
+	Click EventType = "CLICK"
+
+	// Redirect event type.
+	Redirect EventType = "REDIRECT"
+
+	// AppInstall event type.
+	AppInstall EventType = "APP_INSTALL"
+
+	// AppFirstOpen event type.
+	AppFirstOpen EventType = "APP_FIRST_OPEN"
+
+	// AppReOpen event type.
+	AppReOpen EventType = "APP_RE_OPEN"
+
 	linksEndpoint = "https://firebasedynamiclinks.googleapis.com/v1"
 )
 
-// LinkStats is returned from the GetLinkStats, contains an array of Event Stats
-type LinkStats struct {
-	EventStats []EventStats `json:"linkEventStats"`
-}
-
-// EventStats will contain the counts for the aggregations for the requested period
+// EventStats will contain the aggregated counts for the requested period.
 type EventStats struct {
 	Platform  Platform  `json:"platform"`
 	EventType EventType `json:"event"`
 	Count     int32     `json:"count,string"`
 }
 
-// Platform constant "enum" for the event
-type Platform string
-
-// There are 3 possible values for the platforms "enum" in the platform
-const (
-	Desktop Platform = "DESKTOP"
-	IOS     Platform = "IOS"
-	Android Platform = "ANDROID"
-)
-
-// EventType constant for the event stats
-type EventType string
-
-// There are 5 possible values for the event type "enum" in the event_stats
-const (
-	Click        EventType = "CLICK"
-	Redirect     EventType = "REDIRECT"
-	AppInstall   EventType = "APP_INSTALL"
-	AppFirstOpen EventType = "APP_FIRST_OPEN"
-	AppReOpen    EventType = "APP_RE_OPEN"
-)
+// LinkStats contains an array of EventStats.
+type LinkStats struct {
+	EventStats []EventStats `json:"linkEventStats"`
+}
 
 // StatOptions are used in the request for GetLinkStats. It is used to request data
-// covering the last LastNDays days.
+// covering the last N days.
 type StatOptions struct {
 	LastNDays int
 }
 
-// Client is the interface for the Firebase dynamics links service.
-//
-// Client is the entry point to the dynamic links functions
+// Client is the interface for the Firebase Dynamics Links (FDL) service.
 type Client struct {
-	hc            *internal.HTTPClient
+	client        *internal.HTTPClient
 	linksEndpoint string
 }
 
@@ -92,47 +98,36 @@ func NewClient(ctx context.Context, c *internal.LinksConfig) (*Client, error) {
 	}
 
 	return &Client{
-		hc:            &internal.HTTPClient{Client: hc},
+		client:        &internal.HTTPClient{Client: hc},
 		linksEndpoint: linksEndpoint,
 	}, nil
 }
 
-// LinkStats returns the stats given a shortLink and the duration (last ndays, inside the StatOptions).
+// LinkStats returns the stats given a short link and a duration (last n days).
 //
-// Returns a LinkStats object which contains a list of EventStats.
-// The credential with which the firebase.App is initialized must be associated with the project
-// for which the stats are requested.
 // If the URI prefix for the shortlink belongs to the project but the link suffix has either not
-// been created or has no data in the requested period, the LinkStats object will contain an
+// been created or has no data in the requested period, the returned LinkStats object will contain an
 // empty list of EventStats.
 func (c *Client) LinkStats(ctx context.Context, shortLink string, statOptions StatOptions) (*LinkStats, error) {
 	if !strings.HasPrefix(shortLink, "https://") {
-		return nil, fmt.Errorf("short link must start with `https://`")
+		return nil, errors.New("short link must start with https://")
 	}
 	if statOptions.LastNDays <= 0 {
-		return nil, fmt.Errorf("LastNDays must be > 0")
+		return nil, errors.New("last n days must be positive")
 	}
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    c.linksEndpoint + c.makeLinkStatsRequestString(shortLink, statOptions),
+		URL: fmt.Sprintf("%s/%s/linkStats?durationDays=%d",
+			c.linksEndpoint, url.QueryEscape(shortLink), statOptions.LastNDays),
 	}
 
-	resp, err := c.hc.Do(ctx, request)
+	resp, err := c.client.Do(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return nil, err
-	}
 	var result LinkStats
-	if err = json.Unmarshal(resp.Body, &result); err != nil {
+	if err = resp.Unmarshal(http.StatusOK, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
-}
-
-func (c *Client) makeLinkStatsRequestString(shortLink string, statOptions StatOptions) string {
-	return fmt.Sprintf("/%s/linkStats?durationDays=%d",
-		url.QueryEscape(shortLink),
-		statOptions.LastNDays)
 }

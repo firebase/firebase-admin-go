@@ -138,15 +138,17 @@ go test firebase.google.com/go/...
 
 This will execute both unit and integration test suites.
 
-### End-to-End Testing for Firebase Dynamic Links.
+#### Integration Testing for Firebase Dynamic Links.
 
-To run end-to-end tests for Firebase Dynamic Links follow these steps:
+To run integration tests for Firebase Dynamic Links follow these steps:
 
-1. From the [`Firebase Console`](https://firebase.corp.google.com/), create a short link in your project under "`Grow` > `Dynamic Links`".
-2. From your browser or phone, go to that short link and see that it redirects as desired.
+1. From the [`Firebase Console`](https://firebase.corp.google.com/), create a
+   short link in your project under "`Grow` > `Dynamic Links`".
+2. From your browser or phone, go to that short link and see that it redirects
+   as desired.
 3. Wait up to 36 hours for stats to show up on the console.
-4. Create a file at `tests/data/dynamic_links_e2e_url.txt` containing the short link,
-   e.g. `https://your1.app.goo.gl/suff`.
+4. Create a file at `testdata/integration_dynamic_links.txt` containing the
+   short link, e.g. `https://your1.app.goo.gl/suff`.
 
 
 ### Test Coverage

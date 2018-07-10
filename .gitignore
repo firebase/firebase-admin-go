@@ -1,3 +1,2 @@
 testdata/integration_*
 .vscode/*
-testdata/dynamic_links_e2e_url.txt

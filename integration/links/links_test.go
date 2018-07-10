@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,11 +29,10 @@ import (
 	"firebase.google.com/go/links"
 )
 
-var client *links.Client
-var ctx context.Context
-var dynamicLinksE2EURL []byte
-
-var e2eWarning = "End-to-end tests not set up, see CONTRIBUTING.md file."
+var (
+	client          *links.Client
+	dynamicLinksURL string
+)
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -42,14 +41,17 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	ctx = context.Background()
+	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// End-to-end tests take some setting up, and once they have it might take another 36 hours
-	// to get the desired results, therefore if they haven't been set up we do not want to fail.
-	dynamicLinksE2EURL, _ = ioutil.ReadFile(internal.Resource("dynamic_links_e2e_url.txt"))
+	// Integration tests need some setting up, and once they have it might take another 36 hours
+	// to get the desired results. Therefore if they haven't been set up we do not want to fail.
+	b, err := ioutil.ReadFile(internal.Resource("integration_dynamic_links.txt"))
+	if err == nil {
+		dynamicLinksURL = strings.TrimSpace(string(b))
+	}
 
 	client, err = app.DynamicLinks(ctx)
 	if err != nil {
@@ -58,30 +60,31 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestE2EGetLinkStats(t *testing.T) {
-	if dynamicLinksE2EURL == nil {
-		log.Println(e2eWarning)
+func TestLinkStats(t *testing.T) {
+	if dynamicLinksURL == "" {
+		log.Println("Integration tests for dynamic links not set up")
 		return
 	}
-	shortLink := strings.Trim(string(dynamicLinksE2EURL), "\n ")
-	ls, err := client.LinkStats(ctx, shortLink, links.StatOptions{LastNDays: 4000})
+	ls, err := client.LinkStats(context.Background(), dynamicLinksURL, links.StatOptions{
+		LastNDays: 4000,
+	})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if len(ls.EventStats) == 0 {
-		t.Fatalf("empty EventStats, want, non-empty. %s", e2eWarning)
+		t.Fatal("LinkStats() = empty; want = non-empty")
 	}
 	if ls.EventStats[0].Count == 0 {
-		t.Errorf("EventStat.Count = 0; want = non zero count %v", ls.EventStats[0])
+		t.Fatal("EventStats[0].Count = 0; want = non zero")
 	}
-
 }
 
-func TestGetLinkStats(t *testing.T) {
-	_, err := client.LinkStats(ctx, "https://fake1.app.gpp.gl/fake", links.StatOptions{LastNDays: 3})
+func TestLinkStatsInvalidLink(t *testing.T) {
+	_, err := client.LinkStats(context.Background(), "https://fake1.app.gpp.gl/fake", links.StatOptions{
+		LastNDays: 3,
+	})
 	ws := "http error status: 403"
 	if err == nil || !strings.Contains(err.Error(), ws) {
-		t.Fatalf("LinkStats(<short link in some other project>) err = %q, want(substring of) = %q",
-			err, ws)
+		t.Fatalf("LinkStats() err = %v, want = %q", err, ws)
 	}
 }
