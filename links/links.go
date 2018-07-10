@@ -122,7 +122,6 @@ func (c *Client) LinkStats(
 		URL: fmt.Sprintf("%s/%s/linkStats?durationDays=%d",
 			c.linksEndpoint, url.QueryEscape(shortLink), statOptions.LastNDays),
 	}
-
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
 		return nil, err
