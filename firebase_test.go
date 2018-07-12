@@ -142,25 +142,29 @@ func TestRefreshTokenFileWithConfig(t *testing.T) {
 }
 
 func TestRefreshTokenWithEnvVar(t *testing.T) {
-	varName := "GCLOUD_PROJECT"
-	current := os.Getenv(varName)
+	verify := func(varName string) {
+		current := os.Getenv(varName)
 
-	if err := os.Setenv(varName, "mock-project-id"); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Setenv(varName, current)
+		if err := os.Setenv(varName, "mock-project-id"); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Setenv(varName, current)
 
-	app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/refresh_token.json"))
-	if err != nil {
-		t.Fatal(err)
+		app, err := NewApp(context.Background(), nil, option.WithCredentialsFile("testdata/refresh_token.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if app.projectID != "mock-project-id" {
+			t.Errorf("[env=%s] Project ID: %q; want: mock-project-id", varName, app.projectID)
+		}
+		if app.creds == nil {
+			t.Errorf("[env=%s] Credentials: nil; want creds", varName)
+		} else if len(app.creds.JSON) == 0 {
+			t.Errorf("[env=%s] JSON: empty; want; non-empty", varName)
+		}
 	}
-	if app.projectID != "mock-project-id" {
-		t.Errorf("Project ID: %q; want: mock-project-id", app.projectID)
-	}
-	if app.creds == nil {
-		t.Error("Credentials: nil; want creds")
-	} else if len(app.creds.JSON) == 0 {
-		t.Error("JSON: empty; want; non-empty")
+	for _, varName := range []string{"GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"} {
+		verify(varName)
 	}
 }
 
@@ -295,34 +299,44 @@ func TestFirestore(t *testing.T) {
 }
 
 func TestFirestoreWithProjectID(t *testing.T) {
-	varName := "GCLOUD_PROJECT"
-	current := os.Getenv(varName)
+	verify := func(varName string) {
+		current := os.Getenv(varName)
 
-	if err := os.Setenv(varName, ""); err != nil {
-		t.Fatal(err)
+		if err := os.Setenv(varName, ""); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Setenv(varName, current)
+
+		ctx := context.Background()
+		config := &Config{ProjectID: "project-id"}
+		app, err := NewApp(ctx, config, option.WithCredentialsFile("testdata/refresh_token.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if c, err := app.Firestore(ctx); c == nil || err != nil {
+			t.Errorf("[env=%s] Firestore() = (%v, %v); want (auth, nil)", varName, c, err)
+		}
 	}
-	defer os.Setenv(varName, current)
-
-	ctx := context.Background()
-	config := &Config{ProjectID: "project-id"}
-	app, err := NewApp(ctx, config, option.WithCredentialsFile("testdata/refresh_token.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if c, err := app.Firestore(ctx); c == nil || err != nil {
-		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	for _, varName := range []string{"GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"} {
+		verify(varName)
 	}
 }
 
 func TestFirestoreWithNoProjectID(t *testing.T) {
-	varName := "GCLOUD_PROJECT"
-	current := os.Getenv(varName)
-
-	if err := os.Setenv(varName, ""); err != nil {
-		t.Fatal(err)
+	unsetVariable := func(varName string) string {
+		current := os.Getenv(varName)
+		if err := os.Setenv(varName, ""); err != nil {
+			t.Fatal(err)
+		}
+		return current
 	}
-	defer os.Setenv(varName, current)
+
+	for _, varName := range []string{"GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"} {
+		if current := unsetVariable(varName); current != "" {
+			defer os.Setenv(varName, current)
+		}
+	}
 
 	ctx := context.Background()
 	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/refresh_token.json"))
