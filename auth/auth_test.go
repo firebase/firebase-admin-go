@@ -38,11 +38,10 @@ import (
 )
 
 var (
-	client                *Client
-	ctx                   context.Context
-	testIDToken           string
-	testGetUserResponse   []byte
-	testListUsersResponse []byte
+	client              *Client
+	ctx                 context.Context
+	testIDToken         string
+	testGetUserResponse []byte
 )
 
 var defaultTestOpts = []option.ClientOption{
@@ -86,14 +85,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client.ks = ks
+	client.keySource = ks
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	testListUsersResponse, err = ioutil.ReadFile("../testdata/list_users.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -102,9 +96,50 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestNewClientServiceAccountSigner(t *testing.T) {
+	if _, ok := client.signer.(*serviceAccountSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = serviceAccountSigner", client.signer)
+	}
+}
+
+func TestNewClientIAMSigner(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+	}
+	c, err := NewClient(ctx, conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+	if _, ok := c.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+}
+
+func TestNewClientServiceAccountID(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithTokenSource(&mockTokenSource{"test.token"}),
+		},
+		ServiceAccountID: "explicit-service-account",
+	}
+	c, err := NewClient(ctx, conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+	if _, ok := c.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+	email, err := c.signer.Email(ctx)
+	if email != conf.ServiceAccountID || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
+	}
+}
+
 func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
-		JSON: []byte("foo"),
+		JSON: []byte("not json"),
 	}
 	conf := &internal.AuthConfig{Creds: creds}
 	if c, err := NewClient(ctx, conf); c != nil || err == nil {
@@ -292,14 +327,37 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 }
 
-func TestNoProjectID(t *testing.T) {
+func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
+	var payload mockIDTokenPayload
+	segments := strings.Split(testIDToken, ".")
+	if err := decode(segments[1], &payload); err != nil {
+		t.Fatal(err)
+	}
+	info := &jwtInfo{
+		header: jwtHeader{
+			Algorithm: "HS256",
+			Type:      "JWT",
+			KeyID:     "mock-key-id-1",
+		},
+		payload: payload,
+	}
+	token, err := info.Token(ctx, client.signer)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if _, err := client.VerifyIDToken(ctx, token); err == nil {
+		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
+	}
+}
+
+func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	// AuthConfig with empty ProjectID
 	conf := &internal.AuthConfig{Opts: defaultTestOpts}
 	c, err := NewClient(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.ks = client.ks
+	c.keySource = client.keySource
 	if _, err := c.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
@@ -317,10 +375,10 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	ks := client.ks
-	client.ks = &mockKeySource{nil, errors.New("mock error")}
+	ks := client.keySource
+	client.keySource = &mockKeySource{nil, errors.New("mock error")}
 	defer func() {
-		client.ks = ks
+		client.keySource = ks
 	}()
 	if _, err := client.VerifyIDToken(ctx, testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
@@ -328,32 +386,41 @@ func TestCertificateRequestError(t *testing.T) {
 }
 
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
-	h := &jwtHeader{}
-	p := &customToken{}
-	if err := decodeToken(ctx, token, client.ks, h, p); err != nil {
+	if err := verifyToken(ctx, token, client.keySource); err != nil {
+		t.Fatal(err)
+	}
+	var (
+		header  jwtHeader
+		payload customToken
+	)
+	segments := strings.Split(token, ".")
+	if err := decode(segments[0], &header); err != nil {
+		t.Fatal(err)
+	}
+	if err := decode(segments[1], &payload); err != nil {
 		t.Fatal(err)
 	}
 
-	email, err := client.snr.Email(ctx)
+	email, err := client.signer.Email(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if h.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", h.Algorithm)
-	} else if h.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", h.Type)
-	} else if p.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", p.Aud, firebaseAudience)
-	} else if p.Iss != email {
-		t.Errorf("Issuer: %q; want: %q", p.Iss, email)
-	} else if p.Sub != email {
-		t.Errorf("Subject: %q; want: %q", p.Sub, email)
+	if header.Algorithm != "RS256" {
+		t.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
+	} else if header.Type != "JWT" {
+		t.Errorf("Type: %q; want: 'JWT'", header.Type)
+	} else if payload.Aud != firebaseAudience {
+		t.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
+	} else if payload.Iss != email {
+		t.Errorf("Issuer: %q; want: %q", payload.Iss, email)
+	} else if payload.Sub != email {
+		t.Errorf("Subject: %q; want: %q", payload.Sub, email)
 	}
 
 	for k, v := range expected {
-		if p.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, p.Claims[k], v)
+		if payload.Claims[k] != v {
+			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
 	}
 }
@@ -374,9 +441,16 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	for k, v := range p {
 		pCopy[k] = v
 	}
-	h := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	h.KeyID = kid
-	token, err := encodeToken(ctx, client.snr, h, pCopy)
+
+	info := &jwtInfo{
+		header: jwtHeader{
+			Algorithm: "RS256",
+			Type:      "JWT",
+			KeyID:     kid,
+		},
+		payload: pCopy,
+	}
+	token, err := info.Token(ctx, client.signer)
 	if err != nil {
 		log.Fatalln(err)
 	}

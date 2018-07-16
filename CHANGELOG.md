@@ -1,5 +1,8 @@
 # Unreleased
 
+- [added] Implemented the ability to create custom tokens without
+  service account credentials.
+- [added] Added the `ServiceAccount` field to the `firebase.Config` struct.
 - [added] The Admin SDK can now read the Firebase/GCP project ID from
   both `GCLOUD_PROJECT` and `GOOGLE_CLOUD_PROJECT` environment
   variables.

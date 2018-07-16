@@ -68,6 +68,19 @@ func initializeAppDefault() *firebase.App {
 	return app
 }
 
+func initializeServiceAccountID() *firebase.App {
+	// [START initialize_sdk_with_service_account_id]
+	conf := &firebase.Config{
+		ServiceAccountID: "my-client-id@my-project-id.iam.gserviceaccount.com",
+	}
+	app, err := firebase.NewApp(context.Background(), conf)
+	if err != nil {
+		log.Fatalf("error initializing app: %v\n", err)
+	}
+	// [END initialize_sdk_with_service_account_id]
+	return app
+}
+
 func accessServicesSingleApp() (*auth.Client, error) {
 	// [START access_services_single_app_golang]
 	// Initialize default app

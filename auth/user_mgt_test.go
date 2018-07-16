@@ -170,6 +170,10 @@ func TestGetNonExistingUser(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
+	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := echoServer(testListUsersResponse, t)
 	defer s.Close()
 
@@ -1151,7 +1155,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	}
 
 	authClient, err := NewClient(ctx, conf)
-	authClient.ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	authClient.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
 	}

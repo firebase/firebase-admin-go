@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2018 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 package auth
 
 import (
+	"bytes"
 	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -32,35 +31,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context/ctxhttp"
-
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
-
-// publicKey represents a parsed RSA public key along with its unique key ID.
-type publicKey struct {
-	Kid string
-	Key *rsa.PublicKey
-}
-
-// clock is used to query the current local time.
-type clock interface {
-	Now() time.Time
-}
-
-type systemClock struct{}
-
-func (s systemClock) Now() time.Time {
-	return time.Now()
-}
-
-type mockClock struct {
-	now time.Time
-}
-
-func (m *mockClock) Now() time.Time {
-	return m.now
-}
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
 // signatures.
@@ -138,6 +111,83 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	return nil
 }
 
+func verifyToken(ctx context.Context, token string, ks keySource) error {
+	segments := strings.Split(token, ".")
+	if len(segments) != 3 {
+		return errors.New("incorrect number of segments")
+	}
+
+	var h jwtHeader
+	if err := decode(segments[0], &h); err != nil {
+		return err
+	}
+
+	keys, err := ks.Keys(ctx)
+	if err != nil {
+		return err
+	}
+	verified := false
+	for _, k := range keys {
+		if h.KeyID == "" || h.KeyID == k.Kid {
+			if verifySignature(segments, k) == nil {
+				verified = true
+				break
+			}
+		}
+	}
+
+	if !verified {
+		return errors.New("failed to verify token signature")
+	}
+	return nil
+}
+
+// decode accepts a JWT segment, and decodes it into the given interface.
+func decode(segment string, i interface{}) error {
+	decoded, err := base64.RawURLEncoding.DecodeString(segment)
+	if err != nil {
+		return err
+	}
+	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
+}
+
+func verifySignature(parts []string, k *publicKey) error {
+	content := parts[0] + "." + parts[1]
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return err
+	}
+
+	h := sha256.New()
+	h.Write([]byte(content))
+	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
+}
+
+// publicKey represents a parsed RSA public key along with its unique key ID.
+type publicKey struct {
+	Kid string
+	Key *rsa.PublicKey
+}
+
+// clock is used to query the current local time.
+type clock interface {
+	Now() time.Time
+}
+
+type systemClock struct{}
+
+func (s systemClock) Now() time.Time {
+	return time.Now()
+}
+
+type mockClock struct {
+	now time.Time
+}
+
+func (m *mockClock) Now() time.Time {
+	return m.now
+}
+
 func findMaxAge(resp *http.Response) (*time.Duration, error) {
 	cc := resp.Header.Get("cache-control")
 	for _, value := range strings.Split(cc, ",") {
@@ -184,57 +234,4 @@ func parsePublicKey(kid string, key []byte) (*publicKey, error) {
 		return nil, errors.New("Certificate is not a RSA key")
 	}
 	return &publicKey{kid, pk}, nil
-}
-
-func parsePrivateKey(key string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(key))
-	if block == nil {
-		return nil, fmt.Errorf("no private key data found in: %v", key)
-	}
-	k := block.Bytes
-	parsedKey, err := x509.ParsePKCS8PrivateKey(k)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(k)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKSC1 or PKCS8; parse error: %v", err)
-		}
-	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private key is not an RSA key")
-	}
-	return parsed, nil
-}
-
-func verifySignature(parts []string, k *publicKey) error {
-	content := parts[0] + "." + parts[1]
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return err
-	}
-
-	h := sha256.New()
-	h.Write([]byte(content))
-	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
-}
-
-type serviceAcctSigner struct {
-	email string
-	pk    *rsa.PrivateKey
-}
-
-func (s serviceAcctSigner) Email(ctx context.Context) (string, error) {
-	if s.email == "" {
-		return "", errors.New("service account email not available")
-	}
-	return s.email, nil
-}
-
-func (s serviceAcctSigner) Sign(ctx context.Context, ss []byte) ([]byte, error) {
-	if s.pk == nil {
-		return nil, errors.New("private key not available")
-	}
-	hash := sha256.New()
-	hash.Write([]byte(ss))
-	return rsa.SignPKCS1v15(rand.Reader, s.pk, crypto.SHA256, hash.Sum(nil))
 }

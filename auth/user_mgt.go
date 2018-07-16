@@ -617,6 +617,18 @@ func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord,
 	return c.getUser(ctx, request)
 }
 
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
+//
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
+func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+}
+
 // Users returns an iterator over Users.
 //
 // If nextPageToken is empty, the iterator will start at the beginning.
@@ -822,6 +834,7 @@ var serverError = map[string]string{
 	"DUPLICATE_LOCAL_ID":      uidAlreadyExists,
 	"EMAIL_EXISTS":            emailAlredyExists,
 	"INSUFFICIENT_PERMISSION": insufficientPermission,
+	"PERMISSION_DENIED":       insufficientPermission,
 	"PHONE_NUMBER_EXISTS":     phoneNumberAlreadyExists,
 	"PROJECT_NOT_FOUND":       projectNotFound,
 	"USER_NOT_FOUND":          userNotFound,
