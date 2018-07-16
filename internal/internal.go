@@ -35,10 +35,11 @@ var FirebaseScopes = []string{
 
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
-	Opts      []option.ClientOption
-	Creds     *google.DefaultCredentials
-	ProjectID string
-	Version   string
+	Opts             []option.ClientOption
+	Creds            *google.DefaultCredentials
+	ProjectID        string
+	ServiceAccountID string
+	Version          string
 }
 
 // HashConfig represents a hash algorithm configuration used to generate password hashes.
