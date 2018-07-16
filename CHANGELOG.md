@@ -1,5 +1,7 @@
 # Unreleased
 
+# v3.2.0
+
 - [added] Implemented the ability to create custom tokens without
   service account credentials.
 - [added] Added the `ServiceAccount` field to the `firebase.Config` struct.
