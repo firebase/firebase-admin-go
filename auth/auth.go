@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"golang.org/x/net/context"
@@ -128,7 +129,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 
 	return &Client{
 		is:        is,
-		keySource: newHTTPKeySource(idTokenCertURL, hc),
+		keySource: newHTTPKeySource(idTokenCertURL, http.DefaultClient),
 		projectID: conf.ProjectID,
 		signer:    signer,
 		version:   "Go/Admin/" + conf.Version,
