@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -97,6 +98,9 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("invalid response (%d) while retrieving public keys: %s", resp.StatusCode, string(contents))
 	}
 	newKeys, err := parsePublicKeys(contents)
 	if err != nil {
