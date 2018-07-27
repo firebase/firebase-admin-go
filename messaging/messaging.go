@@ -235,13 +235,16 @@ type WebpushNotificationAction struct {
 }
 
 // WebpushNotification is a notification to send via WebPush protocol.
+//
+// See https://developer.mozilla.org/en-US/docs/Web/API/notification/Notification for additional
+// details.
 type WebpushNotification struct {
 	Actions            []*WebpushNotificationAction
 	Title              string      `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
 	Body               string      `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
 	Icon               string      `json:"icon,omitempty"`
 	Badge              string      `json:"badge,omitempty"`
-	Direction          string      `json:"dir,omitempty"`
+	Direction          string      `json:"dir,omitempty"` // one of 'ltr' or 'rtl'
 	Data               interface{} `json:"data,omitempty"`
 	Image              string      `json:"image,omitempty"`
 	Language           string      `json:"lang,omitempty"`
@@ -249,7 +252,7 @@ type WebpushNotification struct {
 	RequireInteraction bool        `json:"requireInteraction,omitempty"`
 	Silent             bool        `json:"silent,omitempty"`
 	Tag                string      `json:"tag,omitempty"`
-	Timestamp          *int64      `json:"timestamp,omitempty"`
+	TimestampMillis    *int64      `json:"timestamp,omitempty"`
 	Vibrate            []int       `json:"vibrate,omitempty"`
 	CustomData         map[string]interface{}
 }
@@ -281,13 +284,25 @@ func (n *WebpushNotification) standardFields() map[string]interface{} {
 	addTrue("requireInteraction", n.RequireInteraction)
 	addTrue("silent", n.Silent)
 	addNonEmpty("tag", n.Tag)
-	if n.Timestamp != nil {
-		m["timestamp"] = *n.Timestamp
+	if n.Data != nil {
+		m["data"] = n.Data
+	}
+	if n.TimestampMillis != nil {
+		m["timestamp"] = *n.TimestampMillis
 	}
 	if len(n.Vibrate) > 0 {
 		m["vibrate"] = n.Vibrate
 	}
 	return m
+}
+
+// MarshalJSON marshals a WebpushNotification into JSON (for internal use only).
+func (n *WebpushNotification) MarshalJSON() ([]byte, error) {
+	m := n.standardFields()
+	for k, v := range n.CustomData {
+		m[k] = v
+	}
+	return json.Marshal(m)
 }
 
 // APNSConfig contains messaging options specific to the Apple Push Notification Service (APNS).

@@ -44,8 +44,9 @@ var (
 	ttl          = time.Duration(10) * time.Second
 	invalidTTL   = time.Duration(-10) * time.Second
 
-	badge     = 42
-	badgeZero = 0
+	badge           = 42
+	badgeZero       = 0
+	timestampMillis = int64(12345)
 )
 
 var validMessages = []struct {
@@ -199,18 +200,45 @@ var validMessages = []struct {
 					"k2": "v2",
 				},
 				Notification: &WebpushNotification{
-					Title: "t",
-					Body:  "b",
-					Icon:  "i",
+					Title:              "title",
+					Body:               "body",
+					Icon:               "icon",
+					Badge:              "badge",
+					Data:               "data",
+					Image:              "image",
+					Language:           "lang",
+					Renotify:           true,
+					RequireInteraction: true,
+					Silent:             true,
+					Tag:                "tag",
+					TimestampMillis:    &timestampMillis,
+					Vibrate:            []int{100, 200, 100},
+					CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
 				},
 			},
 			Topic: "test-topic",
 		},
 		want: map[string]interface{}{
 			"webpush": map[string]interface{}{
-				"headers":      map[string]interface{}{"h1": "v1", "h2": "v2"},
-				"data":         map[string]interface{}{"k1": "v1", "k2": "v2"},
-				"notification": map[string]interface{}{"title": "t", "body": "b", "icon": "i"},
+				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
+				"data":    map[string]interface{}{"k1": "v1", "k2": "v2"},
+				"notification": map[string]interface{}{
+					"title":              "title",
+					"body":               "body",
+					"icon":               "icon",
+					"badge":              "badge",
+					"data":               "data",
+					"image":              "image",
+					"lang":               "lang",
+					"renotify":           true,
+					"requireInteraction": true,
+					"silent":             true,
+					"tag":                "tag",
+					"timestamp":          float64(12345),
+					"vibrate":            []interface{}{float64(100), float64(200), float64(100)},
+					"k1":                 "v1",
+					"k2":                 "v2",
+				},
 			},
 			"topic": "test-topic",
 		},
@@ -524,6 +552,31 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "locKey is required when specifying locArgs",
+	},
+	{
+		name: "InvalidWebpushNotificationDirection",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{
+					Direction: "invalid",
+				},
+			},
+			Topic: "topic",
+		},
+		want: "direction must be 'ltr' or 'rtl'",
+	},
+	{
+		name: "WebpushNotificationMultipleFieldSpecifications",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{
+					Direction:  "ltr",
+					CustomData: map[string]interface{}{"dir": "rtl"},
+				},
+			},
+			Topic: "topic",
+		},
+		want: `multiple specifications for the key "dir"`,
 	},
 }
 
