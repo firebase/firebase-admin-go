@@ -204,11 +204,11 @@ var validMessages = []struct {
 					Body:  "body",
 					Icon:  "icon",
 					Actions: []*WebpushNotificationAction{
-						&WebpushNotificationAction{
+						{
 							Action: "a1",
 							Title:  "a1-title",
 						},
-						&WebpushNotificationAction{
+						{
 							Action: "a2",
 							Title:  "a2-title",
 							Icon:   "a2-icon",
