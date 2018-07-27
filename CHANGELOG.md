@@ -2,6 +2,8 @@
 
 - [fixed] Fixing a regression introduced in 3.2.0, where `VerifyIDToken()`
   cannot be used in App Engine.
+- [added] `messaging.WebpushNotification` type now supports arbitrary key-value
+  pairs in its payload.
 
 # v3.2.0
 

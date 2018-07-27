@@ -200,9 +200,20 @@ var validMessages = []struct {
 					"k2": "v2",
 				},
 				Notification: &WebpushNotification{
-					Title:              "title",
-					Body:               "body",
-					Icon:               "icon",
+					Title: "title",
+					Body:  "body",
+					Icon:  "icon",
+					Actions: []*WebpushNotificationAction{
+						&WebpushNotificationAction{
+							Action: "a1",
+							Title:  "a1-title",
+						},
+						&WebpushNotificationAction{
+							Action: "a2",
+							Title:  "a2-title",
+							Icon:   "a2-icon",
+						},
+					},
 					Badge:              "badge",
 					Data:               "data",
 					Image:              "image",
@@ -223,9 +234,13 @@ var validMessages = []struct {
 				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
 				"data":    map[string]interface{}{"k1": "v1", "k2": "v2"},
 				"notification": map[string]interface{}{
-					"title":              "title",
-					"body":               "body",
-					"icon":               "icon",
+					"title": "title",
+					"body":  "body",
+					"icon":  "icon",
+					"actions": []interface{}{
+						map[string]interface{}{"action": "a1", "title": "a1-title"},
+						map[string]interface{}{"action": "a2", "title": "a2-title", "icon": "a2-icon"},
+					},
 					"badge":              "badge",
 					"data":               "data",
 					"image":              "image",
