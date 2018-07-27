@@ -1,8 +1,18 @@
 # Unreleased
 
+- [fixed] Fixing a regression introduced in 3.2.0, where `VerifyIDToken()`
+  cannot be used in App Engine.
+
+# v3.2.0
+
+- [added] Implemented the ability to create custom tokens without
+  service account credentials.
+- [added] Added the `ServiceAccount` field to the `firebase.Config` struct.
 - [added] The Admin SDK can now read the Firebase/GCP project ID from
   both `GCLOUD_PROJECT` and `GOOGLE_CLOUD_PROJECT` environment
   variables.
+- [fixed] Using the default, unauthorized HTTP client to retrieve
+  public keys when verifying ID tokens.
 
 # v3.1.0
 

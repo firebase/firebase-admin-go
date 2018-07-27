@@ -17,15 +17,15 @@
 package auth
 
 import (
+	"firebase.google.com/go/internal"
 	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
 )
 
-type aeSigner struct {
-}
+type aeSigner struct{}
 
-func newSigner(ctx context.Context) (signer, error) {
+func newCryptoSigner(ctx context.Context, conf *internal.AuthConfig) (cryptoSigner, error) {
 	return aeSigner{}, nil
 }
 
@@ -33,7 +33,7 @@ func (s aeSigner) Email(ctx context.Context) (string, error) {
 	return appengine.ServiceAccount(ctx)
 }
 
-func (s aeSigner) Sign(ctx context.Context, ss []byte) ([]byte, error) {
-	_, sig, err := appengine.SignBytes(ctx, ss)
+func (s aeSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
+	_, sig, err := appengine.SignBytes(ctx, b)
 	return sig, err
 }

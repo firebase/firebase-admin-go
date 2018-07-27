@@ -27,8 +27,13 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/api/option"
+
+	"golang.org/x/oauth2/google"
+
 	"golang.org/x/net/context"
 
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
 )
@@ -64,19 +69,40 @@ func TestCustomToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idt, err := signInWithCustomToken(ct)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer deleteUser(uid)
+	verifyCustomToken(t, ct, uid)
+}
 
-	vt, err := client.VerifyIDToken(context.Background(), idt)
+func TestCustomTokenWithoutServiceAccount(t *testing.T) {
+	// Create a TokenSource from the service account. This makes the private key not accessible
+	// to the Firebase APIs.
+	b, err := ioutil.ReadFile(internal.Resource("integration_cert.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vt.UID != uid {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
+	jwtConfig, err := google.JWTConfigFromJSON(b, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		t.Fatal(err)
 	}
+	appConfig := &firebase.Config{
+		ServiceAccountID: jwtConfig.Email,
+	}
+	opt := option.WithTokenSource(jwtConfig.TokenSource(context.Background()))
+
+	app, err := firebase.NewApp(context.Background(), appConfig, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherClient, err := app.Auth(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uid := randomUID()
+	ct, err := otherClient.CustomToken(context.Background(), uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyCustomToken(t, ct, uid)
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
@@ -89,19 +115,7 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	idt, err := signInWithCustomToken(ct)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer deleteUser(uid)
-
-	vt, err := client.VerifyIDToken(context.Background(), idt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if vt.UID != uid {
-		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
-	}
+	vt := verifyCustomToken(t, ct, uid)
 	if premium, ok := vt.Claims["premium"].(bool); !ok || !premium {
 		t.Errorf("Claims['premium'] = %v; want Claims['premium'] = true", vt.Claims["premium"])
 	}
@@ -159,6 +173,27 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	if _, err = client.VerifyIDTokenAndCheckRevoked(context.Background(), idt); err != nil {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(); err = %s; want err = <nil>", err)
 	}
+}
+
+// verifyCustomToken verifies the given custom token by signing into a Firebase project with it.
+//
+// A successful sign in creates the user account in the Firebase back-end. This method ensures that
+// such user accounts are automatically deleted upon return.
+func verifyCustomToken(t *testing.T, ct, uid string) *auth.Token {
+	idt, err := signInWithCustomToken(ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteUser(uid)
+
+	vt, err := client.VerifyIDToken(context.Background(), idt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != uid {
+		t.Fatalf("UID = %q; want UID = %q", vt.UID, uid)
+	}
+	return vt
 }
 
 func signInWithCustomToken(token string) (string, error) {

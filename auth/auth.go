@@ -16,11 +16,12 @@
 package auth
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"google.golang.org/api/option"
 
 	"golang.org/x/net/context"
 
@@ -58,34 +59,15 @@ type Token struct {
 	Claims   map[string]interface{} `json:"-"`
 }
 
-func (t *Token) decodeFrom(s string) error {
-	// Decode into a regular map to access custom claims.
-	claims := make(map[string]interface{})
-	if err := decode(s, &claims); err != nil {
-		return err
-	}
-	// Now decode into Token to access the standard claims.
-	if err := decode(s, t); err != nil {
-		return err
-	}
-
-	// Delete standard claims from the custom claims maps.
-	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
-		delete(claims, r)
-	}
-	t.Claims = claims
-	return nil
-}
-
 // Client is the interface for the Firebase auth service.
 //
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
 	is        *identitytoolkit.Service
-	ks        keySource
+	keySource keySource
 	projectID string
-	snr       signer
+	signer    cryptoSigner
 	version   string
 }
 
@@ -98,40 +80,45 @@ type signer interface {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // Auth service through firebase.App.
-func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
+func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
 	var (
-		err   error
-		email string
-		pk    *rsa.PrivateKey
+		signer cryptoSigner
+		err    error
 	)
-	if c.Creds != nil && len(c.Creds.JSON) > 0 {
-		var svcAcct struct {
-			ClientEmail string `json:"client_email"`
-			PrivateKey  string `json:"private_key"`
-		}
-		if err := json.Unmarshal(c.Creds.JSON, &svcAcct); err != nil {
+	// Initialize a signer by following the go/firebase-admin-sign protocol.
+	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
+		// If the SDK was initialized with a service account, use it to sign bytes.
+		var sa serviceAccount
+		if err = json.Unmarshal(conf.Creds.JSON, &sa); err != nil {
 			return nil, err
 		}
-		if svcAcct.PrivateKey != "" {
-			pk, err = parsePrivateKey(svcAcct.PrivateKey)
+		if sa.PrivateKey != "" && sa.ClientEmail != "" {
+			var err error
+			signer, err = newServiceAccountSigner(sa)
 			if err != nil {
 				return nil, err
 			}
 		}
-		email = svcAcct.ClientEmail
 	}
-
-	var snr signer
-	if email != "" && pk != nil {
-		snr = serviceAcctSigner{email: email, pk: pk}
-	} else {
-		snr, err = newSigner(ctx)
-		if err != nil {
-			return nil, err
+	if signer == nil {
+		if conf.ServiceAccountID != "" {
+			// If the SDK was initialized with a service account email, use it with the IAM service
+			// to sign bytes.
+			signer, err = newIAMSigner(ctx, conf)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Use GAE signing capabilities if available. Otherwise, obtain a service account email
+			// from the local Metadata service, and fallback to the IAM service.
+			signer, err = newCryptoSigner(ctx, conf)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,19 +128,38 @@ func NewClient(ctx context.Context, c *internal.AuthConfig) (*Client, error) {
 		return nil, err
 	}
 
+	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
 		is:        is,
-		ks:        newHTTPKeySource(idTokenCertURL, hc),
-		projectID: c.ProjectID,
-		snr:       snr,
-		version:   "Go/Admin/" + c.Version,
+		keySource: newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
+		projectID: conf.ProjectID,
+		signer:    signer,
+		version:   "Go/Admin/" + conf.Version,
 	}, nil
 }
 
-// CustomToken creates a signed custom authentication token with the specified user ID. The resulting
-// JWT can be used in a Firebase client SDK to trigger an authentication flow. See
+// CustomToken creates a signed custom authentication token with the specified user ID.
+//
+// The resulting JWT can be used in a Firebase client SDK to trigger an authentication flow. See
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens#sign_in_using_custom_tokens_on_clients
 // for more details on how to use custom tokens for client authentication.
+//
+// CustomToken follows the protocol outlined below to sign the generated tokens:
+//   - If the SDK was initialized with service account credentials, uses the private key present in
+//     the credentials to sign tokens locally.
+//   - If a service account email was specified during initialization (via firebase.Config struct),
+//     calls the IAM service with that email to sign tokens remotely. See
+//     https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob.
+//   - If the code is deployed in the Google App Engine standard environment, uses the App Identity
+//     service to sign tokens. See https://cloud.google.com/appengine/docs/standard/go/reference#SignBytes.
+//   - If the code is deployed in a different GCP-managed environment (e.g. Google Compute Engine),
+//     uses the local Metadata server to auto discover a service account email. This is used in
+//     conjunction with the IAM service to sign tokens remotely.
+//
+// CustomToken returns an error the SDK fails to discover a viable mechanism for signing tokens.
 func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
 	return c.CustomTokenWithClaims(ctx, uid, nil)
 }
@@ -161,7 +167,7 @@ func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
 func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
-	iss, err := c.snr.Email(ctx)
+	iss, err := c.signer.Email(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -183,29 +189,19 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	}
 
 	now := clk.Now().Unix()
-	header := jwtHeader{Algorithm: "RS256", Type: "JWT"}
-	payload := &customToken{
-		Iss:    iss,
-		Sub:    iss,
-		Aud:    firebaseAudience,
-		UID:    uid,
-		Iat:    now,
-		Exp:    now + tokenExpSeconds,
-		Claims: devClaims,
+	info := &jwtInfo{
+		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		payload: &customToken{
+			Iss:    iss,
+			Sub:    iss,
+			Aud:    firebaseAudience,
+			UID:    uid,
+			Iat:    now,
+			Exp:    now + tokenExpSeconds,
+			Claims: devClaims,
+		},
 	}
-	return encodeToken(ctx, c.snr, header, payload)
-}
-
-// RevokeRefreshTokens revokes all refresh tokens issued to a user.
-//
-// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
-// It is important that the server on which this is called has its clock set correctly and synchronized.
-//
-// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
-// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
-// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
-func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
-	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+	return info.Token(ctx, c.signer)
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
@@ -224,11 +220,30 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, fmt.Errorf("id token must be a non-empty string")
 	}
 
-	h := &jwtHeader{}
-	p := &Token{}
-	if err := decodeToken(ctx, idToken, c.ks, h, p); err != nil {
+	if err := verifyToken(ctx, idToken, c.keySource); err != nil {
 		return nil, err
 	}
+	segments := strings.Split(idToken, ".")
+
+	var (
+		header  jwtHeader
+		payload Token
+		claims  map[string]interface{}
+	)
+	if err := decode(segments[0], &header); err != nil {
+		return nil, err
+	}
+	if err := decode(segments[1], &payload); err != nil {
+		return nil, err
+	}
+	if err := decode(segments[1], &claims); err != nil {
+		return nil, err
+	}
+	// Delete standard claims from the custom claims maps.
+	for _, r := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
+		delete(claims, r)
+	}
+	payload.Claims = claims
 
 	projectIDMsg := "make sure the ID token comes from the same Firebase project as the credential used to" +
 		" authenticate this SDK"
@@ -237,36 +252,36 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 	issuer := issuerPrefix + c.projectID
 
 	var err error
-	if h.KeyID == "" {
-		if p.Audience == firebaseAudience {
+	if header.KeyID == "" {
+		if payload.Audience == firebaseAudience {
 			err = fmt.Errorf("expected an ID token but got a custom token")
 		} else {
 			err = fmt.Errorf("ID token has no 'kid' header")
 		}
-	} else if h.Algorithm != "RS256" {
+	} else if header.Algorithm != "RS256" {
 		err = fmt.Errorf("ID token has invalid algorithm; expected 'RS256' but got %q; %s",
-			h.Algorithm, verifyTokenMsg)
-	} else if p.Audience != c.projectID {
+			header.Algorithm, verifyTokenMsg)
+	} else if payload.Audience != c.projectID {
 		err = fmt.Errorf("ID token has invalid 'aud' (audience) claim; expected %q but got %q; %s; %s",
-			c.projectID, p.Audience, projectIDMsg, verifyTokenMsg)
-	} else if p.Issuer != issuer {
+			c.projectID, payload.Audience, projectIDMsg, verifyTokenMsg)
+	} else if payload.Issuer != issuer {
 		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
-			issuer, p.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if p.IssuedAt > clk.Now().Unix() {
-		err = fmt.Errorf("ID token issued at future timestamp: %d", p.IssuedAt)
-	} else if p.Expires < clk.Now().Unix() {
-		err = fmt.Errorf("ID token has expired at: %d", p.Expires)
-	} else if p.Subject == "" {
+			issuer, payload.Issuer, projectIDMsg, verifyTokenMsg)
+	} else if payload.IssuedAt > clk.Now().Unix() {
+		err = fmt.Errorf("ID token issued at future timestamp: %d", payload.IssuedAt)
+	} else if payload.Expires < clk.Now().Unix() {
+		err = fmt.Errorf("ID token has expired at: %d", payload.Expires)
+	} else if payload.Subject == "" {
 		err = fmt.Errorf("ID token has empty 'sub' (subject) claim; %s", verifyTokenMsg)
-	} else if len(p.Subject) > 128 {
+	} else if len(payload.Subject) > 128 {
 		err = fmt.Errorf("ID token has a 'sub' (subject) claim longer than 128 characters; %s", verifyTokenMsg)
 	}
 
 	if err != nil {
 		return nil, err
 	}
-	p.UID = p.Subject
-	return p, nil
+	payload.UID = payload.Subject
+	return &payload, nil
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token and checks it has not been revoked.
