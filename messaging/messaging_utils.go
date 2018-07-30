@@ -136,8 +136,8 @@ func validateWebpushConfig(webpush *WebpushConfig) error {
 		return nil
 	}
 	dir := webpush.Notification.Direction
-	if dir != "" && dir != "ltr" && dir != "rtl" {
-		return fmt.Errorf("direction must be 'ltr' or 'rtl'")
+	if dir != "" && dir != "ltr" && dir != "rtl" && dir != "auto" {
+		return fmt.Errorf("direction must be 'ltr', 'rtl' or 'auto'")
 	}
 	m := webpush.Notification.standardFields()
 	for k := range webpush.Notification.CustomData {

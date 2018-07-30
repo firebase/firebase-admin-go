@@ -578,7 +578,7 @@ var invalidMessages = []struct {
 			},
 			Topic: "topic",
 		},
-		want: "direction must be 'ltr' or 'rtl'",
+		want: "direction must be 'ltr', 'rtl' or 'auto'",
 	},
 	{
 		name: "WebpushNotificationMultipleFieldSpecifications",
