@@ -227,11 +227,82 @@ type WebpushConfig struct {
 	Notification *WebpushNotification `json:"notification,omitempty"`
 }
 
+// WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
+type WebpushNotificationAction struct {
+	Action string `json:"action,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Icon   string `json:"icon,omitempty"`
+}
+
 // WebpushNotification is a notification to send via WebPush protocol.
+//
+// See https://developer.mozilla.org/en-US/docs/Web/API/notification/Notification for additional
+// details.
 type WebpushNotification struct {
-	Title string `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
-	Body  string `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
-	Icon  string `json:"icon,omitempty"`
+	Actions            []*WebpushNotificationAction
+	Title              string      `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body               string      `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
+	Icon               string      `json:"icon,omitempty"`
+	Badge              string      `json:"badge,omitempty"`
+	Direction          string      `json:"dir,omitempty"` // one of 'ltr' or 'rtl'
+	Data               interface{} `json:"data,omitempty"`
+	Image              string      `json:"image,omitempty"`
+	Language           string      `json:"lang,omitempty"`
+	Renotify           bool        `json:"renotify,omitempty"`
+	RequireInteraction bool        `json:"requireInteraction,omitempty"`
+	Silent             bool        `json:"silent,omitempty"`
+	Tag                string      `json:"tag,omitempty"`
+	TimestampMillis    *int64      `json:"timestamp,omitempty"`
+	Vibrate            []int       `json:"vibrate,omitempty"`
+	CustomData         map[string]interface{}
+}
+
+// standardFields creates a map containing all the fields except the custom data.
+func (n *WebpushNotification) standardFields() map[string]interface{} {
+	m := make(map[string]interface{})
+	addNonEmpty := func(key, value string) {
+		if value != "" {
+			m[key] = value
+		}
+	}
+	addTrue := func(key string, value bool) {
+		if value {
+			m[key] = value
+		}
+	}
+	if len(n.Actions) > 0 {
+		m["actions"] = n.Actions
+	}
+	addNonEmpty("title", n.Title)
+	addNonEmpty("body", n.Body)
+	addNonEmpty("icon", n.Icon)
+	addNonEmpty("badge", n.Badge)
+	addNonEmpty("dir", n.Direction)
+	addNonEmpty("image", n.Image)
+	addNonEmpty("lang", n.Language)
+	addTrue("renotify", n.Renotify)
+	addTrue("requireInteraction", n.RequireInteraction)
+	addTrue("silent", n.Silent)
+	addNonEmpty("tag", n.Tag)
+	if n.Data != nil {
+		m["data"] = n.Data
+	}
+	if n.TimestampMillis != nil {
+		m["timestamp"] = *n.TimestampMillis
+	}
+	if len(n.Vibrate) > 0 {
+		m["vibrate"] = n.Vibrate
+	}
+	return m
+}
+
+// MarshalJSON marshals a WebpushNotification into JSON (for internal use only).
+func (n *WebpushNotification) MarshalJSON() ([]byte, error) {
+	m := n.standardFields()
+	for k, v := range n.CustomData {
+		m[k] = v
+	}
+	return json.Marshal(m)
 }
 
 // APNSConfig contains messaging options specific to the Apple Push Notification Service (APNS).
