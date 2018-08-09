@@ -233,6 +233,7 @@ type WebpushNotification struct {
 	Body  string `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
 	Icon  string `json:"icon,omitempty"`
 	Image string `json:"image,omitempty"`
+	ClickAction string `json:"click_action,omitempty"`
 }
 
 // APNSConfig contains messaging options specific to the Apple Push Notification Service (APNS).
