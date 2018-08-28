@@ -134,7 +134,7 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 // DeleteInstanceID deletes the specified instance ID and the associated data from Firebase..
 //
 // Note that Google Analytics for Firebase uses its own form of Instance ID to keep track of
-// analytics data. Therefore deleting a regular Instance ID does not delete Analytics data.
+// analytics data. Therefore deleting a regular instance ID does not delete Analytics data.
 // See https://firebase.google.com/support/privacy/manage-iids#delete_an_instance_id for
 // more information.
 func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
