@@ -19,8 +19,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
+
+	"google.golang.org/api/option"
 
 	"golang.org/x/net/context"
 
@@ -127,9 +128,13 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
+	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
 		is:        is,
-		keySource: newHTTPKeySource(idTokenCertURL, http.DefaultClient),
+		keySource: newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		projectID: conf.ProjectID,
 		signer:    signer,
 		version:   "Go/Admin/" + conf.Version,

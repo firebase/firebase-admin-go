@@ -48,6 +48,11 @@ func validateMessage(message *Message) error {
 		return err
 	}
 
+	// validate WebpushConfig
+	if err := validateWebpushConfig(message.Webpush); err != nil {
+		return err
+	}
+
 	// validate APNSConfig
 	return validateAPNSConfig(message.APNS)
 }
@@ -122,6 +127,23 @@ func validateApsAlert(alert *ApsAlert) error {
 	}
 	if len(alert.LocArgs) > 0 && alert.LocKey == "" {
 		return fmt.Errorf("locKey is required when specifying locArgs")
+	}
+	return nil
+}
+
+func validateWebpushConfig(webpush *WebpushConfig) error {
+	if webpush == nil || webpush.Notification == nil {
+		return nil
+	}
+	dir := webpush.Notification.Direction
+	if dir != "" && dir != "ltr" && dir != "rtl" && dir != "auto" {
+		return fmt.Errorf("direction must be 'ltr', 'rtl' or 'auto'")
+	}
+	m := webpush.Notification.standardFields()
+	for k := range webpush.Notification.CustomData {
+		if _, contains := m[k]; contains {
+			return fmt.Errorf("multiple specifications for the key %q", k)
+		}
 	}
 	return nil
 }
