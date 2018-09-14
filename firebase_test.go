@@ -246,6 +246,10 @@ func TestDatabase(t *testing.T) {
 	if c, err := app.Database(ctx); c == nil || err != nil {
 		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
 	}
+	url := "https://other-mock-db.firebaseio.com"
+	if c, err := app.DatabaseWithURL(ctx, url); c == nil || err != nil {
+		t.Errorf("Database() = (%v, %v); want (db, nil)", c, err)
+	}
 }
 
 func TestDatabaseAuthOverrides(t *testing.T) {

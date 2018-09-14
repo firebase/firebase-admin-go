@@ -131,10 +131,12 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 	}, nil
 }
 
-// DeleteInstanceID deletes an instance ID from Firebase.
+// DeleteInstanceID deletes the specified instance ID and the associated data from Firebase..
 //
-// This can be used to delete an instance ID and associated user data from a Firebase project,
-// pursuant to the General Data protection Regulation (GDPR).
+// Note that Google Analytics for Firebase uses its own form of Instance ID to keep track of
+// analytics data. Therefore deleting a regular instance ID does not delete Analytics data.
+// See https://firebase.google.com/support/privacy/manage-iids#delete_an_instance_id for
+// more information.
 func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
 	if iid == "" {
 		return errors.New("instance id must not be empty")

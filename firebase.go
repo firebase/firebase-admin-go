@@ -42,7 +42,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "3.3.0"
+const Version = "3.4.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -79,11 +79,18 @@ func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	return auth.NewClient(ctx, conf)
 }
 
-// Database returns an instance of db.Client.
+// Database returns an instance of db.Client to interact with the default Firebase Database
+// configured via Config.DatabaseURL.
 func (a *App) Database(ctx context.Context) (*db.Client, error) {
+	return a.DatabaseWithURL(ctx, a.dbURL)
+}
+
+// DatabaseWithURL returns an instance of db.Client to interact with the Firebase Database
+// identified by the given URL.
+func (a *App) DatabaseWithURL(ctx context.Context, url string) (*db.Client, error) {
 	conf := &internal.DatabaseConfig{
 		AuthOverride: a.authOverride,
-		URL:          a.dbURL,
+		URL:          url,
 		Opts:         a.opts,
 		Version:      Version,
 	}
