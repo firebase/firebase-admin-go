@@ -1,5 +1,7 @@
 # Unreleased
 
+# v3.4.0
+
 - [added] `firebase.App` now provides a new `DatabaseWithURL()` function
   for initializing a database client from a URL.
 
