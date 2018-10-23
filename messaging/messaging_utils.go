@@ -16,6 +16,7 @@ package messaging
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -143,6 +144,15 @@ func validateWebpushConfig(webpush *WebpushConfig) error {
 	for k := range webpush.Notification.CustomData {
 		if _, contains := m[k]; contains {
 			return fmt.Errorf("multiple specifications for the key %q", k)
+		}
+	}
+	if webpush.FcmOptions != nil {
+		link := webpush.FcmOptions.Link
+		p, err := url.ParseRequestURI(link)
+		if err != nil {
+			return fmt.Errorf("invalid link URL: %q", link)
+		} else if p.Scheme != "https" {
+			return fmt.Errorf("invalid link URL: %q; want scheme: %q", link, "https")
 		}
 	}
 	return nil
