@@ -20,7 +20,7 @@ go_import_path: firebase.google.com/go
 
 before_install:
     # Golint requires Go 1.7 or later.
-    - if ! [[ "$TRAVIS_GO_VERSION" =~ ^1\.6\.([0-9]+|x)$ ]]; then go get github.com/golang/lint/golint; fi
+    - if ! [[ "$TRAVIS_GO_VERSION" =~ ^1\.6\.([0-9]+|x)$ ]]; then go get golang.org/x/lint/golint; fi
 
 install:
     # Prior to golang 1.8, this can trigger an error for packages containing only tests.
