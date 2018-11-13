@@ -15,6 +15,7 @@
 package firebase
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -557,13 +558,15 @@ func TestAutoInit(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		overwriteEnv(firebaseEnvName, test.optionsConfig)
-		app, err := NewApp(context.Background(), test.initOptions)
-		if err != nil {
-			t.Errorf("NewApp(%s): %v", test.name, err)
-		} else {
-			compareConfig(app, test.wantOptions, t)
-		}
+		t.Run(fmt.Sprintf("NewApp(%s)", test.name), func(t *testing.T) {
+			overwriteEnv(firebaseEnvName, test.optionsConfig)
+			app, err := NewApp(context.Background(), test.initOptions)
+			if err != nil {
+				t.Error(err)
+			} else {
+				compareConfig(app, test.wantOptions, t)
+			}
+		})
 	}
 }
 
@@ -593,11 +596,13 @@ func TestAutoInitInvalidFiles(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		overwriteEnv(firebaseEnvName, test.filename)
-		_, err := NewApp(context.Background(), nil)
-		if err == nil || err.Error() != test.wantError {
-			t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			overwriteEnv(firebaseEnvName, test.filename)
+			_, err := NewApp(context.Background(), nil)
+			if err == nil || err.Error() != test.wantError {
+				t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
+			}
+		})
 	}
 }
 
