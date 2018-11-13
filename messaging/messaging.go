@@ -224,7 +224,7 @@ type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
-	FcmOptions   *WebpushFcmOptions   `json:"fcm_options,omitempty"`
+	FcmOptions   *WebpushFcmOptions   `json:"fcmOptions,omitempty"`
 }
 
 // WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
