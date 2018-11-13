@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/net/context"
+	"context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/internal"

@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 var sortableKeysResp = map[string]interface{}{

@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"golang.org/x/oauth2/google"
 

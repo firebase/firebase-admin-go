@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type refOp func(r *Ref) error

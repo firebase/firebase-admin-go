@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"

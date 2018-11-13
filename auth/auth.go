@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/api/option"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/identitytoolkit/v3"

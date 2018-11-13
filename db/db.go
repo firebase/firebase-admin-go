@@ -25,7 +25,8 @@ import (
 
 	"net/url"
 
-	"golang.org/x/net/context"
+	"context"
+
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
