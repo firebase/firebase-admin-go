@@ -370,14 +370,17 @@ var validMessages = []struct {
 				Payload: &APNSPayload{
 					Aps: &Aps{
 						Alert: &ApsAlert{
-							Title:        "t",
-							Body:         "b",
-							TitleLocKey:  "tlk",
-							TitleLocArgs: []string{"t1", "t2"},
-							LocKey:       "blk",
-							LocArgs:      []string{"b1", "b2"},
-							ActionLocKey: "alk",
-							LaunchImage:  "li",
+							Title:           "t",
+							SubTitle:        "st",
+							Body:            "b",
+							TitleLocKey:     "tlk",
+							TitleLocArgs:    []string{"t1", "t2"},
+							SubTitleLocKey:  "stlk",
+							SubTitleLocArgs: []string{"t1", "t2"},
+							LocKey:          "blk",
+							LocArgs:         []string{"b1", "b2"},
+							ActionLocKey:    "alk",
+							LaunchImage:     "li",
 						},
 					},
 				},
@@ -389,14 +392,17 @@ var validMessages = []struct {
 				"payload": map[string]interface{}{
 					"aps": map[string]interface{}{
 						"alert": map[string]interface{}{
-							"title":          "t",
-							"body":           "b",
-							"title-loc-key":  "tlk",
-							"title-loc-args": []interface{}{"t1", "t2"},
-							"loc-key":        "blk",
-							"loc-args":       []interface{}{"b1", "b2"},
-							"action-loc-key": "alk",
-							"launch-image":   "li",
+							"title":             "t",
+							"subtitle":          "st",
+							"body":              "b",
+							"title-loc-key":     "tlk",
+							"title-loc-args":    []interface{}{"t1", "t2"},
+							"subtitle-loc-key":  "stlk",
+							"subtitle-loc-args": []interface{}{"t1", "t2"},
+							"loc-key":           "blk",
+							"loc-args":          []interface{}{"b1", "b2"},
+							"action-loc-key":    "alk",
+							"launch-image":      "li",
 						},
 					},
 				},
@@ -556,6 +562,22 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "titleLocKey is required when specifying titleLocArgs",
+	},
+	{
+		name: "InvalidAPNSSubTitleLocArgs",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert: &ApsAlert{
+							SubTitleLocArgs: []string{"a1"},
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "subtitleLocKey is required when specifying subtitleLocArgs",
 	},
 	{
 		name: "InvalidAPNSLocArgs",
@@ -794,7 +816,7 @@ func TestSendError(t *testing.T) {
 		},
 		{
 			resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
-				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode", "errorCode": "UNREGISTERED"}]}}`,
+				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}`,
 			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
 				"details: test error",
 			check: IsRegistrationTokenNotRegistered,

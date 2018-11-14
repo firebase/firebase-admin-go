@@ -126,6 +126,9 @@ func validateApsAlert(alert *ApsAlert) error {
 	if len(alert.TitleLocArgs) > 0 && alert.TitleLocKey == "" {
 		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
 	}
+	if len(alert.SubTitleLocArgs) > 0 && alert.SubTitleLocKey == "" {
+		return fmt.Errorf("subtitleLocKey is required when specifying subtitleLocArgs")
+	}
 	if len(alert.LocArgs) > 0 && alert.LocKey == "" {
 		return fmt.Errorf("locKey is required when specifying locArgs")
 	}
