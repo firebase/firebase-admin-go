@@ -1,5 +1,8 @@
 # Unreleased
 
+- [fixed] Fixing error handling in FCM now check the key 
+  `type.googleapis.com/google.firebase.fcm.v1.FcmError` to set ErrorCode.
+
 # v3.4.0
 
 - [added] `firebase.App` now provides a new `DatabaseWithURL()` function
