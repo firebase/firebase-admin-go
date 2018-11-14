@@ -1,5 +1,7 @@
 # Unreleased
 
+- [dropped] Dropped support for Go 1.8 and earlier.
+
 # v3.4.0
 
 - [added] `firebase.App` now provides a new `DatabaseWithURL()` function
