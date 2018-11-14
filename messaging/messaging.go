@@ -399,14 +399,17 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
 // for supported fields.
 type ApsAlert struct {
-	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
-	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
-	LocKey       string   `json:"loc-key,omitempty"`
-	LocArgs      []string `json:"loc-args,omitempty"`
-	TitleLocKey  string   `json:"title-loc-key,omitempty"`
-	TitleLocArgs []string `json:"title-loc-args,omitempty"`
-	ActionLocKey string   `json:"action-loc-key,omitempty"`
-	LaunchImage  string   `json:"launch-image,omitempty"`
+	Title           string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	SubTitle        string   `json:"subtitle,omitempty"`
+	Body            string   `json:"body,omitempty"` // if specified, overrides the Body field of the Notification type
+	LocKey          string   `json:"loc-key,omitempty"`
+	LocArgs         []string `json:"loc-args,omitempty"`
+	TitleLocKey     string   `json:"title-loc-key,omitempty"`
+	TitleLocArgs    []string `json:"title-loc-args,omitempty"`
+	SubTitleLocKey  string   `json:"subtitle-loc-key,omitempty"`
+	SubTitleLocArgs []string `json:"subtitle-loc-args,omitempty"`
+	ActionLocKey    string   `json:"action-loc-key,omitempty"`
+	LaunchImage     string   `json:"launch-image,omitempty"`
 }
 
 // ErrorInfo is a topic management error.
