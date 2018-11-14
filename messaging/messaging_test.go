@@ -24,9 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"firebase.google.com/go/internal"
+	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 )
 
@@ -226,6 +225,9 @@ var validMessages = []struct {
 					Vibrate:            []int{100, 200, 100},
 					CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
 				},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "https://link.com",
+				},
 			},
 			Topic: "test-topic",
 		},
@@ -253,6 +255,9 @@ var validMessages = []struct {
 					"vibrate":            []interface{}{float64(100), float64(200), float64(100)},
 					"k1":                 "v1",
 					"k2":                 "v2",
+				},
+				"fcmOptions": map[string]interface{}{
+					"link": "https://link.com",
 				},
 			},
 			"topic": "test-topic",
@@ -592,6 +597,32 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: `multiple specifications for the key "dir"`,
+	},
+	{
+		name: "InvalidWebpushFcmOptionsLink",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "link",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid link URL: "link"`,
+	},
+	{
+		name: "InvalidWebpushFcmOptionsLinkScheme",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "http://link.com",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid link URL: "http://link.com"; want scheme: "https"`,
 	},
 }
 
