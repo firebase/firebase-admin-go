@@ -74,6 +74,10 @@ func TestClientOptions(t *testing.T) {
 	defer ts.Close()
 
 	b, err := mockServiceAcct(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	config, err := google.JWTConfigFromJSON(b)
 	if err != nil {
 		t.Fatal(err)

@@ -220,9 +220,6 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, fmt.Errorf("id token must be a non-empty string")
 	}
 
-	if err := verifyToken(ctx, idToken, c.keySource); err != nil {
-		return nil, err
-	}
 	segments := strings.Split(idToken, ".")
 
 	var (
@@ -281,6 +278,13 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 		return nil, err
 	}
 	payload.UID = payload.Subject
+
+	// Verifying the signature requires syncronized access to a key store and
+	// potentially issues a http request. Validating the fields of the token is
+	// cheaper and invalid tokens will fail faster.
+	if err := verifyToken(ctx, idToken, c.keySource); err != nil {
+		return nil, err
+	}
 	return &payload, nil
 }
 

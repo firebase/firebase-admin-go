@@ -28,7 +28,6 @@ import (
 	"context"
 
 	"firebase.google.com/go/internal"
-
 	"google.golang.org/api/transport"
 )
 
@@ -226,6 +225,7 @@ type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
+	FcmOptions   *WebpushFcmOptions   `json:"fcmOptions,omitempty"`
 }
 
 // WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
@@ -256,6 +256,11 @@ type WebpushNotification struct {
 	TimestampMillis    *int64      `json:"timestamp,omitempty"`
 	Vibrate            []int       `json:"vibrate,omitempty"`
 	CustomData         map[string]interface{}
+}
+
+// WebpushFcmOptions Options for features provided by the FCM SDK for Web.
+type WebpushFcmOptions struct {
+	Link string `json:"link,omitempty"`
 }
 
 // standardFields creates a map containing all the fields except the custom data.
