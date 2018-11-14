@@ -633,7 +633,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	var serverCode string
 	for _, d := range fe.Error.Details {
-		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode" {
+		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" {
 			serverCode = d.ErrorCode
 			break
 		}
