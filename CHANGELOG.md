@@ -1,7 +1,8 @@
 # Unreleased
 
-- [fixed] Fixing error handling in FCM now check the key 
-  `type.googleapis.com/google.firebase.fcm.v1.FcmError` to set ErrorCode.
+- [fixed] Fixing error handling in FCM. The SDK now checks the key 
+  `type.googleapis.com/google.firebase.fcm.v1.FcmError` to set error code.
+- [added] `messaging.ApsAlert` type now supports subtitle in its payload.
 
 # v3.4.0
 
