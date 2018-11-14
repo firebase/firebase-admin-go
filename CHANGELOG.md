@@ -1,5 +1,7 @@
 # Unreleased
 
+- [added] `messaging.ApsAlert` type now supports subtitle in its payload.
+
 # v3.4.0
 
 - [added] `firebase.App` now provides a new `DatabaseWithURL()` function
