@@ -108,6 +108,9 @@ func validateAps(aps *Aps) error {
 		if aps.Alert != nil && aps.AlertString != "" {
 			return fmt.Errorf("multiple alert specifications")
 		}
+		if aps.CriticalSound != nil && aps.Sound != "" {
+			return fmt.Errorf("multiple sound specifications")
+		}
 		m := aps.standardFields()
 		for k := range aps.CustomData {
 			if _, contains := m[k]; contains {
