@@ -400,7 +400,7 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 
 // CriticalSound is the sound payload that can be included in an Aps.
 type CriticalSound struct {
-	Critical int     `json:"critical,omitempty"`
+	Critical bool    `json:"critical,omitempty"`
 	Name     string  `json:"name,omitempty"`
 	Volume   float64 `json:"volume,omitempty"`
 }

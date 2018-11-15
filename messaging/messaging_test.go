@@ -341,7 +341,7 @@ var validMessages = []struct {
 						Badge:       &badge,
 						Category:    "c",
 						CriticalSound: &CriticalSound{
-							Critical: 1,
+							Critical: true,
 							Name:     "n",
 							Volume:   0.7,
 						},
@@ -366,7 +366,7 @@ var validMessages = []struct {
 						"badge":    float64(badge),
 						"category": "c",
 						"sound": map[string]interface{}{
-							"critical": float64(1),
+							"critical": true,
 							"name":     "n",
 							"volume":   float64(0.7),
 						},
