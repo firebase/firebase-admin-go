@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go/db"
 

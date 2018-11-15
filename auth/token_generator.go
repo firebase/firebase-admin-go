@@ -32,7 +32,7 @@ import (
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type jwtHeader struct {

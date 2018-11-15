@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 	"google.golang.org/api/transport"
 )
 

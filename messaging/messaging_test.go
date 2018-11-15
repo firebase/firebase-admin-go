@@ -15,6 +15,7 @@
 package messaging
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -25,7 +26,6 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 )
 
@@ -709,11 +709,13 @@ func TestSend(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		name, err := client.Send(ctx, tc.req)
-		if name != testMessageID || err != nil {
-			t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
-		}
-		checkFCMRequest(t, b, tr, tc.want, false)
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+			}
+			checkFCMRequest(t, b, tr, tc.want, false)
+		})
 	}
 }
 
@@ -736,11 +738,13 @@ func TestSendDryRun(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		name, err := client.SendDryRun(ctx, tc.req)
-		if name != testMessageID || err != nil {
-			t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
-		}
-		checkFCMRequest(t, b, tr, tc.want, true)
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SendDryRun(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+			}
+			checkFCMRequest(t, b, tr, tc.want, true)
+		})
 	}
 }
 
@@ -839,10 +843,12 @@ func TestInvalidMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidMessages {
-		name, err := client.Send(ctx, tc.req)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("Send(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("Send(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 
@@ -879,10 +885,12 @@ func TestInvalidSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("SubscribeToTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("SubscribeToTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 
@@ -919,10 +927,12 @@ func TestInvalidUnsubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("UnsubscribeFromTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("UnsubscribeFromTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 

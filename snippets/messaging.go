@@ -19,7 +19,7 @@ import (
 	"log"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/messaging"

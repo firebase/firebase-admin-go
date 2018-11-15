@@ -24,8 +24,9 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/identitytoolkit/v3"

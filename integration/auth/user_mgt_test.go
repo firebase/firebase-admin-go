@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"google.golang.org/api/iterator"
 
@@ -61,10 +61,12 @@ func TestGetUser(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got, err := tc.getOp(context.Background())
-		if err != nil || !reflect.DeepEqual(*got, *want) {
-			t.Errorf("%s = (%#v, %v); want = (%#v, nil)", tc.name, got, err, want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.getOp(context.Background())
+			if err != nil || !reflect.DeepEqual(*got, *want) {
+				t.Errorf("%s = (%#v, %v); want = (%#v, nil)", tc.name, got, err, want)
+			}
+		})
 	}
 }
 

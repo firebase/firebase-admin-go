@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"golang.org/x/oauth2/google"
 
@@ -205,10 +205,12 @@ func TestCustomTokenError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		token, err := client.CustomTokenWithClaims(ctx, tc.uid, tc.claims)
-		if token != "" || err == nil {
-			t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			token, err := client.CustomTokenWithClaims(ctx, tc.uid, tc.claims)
+			if token != "" || err == nil {
+				t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
+			}
+		})
 	}
 }
 
@@ -321,9 +323,11 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if _, err := client.VerifyIDToken(ctx, tc.token); err == nil {
-			t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := client.VerifyIDToken(ctx, tc.token); err == nil {
+				t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
+			}
+		})
 	}
 }
 

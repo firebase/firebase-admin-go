@@ -28,7 +28,7 @@ import (
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 func TestEncodeToken(t *testing.T) {

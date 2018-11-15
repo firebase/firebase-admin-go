@@ -23,7 +23,8 @@ import (
 	"runtime"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
+
 	"golang.org/x/oauth2"
 
 	"encoding/json"
