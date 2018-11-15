@@ -1028,7 +1028,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to": "/topics/test-topic",
+		"to":                  "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {
