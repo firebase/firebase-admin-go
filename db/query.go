@@ -24,7 +24,7 @@ import (
 
 	"firebase.google.com/go/internal"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // QueryNode represents a data node retrieved from an ordered query.

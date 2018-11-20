@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"cloud.google.com/go/firestore"
 

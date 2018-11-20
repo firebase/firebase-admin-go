@@ -31,7 +31,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
-	"golang.org/x/net/context"
+	"context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"

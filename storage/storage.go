@@ -18,7 +18,7 @@ package storage // import "firebase.google.com/go/storage"
 import (
 	"errors"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"cloud.google.com/go/storage"
 	"firebase.google.com/go/internal"

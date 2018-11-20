@@ -22,7 +22,7 @@ import (
 	"os"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go"
 
