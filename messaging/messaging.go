@@ -618,7 +618,9 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		Method: http.MethodPost,
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project),
 		Body:   internal.NewJSONEntity(req),
+		Opts:   []internal.HTTPOption{internal.WithHeader("X-GOOG-API-FORMAT-VERSION", "2")},
 	}
+
 	resp, err := c.client.Do(ctx, request)
 	if err != nil {
 		return "", err
