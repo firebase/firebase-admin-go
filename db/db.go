@@ -116,6 +116,7 @@ func (c *Client) send(
 	if c.authOverride != "" {
 		opts = append(opts, internal.WithQueryParam(authVarOverride, c.authOverride))
 	}
+	opts = append(opts, internal.WithHeader("X-Firebase-Decoding", "1"))
 	return c.hc.Do(ctx, &internal.Request{
 		Method: method,
 		URL:    fmt.Sprintf("%s%s.json", c.url, path),
