@@ -1020,6 +1020,9 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
 	}
+	if h := tr.Header.Get("X-GOOG-API-FORMAT-VERSION"); h != "2" {
+		t.Errorf("X-GOOG-API-FORMAT-VERSION = %q; want = %q", h, "2")
+	}
 }
 
 func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
