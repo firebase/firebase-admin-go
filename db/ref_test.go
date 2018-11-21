@@ -15,12 +15,11 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
-
-	"context"
 )
 
 type refOp func(r *Ref) error

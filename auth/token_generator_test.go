@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -27,8 +28,6 @@ import (
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
-
-	"context"
 )
 
 func TestEncodeToken(t *testing.T) {

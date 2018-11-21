@@ -17,6 +17,7 @@
 package messaging // import "firebase.google.com/go/messaging"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,8 +25,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"

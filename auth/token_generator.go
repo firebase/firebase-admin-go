@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -31,8 +32,6 @@ import (
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
-
-	"context"
 )
 
 type jwtHeader struct {

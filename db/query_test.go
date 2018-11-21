@@ -14,11 +14,10 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
-
-	"context"
 )
 
 var sortableKeysResp = map[string]interface{}{

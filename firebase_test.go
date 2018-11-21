@@ -15,6 +15,8 @@
 package firebase
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,16 +29,10 @@ import (
 	"testing"
 	"time"
 
-	"context"
-
-	"golang.org/x/oauth2/google"
-
-	"google.golang.org/api/transport"
-
-	"encoding/json"
-
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 const credEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"

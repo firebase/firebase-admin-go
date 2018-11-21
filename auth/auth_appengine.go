@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"firebase.google.com/go/internal"
-
 	"google.golang.org/appengine"
 )
 

@@ -16,6 +16,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -27,10 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"context"
-
 	"firebase.google.com/go/internal"
-
 	"golang.org/x/oauth2"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"

@@ -16,6 +16,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -31,8 +32,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 )
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic

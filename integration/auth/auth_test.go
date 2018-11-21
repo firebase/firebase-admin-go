@@ -17,6 +17,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -27,15 +28,11 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/api/option"
-
-	"golang.org/x/oauth2/google"
-
-	"context"
-
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/integration/internal"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 const (
