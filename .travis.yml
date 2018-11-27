@@ -1,8 +1,9 @@
 language: go
 
 go:
-  - 1.9.x
+  - "1.9.x"
   - "1.10.x"
+  - "1.11.x"
   - master
 
 matrix:
@@ -21,6 +22,6 @@ install:
 
 script:
     - golint -set_exit_status $(go list ./...)
-    - ./.travis.gofmt.sh
+    - if [[ "$TRAVIS_GO_VERSION" =~ ^1\.11\.([0-9]+|x)$ ]]; then ./.travis.gofmt.sh; fi
     - go test -v -race -test.short ./...        # Run tests with the race detector.
     - go vet -v ./...                           # Run Go static analyzer.
