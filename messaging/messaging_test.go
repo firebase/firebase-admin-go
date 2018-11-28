@@ -149,6 +149,7 @@ var validMessages = []struct {
 					TitleLocArgs: []string{"t1", "t2"},
 					BodyLocKey:   "blk",
 					BodyLocArgs:  []string{"b1", "b2"},
+					ChannelId:    "channel",
 				},
 				TTL: &ttlWithNanos,
 			},
@@ -166,6 +167,7 @@ var validMessages = []struct {
 					"title_loc_args": []interface{}{"t1", "t2"},
 					"body_loc_key":   "blk",
 					"body_loc_args":  []interface{}{"b1", "b2"},
+					"channel_id":     "channel",
 				},
 				"ttl": "1.500000000s",
 			},
@@ -965,7 +967,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to": "/topics/test-topic",
+		"to":                  "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {
