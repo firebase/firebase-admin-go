@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/db"

@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/messaging"

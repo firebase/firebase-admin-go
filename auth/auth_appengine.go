@@ -17,8 +17,9 @@
 package auth
 
 import (
+	"context"
+
 	"firebase.google.com/go/internal"
-	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
 )

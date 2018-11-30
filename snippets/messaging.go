@@ -19,7 +19,7 @@ import (
 	"log"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/messaging"
@@ -30,6 +30,9 @@ func sendToToken(app *firebase.App) {
 	// Obtain a messaging.Client from the App.
 	ctx := context.Background()
 	client, err := app.Messaging(ctx)
+	if err != nil {
+		log.Fatalf("error getting Messaging client: %v\n", err)
+	}
 
 	// This registration token comes from the client FCM SDKs.
 	registrationToken := "YOUR_REGISTRATION_TOKEN"

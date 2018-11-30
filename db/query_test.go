@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 var sortableKeysResp = map[string]interface{}{
@@ -297,13 +297,15 @@ func TestInvalidLimitQuery(t *testing.T) {
 		{"NegativeLast", q.LimitToLast(-10)},
 	}
 	for _, tc := range cases {
-		var got map[string]interface{}
-		if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
-			t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
-		}
-		if len(mock.Reqs) != 0 {
-			t.Errorf("OrderByChild(%q): %v; want: empty", tc.name, mock.Reqs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			var got map[string]interface{}
+			if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
+				t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
+			}
+			if len(mock.Reqs) != 0 {
+				t.Errorf("OrderByChild(%q): %v; want: empty", tc.name, mock.Reqs)
+			}
+		})
 	}
 }
 
@@ -383,13 +385,15 @@ func TestInvalidFilterQuery(t *testing.T) {
 		{"InvalidEqualTo", q.EqualTo(func() {})},
 	}
 	for _, tc := range cases {
-		var got map[string]interface{}
-		if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
-			t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
-		}
-		if len(mock.Reqs) != 0 {
-			t.Errorf("OrdderByChild(%q) = %v; want = empty", tc.name, mock.Reqs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			var got map[string]interface{}
+			if err := tc.q.Get(context.Background(), &got); got != nil || err == nil {
+				t.Errorf("OrderByChild(%q) = (%v, %v); want = (nil, error)", tc.name, got, err)
+			}
+			if len(mock.Reqs) != 0 {
+				t.Errorf("OrdderByChild(%q) = %v; want = empty", tc.name, mock.Reqs)
+			}
+		})
 	}
 }
 
