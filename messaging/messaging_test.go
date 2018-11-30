@@ -148,7 +148,7 @@ var validMessages = []struct {
 					TitleLocArgs: []string{"t1", "t2"},
 					BodyLocKey:   "blk",
 					BodyLocArgs:  []string{"b1", "b2"},
-					ChannelId:    "channel",
+					ChannelID:    "channel",
 				},
 				TTL: &ttlWithNanos,
 			},
