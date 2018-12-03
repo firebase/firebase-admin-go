@@ -16,17 +16,14 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"runtime"
 	"strings"
 
 	"firebase.google.com/go/internal"
-
-	"net/url"
-
-	"context"
-
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )

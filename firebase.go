@@ -18,22 +18,19 @@
 package firebase // import "firebase.google.com/go"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 
-	"context"
-
 	"cloud.google.com/go/firestore"
-
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/db"
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/messaging"
 	"firebase.google.com/go/storage"
-
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"

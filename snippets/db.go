@@ -16,14 +16,12 @@ package snippets
 
 // [START authenticate_db_imports]
 import (
+	"context"
 	"fmt"
 	"log"
 
-	"context"
-
-	"firebase.google.com/go/db"
-
 	"firebase.google.com/go"
+	"firebase.google.com/go/db"
 	"google.golang.org/api/option"
 )
 

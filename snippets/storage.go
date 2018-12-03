@@ -15,9 +15,8 @@
 package snippets
 
 import (
-	"log"
-
 	"context"
+	"log"
 
 	firebase "firebase.google.com/go"
 	"google.golang.org/api/option"

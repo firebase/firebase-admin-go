@@ -15,16 +15,14 @@
 package iid
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"context"
-
-	"google.golang.org/api/option"
-
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/option"
 )
 
 var testIIDConfig = &internal.InstanceIDConfig{

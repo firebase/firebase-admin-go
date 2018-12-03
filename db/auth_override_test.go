@@ -15,9 +15,8 @@
 package db
 
 import (
-	"testing"
-
 	"context"
+	"testing"
 )
 
 func TestAuthOverrideGet(t *testing.T) {
