@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -22,11 +23,8 @@ import (
 	"os"
 	"testing"
 
-	"context"
-
-	"firebase.google.com/go"
-
 	gcs "cloud.google.com/go/storage"
+	"firebase.google.com/go"
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/storage"
 )

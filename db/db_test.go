@@ -15,27 +15,21 @@
 package db
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"reflect"
 	"runtime"
 	"testing"
 
-	"context"
-
-	"golang.org/x/oauth2"
-
-	"encoding/json"
-
-	"reflect"
-
-	"io/ioutil"
-
-	"net/url"
-
 	"firebase.google.com/go/internal"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
 

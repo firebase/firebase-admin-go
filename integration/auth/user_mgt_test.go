@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"math/rand"
@@ -24,12 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"context"
-
-	"google.golang.org/api/iterator"
-
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/auth/hash"
+	"google.golang.org/api/iterator"
 )
 
 func TestGetUser(t *testing.T) {

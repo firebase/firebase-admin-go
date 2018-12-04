@@ -15,13 +15,12 @@
 package messaging
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
 	"regexp"
 	"testing"
-
-	"context"
 
 	"firebase.google.com/go/integration/internal"
 	"firebase.google.com/go/messaging"

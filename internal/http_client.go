@@ -16,13 +16,12 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-
-	"context"
 )
 
 // HTTPClient is a convenient API to make HTTP calls.

@@ -1,6 +1,10 @@
 # Unreleased
 
 - [added] `messaging.Aps` type now supports critical sound in its payload.
+
+# v3.5.0
+
+- [added] `messaging.AndroidNotification` type now supports `channel_id`.
 - [dropped] Dropped support for Go 1.8 and earlier.
 - [fixed] Fixing error handling in FCM. The SDK now checks the key 
   `type.googleapis.com/google.firebase.fcm.v1.FcmError` to set error code.

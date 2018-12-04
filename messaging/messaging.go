@@ -17,6 +17,7 @@
 package messaging // import "firebase.google.com/go/messaging"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,8 +25,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -215,6 +214,7 @@ type AndroidNotification struct {
 	BodyLocArgs  []string `json:"body_loc_args,omitempty"`
 	TitleLocKey  string   `json:"title_loc_key,omitempty"`
 	TitleLocArgs []string `json:"title_loc_args,omitempty"`
+	ChannelID    string   `json:"channel_id,omitempty"`
 }
 
 // WebpushConfig contains messaging options specific to the WebPush protocol.

@@ -15,13 +15,11 @@
 package db
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"firebase.google.com/go/db"
-
-	"reflect"
-
-	"context"
 )
 
 var heightSorted = []string{

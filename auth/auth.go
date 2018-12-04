@@ -16,17 +16,15 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	"google.golang.org/api/option"
-
-	"context"
-
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/identitytoolkit/v3"
+	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 

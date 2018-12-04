@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,16 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"context"
-
+	"firebase.google.com/go/internal"
 	"golang.org/x/oauth2/google"
-
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
-
-	"firebase.google.com/go/internal"
 )
 
 var (

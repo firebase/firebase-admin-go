@@ -17,6 +17,7 @@ package db
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -26,8 +27,6 @@ import (
 	"os"
 	"reflect"
 	"testing"
-
-	"context"
 
 	"firebase.google.com/go"
 	"firebase.google.com/go/db"
