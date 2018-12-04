@@ -350,6 +350,7 @@ type Aps struct {
 	Alert            *ApsAlert
 	Badge            *int
 	Sound            string
+	CriticalSound    *CriticalSound
 	ContentAvailable bool
 	MutableContent   bool
 	Category         string
@@ -374,7 +375,9 @@ func (a *Aps) standardFields() map[string]interface{} {
 	if a.Badge != nil {
 		m["badge"] = *a.Badge
 	}
-	if a.Sound != "" {
+	if a.CriticalSound != nil {
+		m["sound"] = a.CriticalSound
+	} else if a.Sound != "" {
 		m["sound"] = a.Sound
 	}
 	if a.Category != "" {
@@ -393,6 +396,13 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 		m[k] = v
 	}
 	return json.Marshal(m)
+}
+
+// CriticalSound is the sound payload that can be included in an Aps.
+type CriticalSound struct {
+	Critical bool    `json:"critical,omitempty"`
+	Name     string  `json:"name,omitempty"`
+	Volume   float64 `json:"volume,omitempty"`
 }
 
 // ApsAlert is the alert payload that can be included in an Aps.

@@ -330,6 +330,60 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "APNSAlertCrticalSound",
+		req: &Message{
+			APNS: &APNSConfig{
+				Headers: map[string]string{
+					"h1": "v1",
+					"h2": "v2",
+				},
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						AlertString: "a",
+						Badge:       &badge,
+						Category:    "c",
+						CriticalSound: &CriticalSound{
+							Critical: true,
+							Name:     "n",
+							Volume:   0.7,
+						},
+						ThreadID:         "t",
+						ContentAvailable: true,
+						MutableContent:   true,
+					},
+					CustomData: map[string]interface{}{
+						"k1": "v1",
+						"k2": true,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"alert":    "a",
+						"badge":    float64(badge),
+						"category": "c",
+						"sound": map[string]interface{}{
+							"critical": true,
+							"name":     "n",
+							"volume":   float64(0.7),
+						},
+						"thread-id":         "t",
+						"content-available": float64(1),
+						"mutable-content":   float64(1),
+					},
+					"k1": "v1",
+					"k2": true,
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
 		name: "APNSBadgeZero",
 		req: &Message{
 			APNS: &APNSConfig{
