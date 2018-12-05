@@ -16,6 +16,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -31,9 +32,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
@@ -89,7 +87,7 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 		return err
 	}
 
-	resp, err := ctxhttp.Do(ctx, k.HTTPClient, req)
+	resp, err := k.HTTPClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return err
 	}

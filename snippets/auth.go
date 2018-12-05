@@ -15,10 +15,9 @@
 package snippets
 
 import (
+	"context"
 	"encoding/base64"
 	"log"
-
-	"golang.org/x/net/context"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"

@@ -15,12 +15,11 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
-
-	"golang.org/x/net/context"
 )
 
 type refOp func(r *Ref) error
@@ -285,10 +284,12 @@ func TestWelformedHttpError(t *testing.T) {
 
 	want := "http error status: 500; reason: test error"
 	for _, tc := range testOps {
-		err := tc.op(testref)
-		if err == nil || err.Error() != want {
-			t.Errorf("%s = %v; want = %v", tc.name, err, want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.op(testref)
+			if err == nil || err.Error() != want {
+				t.Errorf("%s = %v; want = %v", tc.name, err, want)
+			}
+		})
 	}
 
 	if len(mock.Reqs) != len(testOps) {
@@ -303,10 +304,12 @@ func TestUnexpectedHttpError(t *testing.T) {
 
 	want := "http error status: 500; reason: \"unexpected error\""
 	for _, tc := range testOps {
-		err := tc.op(testref)
-		if err == nil || err.Error() != want {
-			t.Errorf("%s = %v; want = %v", tc.name, err, want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.op(testref)
+			if err == nil || err.Error() != want {
+				t.Errorf("%s = %v; want = %v", tc.name, err, want)
+			}
+		})
 	}
 
 	if len(mock.Reqs) != len(testOps) {

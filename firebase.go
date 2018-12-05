@@ -18,22 +18,19 @@
 package firebase // import "firebase.google.com/go"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 
-	"golang.org/x/net/context"
-
 	"cloud.google.com/go/firestore"
-
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/db"
 	"firebase.google.com/go/iid"
 	"firebase.google.com/go/internal"
 	"firebase.google.com/go/messaging"
 	"firebase.google.com/go/storage"
-
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -42,7 +39,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "3.4.0"
+const Version = "3.5.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"

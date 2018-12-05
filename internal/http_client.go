@@ -16,15 +16,12 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-
-	"golang.org/x/net/context/ctxhttp"
-
-	"golang.org/x/net/context"
 )
 
 // HTTPClient is a convenient API to make HTTP calls.
@@ -46,7 +43,7 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		return nil, err
 	}
 
-	resp, err := ctxhttp.Do(ctx, c.Client, req)
+	resp, err := c.Client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

@@ -15,14 +15,13 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"firebase.google.com/go/internal"
-
-	"golang.org/x/net/context"
 )
 
 // txnRetires is the maximum number of times a transaction is retried before giving up. Transaction

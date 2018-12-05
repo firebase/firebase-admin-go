@@ -15,6 +15,9 @@
 package firebase
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -26,16 +29,10 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"golang.org/x/oauth2/google"
-
-	"google.golang.org/api/transport"
-
-	"encoding/json"
-
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
 
 const credEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
@@ -73,6 +70,10 @@ func TestClientOptions(t *testing.T) {
 	defer ts.Close()
 
 	b, err := mockServiceAcct(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	config, err := google.JWTConfigFromJSON(b)
 	if err != nil {
 		t.Fatal(err)
@@ -557,13 +558,15 @@ func TestAutoInit(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		overwriteEnv(firebaseEnvName, test.optionsConfig)
-		app, err := NewApp(context.Background(), test.initOptions)
-		if err != nil {
-			t.Errorf("NewApp(%s): %v", test.name, err)
-		} else {
-			compareConfig(app, test.wantOptions, t)
-		}
+		t.Run(fmt.Sprintf("NewApp(%s)", test.name), func(t *testing.T) {
+			overwriteEnv(firebaseEnvName, test.optionsConfig)
+			app, err := NewApp(context.Background(), test.initOptions)
+			if err != nil {
+				t.Error(err)
+			} else {
+				compareConfig(app, test.wantOptions, t)
+			}
+		})
 	}
 }
 
@@ -593,11 +596,13 @@ func TestAutoInitInvalidFiles(t *testing.T) {
 	defer reinstateEnv(credEnvVar, credOld)
 
 	for _, test := range tests {
-		overwriteEnv(firebaseEnvName, test.filename)
-		_, err := NewApp(context.Background(), nil)
-		if err == nil || err.Error() != test.wantError {
-			t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			overwriteEnv(firebaseEnvName, test.filename)
+			_, err := NewApp(context.Background(), nil)
+			if err == nil || err.Error() != test.wantError {
+				t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
+			}
+		})
 	}
 }
 

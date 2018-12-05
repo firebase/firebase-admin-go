@@ -15,6 +15,7 @@
 package messaging
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -23,8 +24,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/option"
@@ -149,6 +148,7 @@ var validMessages = []struct {
 					TitleLocArgs: []string{"t1", "t2"},
 					BodyLocKey:   "blk",
 					BodyLocArgs:  []string{"b1", "b2"},
+					ChannelID:    "channel",
 				},
 				TTL: &ttlWithNanos,
 			},
@@ -166,6 +166,7 @@ var validMessages = []struct {
 					"title_loc_args": []interface{}{"t1", "t2"},
 					"body_loc_key":   "blk",
 					"body_loc_args":  []interface{}{"b1", "b2"},
+					"channel_id":     "channel",
 				},
 				"ttl": "1.500000000s",
 			},
@@ -226,6 +227,9 @@ var validMessages = []struct {
 					Vibrate:            []int{100, 200, 100},
 					CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
 				},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "https://link.com",
+				},
 			},
 			Topic: "test-topic",
 		},
@@ -253,6 +257,9 @@ var validMessages = []struct {
 					"vibrate":            []interface{}{float64(100), float64(200), float64(100)},
 					"k1":                 "v1",
 					"k2":                 "v2",
+				},
+				"fcmOptions": map[string]interface{}{
+					"link": "https://link.com",
 				},
 			},
 			"topic": "test-topic",
@@ -323,6 +330,60 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "APNSAlertCrticalSound",
+		req: &Message{
+			APNS: &APNSConfig{
+				Headers: map[string]string{
+					"h1": "v1",
+					"h2": "v2",
+				},
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						AlertString: "a",
+						Badge:       &badge,
+						Category:    "c",
+						CriticalSound: &CriticalSound{
+							Critical: true,
+							Name:     "n",
+							Volume:   0.7,
+						},
+						ThreadID:         "t",
+						ContentAvailable: true,
+						MutableContent:   true,
+					},
+					CustomData: map[string]interface{}{
+						"k1": "v1",
+						"k2": true,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"apns": map[string]interface{}{
+				"headers": map[string]interface{}{"h1": "v1", "h2": "v2"},
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"alert":    "a",
+						"badge":    float64(badge),
+						"category": "c",
+						"sound": map[string]interface{}{
+							"critical": true,
+							"name":     "n",
+							"volume":   float64(0.7),
+						},
+						"thread-id":         "t",
+						"content-available": float64(1),
+						"mutable-content":   float64(1),
+					},
+					"k1": "v1",
+					"k2": true,
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
 		name: "APNSBadgeZero",
 		req: &Message{
 			APNS: &APNSConfig{
@@ -365,14 +426,17 @@ var validMessages = []struct {
 				Payload: &APNSPayload{
 					Aps: &Aps{
 						Alert: &ApsAlert{
-							Title:        "t",
-							Body:         "b",
-							TitleLocKey:  "tlk",
-							TitleLocArgs: []string{"t1", "t2"},
-							LocKey:       "blk",
-							LocArgs:      []string{"b1", "b2"},
-							ActionLocKey: "alk",
-							LaunchImage:  "li",
+							Title:           "t",
+							SubTitle:        "st",
+							Body:            "b",
+							TitleLocKey:     "tlk",
+							TitleLocArgs:    []string{"t1", "t2"},
+							SubTitleLocKey:  "stlk",
+							SubTitleLocArgs: []string{"t1", "t2"},
+							LocKey:          "blk",
+							LocArgs:         []string{"b1", "b2"},
+							ActionLocKey:    "alk",
+							LaunchImage:     "li",
 						},
 					},
 				},
@@ -384,14 +448,17 @@ var validMessages = []struct {
 				"payload": map[string]interface{}{
 					"aps": map[string]interface{}{
 						"alert": map[string]interface{}{
-							"title":          "t",
-							"body":           "b",
-							"title-loc-key":  "tlk",
-							"title-loc-args": []interface{}{"t1", "t2"},
-							"loc-key":        "blk",
-							"loc-args":       []interface{}{"b1", "b2"},
-							"action-loc-key": "alk",
-							"launch-image":   "li",
+							"title":             "t",
+							"subtitle":          "st",
+							"body":              "b",
+							"title-loc-key":     "tlk",
+							"title-loc-args":    []interface{}{"t1", "t2"},
+							"subtitle-loc-key":  "stlk",
+							"subtitle-loc-args": []interface{}{"t1", "t2"},
+							"loc-key":           "blk",
+							"loc-args":          []interface{}{"b1", "b2"},
+							"action-loc-key":    "alk",
+							"launch-image":      "li",
 						},
 					},
 				},
@@ -553,6 +620,22 @@ var invalidMessages = []struct {
 		want: "titleLocKey is required when specifying titleLocArgs",
 	},
 	{
+		name: "InvalidAPNSSubTitleLocArgs",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Alert: &ApsAlert{
+							SubTitleLocArgs: []string{"a1"},
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "subtitleLocKey is required when specifying subtitleLocArgs",
+	},
+	{
 		name: "InvalidAPNSLocArgs",
 		req: &Message{
 			APNS: &APNSConfig{
@@ -592,6 +675,32 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: `multiple specifications for the key "dir"`,
+	},
+	{
+		name: "InvalidWebpushFcmOptionsLink",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "link",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid link URL: "link"`,
+	},
+	{
+		name: "InvalidWebpushFcmOptionsLinkScheme",
+		req: &Message{
+			Webpush: &WebpushConfig{
+				Notification: &WebpushNotification{},
+				FcmOptions: &WebpushFcmOptions{
+					Link: "http://link.com",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid link URL: "http://link.com"; want scheme: "https"`,
 	},
 }
 
@@ -656,11 +765,13 @@ func TestSend(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		name, err := client.Send(ctx, tc.req)
-		if name != testMessageID || err != nil {
-			t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
-		}
-		checkFCMRequest(t, b, tr, tc.want, false)
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+			}
+			checkFCMRequest(t, b, tr, tc.want, false)
+		})
 	}
 }
 
@@ -683,11 +794,13 @@ func TestSendDryRun(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 
 	for _, tc := range validMessages {
-		name, err := client.SendDryRun(ctx, tc.req)
-		if name != testMessageID || err != nil {
-			t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
-		}
-		checkFCMRequest(t, b, tr, tc.want, true)
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SendDryRun(ctx, tc.req)
+			if name != testMessageID || err != nil {
+				t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
+			}
+			checkFCMRequest(t, b, tr, tc.want, true)
+		})
 	}
 }
 
@@ -759,7 +872,7 @@ func TestSendError(t *testing.T) {
 		},
 		{
 			resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
-				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmErrorCode", "errorCode": "UNREGISTERED"}]}}`,
+				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}`,
 			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
 				"details: test error",
 			check: IsRegistrationTokenNotRegistered,
@@ -786,10 +899,12 @@ func TestInvalidMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidMessages {
-		name, err := client.Send(ctx, tc.req)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("Send(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.Send(ctx, tc.req)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("Send(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 
@@ -826,10 +941,12 @@ func TestInvalidSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("SubscribeToTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("SubscribeToTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 
@@ -866,10 +983,12 @@ func TestInvalidUnsubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range invalidTopicMgtArgs {
-		name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("UnsubscribeFromTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("UnsubscribeFromTopic(%s) = (%q, %v); want = (%q, %q)", tc.name, name, err, "", tc.want)
+			}
+		})
 	}
 }
 
@@ -957,6 +1076,9 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
 	}
+	if h := tr.Header.Get("X-GOOG-API-FORMAT-VERSION"); h != "2" {
+		t.Errorf("X-GOOG-API-FORMAT-VERSION = %q; want = %q", h, "2")
+	}
 }
 
 func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
@@ -965,7 +1087,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to": "/topics/test-topic",
+		"to":                  "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {

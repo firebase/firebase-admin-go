@@ -16,6 +16,7 @@ package messaging
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -107,6 +108,9 @@ func validateAps(aps *Aps) error {
 		if aps.Alert != nil && aps.AlertString != "" {
 			return fmt.Errorf("multiple alert specifications")
 		}
+		if aps.CriticalSound != nil && aps.Sound != "" {
+			return fmt.Errorf("multiple sound specifications")
+		}
 		m := aps.standardFields()
 		for k := range aps.CustomData {
 			if _, contains := m[k]; contains {
@@ -124,6 +128,9 @@ func validateApsAlert(alert *ApsAlert) error {
 	}
 	if len(alert.TitleLocArgs) > 0 && alert.TitleLocKey == "" {
 		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
+	}
+	if len(alert.SubTitleLocArgs) > 0 && alert.SubTitleLocKey == "" {
+		return fmt.Errorf("subtitleLocKey is required when specifying subtitleLocArgs")
 	}
 	if len(alert.LocArgs) > 0 && alert.LocKey == "" {
 		return fmt.Errorf("locKey is required when specifying locArgs")
@@ -143,6 +150,15 @@ func validateWebpushConfig(webpush *WebpushConfig) error {
 	for k := range webpush.Notification.CustomData {
 		if _, contains := m[k]; contains {
 			return fmt.Errorf("multiple specifications for the key %q", k)
+		}
+	}
+	if webpush.FcmOptions != nil {
+		link := webpush.FcmOptions.Link
+		p, err := url.ParseRequestURI(link)
+		if err != nil {
+			return fmt.Errorf("invalid link URL: %q", link)
+		} else if p.Scheme != "https" {
+			return fmt.Errorf("invalid link URL: %q; want scheme: %q", link, "https")
 		}
 	}
 	return nil

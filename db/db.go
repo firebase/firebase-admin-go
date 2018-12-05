@@ -16,16 +16,14 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"runtime"
 	"strings"
 
 	"firebase.google.com/go/internal"
-
-	"net/url"
-
-	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
@@ -115,6 +113,7 @@ func (c *Client) send(
 	if c.authOverride != "" {
 		opts = append(opts, internal.WithQueryParam(authVarOverride, c.authOverride))
 	}
+	opts = append(opts, internal.WithHeader("X-Firebase-Decoding", "1"))
 	return c.hc.Do(ctx, &internal.Request{
 		Method: method,
 		URL:    fmt.Sprintf("%s%s.json", c.url, path),

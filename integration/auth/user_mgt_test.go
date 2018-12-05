@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"math/rand"
@@ -24,12 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"google.golang.org/api/iterator"
-
 	"firebase.google.com/go/auth"
 	"firebase.google.com/go/auth/hash"
+	"google.golang.org/api/iterator"
 )
 
 func TestGetUser(t *testing.T) {
@@ -61,10 +59,12 @@ func TestGetUser(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got, err := tc.getOp(context.Background())
-		if err != nil || !reflect.DeepEqual(*got, *want) {
-			t.Errorf("%s = (%#v, %v); want = (%#v, nil)", tc.name, got, err, want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.getOp(context.Background())
+			if err != nil || !reflect.DeepEqual(*got, *want) {
+				t.Errorf("%s = (%#v, %v); want = (%#v, nil)", tc.name, got, err, want)
+			}
+		})
 	}
 }
 

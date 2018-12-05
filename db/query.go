@@ -15,6 +15,7 @@
 package db // import "firebase.google.com/go/db"
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,8 +24,6 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
-
-	"golang.org/x/net/context"
 )
 
 // QueryNode represents a data node retrieved from an ordered query.
