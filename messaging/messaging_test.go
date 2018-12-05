@@ -652,6 +652,57 @@ var invalidMessages = []struct {
 		want: "locKey is required when specifying locArgs",
 	},
 	{
+		name: "MultipleSoundSpecifications",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Sound: "s",
+						CriticalSound: &CriticalSound{
+							Name: "s",
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "multiple sound specifications",
+	},
+	{
+		name: "VolumeTooLow",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						CriticalSound: &CriticalSound{
+							Name:   "s",
+							Volume: -0.1,
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "critical sound volume must be in the interval [0, 1]",
+	},
+	{
+		name: "VolumeTooHigh",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						CriticalSound: &CriticalSound{
+							Name:   "s",
+							Volume: 1.1,
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "critical sound volume must be in the interval [0, 1]",
+	},
+	{
 		name: "InvalidWebpushNotificationDirection",
 		req: &Message{
 			Webpush: &WebpushConfig{
