@@ -398,6 +398,63 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// UnmarshalJSON unmarshals an Aps from JSON (for internal use only).
+func (a *Aps) UnmarshalJSON(data []byte) error {
+	m := make(map[string]interface{})
+	a.CustomData = make(map[string]interface{})
+	err := json.Unmarshal(data, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "alert":
+			if v != nil {
+				switch alert := m["alert"].(type) {
+				case interface{}:
+					a.Alert = alert.(*ApsAlert)
+				case string:
+					a.AlertString = alert
+				}
+			}
+		case "content-available":
+			if v == 1 {
+				a.ContentAvailable = true
+			}
+		case "mutable-content":
+			if v == 1 {
+				a.MutableContent = true
+			}
+		case "badge":
+			if v != nil {
+				floatFromMap := m["badge"].(float64)
+				intFromMap := int(floatFromMap)
+				intPointer := &intFromMap
+				a.Badge = intPointer
+			}
+
+		case "sound":
+			if v != nil {
+				a.Sound = m["sound"].(string)
+			}
+
+		case "category":
+			if v != nil {
+				a.Category = m["category"].(string)
+			}
+
+		case "thread-id":
+			if v != nil {
+				a.ThreadID = m["thread-id"].(string)
+			}
+
+		default:
+			a.CustomData[k] = v
+		}
+	}
+	return nil
+}
+
 // CriticalSound is the sound payload that can be included in an Aps.
 type CriticalSound struct {
 	Critical bool
