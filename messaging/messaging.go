@@ -346,16 +346,16 @@ func (p *APNSPayload) MarshalJSON() ([]byte, error) {
 // Alert may be specified as a string (via the AlertString field), or as a struct (via the Alert
 // field).
 type Aps struct {
-	AlertString      string
-	Alert            *ApsAlert
-	Badge            *int
-	Sound            string
-	CriticalSound    *CriticalSound
-	ContentAvailable bool
-	MutableContent   bool
-	Category         string
-	ThreadID         string
-	CustomData       map[string]interface{}
+	AlertString      string                 `json:"-"`
+	Alert            *ApsAlert              `json:"-"`
+	Badge            *int                   `json:"badge,omitempty"`
+	Sound            string                 `json:"-"`
+	CriticalSound    *CriticalSound         `json:"-"`
+	ContentAvailable bool                   `json:"-"`
+	MutableContent   bool                   `json:"-"`
+	Category         string                 `json:"category,omitempty"`
+	ThreadID         string                 `json:"thread-id,omitempty"`
+	CustomData       map[string]interface{} `json:"-"`
 }
 
 // standardFields creates a map containing all the fields except the custom data.
@@ -398,26 +398,89 @@ func (a *Aps) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// UnmarshalJSON unmarshals a JSON string into an Aps (for internal use only).
+func (a *Aps) UnmarshalJSON(b []byte) error {
+	type apsInternal Aps
+	temp := struct {
+		AlertObject         *json.RawMessage `json:"alert,omitempty"`
+		SoundObject         *json.RawMessage `json:"sound,omitempty"`
+		ContentAvailableInt int              `json:"content-available,omitempty"`
+		MutableContentInt   int              `json:"mutable-content,omitempty"`
+		*apsInternal
+	}{
+		apsInternal: (*apsInternal)(a),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+	a.ContentAvailable = (temp.ContentAvailableInt == 1)
+	a.MutableContent = (temp.MutableContentInt == 1)
+	if temp.AlertObject != nil {
+		if err := json.Unmarshal(*temp.AlertObject, &a.Alert); err != nil {
+			a.Alert = nil
+			if err := json.Unmarshal(*temp.AlertObject, &a.AlertString); err != nil {
+				return fmt.Errorf("failed to unmarshal alert as a struct or a string: %v", err)
+			}
+		}
+	}
+	if temp.SoundObject != nil {
+		if err := json.Unmarshal(*temp.SoundObject, &a.CriticalSound); err != nil {
+			a.CriticalSound = nil
+			if err := json.Unmarshal(*temp.SoundObject, &a.Sound); err != nil {
+				return fmt.Errorf("failed to unmarshal sound as a struct or a string")
+			}
+		}
+	}
+
+	allFields := make(map[string]interface{})
+	if err := json.Unmarshal(b, &allFields); err != nil {
+		return err
+	}
+	for k := range a.standardFields() {
+		delete(allFields, k)
+	}
+	if len(allFields) > 0 {
+		a.CustomData = allFields
+	}
+	return nil
+}
+
 // CriticalSound is the sound payload that can be included in an Aps.
 type CriticalSound struct {
-	Critical bool
-	Name     string
-	Volume   float64
+	Critical bool    `json:"-"`
+	Name     string  `json:"name,omitempty"`
+	Volume   float64 `json:"volume,omitempty"`
 }
 
 // MarshalJSON marshals a CriticalSound into JSON (for internal use only).
 func (cs *CriticalSound) MarshalJSON() ([]byte, error) {
-	m := make(map[string]interface{})
+	type criticalSoundInternal CriticalSound
+	temp := struct {
+		CriticalInt int `json:"critical,omitempty"`
+		*criticalSoundInternal
+	}{
+		criticalSoundInternal: (*criticalSoundInternal)(cs),
+	}
 	if cs.Critical {
-		m["critical"] = 1
+		temp.CriticalInt = 1
 	}
-	if cs.Name != "" {
-		m["name"] = cs.Name
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into a CriticalSound (for internal use only).
+func (cs *CriticalSound) UnmarshalJSON(b []byte) error {
+	type criticalSoundInternal CriticalSound
+	temp := struct {
+		CriticalInt int `json:"critical,omitempty"`
+		*criticalSoundInternal
+	}{
+		criticalSoundInternal: (*criticalSoundInternal)(cs),
 	}
-	if cs.Volume != 0 {
-		m["volume"] = cs.Volume
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
 	}
-	return json.Marshal(m)
+	cs.Critical = temp.CriticalInt == 1
+	return nil
 }
 
 // ApsAlert is the alert payload that can be included in an Aps.

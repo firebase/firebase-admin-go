@@ -797,6 +797,60 @@ func TestNoProjectID(t *testing.T) {
 	}
 }
 
+func TestJSONSerialization(t *testing.T) {
+	cases := []struct {
+		value  interface{}
+		target interface{}
+	}{
+		{
+			value: &Aps{
+				AlertString:      "alertString",
+				Sound:            "soundString",
+				Badge:            &badge,
+				ContentAvailable: true,
+				MutableContent:   true,
+				Category:         "categoryString",
+				ThreadID:         "threadId",
+			},
+			target: &Aps{},
+		},
+		{
+			value: &Aps{
+				Alert: &ApsAlert{
+					Title:    "t",
+					SubTitle: "st",
+				},
+				CriticalSound: &CriticalSound{
+					Critical: true,
+					Name:     "fileName",
+					Volume:   0.5,
+				},
+				Badge:            &badge,
+				ContentAvailable: true,
+				MutableContent:   true,
+				Category:         "categoryString",
+				ThreadID:         "threadId",
+				CustomData: map[string]interface{}{
+					"key": "value",
+				},
+			},
+			target: &Aps{},
+		},
+	}
+	for idx, tc := range cases {
+		b, err := json.Marshal(tc.value)
+		if err != nil {
+			t.Errorf("Marshal(%d) = %v; want = nil", idx, err)
+		}
+		if err := json.Unmarshal(b, tc.target); err != nil {
+			t.Errorf("Unmarshal(%d) = %v; want = nil", idx, err)
+		}
+		if !reflect.DeepEqual(tc.value, tc.target) {
+			t.Errorf("[%d] Unmarshal result = %#v; want = %#v", idx, tc.target, tc.value)
+		}
+	}
+}
+
 func TestSend(t *testing.T) {
 	var tr *http.Request
 	var b []byte
@@ -1138,7 +1192,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to":                  "/topics/test-topic",
+		"to": "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {
