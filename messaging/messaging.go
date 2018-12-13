@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -149,16 +150,17 @@ type Message struct {
 
 // MarshalJSON marshals a Message into JSON (for internal use only).
 func (m *Message) MarshalJSON() ([]byte, error) {
-	// Create a new type to prevent infinite recursion.
+	// Create a new type to prevent infinite recursion. We use this technique whenever it is needed
+	// to customize how a subset of the fields in a struct should be serialized.
 	type messageInternal Message
-	s := &struct {
+	temp := &struct {
 		BareTopic string `json:"topic,omitempty"`
 		*messageInternal
 	}{
 		BareTopic:       strings.TrimPrefix(m.Topic, "/topics/"),
 		messageInternal: (*messageInternal)(m),
 	}
-	return json.Marshal(s)
+	return json.Marshal(temp)
 }
 
 // UnmarshalJSON unmarshals a JSON string into a Message (for internal use only).
@@ -207,14 +209,48 @@ func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 	}
 
 	type androidInternal AndroidConfig
-	s := &struct {
+	temp := &struct {
 		TTL string `json:"ttl,omitempty"`
 		*androidInternal
 	}{
 		TTL:             ttl,
 		androidInternal: (*androidInternal)(a),
 	}
-	return json.Marshal(s)
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into an AndroidConfig (for internal use only).
+func (a *AndroidConfig) UnmarshalJSON(b []byte) error {
+	type androidInternal AndroidConfig
+	temp := struct {
+		TTL string `json:"ttl,omitempty"`
+		*androidInternal
+	}{
+		androidInternal: (*androidInternal)(a),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+	if temp.TTL != "" {
+		segments := strings.Split(strings.TrimSuffix(temp.TTL, "s"), ".")
+		if len(segments) != 1 && len(segments) != 2 {
+			return fmt.Errorf("incorrect number of segments in ttl: %q", temp.TTL)
+		}
+		seconds, err := strconv.ParseInt(segments[0], 10, 64)
+		if err != nil {
+			return err
+		}
+		ttl := time.Duration(seconds) * time.Second
+		if len(segments) == 2 {
+			nanos, err := strconv.ParseInt(strings.TrimLeft(segments[1], "0"), 10, 64)
+			if err != nil {
+				return err
+			}
+			ttl += time.Duration(nanos) * time.Nanosecond
+		}
+		a.TTL = &ttl
+	}
+	return nil
 }
 
 // AndroidNotification is a notification to send to Android devices.
@@ -275,6 +311,11 @@ type WebpushNotification struct {
 }
 
 // standardFields creates a map containing all the fields except the custom data.
+//
+// We implement a standardFields function whenever we want to add custom and arbitrary
+// fields to an object during its serialization. This helper function also comes in
+// handy during validation of the message (to detect duplicate specifications of
+// fields), and also during deserialization.
 func (n *WebpushNotification) standardFields() map[string]interface{} {
 	m := make(map[string]interface{})
 	addNonEmpty := func(key, value string) {
@@ -368,9 +409,14 @@ type APNSPayload struct {
 	CustomData map[string]interface{} `json:"-"`
 }
 
+// standardFields creates a map containing all the fields except the custom data.
+func (p *APNSPayload) standardFields() map[string]interface{} {
+	return map[string]interface{}{"aps": p.Aps}
+}
+
 // MarshalJSON marshals an APNSPayload into JSON (for internal use only).
 func (p *APNSPayload) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{"aps": p.Aps}
+	m := p.standardFields()
 	for k, v := range p.CustomData {
 		m[k] = v
 	}
@@ -388,7 +434,9 @@ func (p *APNSPayload) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &allFields); err != nil {
 		return err
 	}
-	delete(allFields, "aps")
+	for k := range p.standardFields() {
+		delete(allFields, k)
+	}
 	if len(allFields) > 0 {
 		p.CustomData = allFields
 	}

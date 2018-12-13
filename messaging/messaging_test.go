@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -395,7 +396,7 @@ var validMessages = []struct {
 						ThreadID:         "t",
 						ContentAvailable: true,
 						MutableContent:   true,
-						CustomData:       map[string]interface{}{"k1": "v1", "k2": 1},
+						CustomData:       map[string]interface{}{"k1": "v1", "k2": float64(1)},
 					},
 				},
 			},
@@ -797,107 +798,76 @@ func TestNoProjectID(t *testing.T) {
 	}
 }
 
-func TestJSONSerialization(t *testing.T) {
+func TestJSONUnmarshal(t *testing.T) {
+	for _, tc := range validMessages {
+		if tc.name == "PrefixedTopicOnly" {
+			continue
+		}
+		b, err := json.Marshal(tc.req)
+		if err != nil {
+			t.Errorf("Marshal(%s) = %v; want = nil", tc.name, err)
+		}
+		var target Message
+		if err := json.Unmarshal(b, &target); err != nil {
+			t.Errorf("Unmarshal(%s) = %v; want = nil", tc.name, err)
+		}
+		if !reflect.DeepEqual(tc.req, &target) {
+			log.Printf("%#v\n", *tc.req.APNS.Payload.Aps)
+			log.Printf("%#v\n", *target.APNS.Payload.Aps)
+			t.Errorf("Unmarshal(%s) result = %#v; want = %#v", tc.name, tc.req, target)
+		}
+	}
+}
+
+func TestInvalidJSONUnmarshal(t *testing.T) {
 	cases := []struct {
-		value  interface{}
+		name   string
+		req    map[string]interface{}
 		target interface{}
 	}{
 		{
-			value: &Message{
-				Topic: "test-topic",
-				Notification: &Notification{
-					Title: "t",
-					Body:  "b",
-				},
+			name: "InvalidTTLSegments",
+			req: map[string]interface{}{
+				"ttl": "1.2.3s",
 			},
-			target: &Message{},
+			target: &AndroidConfig{},
 		},
 		{
-			value: &WebpushNotification{
-				Title: "title",
-				Body:  "body",
-				Icon:  "icon",
-				Actions: []*WebpushNotificationAction{
-					{
-						Action: "a1",
-						Title:  "a1-title",
-					},
-					{
-						Action: "a2",
-						Title:  "a2-title",
-						Icon:   "a2-icon",
-					},
-				},
-				Badge:              "badge",
-				Data:               "data",
-				Image:              "image",
-				Language:           "lang",
-				Renotify:           true,
-				RequireInteraction: true,
-				Silent:             true,
-				Tag:                "tag",
-				TimestampMillis:    &timestampMillis,
-				Vibrate:            []int{100, 200, 100},
-				CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
+			name: "IncorrectTTLSeconds",
+			req: map[string]interface{}{
+				"ttl": "abcs",
 			},
-			target: &WebpushNotification{},
+			target: &AndroidConfig{},
 		},
 		{
-			value: &APNSPayload{
-				Aps: &Aps{
-					AlertString: "alertString",
-				},
-				CustomData: map[string]interface{}{
-					"key": "value",
-				},
+			name: "IncorrectTTLNanoseconds",
+			req: map[string]interface{}{
+				"ttl": "10.abcs",
 			},
-			target: &APNSPayload{},
+			target: &AndroidConfig{},
 		},
 		{
-			value: &Aps{
-				AlertString:      "alertString",
-				Sound:            "soundString",
-				Badge:            &badge,
-				ContentAvailable: true,
-				MutableContent:   true,
-				Category:         "categoryString",
-				ThreadID:         "threadId",
+			name: "InvalidApsAlert",
+			req: map[string]interface{}{
+				"alert": 10,
 			},
 			target: &Aps{},
 		},
 		{
-			value: &Aps{
-				Alert: &ApsAlert{
-					Title:    "t",
-					SubTitle: "st",
-				},
-				CriticalSound: &CriticalSound{
-					Critical: true,
-					Name:     "fileName",
-					Volume:   0.5,
-				},
-				Badge:            &badge,
-				ContentAvailable: true,
-				MutableContent:   true,
-				Category:         "categoryString",
-				ThreadID:         "threadId",
-				CustomData: map[string]interface{}{
-					"key": "value",
-				},
+			name: "InvalidApsSound",
+			req: map[string]interface{}{
+				"sound": 10,
 			},
 			target: &Aps{},
 		},
 	}
-	for idx, tc := range cases {
-		b, err := json.Marshal(tc.value)
+	for _, tc := range cases {
+		b, err := json.Marshal(tc.req)
 		if err != nil {
-			t.Errorf("Marshal(%d) = %v; want = nil", idx, err)
+			t.Errorf("Marshal(%s) = %v; want = nil", tc.name, err)
 		}
-		if err := json.Unmarshal(b, tc.target); err != nil {
-			t.Errorf("Unmarshal(%d) = %v; want = nil", idx, err)
-		}
-		if !reflect.DeepEqual(tc.value, tc.target) {
-			t.Errorf("[%d] Unmarshal result = %#v; want = %#v", idx, tc.target, tc.value)
+		if err := json.Unmarshal(b, tc.target); err == nil {
+			t.Errorf("Unmarshal(%s) = %v; want =error", tc.name, err)
 		}
 	}
 }
@@ -1243,7 +1213,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to": "/topics/test-topic",
+		"to":                  "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {
