@@ -575,6 +575,23 @@ var invalidMessages = []struct {
 		want: "bodyLocKey is required when specifying bodyLocArgs",
 	},
 	{
+		name: "APNSMultipleAps",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						AlertString: "alert",
+					},
+					CustomData: map[string]interface{}{
+						"aps": map[string]interface{}{"key": "value"},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: `multiple specifications for the key "aps"`,
+	},
+	{
 		name: "APNSMultipleAlerts",
 		req: &Message{
 			APNS: &APNSConfig{
@@ -867,7 +884,7 @@ func TestInvalidJSONUnmarshal(t *testing.T) {
 			t.Errorf("Marshal(%s) = %v; want = nil", tc.name, err)
 		}
 		if err := json.Unmarshal(b, tc.target); err == nil {
-			t.Errorf("Unmarshal(%s) = %v; want =error", tc.name, err)
+			t.Errorf("Unmarshal(%s) = %v; want = error", tc.name, err)
 		}
 	}
 }
