@@ -1,6 +1,8 @@
 # Unreleased
 
 - [added] `messaging.Aps` type now supports critical sound in its payload.
+- [fixed] Public types in the `messaging` package now support correct
+  JSON marshalling and unmarshalling.
 
 # v3.5.0
 

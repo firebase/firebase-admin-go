@@ -98,8 +98,11 @@ func validateAPNSConfig(config *APNSConfig) error {
 
 func validateAPNSPayload(payload *APNSPayload) error {
 	if payload != nil {
-		if _, ok := payload.CustomData["aps"]; ok {
-			return fmt.Errorf("multiple aps specifications")
+		m := payload.standardFields()
+		for k := range payload.CustomData {
+			if _, contains := m[k]; contains {
+				return fmt.Errorf("multiple specifications for the key %q", k)
+			}
 		}
 		return validateAps(payload.Aps)
 	}
