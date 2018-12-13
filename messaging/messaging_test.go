@@ -803,6 +803,57 @@ func TestJSONSerialization(t *testing.T) {
 		target interface{}
 	}{
 		{
+			value: &Message{
+				Topic: "test-topic",
+				Notification: &Notification{
+					Title: "t",
+					Body:  "b",
+				},
+			},
+			target: &Message{},
+		},
+		{
+			value: &WebpushNotification{
+				Title: "title",
+				Body:  "body",
+				Icon:  "icon",
+				Actions: []*WebpushNotificationAction{
+					{
+						Action: "a1",
+						Title:  "a1-title",
+					},
+					{
+						Action: "a2",
+						Title:  "a2-title",
+						Icon:   "a2-icon",
+					},
+				},
+				Badge:              "badge",
+				Data:               "data",
+				Image:              "image",
+				Language:           "lang",
+				Renotify:           true,
+				RequireInteraction: true,
+				Silent:             true,
+				Tag:                "tag",
+				TimestampMillis:    &timestampMillis,
+				Vibrate:            []int{100, 200, 100},
+				CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
+			},
+			target: &WebpushNotification{},
+		},
+		{
+			value: &APNSPayload{
+				Aps: &Aps{
+					AlertString: "alertString",
+				},
+				CustomData: map[string]interface{}{
+					"key": "value",
+				},
+			},
+			target: &APNSPayload{},
+		},
+		{
 			value: &Aps{
 				AlertString:      "alertString",
 				Sound:            "soundString",
