@@ -108,8 +108,13 @@ func validateAps(aps *Aps) error {
 		if aps.Alert != nil && aps.AlertString != "" {
 			return fmt.Errorf("multiple alert specifications")
 		}
-		if aps.CriticalSound != nil && aps.Sound != "" {
-			return fmt.Errorf("multiple sound specifications")
+		if aps.CriticalSound != nil {
+			if aps.Sound != "" {
+				return fmt.Errorf("multiple sound specifications")
+			}
+			if aps.CriticalSound.Volume < 0 || aps.CriticalSound.Volume > 1 {
+				return fmt.Errorf("critical sound volume must be in the interval [0, 1]")
+			}
 		}
 		m := aps.standardFields()
 		for k := range aps.CustomData {

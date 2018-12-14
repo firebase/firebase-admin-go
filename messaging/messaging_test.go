@@ -368,7 +368,7 @@ var validMessages = []struct {
 						"badge":    float64(badge),
 						"category": "c",
 						"sound": map[string]interface{}{
-							"critical": true,
+							"critical": float64(1),
 							"name":     "n",
 							"volume":   float64(0.7),
 						},
@@ -650,6 +650,57 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "locKey is required when specifying locArgs",
+	},
+	{
+		name: "MultipleSoundSpecifications",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						Sound: "s",
+						CriticalSound: &CriticalSound{
+							Name: "s",
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "multiple sound specifications",
+	},
+	{
+		name: "VolumeTooLow",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						CriticalSound: &CriticalSound{
+							Name:   "s",
+							Volume: -0.1,
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "critical sound volume must be in the interval [0, 1]",
+	},
+	{
+		name: "VolumeTooHigh",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						CriticalSound: &CriticalSound{
+							Name:   "s",
+							Volume: 1.1,
+						},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "critical sound volume must be in the interval [0, 1]",
 	},
 	{
 		name: "InvalidWebpushNotificationDirection",
