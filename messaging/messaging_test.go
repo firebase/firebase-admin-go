@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -395,7 +396,7 @@ var validMessages = []struct {
 						ThreadID:         "t",
 						ContentAvailable: true,
 						MutableContent:   true,
-						CustomData:       map[string]interface{}{"k1": "v1", "k2": 1},
+						CustomData:       map[string]interface{}{"k1": "v1", "k2": float64(1)},
 					},
 				},
 			},
@@ -572,6 +573,23 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "bodyLocKey is required when specifying bodyLocArgs",
+	},
+	{
+		name: "APNSMultipleAps",
+		req: &Message{
+			APNS: &APNSConfig{
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						AlertString: "alert",
+					},
+					CustomData: map[string]interface{}{
+						"aps": map[string]interface{}{"key": "value"},
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: `multiple specifications for the key "aps"`,
 	},
 	{
 		name: "APNSMultipleAlerts",
@@ -794,6 +812,80 @@ func TestNoProjectID(t *testing.T) {
 	client, err := NewClient(context.Background(), &internal.MessagingConfig{})
 	if client != nil || err == nil {
 		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", client, err)
+	}
+}
+
+func TestJSONUnmarshal(t *testing.T) {
+	for _, tc := range validMessages {
+		if tc.name == "PrefixedTopicOnly" {
+			continue
+		}
+		b, err := json.Marshal(tc.req)
+		if err != nil {
+			t.Errorf("Marshal(%s) = %v; want = nil", tc.name, err)
+		}
+		var target Message
+		if err := json.Unmarshal(b, &target); err != nil {
+			t.Errorf("Unmarshal(%s) = %v; want = nil", tc.name, err)
+		}
+		if !reflect.DeepEqual(tc.req, &target) {
+			log.Printf("%#v\n", *tc.req.APNS.Payload.Aps)
+			log.Printf("%#v\n", *target.APNS.Payload.Aps)
+			t.Errorf("Unmarshal(%s) result = %#v; want = %#v", tc.name, tc.req, target)
+		}
+	}
+}
+
+func TestInvalidJSONUnmarshal(t *testing.T) {
+	cases := []struct {
+		name   string
+		req    map[string]interface{}
+		target interface{}
+	}{
+		{
+			name: "InvalidTTLSegments",
+			req: map[string]interface{}{
+				"ttl": "1.2.3s",
+			},
+			target: &AndroidConfig{},
+		},
+		{
+			name: "IncorrectTTLSeconds",
+			req: map[string]interface{}{
+				"ttl": "abcs",
+			},
+			target: &AndroidConfig{},
+		},
+		{
+			name: "IncorrectTTLNanoseconds",
+			req: map[string]interface{}{
+				"ttl": "10.abcs",
+			},
+			target: &AndroidConfig{},
+		},
+		{
+			name: "InvalidApsAlert",
+			req: map[string]interface{}{
+				"alert": 10,
+			},
+			target: &Aps{},
+		},
+		{
+			name: "InvalidApsSound",
+			req: map[string]interface{}{
+				"sound": 10,
+			},
+			target: &Aps{},
+		},
+	}
+	for _, tc := range cases {
+		b, err := json.Marshal(tc.req)
+		if err != nil {
+			t.Errorf("Marshal(%s) = %v; want = nil", tc.name, err)
+		}
+		if err := json.Unmarshal(b, tc.target); err == nil {
+			t.Errorf("Unmarshal(%s) = %v; want = error", tc.name, err)
+		}
 	}
 }
 
