@@ -777,7 +777,7 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 // Error handlers.
 
 const (
-	emailAlredyExists        = "email-already-exists"
+	emailAlreadyExists       = "email-already-exists"
 	idTokenRevoked           = "id-token-revoked"
 	insufficientPermission   = "insufficient-permission"
 	phoneNumberAlreadyExists = "phone-number-already-exists"
@@ -789,7 +789,7 @@ const (
 
 // IsEmailAlreadyExists checks if the given error was due to a duplicate email.
 func IsEmailAlreadyExists(err error) bool {
-	return internal.HasErrorCode(err, emailAlredyExists)
+	return internal.HasErrorCode(err, emailAlreadyExists)
 }
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
@@ -829,9 +829,9 @@ func IsUserNotFound(err error) bool {
 
 var serverError = map[string]string{
 	"CONFIGURATION_NOT_FOUND": projectNotFound,
-	"DUPLICATE_EMAIL":         emailAlredyExists,
+	"DUPLICATE_EMAIL":         emailAlreadyExists,
 	"DUPLICATE_LOCAL_ID":      uidAlreadyExists,
-	"EMAIL_EXISTS":            emailAlredyExists,
+	"EMAIL_EXISTS":            emailAlreadyExists,
 	"INSUFFICIENT_PERMISSION": insufficientPermission,
 	"PERMISSION_DENIED":       insufficientPermission,
 	"PHONE_NUMBER_EXISTS":     phoneNumberAlreadyExists,
