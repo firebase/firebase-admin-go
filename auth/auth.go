@@ -33,14 +33,13 @@ const (
 	idTokenCertURL   = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
 	issuerPrefix     = "https://securetoken.google.com/"
 	tokenExpSeconds  = 3600
+	clockSkewSeconds = 300
 )
 
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
 	"exp", "firebase", "iat", "iss", "jti", "nbf", "nonce", "sub",
 }
-
-var clk clock = &systemClock{}
 
 // Token represents a decoded Firebase ID token.
 //
@@ -67,6 +66,7 @@ type Client struct {
 	projectID string
 	signer    cryptoSigner
 	version   string
+	clock     clock
 }
 
 type signer interface {
@@ -136,6 +136,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		projectID: conf.ProjectID,
 		signer:    signer,
 		version:   "Go/Admin/" + conf.Version,
+		clock:     &systemClock{},
 	}, nil
 }
 
@@ -186,7 +187,7 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 		return "", fmt.Errorf("developer claims %q are reserved and cannot be specified", strings.Join(disallowed, ", "))
 	}
 
-	now := clk.Now().Unix()
+	now := c.clock.Now().Unix()
 	info := &jwtInfo{
 		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: &customToken{
@@ -262,9 +263,9 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 	} else if payload.Issuer != issuer {
 		err = fmt.Errorf("ID token has invalid 'iss' (issuer) claim; expected %q but got %q; %s; %s",
 			issuer, payload.Issuer, projectIDMsg, verifyTokenMsg)
-	} else if payload.IssuedAt > clk.Now().Unix() {
+	} else if (payload.IssuedAt - clockSkewSeconds) > c.clock.Now().Unix() {
 		err = fmt.Errorf("ID token issued at future timestamp: %d", payload.IssuedAt)
-	} else if payload.Expires < clk.Now().Unix() {
+	} else if (payload.Expires + clockSkewSeconds) < c.clock.Now().Unix() {
 		err = fmt.Errorf("ID token has expired at: %d", payload.Expires)
 	} else if payload.Subject == "" {
 		err = fmt.Errorf("ID token has empty 'sub' (subject) claim; %s", verifyTokenMsg)

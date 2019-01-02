@@ -44,6 +44,7 @@ var (
 var defaultTestOpts = []option.ClientOption{
 	option.WithCredentialsFile("../testdata/service_account.json"),
 }
+var testClock = &mockClock{now: time.Now()}
 
 func TestMain(m *testing.M) {
 	var (
@@ -74,6 +75,7 @@ func TestMain(m *testing.M) {
 
 		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	}
+
 	client, err = NewClient(ctx, &internal.AuthConfig{
 		Creds:     creds,
 		Opts:      opts,
@@ -83,6 +85,7 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	client.keySource = ks
+	client.clock = testClock
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
@@ -289,6 +292,35 @@ func TestVerifyIDToken(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenClockSkew(t *testing.T) {
+	now := testClock.Now().Unix()
+	cases := []struct {
+		name  string
+		token string
+	}{
+		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": now + clockSkewSeconds - 1})},
+		{"ExpiredToken", getIDToken(mockIDTokenPayload{
+			"iat": now - 1000,
+			"exp": now - clockSkewSeconds + 1,
+		})},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ft, err := client.VerifyIDToken(ctx, tc.token)
+			if err != nil {
+				t.Errorf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
+			}
+			if ft.Claims["admin"] != true {
+				t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+			}
+			if ft.UID != ft.Subject {
+				t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+			}
+		})
+	}
+}
+
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
@@ -298,7 +330,7 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 }
 
 func TestVerifyIDTokenError(t *testing.T) {
-	now := time.Now().Unix()
+	now := testClock.Now().Unix()
 	cases := []struct {
 		name  string
 		token string
@@ -310,10 +342,10 @@ func TestVerifyIDTokenError(t *testing.T) {
 		{"EmptySubject", getIDToken(mockIDTokenPayload{"sub": ""})},
 		{"IntSubject", getIDToken(mockIDTokenPayload{"sub": 10})},
 		{"LongSubject", getIDToken(mockIDTokenPayload{"sub": strings.Repeat("a", 129)})},
-		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": now + 1000})},
+		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": now + clockSkewSeconds + 1})},
 		{"ExpiredToken", getIDToken(mockIDTokenPayload{
 			"iat": now - 1000,
-			"exp": now - 100,
+			"exp": now - clockSkewSeconds - 1,
 		})},
 		{"EmptyToken", ""},
 		{"BadFormatToken", "foobar"},
@@ -419,6 +451,14 @@ func verifyCustomToken(ctx context.Context, token string, expected map[string]in
 		t.Errorf("Subject: %q; want: %q", payload.Sub, email)
 	}
 
+	now := testClock.Now().Unix()
+	if payload.Exp != now+3600 {
+		t.Errorf("Exp: %d; want: %d", payload.Exp, now+3600)
+	}
+	if payload.Iat != now {
+		t.Errorf("Iat: %d; want: %d", payload.Iat, now)
+	}
+
 	for k, v := range expected {
 		if payload.Claims[k] != v {
 			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
@@ -434,8 +474,8 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	pCopy := mockIDTokenPayload{
 		"aud":   client.projectID,
 		"iss":   "https://securetoken.google.com/" + client.projectID,
-		"iat":   time.Now().Unix() - 100,
-		"exp":   time.Now().Unix() + 3600,
+		"iat":   testClock.Now().Unix() - 100,
+		"exp":   testClock.Now().Unix() + 3600,
 		"sub":   "1234567890",
 		"admin": true,
 	}
