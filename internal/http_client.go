@@ -21,8 +21,83 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
+	"strconv"
+	"time"
+
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
+
+// RetryConfig specifies how the HTTPClient should retry failing HTTP requests.
+//
+// A request is never retried more than MaxRetries times. If CheckForRetry is nil, all network
+// errors, and all 400+ HTTP status codes are retried. If an HTTP error response contains the
+// Retry-After header, it is always respected. Otherwise retries are delayed with exponential
+// backoff. Set ExpBackoffFactor to 0 to disable exponential backoff, and retry immediately
+// after each error.
+type RetryConfig struct {
+	MaxRetries       int
+	CheckForRetry    func(*http.Response, error) bool
+	ExpBackoffFactor float64
+}
+
+func (rc *RetryConfig) retryEligible(retryAttempts int, resp *http.Response, err error) bool {
+	if retryAttempts >= rc.MaxRetries {
+		return false
+	}
+	if rc.CheckForRetry == nil {
+		return err != nil && resp.StatusCode >= 400
+	}
+	return rc.CheckForRetry(resp, err)
+}
+
+func (rc *RetryConfig) retryDelay(retryAttempts int, resp *http.Response) time.Duration {
+	delayForResponse := retryDelayForResponse(resp)
+	delayForAttempt := retryDelayForAttempt(retryAttempts, rc.ExpBackoffFactor)
+	if delayForResponse > delayForAttempt {
+		return delayForResponse
+	}
+	return delayForAttempt
+}
+
+func retryDelayForResponse(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+	retryAfterHeader := resp.Header.Get("retry-after")
+	if retryAfterHeader == "" {
+		return 0
+	}
+	delayInSeconds, err := strconv.ParseInt(retryAfterHeader, 10, 64)
+	if err != nil {
+		timestamp, err := http.ParseTime(retryAfterHeader)
+		if err == nil {
+			return timestamp.Sub(time.Now())
+		}
+	}
+	return time.Duration(delayInSeconds) * time.Second
+}
+
+func retryDelayForAttempt(retryAttempts int, factor float64) time.Duration {
+	if retryAttempts == 0 {
+		return 0
+	}
+	delayInSeconds := int64(math.Pow(2, float64(retryAttempts)) * factor)
+	return time.Duration(delayInSeconds) * time.Second
+}
+
+// defaultRetryConfig retries HTTP requests on all low-level network errors, as well as HTTP 500
+// and 503 responses. It retries up to 4 times with exponential backoff.
+var defaultRetryConfig = RetryConfig{
+	MaxRetries: 4,
+	CheckForRetry: func(resp *http.Response, err error) bool {
+		return err != nil || resp.StatusCode == http.StatusInternalServerError ||
+			resp.StatusCode == http.StatusServiceUnavailable
+	},
+	ExpBackoffFactor: 0.5,
+}
 
 // HTTPClient is a convenient API to make HTTP calls.
 //
@@ -30,35 +105,53 @@ import (
 // involved in making HTTP calls. It provides a convenient mechanism to set headers and query
 // parameters on outgoing requests, while enforcing that an explicit context is used per request.
 // Responses returned by HTTPClient can be easily parsed as JSON, and provide a simple mechanism to
-// extract error details.
+// configure retries.
 type HTTPClient struct {
-	Client    *http.Client
-	ErrParser ErrorParser
+	Client      *http.Client
+	RetryConfig *RetryConfig
+	ErrParser   ErrorParser
+}
+
+// NewHTTPClient creates a new HTTPClient using the provided client options and the default
+// RetryConfig.
+func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, error) {
+	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &HTTPClient{
+		Client:      hc,
+		RetryConfig: &defaultRetryConfig,
+	}, nil
 }
 
 // Do executes the given Request, and returns a Response.
+//
+// If a RetryConfig is specified on the client, Do attempts to retry failing requests.
 func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
-	req, err := r.buildHTTPRequest()
-	if err != nil {
-		return nil, err
-	}
+	retryAttempt := 0
+	for {
+		req, err := r.buildHTTPRequest()
+		if err != nil {
+			return nil, err
+		}
 
-	resp, err := c.Client.Do(req.WithContext(ctx))
-	if err != nil {
-		return nil, err
+		resp, err := c.Client.Do(req.WithContext(ctx))
+		if c.RetryConfig != nil && c.RetryConfig.retryEligible(retryAttempt, resp, err) {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			retryDelay := c.RetryConfig.retryDelay(retryAttempt, resp)
+			time.Sleep(retryDelay)
+			retryAttempt++
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		return newResponse(resp, c.ErrParser)
 	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return &Response{
-		Status:    resp.StatusCode,
-		Body:      b,
-		Header:    resp.Header,
-		errParser: c.ErrParser,
-	}, nil
 }
 
 // Request contains all the parameters required to construct an outgoing HTTP request.
@@ -124,9 +217,22 @@ type Response struct {
 	errParser ErrorParser
 }
 
+func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) {
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{
+		Status:    resp.StatusCode,
+		Body:      b,
+		Header:    resp.Header,
+		errParser: errParser,
+	}, nil
+}
+
 // CheckStatus checks whether the Response status code has the given HTTP status code.
 //
-// Returns an error if the status code does not match. If an ErroParser is specified, uses that to
+// Returns an error if the status code does not match. If an ErrorParser is specified, uses that to
 // construct the returned error message. Otherwise includes the full response body in the error.
 func (r *Response) CheckStatus(want int) error {
 	if r.Status == want {

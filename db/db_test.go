@@ -56,6 +56,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	// Disable retries for faster execution
+	client.hc.RetryConfig = nil
 
 	ao := map[string]interface{}{"uid": "user1"}
 	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{

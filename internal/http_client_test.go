@@ -16,6 +16,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -91,6 +92,11 @@ var cases = []struct {
 		headers: map[string]string{"Test-Header": "value1"},
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
+}
+
+var defaultRetryConfigWithoutBackoff = RetryConfig{
+	MaxRetries:    defaultRetryConfig.MaxRetries,
+	CheckForRetry: defaultRetryConfig.CheckForRetry,
 }
 
 func TestHTTPClient(t *testing.T) {
@@ -290,5 +296,94 @@ func TestUnmarshalError(t *testing.T) {
 	var got func()
 	if err := resp.Unmarshal(http.StatusOK, &got); err == nil {
 		t.Errorf("Unmarshal() = nil; want error")
+	}
+}
+
+func TestNetworkErrorRetryEligible(t *testing.T) {
+	err := errors.New("network error")
+	for i := 0; i < 4; i++ {
+		if eligible := defaultRetryConfig.retryEligible(i, nil, err); !eligible {
+			t.Errorf("retryEligible(%d, nil, err) = false; want = true", i)
+		}
+	}
+	if eligible := defaultRetryConfig.retryEligible(4, nil, err); eligible {
+		t.Errorf("retryEligible(%d, nil, err) = true; want = false", 4)
+	}
+}
+
+func TestHttpErrorRetryEligible(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+	}
+	for i := 0; i < 4; i++ {
+		if eligible := defaultRetryConfig.retryEligible(i, resp, nil); !eligible {
+			t.Errorf("retryEligible(%d, 503, nil) = false; want = true", i)
+		}
+	}
+	if eligible := defaultRetryConfig.retryEligible(4, resp, nil); eligible {
+		t.Errorf("retryEligible(%d, 503, nil) = true; want = false", 4)
+	}
+}
+
+func TestRetryOnInternalErrorAndUnavailable(t *testing.T) {
+	var status int
+	requests := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(status)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client:      http.DefaultClient,
+		RetryConfig: &defaultRetryConfigWithoutBackoff,
+	}
+	for _, status = range []int{http.StatusInternalServerError, http.StatusServiceUnavailable} {
+		requests = 0
+		req := &Request{Method: http.MethodGet, URL: server.URL}
+		resp, err := client.Do(context.Background(), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := resp.CheckStatus(status); err != nil {
+			t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+		}
+		wr := 1 + defaultRetryConfigWithoutBackoff.MaxRetries
+		if requests != wr {
+			t.Errorf("Total requests = %d; want = %d", requests, wr)
+		}
+	}
+}
+
+func TestNoRetryOnNotFound(t *testing.T) {
+	requests := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	defaultRetryConfig.ExpBackoffFactor = 0
+	client := &HTTPClient{
+		Client:      http.DefaultClient,
+		RetryConfig: &defaultRetryConfigWithoutBackoff,
+	}
+
+	req := &Request{Method: http.MethodGet, URL: server.URL}
+	resp, err := client.Do(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resp.CheckStatus(http.StatusNotFound); err != nil {
+		t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+	}
+	if requests != 1 {
+		t.Errorf("Total requests = %d; want = %d", requests, 1)
 	}
 }
