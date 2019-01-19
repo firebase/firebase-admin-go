@@ -338,7 +338,7 @@ func TestNoRetryOnRequestBuildError(t *testing.T) {
 		RetryConfig: &testRetryConfig,
 	}
 
-	entity := &errorEntry{}
+	entity := &faultyEntity{}
 	req := &Request{
 		Method: http.MethodGet,
 		URL:    "https://firebase.google.com",
@@ -497,29 +497,24 @@ func TestNewHTTPClient(t *testing.T) {
 }
 
 func TestNewHTTPClientRetryOnNetworkErrors(t *testing.T) {
-	requests := 0
-	var server *httptest.Server
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		server.CloseClientConnections()
-	})
-	server = httptest.NewServer(handler)
-	defer server.Close()
-
 	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tansport := &faultyTransport{}
+	client.Client.Transport = tansport
 	client.RetryConfig.ExpBackoffFactor = 0
-	req := &Request{Method: http.MethodGet, URL: server.URL}
+
+	req := &Request{Method: http.MethodGet, URL: "http://firebase.google.com"}
 	resp, err := client.Do(context.Background(), req)
 	if resp != nil || err == nil {
 		t.Errorf("Do() = (%v, %v); want = (nil, error)", resp, err)
 	}
+
 	const defaultMaxRetries = 4
 	wantRequests := 1 + defaultMaxRetries
-	if requests != wantRequests {
-		t.Errorf("Total requests = %d; want = %d", requests, wantRequests)
+	if tansport.RequestAttempts != wantRequests {
+		t.Errorf("Total requests = %d; want = %d", tansport.RequestAttempts, wantRequests)
 	}
 }
 
@@ -586,15 +581,24 @@ func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
 	}
 }
 
-type errorEntry struct {
+type faultyEntity struct {
 	RequestAttempts int
 }
 
-func (e *errorEntry) Bytes() ([]byte, error) {
+func (e *faultyEntity) Bytes() ([]byte, error) {
 	e.RequestAttempts++
 	return nil, errors.New("test error")
 }
 
-func (e *errorEntry) Mime() string {
+func (e *faultyEntity) Mime() string {
 	return "application/json"
+}
+
+type faultyTransport struct {
+	RequestAttempts int
+}
+
+func (e *faultyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	e.RequestAttempts++
+	return nil, errors.New("test error")
 }
