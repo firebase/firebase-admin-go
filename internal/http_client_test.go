@@ -27,7 +27,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var cases = []struct {
+var testRequests = []struct {
 	req     *Request
 	method  string
 	body    string
@@ -99,7 +99,6 @@ var cases = []struct {
 
 var testRetryConfig = RetryConfig{
 	MaxRetries:       4,
-	CheckForRetry:    defaultRetryPolicy,
 	ExpBackoffFactor: 0.5,
 }
 
@@ -117,7 +116,7 @@ func TestHTTPClient(t *testing.T) {
 
 	idx := 0
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		want := cases[idx]
+		want := testRequests[idx]
 		if r.Method != want.method {
 			t.Errorf("[%d] Method = %q; want = %q", idx, r.Method, want.method)
 		}
@@ -161,7 +160,7 @@ func TestHTTPClient(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{Client: http.DefaultClient}
-	for _, tc := range cases {
+	for _, tc := range testRequests {
 		tc.req.URL = server.URL
 		resp, err := client.Do(context.Background(), tc.req)
 		if err != nil {
@@ -305,7 +304,7 @@ func TestUnmarshalError(t *testing.T) {
 	}
 }
 
-func TestNetworkErrorRetryEligible(t *testing.T) {
+func TestNetworkErrorMaxRetries(t *testing.T) {
 	err := errors.New("network error")
 	maxRetries := testRetryConfig.MaxRetries
 	for i := 0; i < maxRetries; i++ {
@@ -318,7 +317,7 @@ func TestNetworkErrorRetryEligible(t *testing.T) {
 	}
 }
 
-func TestHttpErrorRetryEligible(t *testing.T) {
+func TestHTTPErrorMaxRetries(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusServiceUnavailable,
 	}
@@ -333,7 +332,28 @@ func TestHttpErrorRetryEligible(t *testing.T) {
 	}
 }
 
-func TestNilCheckForRetry(t *testing.T) {
+func TestNoRetryOnRequestBuildError(t *testing.T) {
+	client := &HTTPClient{
+		Client:      http.DefaultClient,
+		RetryConfig: &testRetryConfig,
+	}
+
+	entity := &errorEntry{}
+	req := &Request{
+		Method: http.MethodGet,
+		URL:    "https://firebase.google.com",
+		Body:   entity,
+	}
+	_, err := client.Do(context.Background(), req)
+	if err == nil {
+		t.Errorf("Do() = nil; want = error")
+	}
+	if entity.RequestAttempts != 1 {
+		t.Errorf("Request attempts = %d; want = %d", entity.RequestAttempts, 1)
+	}
+}
+
+func TestNoRetryOnHTTPSuccessCodes(t *testing.T) {
 	rc := &RetryConfig{
 		MaxRetries:    1000,
 		CheckForRetry: nil,
@@ -341,7 +361,7 @@ func TestNilCheckForRetry(t *testing.T) {
 	if eligible := rc.retryEligible(999, nil, errors.New("network error")); !eligible {
 		t.Errorf("retryEligible(999, nil, err) = false; want = true")
 	}
-	for i := 200; i < 400; i++ {
+	for i := http.StatusOK; i < http.StatusBadRequest; i++ {
 		resp := &http.Response{
 			StatusCode: i,
 		}
@@ -349,7 +369,17 @@ func TestNilCheckForRetry(t *testing.T) {
 			t.Errorf("retryEligible(%d, %d, nil) = true; want = false", i, resp.StatusCode)
 		}
 	}
-	for i := 400; i < 600; i++ {
+}
+
+func TestRetryOnHTTPErrorCodes(t *testing.T) {
+	rc := &RetryConfig{
+		MaxRetries:    1000,
+		CheckForRetry: nil,
+	}
+	if eligible := rc.retryEligible(999, nil, errors.New("network error")); !eligible {
+		t.Errorf("retryEligible(999, nil, err) = false; want = true")
+	}
+	for i := http.StatusBadRequest; i <= http.StatusNetworkAuthenticationRequired; i++ {
 		resp := &http.Response{
 			StatusCode: i,
 		}
@@ -378,6 +408,7 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 	header := make(http.Header)
 	now := time.Now()
 	retryAfter := now.Add(time.Duration(60) * time.Second)
+	// http.TimeFormat requires the time be in UTC.
 	header.Add("retry-after", retryAfter.UTC().Format(http.TimeFormat))
 	resp := &http.Response{
 		StatusCode: http.StatusServiceUnavailable,
@@ -386,7 +417,7 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 	clock = &MockClock{now}
 	for i := 0; i < 5; i++ {
 		delay := testRetryConfig.retryDelay(i, resp)
-		// HTTP timestamp format only has seconds precision. So the final value could be off by 1s.
+		// HTTP timestamp format has seconds precision. So the final value could be off by 1s.
 		if delay < time.Duration(60-1)*time.Second || delay > time.Duration(60+1)*time.Second {
 			t.Errorf("retryDelay = %f s; want = ~60.0 s", delay.Seconds())
 		}
@@ -403,7 +434,7 @@ func TestRetryDelayExponentialBackoff(t *testing.T) {
 	}
 }
 
-func TestRetryDelayNoExponentialBackoff(t *testing.T) {
+func TestRetryDelayDisableExponentialBackoff(t *testing.T) {
 	retryConfigWithoutBackoff := &RetryConfig{
 		MaxRetries: 4,
 	}
@@ -440,27 +471,6 @@ func TestLongestRetryDelayHasPrecedence(t *testing.T) {
 	}
 }
 
-func TestNoRetryOnRequestBuildError(t *testing.T) {
-	client := &HTTPClient{
-		Client:      http.DefaultClient,
-		RetryConfig: &testRetryConfig,
-	}
-
-	entity := &errorEntry{}
-	req := &Request{
-		Method: http.MethodGet,
-		URL:    "https://firebase.google.com",
-		Body:   entity,
-	}
-	_, err := client.Do(context.Background(), req)
-	if err == nil {
-		t.Errorf("Do() = nil; want = error")
-	}
-	if entity.Count != 1 {
-		t.Errorf("Total requests = %d; want = %d", entity.Count, 1)
-	}
-}
-
 func TestNewHTTPClient(t *testing.T) {
 	wantEndpoint := "https://cloud.google.com"
 	opts := []option.ClientOption{
@@ -483,6 +493,33 @@ func TestNewHTTPClient(t *testing.T) {
 	}
 	if endpoint != wantEndpoint {
 		t.Errorf("NewHTTPClient() = %q; want = %q", endpoint, wantEndpoint)
+	}
+}
+
+func TestNewHTTPClientRetryOnNetworkErrors(t *testing.T) {
+	requests := 0
+	var server *httptest.Server
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		server.CloseClientConnections()
+	})
+	server = httptest.NewServer(handler)
+	defer server.Close()
+
+	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.RetryConfig.ExpBackoffFactor = 0
+	req := &Request{Method: http.MethodGet, URL: server.URL}
+	resp, err := client.Do(context.Background(), req)
+	if resp != nil || err == nil {
+		t.Errorf("Do() = (%v, %v); want = (nil, error)", resp, err)
+	}
+	const defaultMaxRetries = 4
+	wantRequests := 1 + defaultMaxRetries
+	if requests != wantRequests {
+		t.Errorf("Total requests = %d; want = %d", requests, wantRequests)
 	}
 }
 
@@ -550,11 +587,11 @@ func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
 }
 
 type errorEntry struct {
-	Count int
+	RequestAttempts int
 }
 
 func (e *errorEntry) Bytes() ([]byte, error) {
-	e.Count++
+	e.RequestAttempts++
 	return nil, errors.New("test error")
 }
 

@@ -41,7 +41,7 @@ var clock Clock = &SystemClock{}
 // after each error.
 type RetryConfig struct {
 	MaxRetries       int
-	CheckForRetry    func(*http.Response, error) bool
+	CheckForRetry    RetryCondition
 	ExpBackoffFactor float64
 }
 
@@ -90,9 +90,21 @@ func estimateDelayForAttempt(retryAttempts int, factor float64) time.Duration {
 	return time.Duration(delayInSeconds) * time.Second
 }
 
-func defaultRetryPolicy(resp *http.Response, err error) bool {
-	return err != nil || resp.StatusCode == http.StatusInternalServerError ||
-		resp.StatusCode == http.StatusServiceUnavailable
+// RetryCondition determines if an HTTP request should be retried depending on its last outcome.
+type RetryCondition func(resp *http.Response, networkErr error) bool
+
+func retryOnNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
+	return func(resp *http.Response, networkErr error) bool {
+		if networkErr != nil {
+			return true
+		}
+		for _, retryOnStatus := range statusCodes {
+			if resp.StatusCode == retryOnStatus {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // HTTPClient is a convenient API to make HTTP calls.
@@ -112,8 +124,9 @@ type HTTPClient struct {
 // NewHTTPClient creates a new HTTPClient using the provided client options and the default
 // RetryConfig.
 //
-// The default RetryConfig retries requests on all low-level network errors as well as on HTTP 500
-// and 503 errors. Repatedly failing requests are retried up to 4 times with exponential backoff.
+// The default RetryConfig retries requests on all low-level network errors as well as on HTTP
+// InternalServerError (500) and ServiceUnavailable (503) errors. Repatedly failing requests are
+// retried up to 4 times with exponential backoff.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
 	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
@@ -122,8 +135,11 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 	client := &HTTPClient{
 		Client: hc,
 		RetryConfig: &RetryConfig{
-			MaxRetries:       4,
-			CheckForRetry:    defaultRetryPolicy,
+			MaxRetries: 4,
+			CheckForRetry: retryOnNetworkAndHTTPErrors(
+				http.StatusInternalServerError,
+				http.StatusServiceUnavailable,
+			),
 			ExpBackoffFactor: 0.5,
 		},
 	}
