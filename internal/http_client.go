@@ -30,6 +30,8 @@ import (
 	"google.golang.org/api/transport"
 )
 
+var clock Clock = &SystemClock{}
+
 // RetryConfig specifies how the HTTPClient should retry failing HTTP requests.
 //
 // A request is never retried more than MaxRetries times. If CheckForRetry is nil, all network
@@ -48,7 +50,7 @@ func (rc *RetryConfig) retryEligible(retryAttempts int, resp *http.Response, err
 		return false
 	}
 	if rc.CheckForRetry == nil {
-		return err != nil && resp.StatusCode >= 400
+		return err != nil || resp.StatusCode >= 400
 	}
 	return rc.CheckForRetry(resp, err)
 }
@@ -74,7 +76,7 @@ func retryDelayForResponse(resp *http.Response) time.Duration {
 	if err != nil {
 		timestamp, err := http.ParseTime(retryAfterHeader)
 		if err == nil {
-			return timestamp.Sub(time.Now())
+			return timestamp.Sub(clock.Now())
 		}
 	}
 	return time.Duration(delayInSeconds) * time.Second
@@ -114,15 +116,16 @@ type HTTPClient struct {
 
 // NewHTTPClient creates a new HTTPClient using the provided client options and the default
 // RetryConfig.
-func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, opts...)
+func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
+	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return &HTTPClient{
+	client := &HTTPClient{
 		Client:      hc,
 		RetryConfig: &defaultRetryConfig,
-	}, nil
+	}
+	return client, endpoint, nil
 }
 
 // Do executes the given Request, and returns a Response.

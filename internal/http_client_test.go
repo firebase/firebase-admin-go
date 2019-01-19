@@ -22,6 +22,9 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
+
+	"google.golang.org/api/option"
 )
 
 var cases = []struct {
@@ -301,13 +304,14 @@ func TestUnmarshalError(t *testing.T) {
 
 func TestNetworkErrorRetryEligible(t *testing.T) {
 	err := errors.New("network error")
-	for i := 0; i < 4; i++ {
+	maxRetries := defaultRetryConfig.MaxRetries
+	for i := 0; i < maxRetries; i++ {
 		if eligible := defaultRetryConfig.retryEligible(i, nil, err); !eligible {
 			t.Errorf("retryEligible(%d, nil, err) = false; want = true", i)
 		}
 	}
-	if eligible := defaultRetryConfig.retryEligible(4, nil, err); eligible {
-		t.Errorf("retryEligible(%d, nil, err) = true; want = false", 4)
+	if eligible := defaultRetryConfig.retryEligible(maxRetries, nil, err); eligible {
+		t.Errorf("retryEligible(%d, nil, err) = true; want = false", maxRetries)
 	}
 }
 
@@ -315,13 +319,118 @@ func TestHttpErrorRetryEligible(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusServiceUnavailable,
 	}
-	for i := 0; i < 4; i++ {
+	maxRetries := defaultRetryConfig.MaxRetries
+	for i := 0; i < maxRetries; i++ {
 		if eligible := defaultRetryConfig.retryEligible(i, resp, nil); !eligible {
 			t.Errorf("retryEligible(%d, 503, nil) = false; want = true", i)
 		}
 	}
-	if eligible := defaultRetryConfig.retryEligible(4, resp, nil); eligible {
-		t.Errorf("retryEligible(%d, 503, nil) = true; want = false", 4)
+	if eligible := defaultRetryConfig.retryEligible(maxRetries, resp, nil); eligible {
+		t.Errorf("retryEligible(%d, 503, nil) = true; want = false", maxRetries)
+	}
+}
+
+func TestCheckForRetryIsNil(t *testing.T) {
+	rc := &RetryConfig{
+		MaxRetries:    1000,
+		CheckForRetry: nil,
+	}
+	if eligible := rc.retryEligible(999, nil, errors.New("network error")); !eligible {
+		t.Errorf("retryEligible(999, nil, err) = false; want = true")
+	}
+	for i := 200; i < 400; i++ {
+		resp := &http.Response{
+			StatusCode: i,
+		}
+		if eligible := rc.retryEligible(i, resp, nil); eligible {
+			t.Errorf("retryEligible(%d, %d, nil) = true; want = false", i, resp.StatusCode)
+		}
+	}
+	for i := 400; i < 600; i++ {
+		resp := &http.Response{
+			StatusCode: i,
+		}
+		if eligible := rc.retryEligible(i, resp, nil); !eligible {
+			t.Errorf("retryEligible(%d, %d, nil) = false; want = true", i, resp.StatusCode)
+		}
+	}
+}
+
+func TestRetryAfterHeaderInSecondsFormat(t *testing.T) {
+	header := make(http.Header)
+	header.Add("retry-after", "30")
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Header:     header,
+	}
+	for i := 0; i < 5; i++ {
+		delay := defaultRetryConfig.retryDelay(i, resp)
+		if delay != time.Duration(30)*time.Second {
+			t.Errorf("retryDelay = %f s; want = 30.0 s", delay.Seconds())
+		}
+	}
+}
+
+func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
+	header := make(http.Header)
+	now := time.Now()
+	retryAfter := now.Add(time.Duration(60) * time.Second)
+	header.Add("retry-after", retryAfter.UTC().Format(http.TimeFormat))
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Header:     header,
+	}
+	clock = &MockClock{now}
+	for i := 0; i < 5; i++ {
+		delay := defaultRetryConfig.retryDelay(i, resp)
+		// HTTP timestamp format only has seconds precision. So the final value could be off by 1s.
+		if delay < time.Duration(60-1)*time.Second || delay > time.Duration(60+1)*time.Second {
+			t.Errorf("retryDelay = %f s; want = ~60.0 s", delay.Seconds())
+		}
+	}
+}
+
+func TestRetryDelayExponentialBackoff(t *testing.T) {
+	want := []int{0, 1, 2, 4, 8}
+	for i := 0; i < 5; i++ {
+		delay := defaultRetryConfig.retryDelay(i, nil)
+		if delay != time.Duration(want[i])*time.Second {
+			t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
+		}
+	}
+}
+
+func TestRetryDelayNoExponentialBackoff(t *testing.T) {
+	for i := 0; i < 5; i++ {
+		delay := defaultRetryConfigWithoutBackoff.retryDelay(i, nil)
+		if delay != 0 {
+			t.Errorf("retryDelay = %f s; want = 0.0 s", delay.Seconds())
+		}
+	}
+}
+
+func TestRetryDelayLargerHasPriority(t *testing.T) {
+	header := make(http.Header)
+	now := time.Now()
+	retryAfter := now.Add(time.Duration(3) * time.Second)
+	header.Add("retry-after", retryAfter.UTC().Format(http.TimeFormat))
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Header:     header,
+	}
+	clock = &MockClock{now}
+	want := []int{0, 1, 2, 4, 8}
+	for i := 0; i < 5; i++ {
+		delay := defaultRetryConfig.retryDelay(i, resp)
+		if want[i] > 3 {
+			if delay != time.Duration(want[i])*time.Second {
+				t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
+			}
+		} else {
+			if delay < time.Duration(3-1)*time.Second || delay > time.Duration(3+1)*time.Second {
+				t.Errorf("retryDelay = %f s; want = ~3.0 s", delay.Seconds())
+			}
+		}
 	}
 }
 
@@ -369,7 +478,6 @@ func TestNoRetryOnNotFound(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	defaultRetryConfig.ExpBackoffFactor = 0
 	client := &HTTPClient{
 		Client:      http.DefaultClient,
 		RetryConfig: &defaultRetryConfigWithoutBackoff,
@@ -386,4 +494,56 @@ func TestNoRetryOnNotFound(t *testing.T) {
 	if requests != 1 {
 		t.Errorf("Total requests = %d; want = %d", requests, 1)
 	}
+}
+
+func TestNoRetryOnRequestBuildError(t *testing.T) {
+	client := &HTTPClient{
+		Client:      http.DefaultClient,
+		RetryConfig: &defaultRetryConfigWithoutBackoff,
+	}
+
+	entity := &errorEntry{}
+	req := &Request{
+		Method: http.MethodGet,
+		URL:    "https://firebase.google.com",
+		Body:   entity,
+	}
+	_, err := client.Do(context.Background(), req)
+	if err == nil {
+		t.Errorf("Do() = nil; want = error")
+	}
+	if entity.Count != 1 {
+		t.Errorf("Total requests = %d; want = %d", entity.Count, 1)
+	}
+}
+
+func TestNewHTTPClient(t *testing.T) {
+	wantEndpoint := "https://cloud.google.com"
+	opts := []option.ClientOption{
+		option.WithTokenSource(&MockTokenSource{AccessToken: "test"}),
+		option.WithEndpoint(wantEndpoint),
+	}
+	client, endpoint, err := NewHTTPClient(context.Background(), opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.RetryConfig != &defaultRetryConfig {
+		t.Errorf("NewHTTPClient().RetryConfig = %v; want = %v", *client.RetryConfig, defaultRetryConfig)
+	}
+	if endpoint != wantEndpoint {
+		t.Errorf("NewHTTPClient() = %q; want = %q", endpoint, wantEndpoint)
+	}
+}
+
+type errorEntry struct {
+	Count int
+}
+
+func (e *errorEntry) Bytes() ([]byte, error) {
+	e.Count++
+	return nil, errors.New("test error")
+}
+
+func (e *errorEntry) Mime() string {
+	return "application/json"
 }

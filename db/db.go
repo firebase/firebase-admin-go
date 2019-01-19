@@ -63,7 +63,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	opts := append([]option.ClientOption{}, c.Opts...)
 	ua := fmt.Sprintf(userAgentFormat, c.Version, runtime.Version())
 	opts = append(opts, option.WithUserAgent(ua))
-	hc, err := internal.NewHTTPClient(ctx, opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
