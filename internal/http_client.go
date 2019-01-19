@@ -56,15 +56,15 @@ func (rc *RetryConfig) retryEligible(retryAttempts int, resp *http.Response, err
 }
 
 func (rc *RetryConfig) retryDelay(retryAttempts int, resp *http.Response) time.Duration {
-	delayForResponse := retryDelayForResponse(resp)
-	delayForAttempt := retryDelayForAttempt(retryAttempts, rc.ExpBackoffFactor)
-	if delayForResponse > delayForAttempt {
-		return delayForResponse
+	serverRecommendedDelay := parseRetryAfterHeader(resp)
+	clientEstimatedDelay := estimateDelayForAttempt(retryAttempts, rc.ExpBackoffFactor)
+	if serverRecommendedDelay > clientEstimatedDelay {
+		return serverRecommendedDelay
 	}
-	return delayForAttempt
+	return clientEstimatedDelay
 }
 
-func retryDelayForResponse(resp *http.Response) time.Duration {
+func parseRetryAfterHeader(resp *http.Response) time.Duration {
 	if resp == nil {
 		return 0
 	}
@@ -82,7 +82,7 @@ func retryDelayForResponse(resp *http.Response) time.Duration {
 	return time.Duration(delayInSeconds) * time.Second
 }
 
-func retryDelayForAttempt(retryAttempts int, factor float64) time.Duration {
+func estimateDelayForAttempt(retryAttempts int, factor float64) time.Duration {
 	if retryAttempts == 0 {
 		return 0
 	}
@@ -138,14 +138,12 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		resp, err := c.Client.Do(req.WithContext(ctx))
 		if c.RetryConfig != nil && c.RetryConfig.retryEligible(retryAttempt, resp, err) {
 			if resp != nil {
 				resp.Body.Close()
 			}
-			retryDelay := c.RetryConfig.retryDelay(retryAttempt, resp)
-			time.Sleep(retryDelay)
+			c.delayNextAttempt(resp, retryAttempt)
 			retryAttempt++
 			continue
 		}
@@ -155,6 +153,11 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 		defer resp.Body.Close()
 		return newResponse(resp, c.ErrParser)
 	}
+}
+
+func (c *HTTPClient) delayNextAttempt(resp *http.Response, retryAttempt int) {
+	retryDelay := c.RetryConfig.retryDelay(retryAttempt, resp)
+	time.Sleep(retryDelay)
 }
 
 // Request contains all the parameters required to construct an outgoing HTTP request.
