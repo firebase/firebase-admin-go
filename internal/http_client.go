@@ -90,24 +90,19 @@ func estimateDelayForAttempt(retryAttempts int, factor float64) time.Duration {
 	return time.Duration(delayInSeconds) * time.Second
 }
 
-// defaultRetryConfig retries HTTP requests on all low-level network errors, as well as HTTP 500
-// and 503 responses. It retries up to 4 times with exponential backoff.
-var defaultRetryConfig = RetryConfig{
-	MaxRetries: 4,
-	CheckForRetry: func(resp *http.Response, err error) bool {
-		return err != nil || resp.StatusCode == http.StatusInternalServerError ||
-			resp.StatusCode == http.StatusServiceUnavailable
-	},
-	ExpBackoffFactor: 0.5,
+func defaultRetryPolicy(resp *http.Response, err error) bool {
+	return err != nil || resp.StatusCode == http.StatusInternalServerError ||
+		resp.StatusCode == http.StatusServiceUnavailable
 }
 
 // HTTPClient is a convenient API to make HTTP calls.
 //
-// This API handles some of the repetitive tasks such as entity serialization and deserialization
-// involved in making HTTP calls. It provides a convenient mechanism to set headers and query
+// This API handles the repetitive tasks such as entity serialization and deserialization
+// when making HTTP calls. It provides a convenient mechanism to set headers and query
 // parameters on outgoing requests, while enforcing that an explicit context is used per request.
-// Responses returned by HTTPClient can be easily parsed as JSON, and provide a simple mechanism to
-// configure retries.
+// Responses returned by HTTPClient can be easily unmarshalled as JSON.
+//
+// HTTPClient also handles automatically retrying failed HTTP requests.
 type HTTPClient struct {
 	Client      *http.Client
 	RetryConfig *RetryConfig
@@ -116,14 +111,21 @@ type HTTPClient struct {
 
 // NewHTTPClient creates a new HTTPClient using the provided client options and the default
 // RetryConfig.
+//
+// The default RetryConfig retries requests on all low-level network errors as well as on HTTP 500
+// and 503 errors. Repatedly failing requests are retried up to 4 times with exponential backoff.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
 	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, "", err
 	}
 	client := &HTTPClient{
-		Client:      hc,
-		RetryConfig: &defaultRetryConfig,
+		Client: hc,
+		RetryConfig: &RetryConfig{
+			MaxRetries:       4,
+			CheckForRetry:    defaultRetryPolicy,
+			ExpBackoffFactor: 0.5,
+		},
 	}
 	return client, endpoint, nil
 }

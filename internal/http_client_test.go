@@ -97,10 +97,13 @@ var cases = []struct {
 	},
 }
 
-var defaultRetryConfigWithoutBackoff = RetryConfig{
-	MaxRetries:    defaultRetryConfig.MaxRetries,
-	CheckForRetry: defaultRetryConfig.CheckForRetry,
+var testRetryConfig = RetryConfig{
+	MaxRetries:       4,
+	CheckForRetry:    defaultRetryPolicy,
+	ExpBackoffFactor: 0.5,
 }
+
+var tokenSourceOpt = option.WithTokenSource(&MockTokenSource{AccessToken: "test"})
 
 func TestHTTPClient(t *testing.T) {
 	want := map[string]interface{}{
@@ -304,13 +307,13 @@ func TestUnmarshalError(t *testing.T) {
 
 func TestNetworkErrorRetryEligible(t *testing.T) {
 	err := errors.New("network error")
-	maxRetries := defaultRetryConfig.MaxRetries
+	maxRetries := testRetryConfig.MaxRetries
 	for i := 0; i < maxRetries; i++ {
-		if eligible := defaultRetryConfig.retryEligible(i, nil, err); !eligible {
+		if eligible := testRetryConfig.retryEligible(i, nil, err); !eligible {
 			t.Errorf("retryEligible(%d, nil, err) = false; want = true", i)
 		}
 	}
-	if eligible := defaultRetryConfig.retryEligible(maxRetries, nil, err); eligible {
+	if eligible := testRetryConfig.retryEligible(maxRetries, nil, err); eligible {
 		t.Errorf("retryEligible(%d, nil, err) = true; want = false", maxRetries)
 	}
 }
@@ -319,18 +322,18 @@ func TestHttpErrorRetryEligible(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: http.StatusServiceUnavailable,
 	}
-	maxRetries := defaultRetryConfig.MaxRetries
+	maxRetries := testRetryConfig.MaxRetries
 	for i := 0; i < maxRetries; i++ {
-		if eligible := defaultRetryConfig.retryEligible(i, resp, nil); !eligible {
+		if eligible := testRetryConfig.retryEligible(i, resp, nil); !eligible {
 			t.Errorf("retryEligible(%d, 503, nil) = false; want = true", i)
 		}
 	}
-	if eligible := defaultRetryConfig.retryEligible(maxRetries, resp, nil); eligible {
+	if eligible := testRetryConfig.retryEligible(maxRetries, resp, nil); eligible {
 		t.Errorf("retryEligible(%d, 503, nil) = true; want = false", maxRetries)
 	}
 }
 
-func TestCheckForRetryIsNil(t *testing.T) {
+func TestNilCheckForRetry(t *testing.T) {
 	rc := &RetryConfig{
 		MaxRetries:    1000,
 		CheckForRetry: nil,
@@ -364,7 +367,7 @@ func TestRetryAfterHeaderInSecondsFormat(t *testing.T) {
 		Header:     header,
 	}
 	for i := 0; i < 5; i++ {
-		delay := defaultRetryConfig.retryDelay(i, resp)
+		delay := testRetryConfig.retryDelay(i, resp)
 		if delay != time.Duration(30)*time.Second {
 			t.Errorf("retryDelay = %f s; want = 30.0 s", delay.Seconds())
 		}
@@ -382,7 +385,7 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 	}
 	clock = &MockClock{now}
 	for i := 0; i < 5; i++ {
-		delay := defaultRetryConfig.retryDelay(i, resp)
+		delay := testRetryConfig.retryDelay(i, resp)
 		// HTTP timestamp format only has seconds precision. So the final value could be off by 1s.
 		if delay < time.Duration(60-1)*time.Second || delay > time.Duration(60+1)*time.Second {
 			t.Errorf("retryDelay = %f s; want = ~60.0 s", delay.Seconds())
@@ -393,7 +396,7 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 func TestRetryDelayExponentialBackoff(t *testing.T) {
 	want := []int{0, 1, 2, 4, 8}
 	for i := 0; i < 5; i++ {
-		delay := defaultRetryConfig.retryDelay(i, nil)
+		delay := testRetryConfig.retryDelay(i, nil)
 		if delay != time.Duration(want[i])*time.Second {
 			t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
 		}
@@ -401,15 +404,18 @@ func TestRetryDelayExponentialBackoff(t *testing.T) {
 }
 
 func TestRetryDelayNoExponentialBackoff(t *testing.T) {
+	retryConfigWithoutBackoff := &RetryConfig{
+		MaxRetries: 4,
+	}
 	for i := 0; i < 5; i++ {
-		delay := defaultRetryConfigWithoutBackoff.retryDelay(i, nil)
+		delay := retryConfigWithoutBackoff.retryDelay(i, nil)
 		if delay != 0 {
 			t.Errorf("retryDelay = %f s; want = 0.0 s", delay.Seconds())
 		}
 	}
 }
 
-func TestRetryDelayLargerHasPriority(t *testing.T) {
+func TestLongestRetryDelayHasPrecedence(t *testing.T) {
 	header := make(http.Header)
 	now := time.Now()
 	retryAfter := now.Add(time.Duration(3) * time.Second)
@@ -421,7 +427,7 @@ func TestRetryDelayLargerHasPriority(t *testing.T) {
 	clock = &MockClock{now}
 	want := []int{0, 1, 2, 4, 8}
 	for i := 0; i < 5; i++ {
-		delay := defaultRetryConfig.retryDelay(i, resp)
+		delay := testRetryConfig.retryDelay(i, resp)
 		if want[i] > 3 {
 			if delay != time.Duration(want[i])*time.Second {
 				t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
@@ -434,72 +440,10 @@ func TestRetryDelayLargerHasPriority(t *testing.T) {
 	}
 }
 
-func TestRetryOnInternalErrorAndUnavailable(t *testing.T) {
-	var status int
-	requests := 0
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		w.WriteHeader(status)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client:      http.DefaultClient,
-		RetryConfig: &defaultRetryConfigWithoutBackoff,
-	}
-	for _, status = range []int{http.StatusInternalServerError, http.StatusServiceUnavailable} {
-		requests = 0
-		req := &Request{Method: http.MethodGet, URL: server.URL}
-		resp, err := client.Do(context.Background(), req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := resp.CheckStatus(status); err != nil {
-			t.Errorf("CheckStatus() = %q; want = nil", err.Error())
-		}
-		wr := 1 + defaultRetryConfigWithoutBackoff.MaxRetries
-		if requests != wr {
-			t.Errorf("Total requests = %d; want = %d", requests, wr)
-		}
-	}
-}
-
-func TestNoRetryOnNotFound(t *testing.T) {
-	requests := 0
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client:      http.DefaultClient,
-		RetryConfig: &defaultRetryConfigWithoutBackoff,
-	}
-
-	req := &Request{Method: http.MethodGet, URL: server.URL}
-	resp, err := client.Do(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := resp.CheckStatus(http.StatusNotFound); err != nil {
-		t.Errorf("CheckStatus() = %q; want = nil", err.Error())
-	}
-	if requests != 1 {
-		t.Errorf("Total requests = %d; want = %d", requests, 1)
-	}
-}
-
 func TestNoRetryOnRequestBuildError(t *testing.T) {
 	client := &HTTPClient{
 		Client:      http.DefaultClient,
-		RetryConfig: &defaultRetryConfigWithoutBackoff,
+		RetryConfig: &testRetryConfig,
 	}
 
 	entity := &errorEntry{}
@@ -520,18 +464,88 @@ func TestNoRetryOnRequestBuildError(t *testing.T) {
 func TestNewHTTPClient(t *testing.T) {
 	wantEndpoint := "https://cloud.google.com"
 	opts := []option.ClientOption{
-		option.WithTokenSource(&MockTokenSource{AccessToken: "test"}),
+		tokenSourceOpt,
 		option.WithEndpoint(wantEndpoint),
 	}
 	client, endpoint, err := NewHTTPClient(context.Background(), opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.RetryConfig != &defaultRetryConfig {
-		t.Errorf("NewHTTPClient().RetryConfig = %v; want = %v", *client.RetryConfig, defaultRetryConfig)
+	wantRetry := &RetryConfig{
+		MaxRetries:       4,
+		ExpBackoffFactor: 0.5,
+	}
+	gotRetry := client.RetryConfig
+	if gotRetry.MaxRetries != wantRetry.MaxRetries ||
+		gotRetry.ExpBackoffFactor != wantRetry.ExpBackoffFactor ||
+		gotRetry.CheckForRetry == nil {
+		t.Errorf("NewHTTPClient().RetryConfig = %v; want = %v", *gotRetry, wantRetry)
 	}
 	if endpoint != wantEndpoint {
 		t.Errorf("NewHTTPClient() = %q; want = %q", endpoint, wantEndpoint)
+	}
+}
+
+func TestNewHTTPClientRetryOnHTTPErrors(t *testing.T) {
+	var status int
+	requests := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(status)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.RetryConfig.ExpBackoffFactor = 0
+	const defaultMaxRetries = 4
+	for _, status = range []int{http.StatusInternalServerError, http.StatusServiceUnavailable} {
+		requests = 0
+		req := &Request{Method: http.MethodGet, URL: server.URL}
+		resp, err := client.Do(context.Background(), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := resp.CheckStatus(status); err != nil {
+			t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+		}
+		wantRequests := 1 + defaultMaxRetries
+		if requests != wantRequests {
+			t.Errorf("Total requests = %d; want = %d", requests, wantRequests)
+		}
+	}
+}
+
+func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
+	requests := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &Request{Method: http.MethodGet, URL: server.URL}
+	resp, err := client.Do(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resp.CheckStatus(http.StatusNotFound); err != nil {
+		t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+	}
+	if requests != 1 {
+		t.Errorf("Total requests = %d; want = %d", requests, 1)
 	}
 }
 
