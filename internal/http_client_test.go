@@ -304,15 +304,24 @@ func TestUnmarshalError(t *testing.T) {
 	}
 }
 
+func TestRetryDisabled(t *testing.T) {
+	err := errors.New("network error")
+	client := &HTTPClient{}
+	if _, eligible := client.retryDelay(nil, err, 0); eligible {
+		t.Errorf("retryEligible(0, nil, err) = true; want = false")
+	}
+}
+
 func TestNetworkErrorMaxRetries(t *testing.T) {
 	err := errors.New("network error")
 	maxRetries := testRetryConfig.MaxRetries
+	client := &HTTPClient{RetryConfig: &testRetryConfig}
 	for i := 0; i < maxRetries; i++ {
-		if eligible := testRetryConfig.retryEligible(i, nil, err); !eligible {
+		if _, eligible := client.retryDelay(nil, err, i); !eligible {
 			t.Errorf("retryEligible(%d, nil, err) = false; want = true", i)
 		}
 	}
-	if eligible := testRetryConfig.retryEligible(maxRetries, nil, err); eligible {
+	if _, eligible := client.retryDelay(nil, err, maxRetries); eligible {
 		t.Errorf("retryEligible(%d, nil, err) = true; want = false", maxRetries)
 	}
 }
@@ -322,12 +331,13 @@ func TestHTTPErrorMaxRetries(t *testing.T) {
 		StatusCode: http.StatusServiceUnavailable,
 	}
 	maxRetries := testRetryConfig.MaxRetries
+	client := &HTTPClient{RetryConfig: &testRetryConfig}
 	for i := 0; i < maxRetries; i++ {
-		if eligible := testRetryConfig.retryEligible(i, resp, nil); !eligible {
+		if _, eligible := client.retryDelay(resp, nil, i); !eligible {
 			t.Errorf("retryEligible(%d, 503, nil) = false; want = true", i)
 		}
 	}
-	if eligible := testRetryConfig.retryEligible(maxRetries, resp, nil); eligible {
+	if _, eligible := client.retryDelay(resp, nil, maxRetries); eligible {
 		t.Errorf("retryEligible(%d, 503, nil) = true; want = false", maxRetries)
 	}
 }
@@ -354,36 +364,34 @@ func TestNoRetryOnRequestBuildError(t *testing.T) {
 }
 
 func TestNoRetryOnHTTPSuccessCodes(t *testing.T) {
-	rc := &RetryConfig{
-		MaxRetries:    1000,
-		CheckForRetry: nil,
-	}
-	if eligible := rc.retryEligible(999, nil, errors.New("network error")); !eligible {
-		t.Errorf("retryEligible(999, nil, err) = false; want = true")
+	client := &HTTPClient{
+		RetryConfig: &RetryConfig{
+			MaxRetries:    1000,
+			CheckForRetry: nil,
+		},
 	}
 	for i := http.StatusOK; i < http.StatusBadRequest; i++ {
 		resp := &http.Response{
 			StatusCode: i,
 		}
-		if eligible := rc.retryEligible(i, resp, nil); eligible {
+		if _, eligible := client.retryDelay(resp, nil, 0); eligible {
 			t.Errorf("retryEligible(%d, %d, nil) = true; want = false", i, resp.StatusCode)
 		}
 	}
 }
 
 func TestRetryOnHTTPErrorCodes(t *testing.T) {
-	rc := &RetryConfig{
-		MaxRetries:    1000,
-		CheckForRetry: nil,
-	}
-	if eligible := rc.retryEligible(999, nil, errors.New("network error")); !eligible {
-		t.Errorf("retryEligible(999, nil, err) = false; want = true")
+	client := &HTTPClient{
+		RetryConfig: &RetryConfig{
+			MaxRetries:    1000,
+			CheckForRetry: nil,
+		},
 	}
 	for i := http.StatusBadRequest; i <= http.StatusNetworkAuthenticationRequired; i++ {
 		resp := &http.Response{
 			StatusCode: i,
 		}
-		if eligible := rc.retryEligible(i, resp, nil); !eligible {
+		if _, eligible := client.retryDelay(resp, nil, 0); !eligible {
 			t.Errorf("retryEligible(%d, %d, nil) = false; want = true", i, resp.StatusCode)
 		}
 	}
@@ -396,10 +404,11 @@ func TestRetryAfterHeaderInSecondsFormat(t *testing.T) {
 		StatusCode: http.StatusServiceUnavailable,
 		Header:     header,
 	}
-	for i := 0; i < 5; i++ {
-		delay := testRetryConfig.retryDelay(i, resp)
-		if delay != time.Duration(30)*time.Second {
-			t.Errorf("retryDelay = %f s; want = 30.0 s", delay.Seconds())
+	client := &HTTPClient{RetryConfig: &testRetryConfig}
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
+		if !ok || delay != time.Duration(30)*time.Second {
+			t.Errorf("retryDelay(%d) = %f s, %v; want = 30.0 s", i, delay.Seconds(), ok)
 		}
 	}
 }
@@ -414,33 +423,86 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 		StatusCode: http.StatusServiceUnavailable,
 		Header:     header,
 	}
+	client := &HTTPClient{RetryConfig: &testRetryConfig}
 	clock = &MockClock{now}
-	for i := 0; i < 5; i++ {
-		delay := testRetryConfig.retryDelay(i, resp)
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
 		// HTTP timestamp format has seconds precision. So the final value could be off by 1s.
-		if delay < time.Duration(60-1)*time.Second || delay > time.Duration(60+1)*time.Second {
+		if !ok || delay < time.Duration(60-1)*time.Second || delay > time.Duration(60+1)*time.Second {
 			t.Errorf("retryDelay = %f s; want = ~60.0 s", delay.Seconds())
 		}
 	}
 }
 
-func TestRetryDelayExponentialBackoff(t *testing.T) {
+func TestMaxDelayWithRetryAfterHeader(t *testing.T) {
+	header := make(http.Header)
+	header.Add("retry-after", "30")
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Header:     header,
+	}
+	tenSeconds := time.Duration(10) * time.Second
+	client := &HTTPClient{
+		RetryConfig: &RetryConfig{
+			MaxRetries: 4,
+			MaxDelay:   &tenSeconds,
+		},
+	}
+	for i := 0; i < 4; i++ {
+		_, ok := client.retryDelay(resp, nil, i)
+		if ok {
+			t.Errorf("retryDelay(%d) s, %v; want = 30.0 s", i, ok)
+		}
+	}
+}
+
+func TestRetryDelayExpBackoff(t *testing.T) {
 	want := []int{0, 1, 2, 4, 8}
-	for i := 0; i < 5; i++ {
-		delay := testRetryConfig.retryDelay(i, nil)
-		if delay != time.Duration(want[i])*time.Second {
+	client := &HTTPClient{RetryConfig: &testRetryConfig}
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+	}
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
+		if !ok || delay != time.Duration(want[i])*time.Second {
+			t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
+		}
+	}
+}
+
+func TestMaxDelayWithExpBackoff(t *testing.T) {
+	want := []int{0, 2, 4, 5, 5}
+	fiveSeconds := time.Duration(5) * time.Second
+	client := &HTTPClient{
+		RetryConfig: &RetryConfig{
+			MaxRetries:       4,
+			MaxDelay:         &fiveSeconds,
+			ExpBackoffFactor: 1,
+		},
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+	}
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
+		if !ok || delay != time.Duration(want[i])*time.Second {
 			t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
 		}
 	}
 }
 
 func TestRetryDelayDisableExponentialBackoff(t *testing.T) {
-	retryConfigWithoutBackoff := &RetryConfig{
-		MaxRetries: 4,
+	client := &HTTPClient{
+		RetryConfig: &RetryConfig{
+			MaxRetries: 4,
+		},
 	}
-	for i := 0; i < 5; i++ {
-		delay := retryConfigWithoutBackoff.retryDelay(i, nil)
-		if delay != 0 {
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+	}
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
+		if !ok || delay != 0 {
 			t.Errorf("retryDelay = %f s; want = 0.0 s", delay.Seconds())
 		}
 	}
@@ -457,8 +519,14 @@ func TestLongestRetryDelayHasPrecedence(t *testing.T) {
 	}
 	clock = &MockClock{now}
 	want := []int{0, 1, 2, 4, 8}
-	for i := 0; i < 5; i++ {
-		delay := testRetryConfig.retryDelay(i, resp)
+	client := &HTTPClient{
+		RetryConfig: &testRetryConfig,
+	}
+	for i := 0; i < 4; i++ {
+		delay, ok := client.retryDelay(resp, nil, i)
+		if !ok {
+			t.Errorf("retryDelay = false; want = true")
+		}
 		if want[i] > 3 {
 			if delay != time.Duration(want[i])*time.Second {
 				t.Errorf("retryDelay = %f s; want = %d.0 s", delay.Seconds(), want[i])
@@ -468,6 +536,18 @@ func TestLongestRetryDelayHasPrecedence(t *testing.T) {
 				t.Errorf("retryDelay = %f s; want = ~3.0 s", delay.Seconds())
 			}
 		}
+	}
+}
+
+func TestContextCancellationStopsRetry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	client := &HTTPClient{}
+	if err := client.prepareRetry(ctx, nil, 0); err != nil {
+		t.Fatalf("prepareRequest() = %v; want = nil", err)
+	}
+	cancel()
+	if err := client.prepareRetry(ctx, nil, 0); err != context.Canceled {
+		t.Errorf("prepareRequest() = %v; want = %v", err, context.Canceled)
 	}
 }
 

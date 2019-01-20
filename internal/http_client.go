@@ -39,10 +39,14 @@ var clock Clock = &SystemClock{}
 // Retry-After header, it is always respected. Otherwise retries are delayed with exponential
 // backoff. Set ExpBackoffFactor to 0 to disable exponential backoff, and retry immediately
 // after each error.
+//
+// If MaxDelay is set, retries delay gets capped by that value. If the Retry-After header
+// requires a longer delay than MaxDelay, retries are not performed.
 type RetryConfig struct {
 	MaxRetries       int
 	CheckForRetry    RetryCondition
 	ExpBackoffFactor float64
+	MaxDelay         *time.Duration
 }
 
 func (rc *RetryConfig) retryEligible(retryAttempts int, resp *http.Response, err error) bool {
@@ -55,13 +59,16 @@ func (rc *RetryConfig) retryEligible(retryAttempts int, resp *http.Response, err
 	return rc.CheckForRetry(resp, err)
 }
 
-func (rc *RetryConfig) retryDelay(retryAttempts int, resp *http.Response) time.Duration {
+func (rc *RetryConfig) retryDelay(retryAttempts int, resp *http.Response) (time.Duration, bool) {
 	serverRecommendedDelay := parseRetryAfterHeader(resp)
-	clientEstimatedDelay := estimateDelayForAttempt(retryAttempts, rc.ExpBackoffFactor)
-	if serverRecommendedDelay > clientEstimatedDelay {
-		return serverRecommendedDelay
+	estimatedDelay := rc.estimateDelayForNextRetry(retryAttempts)
+	if serverRecommendedDelay > estimatedDelay {
+		estimatedDelay = serverRecommendedDelay
 	}
-	return clientEstimatedDelay
+	if rc.MaxDelay != nil && estimatedDelay > *rc.MaxDelay {
+		return 0, false
+	}
+	return estimatedDelay, true
 }
 
 func parseRetryAfterHeader(resp *http.Response) time.Duration {
@@ -82,12 +89,16 @@ func parseRetryAfterHeader(resp *http.Response) time.Duration {
 	return time.Duration(delayInSeconds) * time.Second
 }
 
-func estimateDelayForAttempt(retryAttempts int, factor float64) time.Duration {
-	if retryAttempts == 0 {
+func (rc *RetryConfig) estimateDelayForNextRetry(retries int) time.Duration {
+	if retries == 0 {
 		return 0
 	}
-	delayInSeconds := int64(math.Pow(2, float64(retryAttempts)) * factor)
-	return time.Duration(delayInSeconds) * time.Second
+	delayInSeconds := int64(math.Pow(2, float64(retries)) * rc.ExpBackoffFactor)
+	estimatedDelay := time.Duration(delayInSeconds) * time.Second
+	if rc.MaxDelay != nil && *rc.MaxDelay < estimatedDelay {
+		return *rc.MaxDelay
+	}
+	return estimatedDelay
 }
 
 // RetryCondition determines if an HTTP request should be retried depending on its last outcome.
@@ -125,13 +136,14 @@ type HTTPClient struct {
 // RetryConfig.
 //
 // The default RetryConfig retries requests on all low-level network errors as well as on HTTP
-// InternalServerError (500) and ServiceUnavailable (503) errors. Repatedly failing requests are
+// InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
 // retried up to 4 times with exponential backoff.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
 	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, "", err
 	}
+	twoMinutes := time.Duration(2) * time.Minute
 	client := &HTTPClient{
 		Client: hc,
 		RetryConfig: &RetryConfig{
@@ -141,6 +153,7 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 				http.StatusServiceUnavailable,
 			),
 			ExpBackoffFactor: 0.5,
+			MaxDelay:         &twoMinutes,
 		},
 	}
 	return client, endpoint, nil
@@ -150,19 +163,11 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 //
 // If a RetryConfig is specified on the client, Do attempts to retry failing requests.
 func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
-	retryAttempt := 0
+	retries := 0
 	for {
-		req, err := r.buildHTTPRequest()
-		if err != nil {
-			return nil, err
-		}
-		resp, err := c.Client.Do(req.WithContext(ctx))
-		if c.RetryConfig != nil && c.RetryConfig.retryEligible(retryAttempt, resp, err) {
-			if resp != nil {
-				resp.Body.Close()
-			}
-			c.delayNextAttempt(resp, retryAttempt)
-			retryAttempt++
+		resp, retry, err := c.attempt(ctx, r, retries)
+		if retry {
+			retries++
 			continue
 		}
 		if err != nil {
@@ -173,9 +178,40 @@ func (c *HTTPClient) Do(ctx context.Context, r *Request) (*Response, error) {
 	}
 }
 
-func (c *HTTPClient) delayNextAttempt(resp *http.Response, retryAttempt int) {
-	retryDelay := c.RetryConfig.retryDelay(retryAttempt, resp)
-	time.Sleep(retryDelay)
+func (c *HTTPClient) attempt(ctx context.Context, r *Request, retries int) (*http.Response, bool, error) {
+	req, err := r.buildHTTPRequest()
+	if err != nil {
+		return nil, false, err
+	}
+	resp, err := c.Client.Do(req.WithContext(ctx))
+	if delay, ok := c.retryDelay(resp, err, retries); ok {
+		if err := c.prepareRetry(ctx, resp, delay); err != nil {
+			return nil, false, err
+		}
+		return nil, true, nil
+	}
+	return resp, false, err
+}
+
+func (c *HTTPClient) retryDelay(resp *http.Response, err error, retries int) (time.Duration, bool) {
+	rc := c.RetryConfig
+	if rc == nil || !rc.retryEligible(retries, resp, err) {
+		return 0, false
+	}
+	return rc.retryDelay(retries, resp)
+}
+
+func (c *HTTPClient) prepareRetry(ctx context.Context, resp *http.Response, delay time.Duration) error {
+	if resp != nil {
+		resp.Body.Close()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	return nil
 }
 
 // Request contains all the parameters required to construct an outgoing HTTP request.
