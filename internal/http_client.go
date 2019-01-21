@@ -30,97 +30,6 @@ import (
 	"google.golang.org/api/transport"
 )
 
-var clock Clock = &SystemClock{}
-
-// RetryCondition determines if an HTTP request should be retried depending on its last outcome.
-type RetryCondition func(resp *http.Response, networkErr error) bool
-
-func retryOnNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
-	return func(resp *http.Response, networkErr error) bool {
-		if networkErr != nil {
-			return true
-		}
-		for _, retryOnStatus := range statusCodes {
-			if resp.StatusCode == retryOnStatus {
-				return true
-			}
-		}
-		return false
-	}
-}
-
-// RetryConfig specifies how the HTTPClient should retry failing HTTP requests.
-//
-// A request is never retried more than MaxRetries times. If CheckForRetry is nil, all network
-// errors, and all 400+ HTTP status codes are retried. If an HTTP error response contains the
-// Retry-After header, it is always respected. Otherwise retries are delayed with exponential
-// backoff. Set ExpBackoffFactor to 0 to disable exponential backoff, and retry immediately
-// after each error.
-//
-// If MaxDelay is set, retries delay gets capped by that value. If the Retry-After header
-// requires a longer delay than MaxDelay, retries are not attempted.
-type RetryConfig struct {
-	MaxRetries       int
-	CheckForRetry    RetryCondition
-	ExpBackoffFactor float64
-	MaxDelay         *time.Duration
-}
-
-func (rc *RetryConfig) retryEligible(retries int, resp *http.Response, err error) bool {
-	if retries >= rc.MaxRetries {
-		return false
-	}
-	if rc.CheckForRetry == nil {
-		return err != nil || resp.StatusCode >= 400
-	}
-	return rc.CheckForRetry(resp, err)
-}
-
-func (rc *RetryConfig) retryDelay(retries int, resp *http.Response, err error) (time.Duration, bool) {
-	if !rc.retryEligible(retries, resp, err) {
-		return 0, false
-	}
-	serverRecommendedDelay := rc.parseRetryAfterHeader(resp)
-	estimatedDelay := rc.estimateDelayBeforeNextRetry(retries)
-	if serverRecommendedDelay > estimatedDelay {
-		estimatedDelay = serverRecommendedDelay
-	}
-	if rc.MaxDelay != nil && estimatedDelay > *rc.MaxDelay {
-		return 0, false
-	}
-	return estimatedDelay, true
-}
-
-func (rc *RetryConfig) parseRetryAfterHeader(resp *http.Response) time.Duration {
-	if resp == nil {
-		return 0
-	}
-	retryAfterHeader := resp.Header.Get("retry-after")
-	if retryAfterHeader == "" {
-		return 0
-	}
-	delayInSeconds, err := strconv.ParseInt(retryAfterHeader, 10, 64)
-	if err != nil {
-		timestamp, err := http.ParseTime(retryAfterHeader)
-		if err == nil {
-			return timestamp.Sub(clock.Now())
-		}
-	}
-	return time.Duration(delayInSeconds) * time.Second
-}
-
-func (rc *RetryConfig) estimateDelayBeforeNextRetry(retries int) time.Duration {
-	if retries == 0 {
-		return 0
-	}
-	delayInSeconds := int64(math.Pow(2, float64(retries)) * rc.ExpBackoffFactor)
-	estimatedDelay := time.Duration(delayInSeconds) * time.Second
-	if rc.MaxDelay != nil && estimatedDelay > *rc.MaxDelay {
-		estimatedDelay = *rc.MaxDelay
-	}
-	return estimatedDelay
-}
-
 // HTTPClient is a convenient API to make HTTP calls.
 //
 // This API handles the repetitive tasks such as entity serialization and deserialization
@@ -140,7 +49,7 @@ type HTTPClient struct {
 //
 // The default RetryConfig retries requests on all low-level network errors as well as on HTTP
 // InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
-// retried up to 4 times with exponential backoff.
+// retried up to 4 times with exponential backoff. Retry delay is never longer than 2 minutes.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
 	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
@@ -151,7 +60,7 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 		Client: hc,
 		RetryConfig: &RetryConfig{
 			MaxRetries: 4,
-			CheckForRetry: retryOnNetworkAndHTTPErrors(
+			CheckForRetry: retryNetworkAndHTTPErrors(
 				http.StatusInternalServerError,
 				http.StatusServiceUnavailable,
 			),
@@ -369,5 +278,96 @@ func WithQueryParams(qp map[string]string) HTTPOption {
 			q.Add(k, v)
 		}
 		r.URL.RawQuery = q.Encode()
+	}
+}
+
+// RetryConfig specifies how the HTTPClient should retry failing HTTP requests.
+//
+// A request is never retried more than MaxRetries times. If CheckForRetry is nil, all network
+// errors, and all 400+ HTTP status codes are retried. If an HTTP error response contains the
+// Retry-After header, it is always respected. Otherwise retries are delayed with exponential
+// backoff. Set ExpBackoffFactor to 0 to disable exponential backoff, and retry immediately
+// after each error.
+//
+// If MaxDelay is set, retries delay gets capped by that value. If the Retry-After header
+// requires a longer delay than MaxDelay, retries are not attempted.
+type RetryConfig struct {
+	MaxRetries       int
+	CheckForRetry    RetryCondition
+	ExpBackoffFactor float64
+	MaxDelay         *time.Duration
+}
+
+// RetryCondition determines if an HTTP request should be retried depending on its last outcome.
+type RetryCondition func(resp *http.Response, networkErr error) bool
+
+func (rc *RetryConfig) retryDelay(retries int, resp *http.Response, err error) (time.Duration, bool) {
+	if !rc.retryEligible(retries, resp, err) {
+		return 0, false
+	}
+	estimatedDelay := rc.estimateDelayBeforeNextRetry(retries)
+	serverRecommendedDelay := parseRetryAfterHeader(resp)
+	if serverRecommendedDelay > estimatedDelay {
+		estimatedDelay = serverRecommendedDelay
+	}
+	if rc.MaxDelay != nil && estimatedDelay > *rc.MaxDelay {
+		return 0, false
+	}
+	return estimatedDelay, true
+}
+
+func (rc *RetryConfig) retryEligible(retries int, resp *http.Response, err error) bool {
+	if retries >= rc.MaxRetries {
+		return false
+	}
+	if rc.CheckForRetry == nil {
+		return err != nil || resp.StatusCode >= 400
+	}
+	return rc.CheckForRetry(resp, err)
+}
+
+func (rc *RetryConfig) estimateDelayBeforeNextRetry(retries int) time.Duration {
+	if retries == 0 {
+		return 0
+	}
+	delayInSeconds := int64(math.Pow(2, float64(retries)) * rc.ExpBackoffFactor)
+	estimatedDelay := time.Duration(delayInSeconds) * time.Second
+	if rc.MaxDelay != nil && estimatedDelay > *rc.MaxDelay {
+		estimatedDelay = *rc.MaxDelay
+	}
+	return estimatedDelay
+}
+
+var retryTimeClock Clock = &SystemClock{}
+
+func parseRetryAfterHeader(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+	retryAfterHeader := resp.Header.Get("retry-after")
+	if retryAfterHeader == "" {
+		return 0
+	}
+	delayInSeconds, err := strconv.ParseInt(retryAfterHeader, 10, 64)
+	if err != nil {
+		timestamp, err := http.ParseTime(retryAfterHeader)
+		if err == nil {
+			return timestamp.Sub(retryTimeClock.Now())
+		}
+	}
+	return time.Duration(delayInSeconds) * time.Second
+}
+
+func retryNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
+	return func(resp *http.Response, networkErr error) bool {
+		if networkErr != nil {
+			return true
+		}
+		for _, retryOnStatus := range statusCodes {
+			if resp.StatusCode == retryOnStatus {
+				return true
+			}
+		}
+		return false
 	}
 }

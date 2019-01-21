@@ -27,6 +27,14 @@ import (
 	"google.golang.org/api/option"
 )
 
+var (
+	testRetryConfig = RetryConfig{
+		MaxRetries:       4,
+		ExpBackoffFactor: 0.5,
+	}
+	tokenSourceOpt = option.WithTokenSource(&MockTokenSource{AccessToken: "test"})
+)
+
 var testRequests = []struct {
 	req     *Request
 	method  string
@@ -96,13 +104,6 @@ var testRequests = []struct {
 		query:   map[string]string{"testParam1": "value2", "testParam2": "value3"},
 	},
 }
-
-var testRetryConfig = RetryConfig{
-	MaxRetries:       4,
-	ExpBackoffFactor: 0.5,
-}
-
-var tokenSourceOpt = option.WithTokenSource(&MockTokenSource{AccessToken: "test"})
 
 func TestHTTPClient(t *testing.T) {
 	want := map[string]interface{}{
@@ -432,7 +433,7 @@ func TestRetryAfterHeaderInTimestampFormat(t *testing.T) {
 		StatusCode: http.StatusServiceUnavailable,
 		Header:     header,
 	}
-	clock = &MockClock{now}
+	retryTimeClock = &MockClock{now}
 	maxRetries := testRetryConfig.MaxRetries
 	for i := 0; i < maxRetries; i++ {
 		delay, ok := testRetryConfig.retryDelay(i, resp, nil)
@@ -520,14 +521,11 @@ func TestRetryDelayDisableExponentialBackoff(t *testing.T) {
 
 func TestLongestRetryDelayHasPrecedence(t *testing.T) {
 	header := make(http.Header)
-	now := time.Now()
-	retryAfter := now.Add(time.Duration(3) * time.Second)
-	header.Add("retry-after", retryAfter.UTC().Format(http.TimeFormat))
+	header.Add("retry-after", "3")
 	resp := &http.Response{
 		StatusCode: http.StatusServiceUnavailable,
 		Header:     header,
 	}
-	clock = &MockClock{now}
 	want := []int{0, 1, 2, 4}
 	for i := 0; i < 4; i++ {
 		delay, ok := testRetryConfig.retryDelay(i, resp, nil)
