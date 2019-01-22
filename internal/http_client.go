@@ -32,7 +32,7 @@ import (
 
 // HTTPClient is a convenient API to make HTTP calls.
 //
-// This API handles the repetitive tasks such as entity serialization and deserialization
+// This API handles repetitive tasks such as entity serialization and deserialization
 // when making HTTP calls. It provides a convenient mechanism to set headers and query
 // parameters on outgoing requests, while enforcing that an explicit context is used per request.
 // Responses returned by HTTPClient can be easily unmarshalled as JSON.
@@ -50,6 +50,9 @@ type HTTPClient struct {
 // The default RetryConfig retries requests on all low-level network errors as well as on HTTP
 // InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
 // retried up to 4 times with exponential backoff. Retry delay is never longer than 2 minutes.
+//
+// NewHTTPClient returns the created HTTPClient along with the target endpoint URL. The endpoint
+// is obtained from the client options passed into the function.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
 	hc, endpoint, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
@@ -75,21 +78,22 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 //
 // If a RetryConfig is specified on the client, Do attempts to retry failing requests.
 func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
-	retries := 0
-	for {
-		result, err := c.attempt(ctx, req, retries)
+	var result *attemptResult
+	var err error
+
+	for retries := 0; ; retries++ {
+		result, err = c.attempt(ctx, req, retries)
 		if err != nil {
 			return nil, err
 		}
-		if result.Retry {
-			if err := result.waitForRetry(ctx); err != nil {
-				return nil, err
-			}
-			retries++
-			continue
+		if !result.Retry {
+			break
 		}
-		return result.handleResponse()
+		if err = result.waitForRetry(ctx); err != nil {
+			return nil, err
+		}
 	}
+	return result.handleResponse()
 }
 
 func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*attemptResult, error) {
@@ -97,16 +101,24 @@ func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*a
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := c.Client.Do(hr.WithContext(ctx))
 	result := &attemptResult{
 		Resp:      resp,
 		Err:       err,
 		ErrParser: c.ErrParser,
 	}
+
+	// If a RetryConfig is available, always consult it to determine if the request should be retried
+	// or not. Even if there was a network error, we may not want to retry the request based on the
+	// RetryConfig that is in effect.
 	if c.RetryConfig != nil {
 		delay, retry := c.RetryConfig.retryDelay(retries, resp, err)
 		result.RetryAfter = delay
 		result.Retry = retry
+		if retry && resp != nil {
+			defer resp.Body.Close()
+		}
 	}
 	return result, nil
 }
@@ -120,23 +132,19 @@ type attemptResult struct {
 }
 
 func (r *attemptResult) waitForRetry(ctx context.Context) error {
-	if r.Resp != nil {
-		r.Resp.Body.Close()
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if r.RetryAfter > 0 {
-		time.Sleep(r.RetryAfter)
+		select {
+		case <-ctx.Done():
+		case <-time.After(r.RetryAfter):
+		}
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (r *attemptResult) handleResponse() (*Response, error) {
 	if r.Err != nil {
 		return nil, r.Err
 	}
-	defer r.Resp.Body.Close()
 	return newResponse(r.Resp, r.ErrParser)
 }
 
@@ -204,6 +212,7 @@ type Response struct {
 }
 
 func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) {
+	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -348,14 +357,13 @@ func parseRetryAfterHeader(resp *http.Response) time.Duration {
 	if retryAfterHeader == "" {
 		return 0
 	}
-	delayInSeconds, err := strconv.ParseInt(retryAfterHeader, 10, 64)
-	if err != nil {
-		timestamp, err := http.ParseTime(retryAfterHeader)
-		if err == nil {
-			return timestamp.Sub(retryTimeClock.Now())
-		}
+	if delayInSeconds, err := strconv.ParseInt(retryAfterHeader, 10, 64); err == nil {
+		return time.Duration(delayInSeconds) * time.Second
 	}
-	return time.Duration(delayInSeconds) * time.Second
+	if timestamp, err := http.ParseTime(retryAfterHeader); err == nil {
+		return timestamp.Sub(retryTimeClock.Now())
+	}
+	return 0
 }
 
 func retryNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
