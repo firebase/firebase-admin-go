@@ -330,7 +330,7 @@ func (rc *RetryConfig) retryEligible(retries int, resp *http.Response, err error
 		return false
 	}
 	if rc.CheckForRetry == nil {
-		return err != nil || resp.StatusCode >= 400
+		return err != nil || resp.StatusCode >= 500
 	}
 	return rc.CheckForRetry(resp, err)
 }

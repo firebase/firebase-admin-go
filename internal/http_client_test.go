@@ -393,7 +393,7 @@ func TestNoRetryOnHTTPSuccessCodes(t *testing.T) {
 }
 
 func TestRetryOnHTTPErrorCodes(t *testing.T) {
-	for i := http.StatusBadRequest; i <= http.StatusNetworkAuthenticationRequired; i++ {
+	for i := http.StatusInternalServerError; i <= http.StatusNetworkAuthenticationRequired; i++ {
 		resp := &http.Response{
 			StatusCode: i,
 		}
