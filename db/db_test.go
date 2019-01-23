@@ -33,7 +33,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-const testURL = "https://test-db.firebaseio.com"
+const (
+	testURL           = "https://test-db.firebaseio.com"
+	defaultMaxRetries = 1
+)
 
 var testUserAgent string
 var testAuthOverrides string
@@ -56,6 +59,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	retryConfig := client.hc.RetryConfig
+	retryConfig.MaxRetries = defaultMaxRetries
+	retryConfig.ExpBackoffFactor = 0
 
 	ao := map[string]interface{}{"uid": "user1"}
 	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{

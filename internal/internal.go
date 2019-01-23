@@ -17,6 +17,7 @@ package internal // import "firebase.google.com/go/internal"
 
 import (
 	"fmt"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -119,4 +120,27 @@ type MockTokenSource struct {
 // Token returns the test token associated with the TokenSource.
 func (ts *MockTokenSource) Token() (*oauth2.Token, error) {
 	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
+}
+
+// Clock is used to query the current local time.
+type Clock interface {
+	Now() time.Time
+}
+
+// SystemClock returns the current system time.
+type SystemClock struct{}
+
+// Now returns the current system time by calling time.Now().
+func (s SystemClock) Now() time.Time {
+	return time.Now()
+}
+
+// MockClock can be used to mock current time during tests.
+type MockClock struct {
+	Timestamp time.Time
+}
+
+// Now returns the timestamp set in the MockClock.
+func (m *MockClock) Now() time.Time {
+	return m.Timestamp
 }
