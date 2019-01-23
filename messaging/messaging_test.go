@@ -962,6 +962,7 @@ func TestSendError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.fcmEndpoint = ts.URL
+	client.client.RetryConfig = nil
 
 	cases := []struct {
 		resp, want string
@@ -1150,6 +1151,7 @@ func TestTopicManagementError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.iidEndpoint = ts.URL
+	client.client.RetryConfig = nil
 
 	cases := []struct {
 		resp, want string

@@ -101,6 +101,7 @@ func TestDeleteInstanceIDError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.endpoint = ts.URL
+	client.client.RetryConfig = nil
 
 	errorHandlers := map[int]func(error) bool{
 		http.StatusBadRequest:          IsInvalidArgument,
