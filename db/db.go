@@ -55,10 +55,8 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	p, err := url.ParseRequestURI(c.URL)
 	if err != nil {
 		return nil, err
-	} else if p.Scheme != "https" {
+	} else if p.Scheme != "https" || p.Scheme != "http" {
 		return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
-	} else if !strings.HasSuffix(p.Host, ".firebaseio.com") {
-		return nil, fmt.Errorf("invalid database URL: %q; want host: %q", c.URL, "firebaseio.com")
 	}
 
 	var ao []byte
@@ -80,7 +78,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	}
 	return &Client{
 		hc:           &internal.HTTPClient{Client: hc, ErrParser: ep},
-		url:          fmt.Sprintf("https://%s", p.Host),
+		url:          fmt.Sprintf("%s://%s", p.Scheme, p.Host),
 		authOverride: string(ao),
 	}, nil
 }
