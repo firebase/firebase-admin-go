@@ -1,5 +1,9 @@
 # Unreleased
 
+- [added] Implemented HTTP retries for the `db` package. This package
+  now retries HTTP calls on low-level connection and socket read errors, as
+  well as HTTP 500 and 503 errors.
+
 # v3.6.0
 
 - [added] `messaging.Aps` type now supports critical sound in its payload.
