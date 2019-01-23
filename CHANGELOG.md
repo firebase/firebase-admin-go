@@ -3,6 +3,8 @@
 - [added] Implemented HTTP retries for the `db` package. This package
   now retries HTTP calls on low-level connection and socket read errors, as
   well as HTTP 500 and 503 errors.
+- [fixed] Updated `messaging.Client` and `iid.Client` to use the new
+  HTTP client API with retries support.
 
 # v3.6.0
 

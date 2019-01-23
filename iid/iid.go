@@ -22,7 +22,6 @@ import (
 	"net/http"
 
 	"firebase.google.com/go/internal"
-	"google.golang.org/api/transport"
 )
 
 const iidEndpoint = "https://console.firebase.google.com/v1"
@@ -117,14 +116,14 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 		return nil, errors.New("project id is required to access instance id client")
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
 		endpoint: iidEndpoint,
-		client:   &internal.HTTPClient{Client: hc},
+		client:   hc,
 		project:  c.ProjectID,
 	}, nil
 }
