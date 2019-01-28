@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
-	"google.golang.org/api/option"
 )
 
 func TestEncodeToken(t *testing.T) {
@@ -35,7 +34,7 @@ func TestEncodeToken(t *testing.T) {
 		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: mockIDTokenPayload{"key": "value"},
 	}
-	s, err := info.Token(ctx, &mockSigner{})
+	s, err := info.Token(context.Background(), &mockSigner{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +72,7 @@ func TestEncodeSignError(t *testing.T) {
 		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: mockIDTokenPayload{"key": "value"},
 	}
-	if s, err := info.Token(ctx, signer); s != "" || err != signer.err {
+	if s, err := info.Token(context.Background(), signer); s != "" || err != signer.err {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', %v)", s, err, signer.err)
 	}
 }
@@ -83,7 +82,7 @@ func TestEncodeInvalidPayload(t *testing.T) {
 		header:  jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: mockIDTokenPayload{"key": func() {}},
 	}
-	s, err := info.Token(ctx, &mockSigner{})
+	s, err := info.Token(context.Background(), &mockSigner{})
 	if s != "" || err == nil {
 		t.Errorf("encodeToken() = (%v, %v); want = ('', error)", s, err)
 	}
@@ -103,21 +102,20 @@ func TestServiceAccountSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	email, err := signer.Email(ctx)
+	email, err := signer.Email(context.Background())
 	if email != sa.ClientEmail || err != nil {
 		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, sa.ClientEmail)
 	}
-	sign, err := signer.Sign(ctx, []byte("test"))
+	sign, err := signer.Sign(context.Background(), []byte("test"))
 	if sign == nil || err != nil {
 		t.Errorf("Sign() = (%v, %v); want = (bytes, nil)", email, err)
 	}
 }
 
 func TestIAMSigner(t *testing.T) {
+	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"}),
-		},
+		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
 	}
 	signer, err := newIAMSigner(ctx, conf)
@@ -145,11 +143,10 @@ func TestIAMSigner(t *testing.T) {
 
 func TestIAMSignerHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"})},
+		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
 	}
-	signer, err := newIAMSigner(ctx, conf)
+	signer, err := newIAMSigner(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +162,7 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	signer.iamHost = server.URL
 
 	want := "http error status: 403; reason: test reason"
-	_, err = signer.Sign(ctx, []byte("input"))
+	_, err = signer.Sign(context.Background(), []byte("input"))
 	if err == nil || !IsInsufficientPermission(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
@@ -173,11 +170,10 @@ func TestIAMSignerHTTPError(t *testing.T) {
 
 func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"})},
+		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
 	}
-	signer, err := newIAMSigner(ctx, conf)
+	signer, err := newIAMSigner(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,17 +189,16 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	signer.iamHost = server.URL
 
 	want := "http error status: 403; reason: client encountered an unknown error; response: not json"
-	_, err = signer.Sign(ctx, []byte("input"))
+	_, err = signer.Sign(context.Background(), []byte("input"))
 	if err == nil || !IsUnknown(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
 
 func TestIAMSignerWithMetadataService(t *testing.T) {
+	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"}),
-		},
+		Opts: optsWithTokenSource,
 	}
 
 	signer, err := newIAMSigner(ctx, conf)
@@ -246,10 +241,9 @@ func TestIAMSignerWithMetadataService(t *testing.T) {
 }
 
 func TestIAMSignerNoMetadataService(t *testing.T) {
+	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"}),
-		},
+		Opts: optsWithTokenSource,
 	}
 
 	signer, err := newIAMSigner(ctx, conf)

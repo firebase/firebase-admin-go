@@ -66,7 +66,7 @@ type Client struct {
 	projectID string
 	signer    cryptoSigner
 	version   string
-	clock     clock
+	clock     internal.Clock
 }
 
 type signer interface {
@@ -136,7 +136,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		projectID: conf.ProjectID,
 		signer:    signer,
 		version:   "Go/Admin/" + conf.Version,
-		clock:     &systemClock{},
+		clock:     internal.SystemClock,
 	}, nil
 }
 

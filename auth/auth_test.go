@@ -30,68 +30,44 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/aetest"
 )
 
 var (
 	client              *Client
-	ctx                 context.Context
 	testIDToken         string
 	testGetUserResponse []byte
+	optsWithServiceAcct = []option.ClientOption{
+		option.WithCredentialsFile("../testdata/service_account.json"),
+	}
+	optsWithTokenSource = []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{
+			AccessToken: "test.token",
+		}),
+	}
+	testClock = &internal.MockClock{Timestamp: time.Now()}
 )
 
-var defaultTestOpts = []option.ClientOption{
-	option.WithCredentialsFile("../testdata/service_account.json"),
-}
-var testClock = &mockClock{now: time.Now()}
-
 func TestMain(m *testing.M) {
-	var (
-		err   error
-		ks    keySource
-		creds *google.DefaultCredentials
-		opts  []option.ClientOption
-	)
-	if appengine.IsDevAppServer() {
-		aectx, aedone, err := aetest.NewContext()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		ctx = aectx
-		defer aedone()
-
-		ks, err = newAEKeySource(ctx)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	} else {
-		ctx = context.Background()
-		opts = defaultTestOpts
-		creds, err = transport.Creds(ctx, opts...)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		ks = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	client, err = NewClient(ctx, &internal.AuthConfig{
+	client, err = NewClient(context.Background(), &internal.AuthConfig{
 		Creds:     creds,
-		Opts:      opts,
+		Opts:      optsWithServiceAcct,
 		ProjectID: "mock-project-id",
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client.keySource = ks
+	client.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	client.clock = testClock
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
 }
@@ -105,10 +81,12 @@ func TestNewClientServiceAccountSigner(t *testing.T) {
 func TestNewClientIAMSigner(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"}),
+			option.WithTokenSource(&internal.MockTokenSource{
+				AccessToken: "test.token",
+			}),
 		},
 	}
-	c, err := NewClient(ctx, conf)
+	c, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
@@ -120,18 +98,20 @@ func TestNewClientIAMSigner(t *testing.T) {
 func TestNewClientServiceAccountID(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{"test.token"}),
+			option.WithTokenSource(&internal.MockTokenSource{
+				AccessToken: "test.token",
+			}),
 		},
 		ServiceAccountID: "explicit-service-account",
 	}
-	c, err := NewClient(ctx, conf)
+	c, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 	if _, ok := c.signer.(*iamSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", c.signer)
 	}
-	email, err := c.signer.Email(ctx)
+	email, err := c.signer.Email(context.Background())
 	if email != conf.ServiceAccountID || err != nil {
 		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
 	}
@@ -142,7 +122,7 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 		JSON: []byte("not json"),
 	}
 	conf := &internal.AuthConfig{Creds: creds}
-	if c, err := NewClient(ctx, conf); c != nil || err == nil {
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
@@ -158,17 +138,17 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 	}
 	creds := &google.DefaultCredentials{JSON: b}
 	conf := &internal.AuthConfig{Creds: creds}
-	if c, err := NewClient(ctx, conf); c != nil || err == nil {
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
 
 func TestCustomToken(t *testing.T) {
-	token, err := client.CustomToken(ctx, "user1")
+	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(ctx, token, nil, t)
+	verifyCustomToken(context.Background(), token, nil, t)
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
@@ -177,19 +157,19 @@ func TestCustomTokenWithClaims(t *testing.T) {
 		"premium": true,
 		"count":   float64(123),
 	}
-	token, err := client.CustomTokenWithClaims(ctx, "user1", claims)
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", claims)
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(ctx, token, claims, t)
+	verifyCustomToken(context.Background(), token, claims, t)
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
-	token, err := client.CustomTokenWithClaims(ctx, "user1", nil)
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(ctx, token, nil, t)
+	verifyCustomToken(context.Background(), token, nil, t)
 }
 
 func TestCustomTokenError(t *testing.T) {
@@ -206,7 +186,7 @@ func TestCustomTokenError(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token, err := client.CustomTokenWithClaims(ctx, tc.uid, tc.claims)
+			token, err := client.CustomTokenWithClaims(context.Background(), tc.uid, tc.claims)
 			if token != "" || err == nil {
 				t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
 			}
@@ -215,8 +195,11 @@ func TestCustomTokenError(t *testing.T) {
 }
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
-	// AuthConfig with nil Creds
-	conf := &internal.AuthConfig{Opts: defaultTestOpts}
+	ctx := context.Background()
+	conf := &internal.AuthConfig{
+		Creds: nil,
+		Opts:  optsWithTokenSource,
+	}
 	s, err := NewClient(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
@@ -237,7 +220,7 @@ func TestVerifyIDTokenAndCheckRevokedValid(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, testIDToken)
+	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), testIDToken)
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,7 +237,7 @@ func TestVerifyIDTokenAndCheckRevokedDoNotCheck(t *testing.T) {
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
-	ft, err := s.Client.VerifyIDToken(ctx, tok)
+	ft, err := s.Client.VerifyIDToken(context.Background(), tok)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +254,7 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
-	p, err := s.Client.VerifyIDTokenAndCheckRevoked(ctx, tok)
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), tok)
 	we := "ID token has been revoked"
 	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
@@ -280,7 +263,7 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	ft, err := client.VerifyIDToken(ctx, testIDToken)
+	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +290,7 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ft, err := client.VerifyIDToken(ctx, tc.token)
+			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
 				t.Errorf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
 			}
@@ -324,7 +307,7 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
-	if ft, err := client.VerifyIDToken(ctx, token); ft != nil || err == nil {
+	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
 		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
 	}
 }
@@ -353,7 +336,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := client.VerifyIDToken(ctx, tc.token); err == nil {
+			if _, err := client.VerifyIDToken(context.Background(), tc.token); err == nil {
 				t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
 			}
 		})
@@ -374,35 +357,37 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 		},
 		payload: payload,
 	}
-	token, err := info.Token(ctx, client.signer)
+	token, err := info.Token(context.Background(), client.signer)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if _, err := client.VerifyIDToken(ctx, token); err == nil {
+	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
 	}
 }
 
 func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
-	// AuthConfig with empty ProjectID
-	conf := &internal.AuthConfig{Opts: defaultTestOpts}
-	c, err := NewClient(ctx, conf)
+	conf := &internal.AuthConfig{
+		ProjectID: "",
+		Opts:      optsWithTokenSource,
+	}
+	c, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c.keySource = client.keySource
-	if _, err := c.VerifyIDToken(ctx, testIDToken); err == nil {
+	if _, err := c.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCustomTokenVerification(t *testing.T) {
-	token, err := client.CustomToken(ctx, "user1")
+	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := client.VerifyIDToken(ctx, token); err == nil {
+	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
@@ -413,7 +398,7 @@ func TestCertificateRequestError(t *testing.T) {
 	defer func() {
 		client.keySource = ks
 	}()
-	if _, err := client.VerifyIDToken(ctx, testIDToken); err == nil {
+	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
@@ -491,7 +476,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 		},
 		payload: pCopy,
 	}
-	token, err := info.Token(ctx, client.signer)
+	token, err := info.Token(context.Background(), client.signer)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -532,32 +517,4 @@ func (f *fileKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
 		}
 	}
 	return f.CachedKeys, nil
-}
-
-// aeKeySource provides access to the public keys associated with App Engine apps. This
-// is used in tests to verify custom tokens and mock ID tokens when they are signed with
-// App Engine private keys.
-type aeKeySource struct {
-	keys []*publicKey
-}
-
-func newAEKeySource(ctx context.Context) (keySource, error) {
-	certs, err := appengine.PublicCertificates(ctx)
-	if err != nil {
-		return nil, err
-	}
-	keys := make([]*publicKey, len(certs))
-	for i, cert := range certs {
-		pk, err := parsePublicKey("mock-key-id-1", cert.Data)
-		if err != nil {
-			return nil, err
-		}
-		keys[i] = pk
-	}
-	return aeKeySource{keys}, nil
-}
-
-// Keys returns the RSA Public Keys managed by App Engine.
-func (k aeKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
-	return k.keys, nil
 }

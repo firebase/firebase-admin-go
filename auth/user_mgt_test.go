@@ -29,10 +29,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 var testUser = &UserRecord{
@@ -1146,13 +1144,12 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	})
 	s.Srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{testToken})},
+		Opts:      optsWithTokenSource,
 		ProjectID: "mock-project-id",
 		Version:   testVersion,
 	}
 
-	authClient, err := NewClient(ctx, conf)
+	authClient, err := NewClient(context.Background(), conf)
 	authClient.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
@@ -1164,12 +1161,4 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.Srv.Close()
-}
-
-type mockTokenSource struct {
-	AccessToken string
-}
-
-func (m *mockTokenSource) Token() (*oauth2.Token, error) {
-	return &oauth2.Token{AccessToken: m.AccessToken}, nil
 }

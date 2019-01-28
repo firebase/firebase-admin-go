@@ -34,6 +34,9 @@ var FirebaseScopes = []string{
 	"https://www.googleapis.com/auth/userinfo.email",
 }
 
+// SystemClock is a clock that returns local time of the system.
+var SystemClock = &systemClock{}
+
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
 	Opts             []option.ClientOption
@@ -127,11 +130,11 @@ type Clock interface {
 	Now() time.Time
 }
 
-// SystemClock returns the current system time.
-type SystemClock struct{}
+// systemClock returns the current system time.
+type systemClock struct{}
 
 // Now returns the current system time by calling time.Now().
-func (s SystemClock) Now() time.Time {
+func (s *systemClock) Now() time.Time {
 	return time.Now()
 }
 

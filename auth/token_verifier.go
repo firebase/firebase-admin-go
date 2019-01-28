@@ -32,6 +32,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"firebase.google.com/go/internal"
 )
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
@@ -48,7 +50,7 @@ type httpKeySource struct {
 	HTTPClient *http.Client
 	CachedKeys []*publicKey
 	ExpiryTime time.Time
-	Clock      clock
+	Clock      internal.Clock
 	Mutex      *sync.Mutex
 }
 
@@ -56,7 +58,7 @@ func newHTTPKeySource(uri string, hc *http.Client) *httpKeySource {
 	return &httpKeySource{
 		KeyURI:     uri,
 		HTTPClient: hc,
-		Clock:      systemClock{},
+		Clock:      internal.SystemClock,
 		Mutex:      &sync.Mutex{},
 	}
 }
@@ -169,25 +171,6 @@ func verifySignature(parts []string, k *publicKey) error {
 type publicKey struct {
 	Kid string
 	Key *rsa.PublicKey
-}
-
-// clock is used to query the current local time.
-type clock interface {
-	Now() time.Time
-}
-
-type systemClock struct{}
-
-func (s systemClock) Now() time.Time {
-	return time.Now()
-}
-
-type mockClock struct {
-	now time.Time
-}
-
-func (m *mockClock) Now() time.Time {
-	return m.now
 }
 
 func findMaxAge(resp *http.Response) (*time.Duration, error) {
