@@ -69,9 +69,15 @@ type Client struct {
 	clock     internal.Clock
 }
 
-type signer interface {
-	Email(ctx context.Context) (string, error)
-	Sign(ctx context.Context, b []byte) ([]byte, error)
+func signerFromCreds(creds []byte) (cryptoSigner, error) {
+	var sa serviceAccount
+	if err := json.Unmarshal(creds, &sa); err != nil {
+		return nil, err
+	}
+	if sa.PrivateKey != "" && sa.ClientEmail != "" {
+		return newServiceAccountSigner(sa)
+	}
+	return nil, nil
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -86,16 +92,9 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	// Initialize a signer by following the go/firebase-admin-sign protocol.
 	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
 		// If the SDK was initialized with a service account, use it to sign bytes.
-		var sa serviceAccount
-		if err = json.Unmarshal(conf.Creds.JSON, &sa); err != nil {
+		signer, err = signerFromCreds(conf.Creds.JSON)
+		if err != nil {
 			return nil, err
-		}
-		if sa.PrivateKey != "" && sa.ClientEmail != "" {
-			var err error
-			signer, err = newServiceAccountSigner(sa)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 	if signer == nil {

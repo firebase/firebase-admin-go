@@ -33,9 +33,10 @@ import (
 )
 
 var (
-	testClient          *Client
-	testIDToken         string
 	testGetUserResponse []byte
+	testIDToken         string
+	testSigner          cryptoSigner
+
 	optsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
 	}
@@ -46,6 +47,7 @@ var (
 	}
 	testClock     = &internal.MockClock{Timestamp: time.Now()}
 	testKeySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	testProjectID = "mock-project-id"
 )
 
 func TestMain(m *testing.M) {
@@ -54,7 +56,25 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
-	testClient, err = NewClient(context.Background(), &internal.AuthConfig{
+	testSigner, err = signerFromCreds(creds.JSON)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	testIDToken = getIDToken(nil)
+
+	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	os.Exit(m.Run())
+}
+
+func TestNewClientServiceAccountSigner(t *testing.T) {
+	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	client, err := NewClient(context.Background(), &internal.AuthConfig{
 		Creds:     creds,
 		Opts:      optsWithServiceAcct,
 		ProjectID: "mock-project-id",
@@ -62,20 +82,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	testClient.keySource = testKeySource
-	testClient.clock = testClock
 
-	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	testIDToken = getIDToken(nil)
-	os.Exit(m.Run())
-}
-
-func TestNewClientServiceAccountSigner(t *testing.T) {
-	if _, ok := testClient.signer.(*serviceAccountSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = serviceAccountSigner", testClient.signer)
+	if _, ok := client.signer.(*serviceAccountSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = serviceAccountSigner", client.signer)
 	}
 }
 
@@ -110,6 +119,23 @@ func TestNewClientServiceAccountID(t *testing.T) {
 	}
 }
 
+func TestNewClientWithUserCredentials(t *testing.T) {
+	creds := &google.DefaultCredentials{
+		JSON: []byte(`{
+			"client_id": "test-client",
+			"client_secret": "test-secret"
+		}`),
+	}
+	conf := &internal.AuthConfig{Creds: creds}
+	c, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+	if _, ok := c.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", c.signer)
+	}
+}
+
 func TestNewClientInvalidCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
@@ -137,7 +163,11 @@ func TestNewClientInvalidPrivateKey(t *testing.T) {
 }
 
 func TestCustomToken(t *testing.T) {
-	token, err := testClient.CustomToken(context.Background(), "user1")
+	client := &Client{
+		signer: testSigner,
+		clock:  testClock,
+	}
+	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,12 +175,16 @@ func TestCustomToken(t *testing.T) {
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
+	client := &Client{
+		signer: testSigner,
+		clock:  testClock,
+	}
 	claims := map[string]interface{}{
 		"foo":     "bar",
 		"premium": true,
 		"count":   float64(123),
 	}
-	token, err := testClient.CustomTokenWithClaims(context.Background(), "user1", claims)
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", claims)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +192,11 @@ func TestCustomTokenWithClaims(t *testing.T) {
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
-	token, err := testClient.CustomTokenWithClaims(context.Background(), "user1", nil)
+	client := &Client{
+		signer: testSigner,
+		clock:  testClock,
+	}
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,9 +215,13 @@ func TestCustomTokenError(t *testing.T) {
 		{"ReservedClaims", "uid", map[string]interface{}{"sub": "1234", "aud": "foo"}},
 	}
 
+	client := &Client{
+		signer: testSigner,
+		clock:  testClock,
+	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token, err := testClient.CustomTokenWithClaims(context.Background(), tc.uid, tc.claims)
+			token, err := client.CustomTokenWithClaims(context.Background(), tc.uid, tc.claims)
 			if token != "" || err == nil {
 				t.Errorf("CustomTokenWithClaims(%q) = (%q, %v); want = (\"\", error)", tc.name, token, err)
 			}
@@ -256,7 +298,12 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 }
 
 func TestVerifyIDToken(t *testing.T) {
-	ft, err := testClient.VerifyIDToken(context.Background(), testIDToken)
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
+	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,9 +328,14 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 		})},
 	}
 
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ft, err := testClient.VerifyIDToken(context.Background(), tc.token)
+			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
 				t.Errorf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
 			}
@@ -300,7 +352,12 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
-	if ft, err := testClient.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
+	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
 		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
 	}
 }
@@ -327,9 +384,14 @@ func TestVerifyIDTokenError(t *testing.T) {
 		{"BadFormatToken", "foobar"},
 	}
 
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := testClient.VerifyIDToken(context.Background(), tc.token); err == nil {
+			if _, err := client.VerifyIDToken(context.Background(), tc.token); err == nil {
 				t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
 			}
 		})
@@ -350,11 +412,17 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 		},
 		payload: payload,
 	}
-	token, err := info.Token(context.Background(), testClient.signer)
+	token, err := info.Token(context.Background(), testSigner)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if _, err := testClient.VerifyIDToken(context.Background(), token); err == nil {
+
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
+	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
 	}
 }
@@ -375,28 +443,35 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 }
 
 func TestCustomTokenVerification(t *testing.T) {
-	token, err := testClient.CustomToken(context.Background(), "user1")
+	client := &Client{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+		signer:    testSigner,
+	}
+	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := testClient.VerifyIDToken(context.Background(), token); err == nil {
+	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	testClient.keySource = &mockKeySource{nil, errors.New("mock error")}
-	defer func() {
-		testClient.keySource = testKeySource
-	}()
-	if _, err := testClient.VerifyIDToken(context.Background(), testIDToken); err == nil {
+	client := &Client{
+		keySource: &mockKeySource{nil, errors.New("mock error")},
+		clock:     testClock,
+		projectID: testProjectID,
+	}
+	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
-	if err := verifyToken(ctx, token, testClient.keySource); err != nil {
+	if err := verifyToken(ctx, token, testKeySource); err != nil {
 		t.Fatal(err)
 	}
 	var (
@@ -411,7 +486,7 @@ func verifyCustomToken(ctx context.Context, token string, expected map[string]in
 		t.Fatal(err)
 	}
 
-	email, err := testClient.signer.Email(ctx)
+	email, err := testSigner.Email(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,8 +524,8 @@ func getIDToken(p mockIDTokenPayload) string {
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	pCopy := mockIDTokenPayload{
-		"aud":   testClient.projectID,
-		"iss":   "https://securetoken.google.com/" + testClient.projectID,
+		"aud":   testProjectID,
+		"iss":   "https://securetoken.google.com/" + testProjectID,
 		"iat":   testClock.Now().Unix() - 100,
 		"exp":   testClock.Now().Unix() + 3600,
 		"sub":   "1234567890",
@@ -468,7 +543,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 		},
 		payload: pCopy,
 	}
-	token, err := info.Token(context.Background(), testClient.signer)
+	token, err := info.Token(context.Background(), testSigner)
 	if err != nil {
 		log.Fatalln(err)
 	}
