@@ -155,7 +155,7 @@ func TestParsePublicKeysError(t *testing.T) {
 }
 
 func TestVerifyToken(t *testing.T) {
-	if err := verifyToken(context.Background(), testIDToken, client.keySource); err != nil {
+	if err := verifyToken(context.Background(), testIDToken, testKeySource); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -163,7 +163,7 @@ func TestVerifyToken(t *testing.T) {
 func TestVerifyTokenError(t *testing.T) {
 	tokens := []string{"", "foo", "foo.bar.baz"}
 	for _, token := range tokens {
-		if err := verifyToken(context.Background(), token, client.keySource); err == nil {
+		if err := verifyToken(context.Background(), token, testKeySource); err == nil {
 			t.Errorf("verifyToken(%q) = nil; want = error", token)
 		}
 	}

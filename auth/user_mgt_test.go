@@ -124,6 +124,7 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 }
 
 func TestInvalidGetUser(t *testing.T) {
+	client := &Client{}
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -269,6 +270,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			`malformed email string: "a@a@a"`,
 		},
 	}
+	client := &Client{}
 	for i, tc := range cases {
 		user, err := client.CreateUser(context.Background(), tc.params)
 		if user != nil || err == nil {
@@ -400,6 +402,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 		cases = append(cases, s)
 	}
 
+	client := &Client{}
 	for i, tc := range cases {
 		user, err := client.UpdateUser(context.Background(), "uid", tc.params)
 		if user != nil || err == nil {
@@ -413,6 +416,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 
 func TestUpdateUserEmptyUID(t *testing.T) {
 	params := (&UserToUpdate{}).DisplayName("test")
+	client := &Client{}
 	user, err := client.UpdateUser(context.Background(), "", params)
 	if user != nil || err == nil {
 		t.Errorf("UpdateUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -576,6 +580,7 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 		cases = append(cases, s)
 	}
 
+	client := &Client{}
 	for _, tc := range cases {
 		err := client.SetCustomUserClaims(context.Background(), "uid", tc.cc)
 		if err == nil {
@@ -976,6 +981,7 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestInvalidDeleteUser(t *testing.T) {
+	client := &Client{}
 	if err := client.DeleteUser(context.Background(), ""); err == nil {
 		t.Errorf("DeleteUser('') = nil; want error")
 	}
