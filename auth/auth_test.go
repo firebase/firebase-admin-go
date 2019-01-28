@@ -69,7 +69,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestNewClientServiceAccountSigner(t *testing.T) {
+func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
 	if err != nil {
 		log.Fatalln(err)
@@ -77,43 +77,77 @@ func TestNewClientServiceAccountSigner(t *testing.T) {
 	client, err := NewClient(context.Background(), &internal.AuthConfig{
 		Creds:     creds,
 		Opts:      optsWithServiceAcct,
-		ProjectID: "mock-project-id",
+		ProjectID: creds.ProjectID,
+		Version:   "test-version",
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	if _, ok := client.signer.(*serviceAccountSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = serviceAccountSigner", client.signer)
+		t.Errorf("NewClient().signer = %#v; want = serviceAccountSigner", client.signer)
+	}
+	if client.projectID != creds.ProjectID {
+		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, creds.ProjectID)
+	}
+	if client.clock != internal.SystemClock {
+		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
 	}
 }
 
-func TestNewClientIAMSigner(t *testing.T) {
+func TestNewClientWithoutCredentials(t *testing.T) {
 	conf := &internal.AuthConfig{
-		Opts: optsWithTokenSource,
+		Opts:    optsWithTokenSource,
+		Version: "test-version",
 	}
-	c, err := NewClient(context.Background(), conf)
+	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
 	}
-	if _, ok := c.signer.(*iamSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = iamSigner", c.signer)
+	if _, ok := client.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+	if client.projectID != "" {
+		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	}
+	if client.clock != internal.SystemClock {
+		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
 	}
 }
 
-func TestNewClientServiceAccountID(t *testing.T) {
+func TestNewClientWithServiceAccountID(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:             optsWithTokenSource,
 		ServiceAccountID: "explicit-service-account",
+		Version:          "test-version",
 	}
-	c, err := NewClient(context.Background(), conf)
+	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
 	}
-	if _, ok := c.signer.(*iamSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = iamSigner", c.signer)
+	if _, ok := client.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
 	}
-	email, err := c.signer.Email(context.Background())
+	if client.projectID != "" {
+		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	}
+	if client.clock != internal.SystemClock {
+		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
+	}
+
+	email, err := client.signer.Email(context.Background())
 	if email != conf.ServiceAccountID || err != nil {
 		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
 	}
@@ -126,17 +160,26 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 			"client_secret": "test-secret"
 		}`),
 	}
-	conf := &internal.AuthConfig{Creds: creds}
-	c, err := NewClient(context.Background(), conf)
-	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	conf := &internal.AuthConfig{
+		Creds:   creds,
+		Version: "test-version",
 	}
-	if _, ok := c.signer.(*iamSigner); !ok {
-		t.Errorf("AuthClient.signer = %#v; want = iamSigner", c.signer)
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+	}
+	if _, ok := client.signer.(*iamSigner); !ok {
+		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
+	}
+	if client.projectID != "" {
+		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	}
+	if client.clock != internal.SystemClock {
+		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
 	}
 }
 
-func TestNewClientInvalidCredentials(t *testing.T) {
+func TestNewClientWithMalformedCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
 	}
@@ -146,10 +189,10 @@ func TestNewClientInvalidCredentials(t *testing.T) {
 	}
 }
 
-func TestNewClientInvalidPrivateKey(t *testing.T) {
+func TestNewClientWithInvalidPrivateKey(t *testing.T) {
 	sa := map[string]interface{}{
-		"private_key":  "foo",
-		"client_email": "bar@test.com",
+		"private_key":  "not-a-private-key",
+		"client_email": "foo@bar",
 	}
 	b, err := json.Marshal(sa)
 	if err != nil {

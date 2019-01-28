@@ -17,7 +17,6 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -69,17 +68,6 @@ type Client struct {
 	clock     internal.Clock
 }
 
-func signerFromCreds(creds []byte) (cryptoSigner, error) {
-	var sa serviceAccount
-	if err := json.Unmarshal(creds, &sa); err != nil {
-		return nil, err
-	}
-	if sa.PrivateKey != "" && sa.ClientEmail != "" {
-		return newServiceAccountSigner(sa)
-	}
-	return nil, nil
-}
-
 // NewClient creates a new instance of the Firebase Auth Client.
 //
 // This function can only be invoked from within the SDK. Client applications should access the
@@ -93,7 +81,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
 		// If the SDK was initialized with a service account, use it to sign bytes.
 		signer, err = signerFromCreds(conf.Creds.JSON)
-		if err != nil {
+		if err != nil && err != errNotAServiceAcct {
 			return nil, err
 		}
 	}
