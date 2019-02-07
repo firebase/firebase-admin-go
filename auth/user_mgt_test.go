@@ -29,10 +29,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 var testUser = &UserRecord{
@@ -126,6 +124,7 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 }
 
 func TestInvalidGetUser(t *testing.T) {
+	client := &Client{}
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -271,6 +270,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			`malformed email string: "a@a@a"`,
 		},
 	}
+	client := &Client{}
 	for i, tc := range cases {
 		user, err := client.CreateUser(context.Background(), tc.params)
 		if user != nil || err == nil {
@@ -402,6 +402,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 		cases = append(cases, s)
 	}
 
+	client := &Client{}
 	for i, tc := range cases {
 		user, err := client.UpdateUser(context.Background(), "uid", tc.params)
 		if user != nil || err == nil {
@@ -415,6 +416,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 
 func TestUpdateUserEmptyUID(t *testing.T) {
 	params := (&UserToUpdate{}).DisplayName("test")
+	client := &Client{}
 	user, err := client.UpdateUser(context.Background(), "", params)
 	if user != nil || err == nil {
 		t.Errorf("UpdateUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -578,6 +580,7 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 		cases = append(cases, s)
 	}
 
+	client := &Client{}
 	for _, tc := range cases {
 		err := client.SetCustomUserClaims(context.Background(), "uid", tc.cc)
 		if err == nil {
@@ -978,6 +981,7 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestInvalidDeleteUser(t *testing.T) {
+	client := &Client{}
 	if err := client.DeleteUser(context.Background(), ""); err == nil {
 		t.Errorf("DeleteUser('') = nil; want error")
 	}
@@ -1146,13 +1150,12 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	})
 	s.Srv = httptest.NewServer(handler)
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&mockTokenSource{testToken})},
+		Opts:      optsWithTokenSource,
 		ProjectID: "mock-project-id",
 		Version:   testVersion,
 	}
 
-	authClient, err := NewClient(ctx, conf)
+	authClient, err := NewClient(context.Background(), conf)
 	authClient.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
 	if err != nil {
 		t.Fatal(err)
@@ -1164,12 +1167,4 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.Srv.Close()
-}
-
-type mockTokenSource struct {
-	AccessToken string
-}
-
-func (m *mockTokenSource) Token() (*oauth2.Token, error) {
-	return &oauth2.Token{AccessToken: m.AccessToken}, nil
 }

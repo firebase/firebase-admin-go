@@ -187,6 +187,8 @@ func TestDeleteInstanceIDConnectionError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.endpoint = ts.URL
+	client.client.RetryConfig = nil
+
 	if err := client.DeleteInstanceID(ctx, "test-iid"); err == nil {
 		t.Errorf("DeleteInstanceID() = nil; want = error")
 		return

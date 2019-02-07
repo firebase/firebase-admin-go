@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"firebase.google.com/go/internal"
 )
 
 func TestHTTPKeySource(t *testing.T) {
@@ -60,7 +63,7 @@ func TestHTTPKeySourceWithClient(t *testing.T) {
 func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 	hc, _ := newTestHTTPClient([]byte(""))
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
+	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -68,7 +71,7 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
 	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
+	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -80,7 +83,7 @@ func TestHTTPKeySourceTransportError(t *testing.T) {
 		},
 	}
 	ks := newHTTPKeySource("http://mock.url", hc)
-	if keys, err := ks.Keys(ctx); keys != nil || err == nil {
+	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
 }
@@ -152,7 +155,7 @@ func TestParsePublicKeysError(t *testing.T) {
 }
 
 func TestVerifyToken(t *testing.T) {
-	if err := verifyToken(ctx, testIDToken, client.keySource); err != nil {
+	if err := verifyToken(context.Background(), testIDToken, testKeySource); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -160,7 +163,7 @@ func TestVerifyToken(t *testing.T) {
 func TestVerifyTokenError(t *testing.T) {
 	tokens := []string{"", "foo", "foo.bar.baz"}
 	for _, token := range tokens {
-		if err := verifyToken(ctx, token, client.keySource); err == nil {
+		if err := verifyToken(context.Background(), token, testKeySource); err == nil {
 			t.Errorf("verifyToken(%q) = nil; want = error", token)
 		}
 	}
@@ -221,12 +224,12 @@ func (r *mockReadCloser) Close() error {
 }
 
 func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
-	mc := &mockClock{now: time.Unix(0, 0)}
+	mc := &internal.MockClock{Timestamp: time.Unix(0, 0)}
 	ks.Clock = mc
 
 	exp := time.Unix(100, 0)
 	for i := 0; i <= 100; i++ {
-		keys, err := ks.Keys(ctx)
+		keys, err := ks.Keys(context.Background())
 		if err != nil {
 			return err
 		}
@@ -237,11 +240,11 @@ func verifyHTTPKeySource(ks *httpKeySource, rc *mockReadCloser) error {
 		} else if ks.ExpiryTime != exp {
 			return fmt.Errorf("Expiry: %v; want: %v", ks.ExpiryTime, exp)
 		}
-		mc.now = mc.now.Add(time.Second)
+		mc.Timestamp = mc.Timestamp.Add(time.Second)
 	}
 
-	mc.now = time.Unix(101, 0)
-	keys, err := ks.Keys(ctx)
+	mc.Timestamp = time.Unix(101, 0)
+	keys, err := ks.Keys(context.Background())
 	if err != nil {
 		return err
 	}

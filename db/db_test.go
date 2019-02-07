@@ -29,7 +29,6 @@ import (
 	"testing"
 
 	"firebase.google.com/go/internal"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
 
@@ -38,15 +37,17 @@ const (
 	defaultMaxRetries = 1
 )
 
-var testUserAgent string
-var testAuthOverrides string
-var testOpts = []option.ClientOption{
-	option.WithTokenSource(&mockTokenSource{"mock-token"}),
-}
+var (
+	aoClient          *Client
+	client            *Client
+	testAuthOverrides string
+	testref           *Ref
+	testUserAgent     string
 
-var client *Client
-var aoClient *Client
-var testref *Ref
+	testOpts = []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "mock-token"}),
+	}
+)
 
 func TestMain(m *testing.M) {
 	var err error
@@ -387,14 +388,6 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 	s.srv = httptest.NewServer(handler)
 	c.url = s.srv.URL
 	return s.srv
-}
-
-type mockTokenSource struct {
-	AccessToken string
-}
-
-func (ts *mockTokenSource) Token() (*oauth2.Token, error) {
-	return &oauth2.Token{AccessToken: ts.AccessToken}, nil
 }
 
 type person struct {

@@ -347,7 +347,7 @@ func (rc *RetryConfig) estimateDelayBeforeNextRetry(retries int) time.Duration {
 	return estimatedDelay
 }
 
-var retryTimeClock Clock = &SystemClock{}
+var retryTimeClock Clock = SystemClock
 
 func parseRetryAfterHeader(resp *http.Response) time.Duration {
 	if resp == nil {
