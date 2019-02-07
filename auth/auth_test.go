@@ -72,7 +72,7 @@ func TestMain(m *testing.M) {
 func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatal(err)
 	}
 	client, err := NewClient(context.Background(), &internal.AuthConfig{
 		Creds:     creds,
@@ -81,7 +81,7 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 		Version:   "test-version",
 	})
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatal(err)
 	}
 
 	if _, ok := client.signer.(*serviceAccountSigner); !ok {
@@ -457,7 +457,7 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 	}
 	token, err := info.Token(context.Background(), testSigner)
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatal(err)
 	}
 
 	client := &Client{
