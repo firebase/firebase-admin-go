@@ -108,7 +108,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
 	if err != nil {
 		return nil, err
 	}

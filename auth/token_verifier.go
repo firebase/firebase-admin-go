@@ -54,7 +54,7 @@ type tokenVerifier struct {
 	clock             internal.Clock
 }
 
-func newIDTokenVerifier(ctx context.Context, conf *internal.AuthConfig) (*tokenVerifier, error) {
+func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func newIDTokenVerifier(ctx context.Context, conf *internal.AuthConfig) (*tokenV
 		shortName:         "ID token",
 		articledShortName: "an ID token",
 		docURL:            "https://firebase.google.com/docs/auth/admin/verify-id-tokens",
-		projectID:         conf.ProjectID,
+		projectID:         projectID,
 		issuerPrefix:      idTokenIssuerPrefix,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
@@ -73,9 +73,6 @@ func newIDTokenVerifier(ctx context.Context, conf *internal.AuthConfig) (*tokenV
 func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
 	if tv.projectID == "" {
 		return nil, errors.New("project id not available")
-	}
-	if tv.issuerPrefix == "" {
-		panic("issuer prefix not available")
 	}
 	if token == "" {
 		return nil, fmt.Errorf("%s must be a non-empty string", tv.shortName)
@@ -164,9 +161,6 @@ func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
 
 func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) error {
 	segments := strings.Split(token, ".")
-	if len(segments) != 3 {
-		return errors.New("incorrect number of segments")
-	}
 
 	var h jwtHeader
 	if err := decode(segments[0], &h); err != nil {
