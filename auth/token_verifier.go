@@ -44,6 +44,8 @@ const (
 	clockSkewSeconds    = 300
 )
 
+// tokenVerifier verifies different types of Firebase token strings, including ID tokens and
+// session cookies.
 type tokenVerifier struct {
 	shortName         string
 	articledShortName string
@@ -70,6 +72,19 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 	}, nil
 }
 
+// VerifyToken Verifies that the given token string is a valid Firebase JWT.
+//
+// VerifyToken considers token string to be valid if all the following conditions are met:
+//   - The token string is a valid RS256 JWT.
+//   - The JWT contains a valid key ID (kid) claim.
+//   - The JWT contains valid issuer (iss) and audience (aud) claims that match the issuerPrefix
+//     and projectID of the tokenVerifier.
+//   - The JWT contains a valid subject (sub) claim.
+//   - The JWT is not expired, and it has been issued some time in the past.
+//   - The JWT is signed by a Firebase Auth backend server as determined by the keySource.
+//
+// If any of the above conditions are not met, an error is returned. Otherwise a pointer to a
+// decoded Token is returned.
 func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
 	if tv.projectID == "" {
 		return nil, errors.New("project id not available")
@@ -78,6 +93,7 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 		return nil, fmt.Errorf("%s must be a non-empty string", tv.shortName)
 	}
 
+	// Validate the token content first. This is fast and cheaper.
 	payload, err := tv.verifyContent(token)
 	if err != nil {
 		return nil, fmt.Errorf("%s; see %s for details on how to retrieve a valid %s",
@@ -88,9 +104,8 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 		return nil, err
 	}
 
-	// Verifying the signature requires syncronized access to a key store and
-	// potentially issues a http request. Validating the fields of the token is
-	// cheaper and invalid tokens will fail faster.
+	// Verifying the signature requires syncronized access to a key cache and
+	// potentially issues an http request. Therefore we do it last.
 	if err := tv.verifySignature(ctx, token); err != nil {
 		return nil, err
 	}
@@ -99,16 +114,20 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 
 func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 	var (
-		header       jwtHeader
-		payload      Token
-		customClaims map[string]interface{}
-		err          error
+		header  jwtHeader
+		payload Token
+		err     error
 	)
 
 	segments := strings.Split(token, ".")
+	if len(segments) != 3 {
+		return nil, errors.New("incorrect number of segments")
+	}
+
 	if err = decode(segments[0], &header); err != nil {
 		return nil, err
 	}
+
 	if err = decode(segments[1], &payload); err != nil {
 		return nil, err
 	}
@@ -138,8 +157,9 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	payload.UID = payload.Subject
+
+	var customClaims map[string]interface{}
 	if err = decode(segments[1], &customClaims); err != nil {
 		return nil, err
 	}
@@ -147,6 +167,7 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 		delete(customClaims, standardClaim)
 	}
 	payload.Claims = customClaims
+
 	return &payload, nil
 }
 
@@ -175,13 +196,12 @@ func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) erro
 	verified := false
 	for _, k := range keys {
 		if h.KeyID == "" || h.KeyID == k.Kid {
-			if verifySignature(segments, k) == nil {
+			if verifyJWTSignature(segments, k) == nil {
 				verified = true
 				break
 			}
 		}
 	}
-
 	if !verified {
 		return errors.New("failed to verify token signature")
 	}
@@ -192,6 +212,33 @@ func (tv *tokenVerifier) getProjectIDMatchMessage() string {
 	return fmt.Sprintf(
 		"make sure the %s comes from the same Firebase project as the credential used to"+
 			" authenticate this SDK", tv.shortName)
+}
+
+// decode accepts a JWT segment, and decodes it into the given interface.
+func decode(segment string, i interface{}) error {
+	decoded, err := base64.RawURLEncoding.DecodeString(segment)
+	if err != nil {
+		return err
+	}
+	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
+}
+
+func verifyJWTSignature(parts []string, k *publicKey) error {
+	content := parts[0] + "." + parts[1]
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return err
+	}
+
+	h := sha256.New()
+	h.Write([]byte(content))
+	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
+}
+
+// publicKey represents a parsed RSA public key along with its unique key ID.
+type publicKey struct {
+	Kid string
+	Key *rsa.PublicKey
 }
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
@@ -258,7 +305,8 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("invalid response (%d) while retrieving public keys: %s", resp.StatusCode, string(contents))
+		return fmt.Errorf("invalid response (%d) while retrieving public keys: %s",
+			resp.StatusCode, string(contents))
 	}
 	newKeys, err := parsePublicKeys(contents)
 	if err != nil {
@@ -271,50 +319,6 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil
-}
-
-// decode accepts a JWT segment, and decodes it into the given interface.
-func decode(segment string, i interface{}) error {
-	decoded, err := base64.RawURLEncoding.DecodeString(segment)
-	if err != nil {
-		return err
-	}
-	return json.NewDecoder(bytes.NewBuffer(decoded)).Decode(i)
-}
-
-func verifySignature(parts []string, k *publicKey) error {
-	content := parts[0] + "." + parts[1]
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return err
-	}
-
-	h := sha256.New()
-	h.Write([]byte(content))
-	return rsa.VerifyPKCS1v15(k.Key, crypto.SHA256, h.Sum(nil), []byte(signature))
-}
-
-// publicKey represents a parsed RSA public key along with its unique key ID.
-type publicKey struct {
-	Kid string
-	Key *rsa.PublicKey
-}
-
-func findMaxAge(resp *http.Response) (*time.Duration, error) {
-	cc := resp.Header.Get("cache-control")
-	for _, value := range strings.Split(cc, ",") {
-		value = strings.TrimSpace(value)
-		if strings.HasPrefix(value, "max-age=") {
-			sep := strings.Index(value, "=")
-			seconds, err := strconv.ParseInt(value[sep+1:], 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			duration := time.Duration(seconds) * time.Second
-			return &duration, nil
-		}
-	}
-	return nil, errors.New("Could not find expiry time from HTTP headers")
 }
 
 func parsePublicKeys(keys []byte) ([]*publicKey, error) {
@@ -337,13 +341,33 @@ func parsePublicKeys(keys []byte) ([]*publicKey, error) {
 
 func parsePublicKey(kid string, key []byte) (*publicKey, error) {
 	block, _ := pem.Decode(key)
+	if block == nil {
+		return nil, errors.New("failed to decode the certificate as PEM")
+	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
 	pk, ok := cert.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		return nil, errors.New("Certificate is not a RSA key")
+		return nil, errors.New("certificate is not an RSA key")
 	}
 	return &publicKey{kid, pk}, nil
+}
+
+func findMaxAge(resp *http.Response) (*time.Duration, error) {
+	cc := resp.Header.Get("cache-control")
+	for _, value := range strings.Split(cc, ",") {
+		value = strings.TrimSpace(value)
+		if strings.HasPrefix(value, "max-age=") {
+			sep := strings.Index(value, "=")
+			seconds, err := strconv.ParseInt(value[sep+1:], 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			duration := time.Duration(seconds) * time.Second
+			return &duration, nil
+		}
+	}
+	return nil, errors.New("Could not find expiry time from HTTP headers")
 }

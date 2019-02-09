@@ -92,7 +92,7 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 }
 
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
-	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
+	hc, _ := newTestHTTPClient([]byte("{\"foo\": \"bar\"}"))
 	ks := newHTTPKeySource("http://mock.url", hc)
 	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)

@@ -38,8 +38,6 @@ var (
 	testSigner          cryptoSigner
 	testIDTokenVerifier *tokenVerifier
 
-	testClock           = &internal.MockClock{Timestamp: time.Now()}
-	testProjectID       = "mock-project-id"
 	optsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
 	}
@@ -48,31 +46,28 @@ var (
 			AccessToken: "test.token",
 		}),
 	}
+	testClock     = &internal.MockClock{Timestamp: time.Now()}
+	testProjectID = "mock-project-id"
 )
 
 func TestMain(m *testing.M) {
-	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
+	var err error
+	testSigner, err = signerForTests(context.Background())
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	testSigner, err = signerFromCreds(creds.JSON)
+	testIDTokenVerifier, err = idTokenVerifierForTests(context.Background())
 	if err != nil {
 		log.Fatalln(err)
 	}
-	testIDToken = getIDToken(nil)
-
-	testIDTokenVerifier, err = newIDTokenVerifier(context.Background(), testProjectID)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	testIDTokenVerifier.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
-	testIDTokenVerifier.clock = testClock
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	testIDToken = getIDToken(nil)
 	os.Exit(m.Run())
 }
 
@@ -305,69 +300,6 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenAndCheckRevokedValid(t *testing.T) {
-	s := echoServer(testGetUserResponse, t)
-	defer s.Close()
-
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), testIDToken)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
-	}
-	if ft.UID != ft.Subject {
-		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
-func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
-	s := echoServer(testGetUserResponse, t)
-	defer s.Close()
-	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
-
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	ft, err := s.Client.VerifyIDToken(context.Background(), tok)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ft.Claims["admin"] != true {
-		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
-	}
-	if ft.UID != ft.Subject {
-		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
-func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
-	s := echoServer(testGetUserResponse, t)
-	defer s.Close()
-
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || err == nil {
-		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, error)", ft, err)
-	}
-	if len(s.Req) != 0 {
-		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
-	}
-}
-
-func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
-	s := echoServer(testGetUserResponse, t)
-	defer s.Close()
-	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
-
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), tok)
-	we := "ID token has been revoked"
-	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
-		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
-			p, err, nil, we)
-	}
-}
-
 func TestVerifyIDToken(t *testing.T) {
 	client := &Client{
 		idTokenVerifier: testIDTokenVerifier,
@@ -381,18 +313,6 @@ func TestVerifyIDToken(t *testing.T) {
 	}
 	if ft.UID != ft.Subject {
 		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
-	}
-}
-
-func TestVerifyTokenMalformedJWT(t *testing.T) {
-	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
-	}
-	tokens := []string{"", "foo", "foo.bar.baz"}
-	for _, token := range tokens {
-		if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
-			t.Errorf("VerifyIDToken('%q') = (%v, %v); want = (nil, error)", token, ft, err)
-		}
 	}
 }
 
@@ -443,23 +363,84 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 func TestVerifyIDTokenError(t *testing.T) {
 	now := testClock.Now().Unix()
 	cases := []struct {
-		name  string
-		token string
+		name, token, want string
 	}{
-		{"NoKid", getIDTokenWithKid("", nil)},
-		{"WrongKid", getIDTokenWithKid("foo", nil)},
-		{"BadAudience", getIDToken(mockIDTokenPayload{"aud": "bad-audience"})},
-		{"BadIssuer", getIDToken(mockIDTokenPayload{"iss": "bad-issuer"})},
-		{"EmptySubject", getIDToken(mockIDTokenPayload{"sub": ""})},
-		{"IntSubject", getIDToken(mockIDTokenPayload{"sub": 10})},
-		{"LongSubject", getIDToken(mockIDTokenPayload{"sub": strings.Repeat("a", 129)})},
-		{"FutureToken", getIDToken(mockIDTokenPayload{"iat": now + clockSkewSeconds + 1})},
-		{"ExpiredToken", getIDToken(mockIDTokenPayload{
-			"iat": now - 1000,
-			"exp": now - clockSkewSeconds - 1,
-		})},
-		{"EmptyToken", ""},
-		{"BadFormatToken", "foobar"},
+		{
+			name:  "NoKid",
+			token: getIDTokenWithKid("", nil),
+			want:  "ID token has no 'kid' header",
+		},
+		{
+			name:  "WrongKid",
+			token: getIDTokenWithKid("foo", nil),
+			want:  "failed to verify token signature",
+		},
+		{
+			name:  "BadAudience",
+			token: getIDToken(mockIDTokenPayload{"aud": "bad-audience"}),
+			want: `ID token has invalid 'aud' (audience) claim; expected "mock-project-id" but ` +
+				`got "bad-audience"; make sure the ID token comes from the same Firebase ` +
+				`project as the credential used to authenticate this SDK; see ` +
+				`https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how ` +
+				`to retrieve a valid ID token`,
+		},
+		{
+			name:  "BadIssuer",
+			token: getIDToken(mockIDTokenPayload{"iss": "bad-issuer"}),
+			want: `ID token has invalid 'iss' (issuer) claim; expected ` +
+				`"https://securetoken.google.com/mock-project-id" but got "bad-issuer"; make sure the ` +
+				`ID token comes from the same Firebase project as the credential used to authenticate ` +
+				`this SDK; see https://firebase.google.com/docs/auth/admin/verify-id-tokens for ` +
+				`details on how to retrieve a valid ID token`,
+		},
+		{
+			name:  "EmptySubject",
+			token: getIDToken(mockIDTokenPayload{"sub": ""}),
+			want:  "ID token has empty 'sub' (subject) claim",
+		},
+		{
+			name:  "NonStringSubject",
+			token: getIDToken(mockIDTokenPayload{"sub": 10}),
+			want:  "json: cannot unmarshal number into Go struct field Token.sub of type string",
+		},
+		{
+			name:  "TooLongSubject",
+			token: getIDToken(mockIDTokenPayload{"sub": strings.Repeat("a", 129)}),
+			want:  "ID token has a 'sub' (subject) claim longer than 128 characters",
+		},
+		{
+			name:  "FutureToken",
+			token: getIDToken(mockIDTokenPayload{"iat": now + clockSkewSeconds + 1}),
+			want:  "ID token issued at future timestamp",
+		},
+		{
+			name: "ExpiredToken",
+			token: getIDToken(mockIDTokenPayload{
+				"iat": now - 1000,
+				"exp": now - clockSkewSeconds - 1,
+			}),
+			want: "ID token has expired",
+		},
+		{
+			name:  "EmptyToken",
+			token: "",
+			want:  "ID token must be a non-empty string",
+		},
+		{
+			name:  "TooFewSegments",
+			token: "foo",
+			want:  "incorrect number of segments",
+		},
+		{
+			name:  "TooManySegments",
+			token: "fo.ob.ar.baz",
+			want:  "incorrect number of segments",
+		},
+		{
+			name:  "MalformedToken",
+			token: "foo.bar.baz",
+			want:  "invalid character",
+		},
 	}
 
 	client := &Client{
@@ -467,8 +448,9 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := client.VerifyIDToken(context.Background(), tc.token); err == nil {
-				t.Errorf("VerifyIDToken(%q) = nil; want error", tc.name)
+			_, err := client.VerifyIDToken(context.Background(), tc.token)
+			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+				t.Errorf("VerifyIDToken(%q) = %v; want = %q", tc.name, err, tc.want)
 			}
 		})
 	}
@@ -546,6 +528,154 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), testIDToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	ft, err := s.Client.VerifyIDToken(context.Background(), revokedToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
+	if ft != nil || err == nil {
+		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, error)", ft, err)
+	}
+	if len(s.Req) != 0 {
+		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
+	}
+}
+
+func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
+	we := "ID token has been revoked"
+	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
+func signerForTests(ctx context.Context) (cryptoSigner, error) {
+	creds, err := transport.Creds(ctx, optsWithServiceAcct...)
+	if err != nil {
+		return nil, err
+	}
+
+	return signerFromCreds(creds.JSON)
+}
+
+func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
+	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	if err != nil {
+		return nil, err
+	}
+	ks, err := newMockKeySource("../testdata/public_certs.json")
+	if err != nil {
+		return nil, err
+	}
+	tv.keySource = ks
+	tv.clock = testClock
+	return tv, nil
+}
+
+// mockKeySource provides access to a set of in-memory public keys.
+type mockKeySource struct {
+	keys []*publicKey
+	err  error
+}
+
+func newMockKeySource(filePath string) (*mockKeySource, error) {
+	certs, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := parsePublicKeys(certs)
+	if err != nil {
+		return nil, err
+	}
+	return &mockKeySource{
+		keys: keys,
+	}, nil
+}
+
+func (k *mockKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
+	return k.keys, k.err
+}
+
+type mockIDTokenPayload map[string]interface{}
+
+func (p mockIDTokenPayload) decodeFrom(s string) error {
+	return decode(s, &p)
+}
+
+func getIDToken(p mockIDTokenPayload) string {
+	return getIDTokenWithKid("mock-key-id-1", p)
+}
+
+func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
+	pCopy := mockIDTokenPayload{
+		"aud":   testProjectID,
+		"iss":   "https://securetoken.google.com/" + testProjectID,
+		"iat":   testClock.Now().Unix() - 100,
+		"exp":   testClock.Now().Unix() + 3600,
+		"sub":   "1234567890",
+		"admin": true,
+	}
+	for k, v := range p {
+		pCopy[k] = v
+	}
+
+	info := &jwtInfo{
+		header: jwtHeader{
+			Algorithm: "RS256",
+			Type:      "JWT",
+			KeyID:     kid,
+		},
+		payload: pCopy,
+	}
+	token, err := info.Token(context.Background(), testSigner)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return token
+}
+
 func checkIDTokenVerifier(tv *tokenVerifier, projectID string) error {
 	if tv == nil {
 		return errors.New("tokenVerifier not initialized")
@@ -605,72 +735,4 @@ func verifyCustomToken(ctx context.Context, token string, expected map[string]in
 			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
 	}
-}
-
-func getIDToken(p mockIDTokenPayload) string {
-	return getIDTokenWithKid("mock-key-id-1", p)
-}
-
-func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
-	pCopy := mockIDTokenPayload{
-		"aud":   testProjectID,
-		"iss":   "https://securetoken.google.com/" + testProjectID,
-		"iat":   testClock.Now().Unix() - 100,
-		"exp":   testClock.Now().Unix() + 3600,
-		"sub":   "1234567890",
-		"admin": true,
-	}
-	for k, v := range p {
-		pCopy[k] = v
-	}
-
-	info := &jwtInfo{
-		header: jwtHeader{
-			Algorithm: "RS256",
-			Type:      "JWT",
-			KeyID:     kid,
-		},
-		payload: pCopy,
-	}
-	token, err := info.Token(context.Background(), testSigner)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return token
-}
-
-type mockIDTokenPayload map[string]interface{}
-
-func (p mockIDTokenPayload) decodeFrom(s string) error {
-	return decode(s, &p)
-}
-
-// mockKeySource provides access to a set of in-memory public keys.
-type mockKeySource struct {
-	keys []*publicKey
-	err  error
-}
-
-func (k *mockKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
-	return k.keys, k.err
-}
-
-// fileKeySource loads a set of public keys from the local file system.
-type fileKeySource struct {
-	FilePath   string
-	CachedKeys []*publicKey
-}
-
-func (f *fileKeySource) Keys(ctx context.Context) ([]*publicKey, error) {
-	if f.CachedKeys == nil {
-		certs, err := ioutil.ReadFile(f.FilePath)
-		if err != nil {
-			return nil, err
-		}
-		f.CachedKeys, err = parsePublicKeys(certs)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return f.CachedKeys, nil
 }

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package auth contains functions for minting custom authentication tokens, and verifying Firebase ID tokens.
+// Package auth contains functions for minting custom authentication tokens, verifying Firebase ID tokens,
+// and managing users in a Firebase project.
 package auth
 
 import (
@@ -34,21 +35,6 @@ const (
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
 	"exp", "firebase", "iat", "iss", "jti", "nbf", "nonce", "sub",
-}
-
-// Token represents a decoded Firebase ID token.
-//
-// Token provides typed accessors to the common JWT fields such as Audience (aud) and Expiry (exp).
-// Additionally it provides a UID field, which indicates the user ID of the account to which this token
-// belongs. Any additional JWT claims can be accessed via the Claims map of Token.
-type Token struct {
-	Issuer   string                 `json:"iss"`
-	Audience string                 `json:"aud"`
-	Expires  int64                  `json:"exp"`
-	IssuedAt int64                  `json:"iat"`
-	Subject  string                 `json:"sub,omitempty"`
-	UID      string                 `json:"uid,omitempty"`
-	Claims   map[string]interface{} `json:"-"`
 }
 
 // Client is the interface for the Firebase auth service.
@@ -184,6 +170,21 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	return info.Token(ctx, c.signer)
 }
 
+// Token represents a decoded Firebase ID token.
+//
+// Token provides typed accessors to the common JWT fields such as Audience (aud) and Expiry (exp).
+// Additionally it provides a UID field, which indicates the user ID of the account to which this token
+// belongs. Any additional JWT claims can be accessed via the Claims map of Token.
+type Token struct {
+	Issuer   string                 `json:"iss"`
+	Audience string                 `json:"aud"`
+	Expires  int64                  `json:"exp"`
+	IssuedAt int64                  `json:"iat"`
+	Subject  string                 `json:"sub,omitempty"`
+	UID      string                 `json:"uid,omitempty"`
+	Claims   map[string]interface{} `json:"-"`
+}
+
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
@@ -191,15 +192,24 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 // a Token containing the decoded claims in the input JWT. See
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
-// This does not check whether or not the token has been revoked. See `VerifyIDTokenAndCheckRevoked` below.
+//
+// This function does not make any RPC calls most of the time. The only time it makes an RPC call
+// is when Google public keys need to be refreshed. These keys get cached up to 24 hours, and
+// therefore the RPC overhead gets amortized over many invocations of this function.
+//
+// This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
+// when a revocation check is needed.
 func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	return c.idTokenVerifier.VerifyToken(ctx, idToken)
 }
 
-// VerifyIDTokenAndCheckRevoked verifies the provided ID token and checks it has not been revoked.
+// VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
+// token has not been revoked.
 //
-// VerifyIDTokenAndCheckRevoked verifies the signature and payload of the provided ID token and
-// checks that it wasn't revoked. Uses VerifyIDToken() internally to verify the ID token JWT.
+// This function uses `VerifyIDToken()` internally to verify the ID token JWT. However, unlike
+// `VerifyIDToken()` this function must make an RPC call to perform the revocation check.
+// Developers are advised to take this additional overhead into consideration when including this
+// function in an authorization flow that gets executed often.
 func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
 	p, err := c.VerifyIDToken(ctx, idToken)
 	if err != nil {
