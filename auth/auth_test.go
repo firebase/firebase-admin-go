@@ -67,6 +67,7 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	testIDTokenVerifier.keySource = &fileKeySource{FilePath: "../testdata/public_certs.json"}
+	testIDTokenVerifier.clock = testClock
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
