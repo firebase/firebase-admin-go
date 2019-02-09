@@ -34,7 +34,171 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 )
+
+const (
+	idTokenCertURL      = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+	idTokenIssuerPrefix = "https://securetoken.google.com/"
+	clockSkewSeconds    = 300
+)
+
+type tokenVerifier struct {
+	shortName         string
+	articledShortName string
+	docURL            string
+	projectID         string
+	issuerPrefix      string
+	keySource         keySource
+	clock             internal.Clock
+}
+
+func newIDTokenVerifier(ctx context.Context, conf *internal.AuthConfig) (*tokenVerifier, error) {
+	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
+	if err != nil {
+		return nil, err
+	}
+	return &tokenVerifier{
+		shortName:         "ID token",
+		articledShortName: "an ID token",
+		docURL:            "https://firebase.google.com/docs/auth/admin/verify-id-tokens",
+		projectID:         conf.ProjectID,
+		issuerPrefix:      idTokenIssuerPrefix,
+		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
+		clock:             internal.SystemClock,
+	}, nil
+}
+
+func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
+	if tv.projectID == "" {
+		return nil, errors.New("project id not available")
+	}
+	if tv.issuerPrefix == "" {
+		panic("issuer prefix not available")
+	}
+	if token == "" {
+		return nil, fmt.Errorf("%s must be a non-empty string", tv.shortName)
+	}
+
+	payload, err := tv.verifyContent(token)
+	if err != nil {
+		return nil, fmt.Errorf("%s; see %s for details on how to retrieve a valid %s",
+			err.Error(), tv.docURL, tv.shortName)
+	}
+
+	if err := tv.verifyTimestamps(payload); err != nil {
+		return nil, err
+	}
+
+	// Verifying the signature requires syncronized access to a key store and
+	// potentially issues a http request. Validating the fields of the token is
+	// cheaper and invalid tokens will fail faster.
+	if err := tv.verifySignature(ctx, token); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
+	var (
+		header       jwtHeader
+		payload      Token
+		customClaims map[string]interface{}
+		err          error
+	)
+
+	segments := strings.Split(token, ".")
+	if err = decode(segments[0], &header); err != nil {
+		return nil, err
+	}
+	if err = decode(segments[1], &payload); err != nil {
+		return nil, err
+	}
+
+	issuer := tv.issuerPrefix + tv.projectID
+	if header.KeyID == "" {
+		if payload.Audience == firebaseAudience {
+			err = fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
+		} else {
+			err = fmt.Errorf("%s has no 'kid' header", tv.shortName)
+		}
+	} else if header.Algorithm != "RS256" {
+		err = fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
+			tv.shortName, header.Algorithm)
+	} else if payload.Audience != tv.projectID {
+		err = fmt.Errorf("%s has invalid 'aud' (audience) claim; expected %q but got %q; %s",
+			tv.shortName, tv.projectID, payload.Audience, tv.getProjectIDMatchMessage())
+	} else if payload.Issuer != issuer {
+		err = fmt.Errorf("%s has invalid 'iss' (issuer) claim; expected %q but got %q; %s",
+			tv.shortName, issuer, payload.Issuer, tv.getProjectIDMatchMessage())
+	} else if payload.Subject == "" {
+		err = fmt.Errorf("%s has empty 'sub' (subject) claim", tv.shortName)
+	} else if len(payload.Subject) > 128 {
+		err = fmt.Errorf("%s has a 'sub' (subject) claim longer than 128 characters", tv.shortName)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	payload.UID = payload.Subject
+	if err = decode(segments[1], &customClaims); err != nil {
+		return nil, err
+	}
+	for _, standardClaim := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {
+		delete(customClaims, standardClaim)
+	}
+	payload.Claims = customClaims
+	return &payload, nil
+}
+
+func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
+	if (payload.IssuedAt - clockSkewSeconds) > tv.clock.Now().Unix() {
+		return fmt.Errorf("%s issued at future timestamp: %d", tv.shortName, payload.IssuedAt)
+	} else if (payload.Expires + clockSkewSeconds) < tv.clock.Now().Unix() {
+		return fmt.Errorf("%s has expired at: %d", tv.shortName, payload.Expires)
+	}
+	return nil
+}
+
+func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) error {
+	segments := strings.Split(token, ".")
+	if len(segments) != 3 {
+		return errors.New("incorrect number of segments")
+	}
+
+	var h jwtHeader
+	if err := decode(segments[0], &h); err != nil {
+		return err
+	}
+
+	keys, err := tv.keySource.Keys(ctx)
+	if err != nil {
+		return err
+	}
+
+	verified := false
+	for _, k := range keys {
+		if h.KeyID == "" || h.KeyID == k.Kid {
+			if verifySignature(segments, k) == nil {
+				verified = true
+				break
+			}
+		}
+	}
+
+	if !verified {
+		return errors.New("failed to verify token signature")
+	}
+	return nil
+}
+
+func (tv *tokenVerifier) getProjectIDMatchMessage() string {
+	return fmt.Sprintf(
+		"make sure the %s comes from the same Firebase project as the credential used to"+
+			" authenticate this SDK", tv.shortName)
+}
 
 // keySource is used to obtain a set of public keys, which can be used to verify cryptographic
 // signatures.
@@ -112,37 +276,6 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	}
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
-	return nil
-}
-
-func verifyToken(ctx context.Context, token string, ks keySource) error {
-	segments := strings.Split(token, ".")
-	if len(segments) != 3 {
-		return errors.New("incorrect number of segments")
-	}
-
-	var h jwtHeader
-	if err := decode(segments[0], &h); err != nil {
-		return err
-	}
-
-	keys, err := ks.Keys(ctx)
-	if err != nil {
-		return err
-	}
-	verified := false
-	for _, k := range keys {
-		if h.KeyID == "" || h.KeyID == k.Kid {
-			if verifySignature(segments, k) == nil {
-				verified = true
-				break
-			}
-		}
-	}
-
-	if !verified {
-		return errors.New("failed to verify token signature")
-	}
 	return nil
 }
 

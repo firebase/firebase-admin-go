@@ -87,8 +87,8 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	if _, ok := client.signer.(*serviceAccountSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = serviceAccountSigner", client.signer)
 	}
-	if client.projectID != creds.ProjectID {
-		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, creds.ProjectID)
+	if err := checkIDTokenVerifier(client.idTokenVerifier, creds.ProjectID); err != nil {
+		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -111,8 +111,8 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
 	}
-	if client.projectID != "" {
-		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -136,8 +136,8 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
 	}
-	if client.projectID != "" {
-		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -171,8 +171,8 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("AuthClient.signer = %#v; want = iamSigner", client.signer)
 	}
-	if client.projectID != "" {
-		t.Errorf("NewClient().projectID = %q; want = %q", client.projectID, "")
+	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -298,9 +298,15 @@ func TestVerifyIDTokenAndCheckRevokedValid(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
+	s.Client.idTokenVerifier = &tokenVerifier{
+		keySource:    testKeySource,
+		clock:        testClock,
+		projectID:    testProjectID,
+		issuerPrefix: idTokenIssuerPrefix,
+	}
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), testIDToken)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if ft.Claims["admin"] != true {
 		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -315,6 +321,12 @@ func TestVerifyIDTokenAndCheckRevokedDoNotCheck(t *testing.T) {
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
+	s.Client.idTokenVerifier = &tokenVerifier{
+		keySource:    testKeySource,
+		clock:        testClock,
+		projectID:    testProjectID,
+		issuerPrefix: idTokenIssuerPrefix,
+	}
 	ft, err := s.Client.VerifyIDToken(context.Background(), tok)
 	if err != nil {
 		t.Fatal(err)
@@ -332,6 +344,12 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 	defer s.Close()
 	tok := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970}) // old token
 
+	s.Client.idTokenVerifier = &tokenVerifier{
+		keySource:    testKeySource,
+		clock:        testClock,
+		projectID:    testProjectID,
+		issuerPrefix: idTokenIssuerPrefix,
+	}
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), tok)
 	we := "ID token has been revoked"
 	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
@@ -342,9 +360,12 @@ func TestVerifyIDTokenAndCheckRevokedInvalidated(t *testing.T) {
 
 func TestVerifyIDToken(t *testing.T) {
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
 	if err != nil {
@@ -372,15 +393,19 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 	}
 
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
 				t.Errorf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
+				return
 			}
 			if ft.Claims["admin"] != true {
 				t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -396,9 +421,12 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
 		t.Errorf("VerifyiDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
@@ -428,9 +456,12 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -461,9 +492,12 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 	}
 
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
@@ -479,7 +513,7 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.keySource = testKeySource
+	c.idTokenVerifier.keySource = testKeySource
 	if _, err := c.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
@@ -487,10 +521,14 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
-		keySource: testKeySource,
-		clock:     testClock,
-		projectID: testProjectID,
-		signer:    testSigner,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    testKeySource,
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
+		signer: testSigner,
+		clock:  testClock,
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
@@ -504,17 +542,38 @@ func TestCustomTokenVerification(t *testing.T) {
 
 func TestCertificateRequestError(t *testing.T) {
 	client := &Client{
-		keySource: &mockKeySource{nil, errors.New("mock error")},
-		clock:     testClock,
-		projectID: testProjectID,
+		idTokenVerifier: &tokenVerifier{
+			keySource:    &mockKeySource{nil, errors.New("mock error")},
+			clock:        testClock,
+			projectID:    testProjectID,
+			issuerPrefix: idTokenIssuerPrefix,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
 	}
 }
 
+func checkIDTokenVerifier(tv *tokenVerifier, projectID string) error {
+	if tv == nil {
+		return errors.New("tokenVerifier not initialized")
+	}
+	if tv.projectID != projectID {
+		return fmt.Errorf("projectID = %q; want = %q", tv.projectID, projectID)
+	}
+	if tv.shortName != "ID token" {
+		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "ID token")
+	}
+	return nil
+}
+
 func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
-	if err := verifyToken(ctx, token, testKeySource); err != nil {
+	tv := &tokenVerifier{
+		keySource: testKeySource,
+		clock:     testClock,
+		projectID: testProjectID,
+	}
+	if err := tv.verifySignature(ctx, token); err != nil {
 		t.Fatal(err)
 	}
 	var (

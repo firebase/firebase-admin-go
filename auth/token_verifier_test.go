@@ -155,15 +155,27 @@ func TestParsePublicKeysError(t *testing.T) {
 }
 
 func TestVerifyToken(t *testing.T) {
-	if err := verifyToken(context.Background(), testIDToken, testKeySource); err != nil {
+	tv := &tokenVerifier{
+		keySource:    testKeySource,
+		clock:        testClock,
+		projectID:    testProjectID,
+		issuerPrefix: idTokenIssuerPrefix,
+	}
+	if _, err := tv.VerifyToken(context.Background(), testIDToken); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifyTokenError(t *testing.T) {
+	tv := &tokenVerifier{
+		keySource:    testKeySource,
+		clock:        testClock,
+		projectID:    testProjectID,
+		issuerPrefix: idTokenIssuerPrefix,
+	}
 	tokens := []string{"", "foo", "foo.bar.baz"}
 	for _, token := range tokens {
-		if err := verifyToken(context.Background(), token, testKeySource); err == nil {
+		if _, err := tv.VerifyToken(context.Background(), token); err == nil {
 			t.Errorf("verifyToken(%q) = nil; want = error", token)
 		}
 	}
