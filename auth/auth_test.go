@@ -304,6 +304,7 @@ func TestVerifyIDToken(t *testing.T) {
 	client := &Client{
 		idTokenVerifier: testIDTokenVerifier,
 	}
+
 	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
 	if err != nil {
 		t.Fatal(err)
@@ -336,8 +337,7 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
-				t.Errorf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
-				return
+				t.Fatalf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
 			}
 			if ft.Claims["admin"] != true {
 				t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -350,11 +350,12 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 }
 
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
-	parts := strings.Split(testIDToken, ".")
-	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
 	client := &Client{
 		idTokenVerifier: testIDTokenVerifier,
 	}
+	parts := strings.Split(testIDToken, ".")
+	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
+
 	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
 		t.Errorf("VerifyIDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
 	}
@@ -549,8 +550,8 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-
 	s.Client.idTokenVerifier = testIDTokenVerifier
+
 	ft, err := s.Client.VerifyIDToken(context.Background(), revokedToken)
 	if err != nil {
 		t.Fatal(err)
@@ -566,8 +567,8 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-
 	s.Client.idTokenVerifier = testIDTokenVerifier
+
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
 	if ft != nil || err == nil {
 		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, error)", ft, err)
@@ -581,8 +582,8 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-
 	s.Client.idTokenVerifier = testIDTokenVerifier
+
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
 	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {

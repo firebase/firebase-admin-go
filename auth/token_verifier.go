@@ -74,7 +74,7 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 
 // VerifyToken Verifies that the given token string is a valid Firebase JWT.
 //
-// VerifyToken considers token string to be valid if all the following conditions are met:
+// VerifyToken considers a token string to be valid if all the following conditions are met:
 //   - The token string is a valid RS256 JWT.
 //   - The JWT contains a valid key ID (kid) claim.
 //   - The JWT contains valid issuer (iss) and audience (aud) claims that match the issuerPrefix
@@ -93,7 +93,7 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 		return nil, fmt.Errorf("%s must be a non-empty string", tv.shortName)
 	}
 
-	// Validate the token content first. This is fast and cheaper.
+	// Validate the token content first. This is fast and cheap.
 	payload, err := tv.verifyContent(token)
 	if err != nil {
 		return nil, fmt.Errorf("%s; see %s for details on how to retrieve a valid %s",
