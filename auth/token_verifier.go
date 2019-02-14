@@ -116,7 +116,6 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 	var (
 		header  jwtHeader
 		payload Token
-		err     error
 	)
 
 	segments := strings.Split(token, ".")
@@ -124,43 +123,45 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 		return nil, errors.New("incorrect number of segments")
 	}
 
-	if err = decode(segments[0], &header); err != nil {
+	if err := decode(segments[0], &header); err != nil {
 		return nil, err
 	}
 
-	if err = decode(segments[1], &payload); err != nil {
+	if err := decode(segments[1], &payload); err != nil {
 		return nil, err
 	}
 
 	issuer := tv.issuerPrefix + tv.projectID
 	if header.KeyID == "" {
 		if payload.Audience == firebaseAudience {
-			err = fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
-		} else {
-			err = fmt.Errorf("%s has no 'kid' header", tv.shortName)
+			return nil, fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
 		}
-	} else if header.Algorithm != "RS256" {
-		err = fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
+		return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
+	}
+	if header.Algorithm != "RS256" {
+		return nil, fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
 			tv.shortName, header.Algorithm)
-	} else if payload.Audience != tv.projectID {
-		err = fmt.Errorf("%s has invalid 'aud' (audience) claim; expected %q but got %q; %s",
+	}
+	if payload.Audience != tv.projectID {
+		return nil, fmt.Errorf("%s has invalid 'aud' (audience) claim; expected %q but got %q; %s",
 			tv.shortName, tv.projectID, payload.Audience, tv.getProjectIDMatchMessage())
-	} else if payload.Issuer != issuer {
-		err = fmt.Errorf("%s has invalid 'iss' (issuer) claim; expected %q but got %q; %s",
+	}
+	if payload.Issuer != issuer {
+		return nil, fmt.Errorf("%s has invalid 'iss' (issuer) claim; expected %q but got %q; %s",
 			tv.shortName, issuer, payload.Issuer, tv.getProjectIDMatchMessage())
-	} else if payload.Subject == "" {
-		err = fmt.Errorf("%s has empty 'sub' (subject) claim", tv.shortName)
-	} else if len(payload.Subject) > 128 {
-		err = fmt.Errorf("%s has a 'sub' (subject) claim longer than 128 characters", tv.shortName)
+	}
+	if payload.Subject == "" {
+		return nil, fmt.Errorf("%s has empty 'sub' (subject) claim", tv.shortName)
+	}
+	if len(payload.Subject) > 128 {
+		return nil, fmt.Errorf("%s has a 'sub' (subject) claim longer than 128 characters",
+			tv.shortName)
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	payload.UID = payload.Subject
 
 	var customClaims map[string]interface{}
-	if err = decode(segments[1], &customClaims); err != nil {
+	if err := decode(segments[1], &customClaims); err != nil {
 		return nil, err
 	}
 	for _, standardClaim := range []string{"iss", "aud", "exp", "iat", "sub", "uid"} {

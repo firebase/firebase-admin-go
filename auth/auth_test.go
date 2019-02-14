@@ -90,7 +90,7 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 		t.Errorf("NewClient().signer = %#v; want = serviceAccountSigner", client.signer)
 	}
 	if err := checkIDTokenVerifier(client.idTokenVerifier, creds.ProjectID); err != nil {
-		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
+		t.Errorf("NewClient().idTokenVerifier: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
