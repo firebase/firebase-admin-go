@@ -27,6 +27,29 @@ import (
 	"firebase.google.com/go/internal"
 )
 
+func TestNewIDTokenVerifier(t *testing.T) {
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tv.shortName != "ID token" {
+		t.Errorf("tokenVerifier.shortName = %q; want = %q", tv.shortName, "ID token")
+	}
+	if tv.projectID != testProjectID {
+		t.Errorf("tokenVerifier.projectID = %q; want = %q", tv.projectID, testProjectID)
+	}
+	if tv.issuerPrefix != idTokenIssuerPrefix {
+		t.Errorf("tokenVerifier.issuerPrefix = %q; want = %q", tv.issuerPrefix, idTokenIssuerPrefix)
+	}
+	ks, ok := tv.keySource.(*httpKeySource)
+	if !ok {
+		t.Fatalf("tokenVerifier.keySource = %#v; want = httpKeySource", tv.keySource)
+	}
+	if ks.KeyURI != idTokenCertURL {
+		t.Errorf("tokenVerifier.certURL = %q; want = %q", ks.KeyURI, idTokenCertURL)
+	}
+}
+
 func TestHTTPKeySource(t *testing.T) {
 	data, err := ioutil.ReadFile("../testdata/public_certs.json")
 	if err != nil {
@@ -69,8 +92,29 @@ func TestHTTPKeySourceEmptyResponse(t *testing.T) {
 }
 
 func TestHTTPKeySourceIncorrectResponse(t *testing.T) {
-	hc, _ := newTestHTTPClient([]byte("{\"foo\": 1}"))
+	hc, _ := newTestHTTPClient([]byte("{\"foo\": \"bar\"}"))
 	ks := newHTTPKeySource("http://mock.url", hc)
+	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
+		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
+	}
+}
+
+func TestHTTPKeySourceHTTPError(t *testing.T) {
+	rc := &mockReadCloser{
+		data:       string(""),
+		closeCount: 0,
+	}
+	client := &http.Client{
+		Transport: &mockHTTPResponse{
+			Response: http.Response{
+				Status:     "503 Service Unavailable",
+				StatusCode: http.StatusServiceUnavailable,
+				Body:       rc,
+			},
+			Err: nil,
+		},
+	}
+	ks := newHTTPKeySource("http://mock.url", client)
 	if keys, err := ks.Keys(context.Background()); keys != nil || err == nil {
 		t.Errorf("Keys() = (%v, %v); want = (nil, error)", keys, err)
 	}
@@ -150,21 +194,6 @@ func TestParsePublicKeysError(t *testing.T) {
 	for _, tc := range cases {
 		if keys, err := parsePublicKeys([]byte(tc)); keys != nil || err == nil {
 			t.Errorf("parsePublicKeys(%q) = (%v, %v); want = (nil, err)", tc, keys, err)
-		}
-	}
-}
-
-func TestVerifyToken(t *testing.T) {
-	if err := verifyToken(context.Background(), testIDToken, testKeySource); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestVerifyTokenError(t *testing.T) {
-	tokens := []string{"", "foo", "foo.bar.baz"}
-	for _, token := range tokens {
-		if err := verifyToken(context.Background(), token, testKeySource); err == nil {
-			t.Errorf("verifyToken(%q) = nil; want = error", token)
 		}
 	}
 }
