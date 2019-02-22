@@ -16,9 +16,7 @@ package auth
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -28,14 +26,11 @@ import (
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/identitytoolkit/v3"
-	"google.golang.org/api/iterator"
 )
 
 const (
-	maxImportUsers     = 1000
-	maxReturnedResults = 1000
-	maxLenPayloadCC    = 1000
-	defaultProviderID  = "firebase"
+	maxLenPayloadCC   = 1000
+	defaultProviderID = "firebase"
 )
 
 // Create a new interface
@@ -77,235 +72,6 @@ type UserRecord struct {
 	ProviderUserInfo       []*UserInfo
 	TokensValidAfterMillis int64 // milliseconds since epoch.
 	UserMetadata           *UserMetadata
-}
-
-// ExportedUserRecord is the returned user value used when listing all the users.
-type ExportedUserRecord struct {
-	*UserRecord
-	PasswordHash string
-	PasswordSalt string
-}
-
-// UserProvider represents a user identity provider.
-//
-// One or more user providers can be specified for each user when importing in bulk.
-// See UserToImport type.
-type UserProvider struct {
-	UID         string
-	ProviderID  string
-	Email       string
-	DisplayName string
-	PhotoURL    string
-}
-
-// UserToImport represents a user account that can be bulk imported into Firebase Auth.
-type UserToImport struct {
-	info   *identitytoolkit.UserInfo
-	claims map[string]interface{}
-}
-
-func (u *UserToImport) userInfo() *identitytoolkit.UserInfo {
-	if u.info == nil {
-		u.info = &identitytoolkit.UserInfo{}
-	}
-	return u.info
-}
-
-func (u *UserToImport) validatedUserInfo() (*identitytoolkit.UserInfo, error) {
-	if u.info == nil {
-		return nil, fmt.Errorf("no parameters are set on the user to import")
-	}
-	info := u.info
-	if err := validateUID(info.LocalId); err != nil {
-		return nil, err
-	}
-	if info.Email != "" {
-		if err := validateEmail(info.Email); err != nil {
-			return nil, err
-		}
-	}
-	if info.PhoneNumber != "" {
-		if err := validatePhone(info.PhoneNumber); err != nil {
-			return nil, err
-		}
-	}
-	if len(u.claims) > 0 {
-		cc, err := marshalCustomClaims(u.claims)
-		if err != nil {
-			return nil, err
-		}
-		info.CustomAttributes = cc
-	}
-
-	for _, p := range info.ProviderUserInfo {
-		if p.RawId == "" {
-			return nil, fmt.Errorf("user provdier must specify a uid")
-		}
-		if p.ProviderId == "" {
-			return nil, fmt.Errorf("user provider must specify a provider ID")
-		}
-	}
-	return info, nil
-}
-
-// UID setter. This field is required.
-func (u *UserToImport) UID(uid string) *UserToImport {
-	u.userInfo().LocalId = uid
-	return u
-}
-
-// Email setter.
-func (u *UserToImport) Email(email string) *UserToImport {
-	u.userInfo().Email = email
-	return u
-}
-
-// DisplayName setter.
-func (u *UserToImport) DisplayName(displayName string) *UserToImport {
-	u.userInfo().DisplayName = displayName
-	return u
-}
-
-// PhotoURL setter.
-func (u *UserToImport) PhotoURL(url string) *UserToImport {
-	u.userInfo().PhotoUrl = url
-	return u
-}
-
-// PhoneNumber setter.
-func (u *UserToImport) PhoneNumber(phoneNumber string) *UserToImport {
-	u.userInfo().PhoneNumber = phoneNumber
-	return u
-}
-
-// Metadata setter.
-func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
-	info := u.userInfo()
-	info.CreatedAt = metadata.CreationTimestamp
-	info.LastLoginAt = metadata.LastLogInTimestamp
-	return u
-}
-
-// ProviderData setter.
-func (u *UserToImport) ProviderData(providers []*UserProvider) *UserToImport {
-	var providerUserInfo []*identitytoolkit.UserInfoProviderUserInfo
-	for _, p := range providers {
-		providerUserInfo = append(providerUserInfo, &identitytoolkit.UserInfoProviderUserInfo{
-			ProviderId:  p.ProviderID,
-			RawId:       p.UID,
-			Email:       p.Email,
-			DisplayName: p.DisplayName,
-			PhotoUrl:    p.PhotoURL,
-		})
-	}
-	u.userInfo().ProviderUserInfo = providerUserInfo
-	return u
-}
-
-// CustomClaims setter.
-func (u *UserToImport) CustomClaims(claims map[string]interface{}) *UserToImport {
-	u.claims = claims
-	return u
-}
-
-// Disabled setter.
-func (u *UserToImport) Disabled(disabled bool) *UserToImport {
-	info := u.userInfo()
-	info.Disabled = disabled
-	if !disabled {
-		info.ForceSendFields = append(info.ForceSendFields, "Disabled")
-	}
-	return u
-}
-
-// EmailVerified setter.
-func (u *UserToImport) EmailVerified(emailVerified bool) *UserToImport {
-	info := u.userInfo()
-	info.EmailVerified = emailVerified
-	if !emailVerified {
-		info.ForceSendFields = append(info.ForceSendFields, "EmailVerified")
-	}
-	return u
-}
-
-// PasswordHash setter. When set a UserImportHash must be specified as an option to call
-// ImportUsers().
-func (u *UserToImport) PasswordHash(password []byte) *UserToImport {
-	u.userInfo().PasswordHash = base64.RawURLEncoding.EncodeToString(password)
-	return u
-}
-
-// PasswordSalt setter.
-func (u *UserToImport) PasswordSalt(salt []byte) *UserToImport {
-	u.userInfo().Salt = base64.RawURLEncoding.EncodeToString(salt)
-	return u
-}
-
-// ErrorInfo represents an error encountered while importing a single user account.
-//
-// The Index field corresponds to the index of the failed user in the users array that was passed
-// to ImportUsers().
-type ErrorInfo struct {
-	Index  int
-	Reason string
-}
-
-// UserImportResult represents the result of an ImportUsers() call.
-type UserImportResult struct {
-	SuccessCount int
-	FailureCount int
-	Errors       []*ErrorInfo
-}
-
-// UserImportOption is an option for the ImportUsers() function.
-type UserImportOption interface {
-	applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest) error
-}
-
-type withHash struct {
-	hash UserImportHash
-}
-
-func (w withHash) applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest) error {
-	conf, err := w.hash.Config()
-	if err != nil {
-		return err
-	}
-	req.HashAlgorithm = conf.HashAlgorithm
-	req.SignerKey = conf.SignerKey
-	req.SaltSeparator = conf.SaltSeparator
-	req.Rounds = conf.Rounds
-	req.MemoryCost = conf.MemoryCost
-	req.DkLen = conf.DerivedKeyLength
-	req.Parallelization = conf.Parallelization
-	req.BlockSize = conf.BlockSize
-	req.ForceSendFields = conf.ForceSendFields
-	return nil
-}
-
-// WithHash returns a UserImportOption that specifies a hash configuration.
-func WithHash(hash UserImportHash) UserImportOption {
-	return withHash{hash}
-}
-
-// UserImportHash represents a hash algorithm and the associated configuration that can be used to
-// hash user passwords.
-//
-// A UserImportHash must be specified in the form of a UserImportOption when importing users with
-// passwords. See ImportUsers() and WithHash() functions.
-type UserImportHash interface {
-	Config() (*internal.HashConfig, error)
-}
-
-// UserIterator is an iterator over Users.
-//
-// Also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
-type UserIterator struct {
-	client   *Client
-	ctx      context.Context
-	nextFunc func() error
-	pageInfo *iterator.PageInfo
-	users    []*ExportedUserRecord
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -628,63 +394,6 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
 
-// Users returns an iterator over Users.
-//
-// If nextPageToken is empty, the iterator will start at the beginning.
-// If the nextPageToken is not empty, the iterator starts after the token.
-func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator {
-	it := &UserIterator{
-		ctx:    ctx,
-		client: c,
-	}
-	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
-		it.fetch,
-		func() int { return len(it.users) },
-		func() interface{} { b := it.users; it.users = nil; return b })
-	it.pageInfo.MaxSize = maxReturnedResults
-	it.pageInfo.Token = nextPageToken
-	return it
-}
-
-func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyDownloadAccountRequest{
-		MaxResults:    int64(pageSize),
-		NextPageToken: pageToken,
-	}
-	call := it.client.is.Relyingparty.DownloadAccount(request)
-	it.client.setHeader(call)
-	resp, err := call.Context(it.ctx).Do()
-	if err != nil {
-		return "", handleServerError(err)
-	}
-
-	for _, u := range resp.Users {
-		eu, err := makeExportedUser(u)
-		if err != nil {
-			return "", err
-		}
-		it.users = append(it.users, eu)
-	}
-	it.pageInfo.Token = resp.NextPageToken
-	return resp.NextPageToken, nil
-}
-
-// PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
-// Page size can be determined by the NewPager(...) function described there.
-func (it *UserIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
-
-// Next returns the next result. Its second return value is [iterator.Done] if
-// there are no more results. Once Next returns [iterator.Done], all subsequent
-// calls will return [iterator.Done].
-func (it *UserIterator) Next() (*ExportedUserRecord, error) {
-	if err := it.nextFunc(); err != nil {
-		return nil, err
-	}
-	user := it.users[0]
-	it.users = it.users[1:]
-	return user, nil
-}
-
 // SetCustomUserClaims sets additional claims on an existing user account.
 //
 // Custom claims set via this function can be used to define user roles and privilege levels.
@@ -698,59 +407,6 @@ func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClai
 		customClaims = map[string]interface{}{}
 	}
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
-}
-
-// ImportUsers imports an array of users to Firebase Auth.
-//
-// No more than 1000 users can be imported in a single call. If at least one user specifies a
-// password, a UserImportHash must be specified as an option.
-func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ...UserImportOption) (*UserImportResult, error) {
-	if len(users) == 0 {
-		return nil, errors.New("users list must not be empty")
-	}
-	if len(users) > maxImportUsers {
-		return nil, fmt.Errorf("users list must not contain more than %d elements", maxImportUsers)
-	}
-
-	req := &identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest{}
-	hashRequired := false
-	for _, u := range users {
-		vu, err := u.validatedUserInfo()
-		if err != nil {
-			return nil, err
-		}
-		if vu.PasswordHash != "" {
-			hashRequired = true
-		}
-		req.Users = append(req.Users, vu)
-	}
-
-	for _, opt := range opts {
-		if err := opt.applyTo(req); err != nil {
-			return nil, err
-		}
-	}
-	if hashRequired && req.HashAlgorithm == "" {
-		return nil, errors.New("hash algorithm option is required to import users with passwords")
-	}
-
-	call := c.is.Relyingparty.UploadAccount(req)
-	c.setHeader(call)
-	resp, err := call.Context(ctx).Do()
-	if err != nil {
-		return nil, handleServerError(err)
-	}
-	result := &UserImportResult{
-		SuccessCount: len(users) - len(resp.Error),
-		FailureCount: len(resp.Error),
-	}
-	for _, e := range resp.Error {
-		result.Errors = append(result.Errors, &ErrorInfo{
-			Index:  int(e.Index),
-			Reason: e.Message,
-		})
-	}
-	return result, nil
 }
 
 func marshalCustomClaims(claims map[string]interface{}) (string, error) {
@@ -972,54 +628,4 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 		return nil, err
 	}
 	return eu.UserRecord, nil
-}
-
-func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) {
-	var cc map[string]interface{}
-	if r.CustomAttributes != "" {
-		if err := json.Unmarshal([]byte(r.CustomAttributes), &cc); err != nil {
-			return nil, err
-		}
-		if len(cc) == 0 {
-			cc = nil
-		}
-	}
-
-	var providerUserInfo []*UserInfo
-	for _, u := range r.ProviderUserInfo {
-		info := &UserInfo{
-			DisplayName: u.DisplayName,
-			Email:       u.Email,
-			PhoneNumber: u.PhoneNumber,
-			PhotoURL:    u.PhotoUrl,
-			ProviderID:  u.ProviderId,
-			UID:         u.RawId,
-		}
-		providerUserInfo = append(providerUserInfo, info)
-	}
-
-	resp := &ExportedUserRecord{
-		UserRecord: &UserRecord{
-			UserInfo: &UserInfo{
-				DisplayName: r.DisplayName,
-				Email:       r.Email,
-				PhoneNumber: r.PhoneNumber,
-				PhotoURL:    r.PhotoUrl,
-				ProviderID:  defaultProviderID,
-				UID:         r.LocalId,
-			},
-			CustomClaims:           cc,
-			Disabled:               r.Disabled,
-			EmailVerified:          r.EmailVerified,
-			ProviderUserInfo:       providerUserInfo,
-			TokensValidAfterMillis: r.ValidSince * 1000,
-			UserMetadata: &UserMetadata{
-				LastLogInTimestamp: r.LastLoginAt,
-				CreationTimestamp:  r.CreatedAt,
-			},
-		},
-		PasswordHash: r.PasswordHash,
-		PasswordSalt: r.Salt,
-	}
-	return resp, nil
 }
