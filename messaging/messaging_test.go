@@ -1089,7 +1089,7 @@ func TestInvalidSubscribe(t *testing.T) {
 			resp, err := client.SubscribeToTopic(ctx, tc.tokens, tc.topic)
 			if err == nil || err.Error() != tc.want {
 				t.Errorf(
-					"SubscribeToTopic(%s) = (%#v, %v); want = (%q, %q)", tc.name, resp, err, "", tc.want)
+					"SubscribeToTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, resp, err, tc.want)
 			}
 		})
 	}
@@ -1132,7 +1132,7 @@ func TestInvalidUnsubscribe(t *testing.T) {
 			resp, err := client.UnsubscribeFromTopic(ctx, tc.tokens, tc.topic)
 			if err == nil || err.Error() != tc.want {
 				t.Errorf(
-					"UnsubscribeFromTopic(%s) = (%#v, %v); want = (%q, %q)", tc.name, resp, err, "", tc.want)
+					"UnsubscribeFromTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, resp, err, tc.want)
 			}
 		})
 	}
@@ -1184,14 +1184,14 @@ func TestTopicManagementError(t *testing.T) {
 		resp = tc.resp
 		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
 		if err == nil || err.Error() != tc.want || !tc.check(err) {
-			t.Errorf("SubscribeToTopic() = (%#v, %v); want = (%q, %q)", tmr, err, "", tc.want)
+			t.Errorf("SubscribeToTopic() = (%#v, %v); want = (nil, %q)", tmr, err, tc.want)
 		}
 	}
 	for _, tc := range cases {
 		resp = tc.resp
 		tmr, err := client.UnsubscribeFromTopic(ctx, []string{"id1"}, "topic")
 		if err == nil || err.Error() != tc.want {
-			t.Errorf("UnsubscribeFromTopic() = (%#v, %v); want = (%q, %q)", tmr, err, "", tc.want)
+			t.Errorf("UnsubscribeFromTopic() = (%#v, %v); want = (nil, %q)", tmr, err, tc.want)
 		}
 	}
 }
