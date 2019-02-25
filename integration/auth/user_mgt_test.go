@@ -396,6 +396,26 @@ func TestImportUsersWithPassword(t *testing.T) {
 	}
 }
 
+func TestSessionCookie(t *testing.T) {
+	customToken, err := client.CustomToken(context.Background(), "testuser")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idToken, err := signInWithCustomToken(customToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cookie, err := client.CreateSessionCookie(context.Background(), idToken, 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cookie == "" {
+		t.Errorf("CreateSessionCookie() = %q; want = non-empty", cookie)
+	}
+}
+
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomUID() string {

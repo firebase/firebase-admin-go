@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -628,4 +629,92 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 		return nil, err
 	}
 	return eu.UserRecord, nil
+}
+
+const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
+
+type userManagementClient struct {
+	baseURL    string
+	httpClient *internal.HTTPClient
+	projectID  string
+	version    string
+}
+
+// CreateSessionCookie creates a new Firebase session cookie from the given ID token and expiry
+// duration. The returned JWT can be set as a server-side session cookie with a custom cookie
+// policy. Expiry duration must be at least 5 minutes and at most 14 days.
+func (c *userManagementClient) CreateSessionCookie(
+	ctx context.Context, idToken string, expiresIn time.Duration) (string, error) {
+
+	if idToken == "" {
+		return "", errors.New("id token must not be empty")
+	}
+
+	if expiresIn < 5*time.Minute || expiresIn > 14*24*time.Hour {
+		return "", errors.New("expiry duration must be between 5 minutes and 14 days")
+	}
+
+	payload := map[string]interface{}{
+		"idToken":       idToken,
+		"validDuration": int64(expiresIn.Seconds()),
+	}
+	resp, err := c.post(ctx, ":createSessionCookie", payload)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Status == http.StatusOK {
+		var result struct {
+			SessionCookie string `json:"sessionCookie"`
+		}
+		err := json.Unmarshal(resp.Body, &result)
+		return result.SessionCookie, err
+	}
+	return "", handleHTTPError(resp)
+}
+
+func (c *userManagementClient) post(
+	ctx context.Context,
+	path string,
+	payload interface{},
+) (*internal.Response, error) {
+
+	req, err := c.newRequest(http.MethodPost, path)
+	if err != nil {
+		return nil, err
+	}
+	req.Body = internal.NewJSONEntity(payload)
+	return c.httpClient.Do(ctx, req)
+}
+
+func (c *userManagementClient) newRequest(method, path string) (*internal.Request, error) {
+	if c.projectID == "" {
+		return nil, errors.New("project id not available")
+	}
+
+	versionHeader := internal.WithHeader("X-Client-Version", c.version)
+	return &internal.Request{
+		Method: method,
+		URL:    fmt.Sprintf("%s/%s%s", c.baseURL, c.projectID, path),
+		Opts:   []internal.HTTPOption{versionHeader},
+	}, nil
+}
+
+func handleHTTPError(resp *internal.Response) error {
+	var httpErr struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	json.Unmarshal(resp.Body, &httpErr) // ignore any json parse errors at this level
+	serverCode := httpErr.Error.Message
+	clientCode, ok := serverError[serverCode]
+	if !ok {
+		clientCode = unknown
+	}
+	return internal.Errorf(
+		clientCode,
+		"http error status: %d; body: %s",
+		resp.Status,
+		string(resp.Body))
 }

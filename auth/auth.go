@@ -24,7 +24,6 @@ import (
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/identitytoolkit/v3"
-	"google.golang.org/api/transport"
 )
 
 const (
@@ -42,7 +41,8 @@ var reservedClaims = []string{
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	is              *identitytoolkit.Service
+	is *identitytoolkit.Service
+	userManagementClient
 	idTokenVerifier *tokenVerifier
 	signer          cryptoSigner
 	version         string
@@ -84,12 +84,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	is, err := identitytoolkit.New(hc)
+	is, err := identitytoolkit.New(hc.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +98,19 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	version := "Go/Admin/" + conf.Version
 	return &Client{
+		userManagementClient: userManagementClient{
+			baseURL:    idToolkitEndpoint,
+			httpClient: hc,
+			projectID:  conf.ProjectID,
+			version:    version,
+		},
 		is:              is,
 		idTokenVerifier: idTokenVerifier,
 		signer:          signer,
-		version:         "Go/Admin/" + conf.Version,
+		version:         version,
 		clock:           internal.SystemClock,
 	}, nil
 }
