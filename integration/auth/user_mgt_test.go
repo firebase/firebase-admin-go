@@ -407,12 +407,12 @@ func TestSessionCookie(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cookie, err := client.CreateSessionCookie(context.Background(), idToken, 10*time.Minute)
+	cookie, err := client.SessionCookie(context.Background(), idToken, 10*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cookie == "" {
-		t.Errorf("CreateSessionCookie() = %q; want = non-empty", cookie)
+		t.Errorf("SessionCookie() = %q; want = non-empty", cookie)
 	}
 }
 

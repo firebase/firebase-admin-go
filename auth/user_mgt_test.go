@@ -592,7 +592,7 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 	}
 }
 
-func TestSetCustomClaims(t *testing.T) {
+func TestSetCustomUserClaims(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
 		{},
@@ -1038,7 +1038,7 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 }
 
-func TestCreateSessionCookie(t *testing.T) {
+func TestSessionCookie(t *testing.T) {
 	resp := `{
 		"sessionCookie": "expectedCookie"
 	}`
@@ -1060,14 +1060,14 @@ func TestCreateSessionCookie(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		cookie, err := s.Client.CreateSessionCookie(context.Background(), "idToken", tc.expiresIn)
+		cookie, err := s.Client.SessionCookie(context.Background(), "idToken", tc.expiresIn)
 		if cookie != "expectedCookie" || err != nil {
-			t.Errorf("CreateSessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
+			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
 		}
 
 		wantURL := "/mock-project-id:createSessionCookie"
 		if s.Req[0].URL.Path != wantURL {
-			t.Errorf("CreateSesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
+			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
 		}
 
 		var got map[string]interface{}
@@ -1079,12 +1079,12 @@ func TestCreateSessionCookie(t *testing.T) {
 			"validDuration": tc.want,
 		}
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("CreateSessionCookie(%f) request =%#v; want = %#v", tc.want, got, want)
+			t.Errorf("SessionCookie(%f) request =%#v; want = %#v", tc.want, got, want)
 		}
 	}
 }
 
-func TestCreateSessionCookieError(t *testing.T) {
+func TestSessionCookieError(t *testing.T) {
 	resp := `{
 		"error": {
 			"message": "PERMISSION_DENIED"
@@ -1094,49 +1094,49 @@ func TestCreateSessionCookieError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusForbidden
 
-	cookie, err := s.Client.CreateSessionCookie(context.Background(), "idToken", 10*time.Minute)
+	cookie, err := s.Client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	if cookie != "" || err == nil {
-		t.Fatalf("CreateSessionCookie() = (%q, %v); want = (%q, error)", cookie, err, "")
+		t.Fatalf("SessionCookie() = (%q, %v); want = (%q, error)", cookie, err, "")
 	}
 
 	want := fmt.Sprintf("http error status: 403; body: %s", resp)
 	if err.Error() != want || !IsInsufficientPermission(err) {
-		t.Errorf("CreateSessionCookie() error = %v; want = %q", err, want)
+		t.Errorf("SessionCookie() error = %v; want = %q", err, want)
 	}
 }
 
-func TestCreateSessionCookieNoProjectID(t *testing.T) {
+func TestSessionCookieWithoutProjectID(t *testing.T) {
 	client := &Client{}
-	_, err := client.CreateSessionCookie(context.Background(), "idToken", 10*time.Minute)
+	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
 	if err == nil || err.Error() != want {
-		t.Errorf("CreateSessionCookie() = %v; want = %q", err, want)
+		t.Errorf("SessionCookie() = %v; want = %q", err, want)
 	}
 }
 
-func TestCreateSessionCookieNoIDToken(t *testing.T) {
+func TestSessionCookieWithoutIDToken(t *testing.T) {
 	client := &Client{}
-	_, err := client.CreateSessionCookie(context.Background(), "", 10*time.Minute)
+	_, err := client.SessionCookie(context.Background(), "", 10*time.Minute)
 	if err == nil {
 		t.Errorf("CreateSessionCookie('') = nil; want error")
 	}
 }
 
-func TestCreateSessionCookieShortExpiresIn(t *testing.T) {
+func TestSessionCookieShortExpiresIn(t *testing.T) {
 	client := &Client{}
 	lessThanFiveMins := 5*time.Minute - time.Second
-	_, err := client.CreateSessionCookie(context.Background(), "idToken", lessThanFiveMins)
+	_, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins)
 	if err == nil {
-		t.Errorf("CreateSessionCookie(< 5 mins) = nil; want error")
+		t.Errorf("SessionCookie(< 5 mins) = nil; want error")
 	}
 }
 
-func TestCreateSessionCookieLongExpiresIn(t *testing.T) {
+func TestSessionCookieLongExpiresIn(t *testing.T) {
 	client := &Client{}
 	moreThanTwoWeeks := 14*24*time.Hour + time.Second
-	_, err := client.CreateSessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
+	_, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
 	if err == nil {
-		t.Errorf("CreateSessionCookie(> 14 days) = nil; want error")
+		t.Errorf("SessionCookie(> 14 days) = nil; want error")
 	}
 }
 

@@ -103,9 +103,9 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	return &Client{
 		userManagementClient: userManagementClient{
 			baseURL:    idToolkitEndpoint,
-			httpClient: hc,
 			projectID:  conf.ProjectID,
 			version:    version,
+			httpClient: hc,
 		},
 		is:              is,
 		idTokenVerifier: idTokenVerifier,

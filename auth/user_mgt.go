@@ -635,16 +635,19 @@ const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
 
 type userManagementClient struct {
 	baseURL    string
-	httpClient *internal.HTTPClient
 	projectID  string
 	version    string
+	httpClient *internal.HTTPClient
 }
 
-// CreateSessionCookie creates a new Firebase session cookie from the given ID token and expiry
+// SessionCookie creates a new Firebase session cookie from the given ID token and expiry
 // duration. The returned JWT can be set as a server-side session cookie with a custom cookie
-// policy. Expiry duration must be at least 5 minutes and at most 14 days.
-func (c *userManagementClient) CreateSessionCookie(
-	ctx context.Context, idToken string, expiresIn time.Duration) (string, error) {
+// policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
+func (c *userManagementClient) SessionCookie(
+	ctx context.Context,
+	idToken string,
+	expiresIn time.Duration,
+) (string, error) {
 
 	if idToken == "" {
 		return "", errors.New("id token must not be empty")
@@ -663,14 +666,15 @@ func (c *userManagementClient) CreateSessionCookie(
 		return "", err
 	}
 
-	if resp.Status == http.StatusOK {
-		var result struct {
-			SessionCookie string `json:"sessionCookie"`
-		}
-		err := json.Unmarshal(resp.Body, &result)
-		return result.SessionCookie, err
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
 	}
-	return "", handleHTTPError(resp)
+
+	var result struct {
+		SessionCookie string `json:"sessionCookie"`
+	}
+	err = json.Unmarshal(resp.Body, &result)
+	return result.SessionCookie, err
 }
 
 func (c *userManagementClient) post(
