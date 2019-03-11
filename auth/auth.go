@@ -110,7 +110,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		is:              is,
 		idTokenVerifier: idTokenVerifier,
 		signer:          signer,
-		version:         version,
+		version:         version, // This can be removed when userManagementClient implements all user mgt APIs.
 		clock:           internal.SystemClock,
 	}, nil
 }

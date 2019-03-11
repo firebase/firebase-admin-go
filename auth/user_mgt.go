@@ -633,6 +633,12 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 
 const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
 
+// userManagementClient is a helper for interacting with the Identity Toolkit REST API.
+//
+// Currently it is only used for some user management operations (e.g. session cookie
+// generation). We will gradually migrate all the user management functionality to this
+// type, and remove our dependency on the google.golang.org/api/identitytoolkit/v3
+// package.
 type userManagementClient struct {
 	baseURL    string
 	projectID  string
