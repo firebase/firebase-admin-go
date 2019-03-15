@@ -38,6 +38,7 @@ var (
 	testSessionCookie   string
 	testSigner          cryptoSigner
 	testIDTokenVerifier *tokenVerifier
+	testCookieVerifier  *tokenVerifier
 
 	optsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
@@ -63,13 +64,18 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 
+	testCookieVerifier, err = cookieVerifierForTests(context.Background())
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	testIDToken = getIDToken(nil)
-	testSessionCookie = testIDToken
+	testSessionCookie = getSessionCookie(nil)
 	os.Exit(m.Run())
 }
 
@@ -624,7 +630,7 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 
 func TestVerifySessionCookie(t *testing.T) {
 	client := &Client{
-		cookieVerifier: testIDTokenVerifier,
+		cookieVerifier: testCookieVerifier,
 	}
 
 	ft, err := client.VerifySessionCookie(context.Background(), testSessionCookie)
@@ -639,11 +645,97 @@ func TestVerifySessionCookie(t *testing.T) {
 	}
 }
 
+func TestVerifySessionCookieError(t *testing.T) {
+	now := testClock.Now().Unix()
+	cases := []struct {
+		name, token, want string
+	}{
+		{
+			name:  "BadAudience",
+			token: getSessionCookie(mockIDTokenPayload{"aud": "bad-audience"}),
+			want: `session cookie has invalid 'aud' (audience) claim; expected "mock-project-id" but ` +
+				`got "bad-audience"; make sure the session cookie comes from the same Firebase ` +
+				`project as the credential used to authenticate this SDK; see ` +
+				`https://firebase.google.com/docs/auth/admin/manage-cookies for details on how ` +
+				`to retrieve a valid session cookie`,
+		},
+		{
+			name:  "BadIssuer",
+			token: getSessionCookie(mockIDTokenPayload{"iss": "bad-issuer"}),
+			want: `session cookie has invalid 'iss' (issuer) claim; expected ` +
+				`"https://session.firebase.google.com/mock-project-id" but got "bad-issuer"; make sure the ` +
+				`session cookie comes from the same Firebase project as the credential used to authenticate ` +
+				`this SDK; see https://firebase.google.com/docs/auth/admin/manage-cookies for ` +
+				`details on how to retrieve a valid session cookie`,
+		},
+		{
+			name:  "EmptySubject",
+			token: getSessionCookie(mockIDTokenPayload{"sub": ""}),
+			want:  "session cookie has empty 'sub' (subject) claim",
+		},
+		{
+			name:  "NonStringSubject",
+			token: getSessionCookie(mockIDTokenPayload{"sub": 10}),
+			want:  "json: cannot unmarshal number into Go struct field Token.sub of type string",
+		},
+		{
+			name:  "TooLongSubject",
+			token: getSessionCookie(mockIDTokenPayload{"sub": strings.Repeat("a", 129)}),
+			want:  "session cookie has a 'sub' (subject) claim longer than 128 characters",
+		},
+		{
+			name:  "FutureToken",
+			token: getSessionCookie(mockIDTokenPayload{"iat": now + clockSkewSeconds + 1}),
+			want:  "session cookie issued at future timestamp",
+		},
+		{
+			name: "ExpiredToken",
+			token: getSessionCookie(mockIDTokenPayload{
+				"iat": now - 1000,
+				"exp": now - clockSkewSeconds - 1,
+			}),
+			want: "session cookie has expired",
+		},
+		{
+			name:  "EmptyToken",
+			token: "",
+			want:  "session cookie must be a non-empty string",
+		},
+		{
+			name:  "TooFewSegments",
+			token: "foo",
+			want:  "incorrect number of segments",
+		},
+		{
+			name:  "TooManySegments",
+			token: "fo.ob.ar.baz",
+			want:  "incorrect number of segments",
+		},
+		{
+			name:  "MalformedToken",
+			token: "foo.bar.baz",
+			want:  "invalid character",
+		},
+	}
+
+	client := &Client{
+		cookieVerifier: testCookieVerifier,
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.VerifySessionCookie(context.Background(), tc.token)
+			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+				t.Errorf("VerifySessionCookie(%q) = %v; want = %q", tc.name, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestVerifySessionCookieDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testIDTokenVerifier
+	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testCookieVerifier
 
 	ft, err := s.Client.VerifySessionCookie(context.Background(), revokedCookie)
 	if err != nil {
@@ -661,7 +753,7 @@ func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.cookieVerifier = testIDTokenVerifier
+	s.Client.cookieVerifier = testCookieVerifier
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), testSessionCookie)
 	if err != nil {
 		t.Fatal(err)
@@ -677,7 +769,7 @@ func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
 func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	s.Client.cookieVerifier = testIDTokenVerifier
+	s.Client.cookieVerifier = testCookieVerifier
 
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
 	if ft != nil || err == nil {
@@ -691,8 +783,8 @@ func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testIDTokenVerifier
+	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testCookieVerifier
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
@@ -709,8 +801,8 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	}`
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
-	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testIDTokenVerifier
+	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testCookieVerifier
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	if p != nil || err == nil || !IsUserNotFound(err) {
@@ -729,6 +821,20 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	if err != nil {
+		return nil, err
+	}
+	ks, err := newMockKeySource("../testdata/public_certs.json")
+	if err != nil {
+		return nil, err
+	}
+	tv.keySource = ks
+	tv.clock = testClock
+	return tv, nil
+}
+
+func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
+	tv, err := newSessionCookieVerifier(ctx, testProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -773,6 +879,16 @@ func (p mockIDTokenPayload) decodeFrom(s string) error {
 
 func getIDToken(p mockIDTokenPayload) string {
 	return getIDTokenWithKid("mock-key-id-1", p)
+}
+
+func getSessionCookie(p mockIDTokenPayload) string {
+	pCopy := map[string]interface{}{
+		"iss": "https://session.firebase.google.com/" + testProjectID,
+	}
+	for k, v := range p {
+		pCopy[k] = v
+	}
+	return getIDToken(pCopy)
 }
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
