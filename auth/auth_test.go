@@ -877,10 +877,6 @@ func (p mockIDTokenPayload) decodeFrom(s string) error {
 	return decode(s, &p)
 }
 
-func getIDToken(p mockIDTokenPayload) string {
-	return getIDTokenWithKid("mock-key-id-1", p)
-}
-
 func getSessionCookie(p mockIDTokenPayload) string {
 	pCopy := map[string]interface{}{
 		"iss": "https://session.firebase.google.com/" + testProjectID,
@@ -889,6 +885,10 @@ func getSessionCookie(p mockIDTokenPayload) string {
 		pCopy[k] = v
 	}
 	return getIDToken(pCopy)
+}
+
+func getIDToken(p mockIDTokenPayload) string {
+	return getIDTokenWithKid("mock-key-id-1", p)
 }
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
