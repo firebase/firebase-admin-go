@@ -35,6 +35,7 @@ import (
 var (
 	testGetUserResponse []byte
 	testIDToken         string
+	testSessionCookie   string
 	testSigner          cryptoSigner
 	testIDTokenVerifier *tokenVerifier
 
@@ -68,6 +69,7 @@ func TestMain(m *testing.M) {
 	}
 
 	testIDToken = getIDToken(nil)
+	testSessionCookie = testIDToken
 	os.Exit(m.Run())
 }
 
@@ -91,6 +93,9 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	}
 	if err := checkIDTokenVerifier(client.idTokenVerifier, creds.ProjectID); err != nil {
 		t.Errorf("NewClient().idTokenVerifier: %v", err)
+	}
+	if err := checkCookieVerifier(client.cookieVerifier, creds.ProjectID); err != nil {
+		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -116,6 +121,9 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
+	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+		t.Errorf("NewClient().cookieVerifier: %v", err)
+	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
 	}
@@ -140,6 +148,9 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
+	}
+	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -175,6 +186,9 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	}
 	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
+	}
+	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -571,7 +585,7 @@ func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
 	if ft != nil || err == nil {
-		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, error)", ft, err)
+		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -589,6 +603,118 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
+	}
+}
+
+func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
+	resp := `{
+		"kind" : "identitytoolkit#GetAccountInfoResponse",
+		"users" : []
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.idTokenVerifier = testIDTokenVerifier
+
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
+	if p != nil || err == nil || !IsUserNotFound(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
+	}
+}
+
+func TestVerifySessionCookie(t *testing.T) {
+	client := &Client{
+		cookieVerifier: testIDTokenVerifier,
+	}
+
+	ft, err := client.VerifySessionCookie(context.Background(), testSessionCookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifySessionCookieDoesNotCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testIDTokenVerifier
+
+	ft, err := s.Client.VerifySessionCookie(context.Background(), revokedCookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.cookieVerifier = testIDTokenVerifier
+	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), testSessionCookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	s.Client.cookieVerifier = testIDTokenVerifier
+
+	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
+	if ft != nil || err == nil {
+		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
+	}
+	if len(s.Req) != 0 {
+		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
+	}
+}
+
+func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testIDTokenVerifier
+
+	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
+	we := "session cookie has been revoked"
+	if p != nil || err == nil || err.Error() != we || !IsSessionCookieRevoked(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
+func TestCookieRevocationCheckUserMgtError(t *testing.T) {
+	resp := `{
+		"kind" : "identitytoolkit#GetAccountInfoResponse",
+		"users" : []
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	revokedCookie := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testIDTokenVerifier
+
+	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
+	if p != nil || err == nil || !IsUserNotFound(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
 	}
 }
 
@@ -686,6 +812,19 @@ func checkIDTokenVerifier(tv *tokenVerifier, projectID string) error {
 	}
 	if tv.shortName != "ID token" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "ID token")
+	}
+	return nil
+}
+
+func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
+	if tv == nil {
+		return errors.New("tokenVerifier not initialized")
+	}
+	if tv.projectID != projectID {
+		return fmt.Errorf("projectID = %q; want = %q", tv.projectID, projectID)
+	}
+	if tv.shortName != "session cookie" {
+		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "session cookie")
 	}
 	return nil
 }

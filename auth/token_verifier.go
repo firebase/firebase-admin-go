@@ -39,9 +39,11 @@ import (
 )
 
 const (
-	idTokenCertURL      = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-	idTokenIssuerPrefix = "https://securetoken.google.com/"
-	clockSkewSeconds    = 300
+	idTokenCertURL            = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+	idTokenIssuerPrefix       = "https://securetoken.google.com/"
+	sessionCookieCertURL      = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys"
+	sessionCookieIssuerPrefix = "https://session.firebase.google.com/"
+	clockSkewSeconds          = 300
 )
 
 // tokenVerifier verifies different types of Firebase token strings, including ID tokens and
@@ -68,6 +70,22 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 		projectID:         projectID,
 		issuerPrefix:      idTokenIssuerPrefix,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
+		clock:             internal.SystemClock,
+	}, nil
+}
+
+func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
+	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
+	if err != nil {
+		return nil, err
+	}
+	return &tokenVerifier{
+		shortName:         "session cookie",
+		articledShortName: "a session cookie",
+		docURL:            "https://firebase.google.com/docs/auth/admin/manage-cookies",
+		projectID:         projectID,
+		issuerPrefix:      sessionCookieIssuerPrefix,
+		keySource:         newHTTPKeySource(sessionCookieCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
 }

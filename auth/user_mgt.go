@@ -439,6 +439,7 @@ const (
 	insufficientPermission   = "insufficient-permission"
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
+	sessionCookieRevoked     = "session-cookie-revoked"
 	uidAlreadyExists         = "uid-already-exists"
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
@@ -467,6 +468,11 @@ func IsPhoneNumberAlreadyExists(err error) bool {
 // IsProjectNotFound checks if the given error was due to a non-existing project.
 func IsProjectNotFound(err error) bool {
 	return internal.HasErrorCode(err, projectNotFound)
+}
+
+// IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
+func IsSessionCookieRevoked(err error) bool {
+	return internal.HasErrorCode(err, sessionCookieRevoked)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
