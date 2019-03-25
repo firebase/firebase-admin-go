@@ -592,7 +592,7 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 	}
 }
 
-func TestSetCustomClaims(t *testing.T) {
+func TestSetCustomUserClaims(t *testing.T) {
 	cases := []map[string]interface{}{
 		nil,
 		{},
@@ -1038,6 +1038,108 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 }
 
+func TestSessionCookie(t *testing.T) {
+	resp := `{
+		"sessionCookie": "expectedCookie"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	cases := []struct {
+		expiresIn time.Duration
+		want      float64
+	}{
+		{
+			expiresIn: 10 * time.Minute,
+			want:      600.0,
+		},
+		{
+			expiresIn: 300500 * time.Millisecond,
+			want:      300.0,
+		},
+	}
+
+	for _, tc := range cases {
+		cookie, err := s.Client.SessionCookie(context.Background(), "idToken", tc.expiresIn)
+		if cookie != "expectedCookie" || err != nil {
+			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
+		}
+
+		wantURL := "/mock-project-id:createSessionCookie"
+		if s.Req[0].URL.Path != wantURL {
+			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
+		}
+
+		var got map[string]interface{}
+		if err := json.Unmarshal(s.Rbody, &got); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]interface{}{
+			"idToken":       "idToken",
+			"validDuration": tc.want,
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("SessionCookie(%f) request =%#v; want = %#v", tc.want, got, want)
+		}
+	}
+}
+
+func TestSessionCookieError(t *testing.T) {
+	resp := `{
+		"error": {
+			"message": "PERMISSION_DENIED"
+		}
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	s.Status = http.StatusForbidden
+
+	cookie, err := s.Client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
+	if cookie != "" || err == nil {
+		t.Fatalf("SessionCookie() = (%q, %v); want = (%q, error)", cookie, err, "")
+	}
+
+	want := fmt.Sprintf("http error status: 403; body: %s", resp)
+	if err.Error() != want || !IsInsufficientPermission(err) {
+		t.Errorf("SessionCookie() error = %v; want = %q", err, want)
+	}
+}
+
+func TestSessionCookieWithoutProjectID(t *testing.T) {
+	client := &Client{}
+	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
+	want := "project id not available"
+	if err == nil || err.Error() != want {
+		t.Errorf("SessionCookie() = %v; want = %q", err, want)
+	}
+}
+
+func TestSessionCookieWithoutIDToken(t *testing.T) {
+	client := &Client{}
+	_, err := client.SessionCookie(context.Background(), "", 10*time.Minute)
+	if err == nil {
+		t.Errorf("CreateSessionCookie('') = nil; want error")
+	}
+}
+
+func TestSessionCookieShortExpiresIn(t *testing.T) {
+	client := &Client{}
+	lessThanFiveMins := 5*time.Minute - time.Second
+	_, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins)
+	if err == nil {
+		t.Errorf("SessionCookie(< 5 mins) = nil; want error")
+	}
+}
+
+func TestSessionCookieLongExpiresIn(t *testing.T) {
+	client := &Client{}
+	moreThanTwoWeeks := 14*24*time.Hour + time.Second
+	_, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
+	if err == nil {
+		t.Errorf("SessionCookie(> 14 days) = nil; want error")
+	}
+}
+
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
@@ -1160,6 +1262,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		t.Fatal(err)
 	}
 	authClient.is.BasePath = s.Srv.URL + "/"
+	authClient.baseURL = s.Srv.URL
 	s.Client = authClient
 	return &s
 }

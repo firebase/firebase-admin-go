@@ -24,7 +24,6 @@ import (
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/identitytoolkit/v3"
-	"google.golang.org/api/transport"
 )
 
 const (
@@ -42,8 +41,10 @@ var reservedClaims = []string{
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	is              *identitytoolkit.Service
+	is *identitytoolkit.Service
+	userManagementClient
 	idTokenVerifier *tokenVerifier
+	cookieVerifier  *tokenVerifier
 	signer          cryptoSigner
 	version         string
 	clock           internal.Clock
@@ -84,12 +85,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	is, err := identitytoolkit.New(hc)
+	is, err := identitytoolkit.New(hc.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +99,25 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
+	version := "Go/Admin/" + conf.Version
 	return &Client{
+		userManagementClient: userManagementClient{
+			baseURL:    idToolkitEndpoint,
+			projectID:  conf.ProjectID,
+			version:    version,
+			httpClient: hc,
+		},
 		is:              is,
 		idTokenVerifier: idTokenVerifier,
+		cookieVerifier:  cookieVerifier,
 		signer:          signer,
-		version:         "Go/Admin/" + conf.Version,
+		version:         version, // This can be removed when userManagementClient implements all user mgt APIs.
 		clock:           internal.SystemClock,
 	}, nil
 }
@@ -216,13 +231,61 @@ func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken strin
 		return nil, err
 	}
 
-	user, err := c.GetUser(ctx, p.UID)
+	revoked, err := c.checkRevoked(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	if revoked {
+		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
+	}
+	return p, nil
+}
+
+// VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
+//
+// VerifySessionCookie accepts a signed JWT token string, and verifies that it is current, issued for the
+// correct Firebase project, and signed by the Google Firebase services in the cloud. It returns a Token containing the
+// decoded claims in the input JWT. See https://firebase.google.com/docs/auth/admin/manage-cookies for more details on
+// how to obtain a session cookie.
+//
+// This function does not make any RPC calls most of the time. The only time it makes an RPC call
+// is when Google public keys need to be refreshed. These keys get cached up to 24 hours, and
+// therefore the RPC overhead gets amortized over many invocations of this function.
+//
+// This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
+// when a revocation check is needed.
+func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
+	return c.cookieVerifier.VerifyToken(ctx, sessionCookie)
+}
+
+// VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
+// cookie has not been revoked.
+//
+// This function uses `VerifySessionCookie()` internally to verify the cookie JWT. However, unlike
+// `VerifySessionCookie()` this function must make an RPC call to perform the revocation check.
+// Developers are advised to take this additional overhead into consideration when including this
+// function in an authorization flow that gets executed often.
+func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
+	p, err := c.VerifySessionCookie(ctx, sessionCookie)
 	if err != nil {
 		return nil, err
 	}
 
-	if p.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
+	revoked, err := c.checkRevoked(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	if revoked {
+		return nil, internal.Error(sessionCookieRevoked, "session cookie has been revoked")
 	}
 	return p, nil
+}
+
+func (c *Client) checkRevoked(ctx context.Context, token *Token) (bool, error) {
+	user, err := c.GetUser(ctx, token.UID)
+	if err != nil {
+		return false, err
+	}
+
+	return token.IssuedAt*1000 < user.TokensValidAfterMillis, nil
 }

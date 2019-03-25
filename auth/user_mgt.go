@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -438,6 +439,7 @@ const (
 	insufficientPermission   = "insufficient-permission"
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
+	sessionCookieRevoked     = "session-cookie-revoked"
 	uidAlreadyExists         = "uid-already-exists"
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
@@ -466,6 +468,11 @@ func IsPhoneNumberAlreadyExists(err error) bool {
 // IsProjectNotFound checks if the given error was due to a non-existing project.
 func IsProjectNotFound(err error) bool {
 	return internal.HasErrorCode(err, projectNotFound)
+}
+
+// IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
+func IsSessionCookieRevoked(err error) bool {
+	return internal.HasErrorCode(err, sessionCookieRevoked)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
@@ -628,4 +635,102 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 		return nil, err
 	}
 	return eu.UserRecord, nil
+}
+
+const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
+
+// userManagementClient is a helper for interacting with the Identity Toolkit REST API.
+//
+// Currently it is only used for some user management operations (e.g. session cookie
+// generation). We will gradually migrate all the user management functionality to this
+// type, and remove our dependency on the google.golang.org/api/identitytoolkit/v3
+// package.
+type userManagementClient struct {
+	baseURL    string
+	projectID  string
+	version    string
+	httpClient *internal.HTTPClient
+}
+
+// SessionCookie creates a new Firebase session cookie from the given ID token and expiry
+// duration. The returned JWT can be set as a server-side session cookie with a custom cookie
+// policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
+func (c *userManagementClient) SessionCookie(
+	ctx context.Context,
+	idToken string,
+	expiresIn time.Duration,
+) (string, error) {
+
+	if idToken == "" {
+		return "", errors.New("id token must not be empty")
+	}
+
+	if expiresIn < 5*time.Minute || expiresIn > 14*24*time.Hour {
+		return "", errors.New("expiry duration must be between 5 minutes and 14 days")
+	}
+
+	payload := map[string]interface{}{
+		"idToken":       idToken,
+		"validDuration": int64(expiresIn.Seconds()),
+	}
+	resp, err := c.post(ctx, ":createSessionCookie", payload)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
+	var result struct {
+		SessionCookie string `json:"sessionCookie"`
+	}
+	err = json.Unmarshal(resp.Body, &result)
+	return result.SessionCookie, err
+}
+
+func (c *userManagementClient) post(
+	ctx context.Context,
+	path string,
+	payload interface{},
+) (*internal.Response, error) {
+
+	req, err := c.newRequest(http.MethodPost, path)
+	if err != nil {
+		return nil, err
+	}
+	req.Body = internal.NewJSONEntity(payload)
+	return c.httpClient.Do(ctx, req)
+}
+
+func (c *userManagementClient) newRequest(method, path string) (*internal.Request, error) {
+	if c.projectID == "" {
+		return nil, errors.New("project id not available")
+	}
+
+	versionHeader := internal.WithHeader("X-Client-Version", c.version)
+	return &internal.Request{
+		Method: method,
+		URL:    fmt.Sprintf("%s/%s%s", c.baseURL, c.projectID, path),
+		Opts:   []internal.HTTPOption{versionHeader},
+	}, nil
+}
+
+func handleHTTPError(resp *internal.Response) error {
+	var httpErr struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	json.Unmarshal(resp.Body, &httpErr) // ignore any json parse errors at this level
+	serverCode := httpErr.Error.Message
+	clientCode, ok := serverError[serverCode]
+	if !ok {
+		clientCode = unknown
+	}
+	return internal.Errorf(
+		clientCode,
+		"http error status: %d; body: %s",
+		resp.Status,
+		string(resp.Body))
 }

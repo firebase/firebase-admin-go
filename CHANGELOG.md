@@ -1,5 +1,10 @@
 # Unreleased
 
+- [added] Implemented `auth.SessionCookie()` function for creating
+  new Firebase session cookies given an ID token.
+- [added] Implemented `auth.VerifySessionCookie()` and
+  `auth.VerifySessionCookieAndCheckRevoked()` functions for verifying
+  Firebase session cookies.
 - [added] Implemented HTTP retries for the `db` package. This package
   now retries HTTP calls on low-level connection and socket read errors, as
   well as HTTP 500 and 503 errors.

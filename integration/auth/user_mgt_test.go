@@ -396,6 +396,57 @@ func TestImportUsersWithPassword(t *testing.T) {
 	}
 }
 
+func TestSessionCookie(t *testing.T) {
+	uid := "cookieuser"
+	customToken, err := client.CustomToken(context.Background(), uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idToken, err := signInWithCustomToken(customToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteUser(uid)
+
+	cookie, err := client.SessionCookie(context.Background(), idToken, 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cookie == "" {
+		t.Errorf("SessionCookie() = %q; want = non-empty", cookie)
+	}
+
+	vt, err := client.VerifySessionCookieAndCheckRevoked(context.Background(), cookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != uid {
+		t.Errorf("VerifySessionCookieAndCheckRevoked() UID = %q; want = %q", vt.UID, uid)
+	}
+
+	// The backend stores the validSince property in seconds since the epoch.
+	// The issuedAt property of the token is also in seconds. If a token was
+	// issued, and then in the same second tokens were revoked, the token will
+	// have the same timestamp as the tokensValidAfterMillis, and will therefore
+	// not be considered revoked. Hence we wait one second before revoking.
+	time.Sleep(time.Second)
+	if err = client.RevokeRefreshTokens(context.Background(), uid); err != nil {
+		t.Fatal(err)
+	}
+
+	vt, err = client.VerifySessionCookieAndCheckRevoked(context.Background(), cookie)
+	if vt != nil || err == nil || !auth.IsSessionCookieRevoked(err) {
+		t.Errorf("tok, err := VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, session-cookie-revoked)",
+			vt, err)
+	}
+
+	// Does not return error for revoked token.
+	if _, err = client.VerifySessionCookie(context.Background(), cookie); err != nil {
+		t.Errorf("VerifySessionCookie() = %v; want = nil", err)
+	}
+}
+
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomUID() string {
