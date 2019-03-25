@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"testing"
@@ -57,6 +58,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	seed := time.Now().UTC().UnixNano()
+	log.Printf("Using random seed: %d", seed)
+	rand.Seed(seed)
 	os.Exit(m.Run())
 }
 
