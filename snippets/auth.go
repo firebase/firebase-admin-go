@@ -17,7 +17,11 @@ package snippets
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"time"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
@@ -572,4 +576,199 @@ func importWithoutPassword(ctx context.Context, client *auth.Client) {
 		log.Println("Failed to import user", e.Reason)
 	}
 	// [END import_without_password]
+}
+
+func loginHandler(client *auth.Client) http.HandlerFunc {
+	// [START session_login]
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the ID token sent by the client
+		defer r.Body.Close()
+		idToken, err := getIDTokenFromBody(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Set session expiration to 5 days.
+		expiresIn := time.Hour * 24 * 5
+
+		// Create the session cookie. This will also verify the ID token in the process.
+		// The session cookie will have the same claims as the ID token.
+		// To only allow session cookie setting on recent sign-in, auth_time in ID token
+		// can be checked to ensure user was recently signed in before creating a session cookie.
+		cookie, err := client.SessionCookie(r.Context(), idToken, expiresIn)
+		if err != nil {
+			http.Error(w, "Failed to create a session cookie", http.StatusInternalServerError)
+			return
+		}
+
+		// Set cookie policy for session cookie.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    cookie,
+			MaxAge:   int(expiresIn.Seconds()),
+			HttpOnly: true,
+			Secure:   true,
+		})
+		w.Write([]byte(`{"status": "success"}`))
+	}
+	// [END session_login]
+}
+
+func loginWithAuthTimeCheckHandler(client *auth.Client) http.HandlerFunc {
+	// [START check_auth_time]
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the ID token sent by the client
+		defer r.Body.Close()
+		idToken, err := getIDTokenFromBody(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		decoded, err := client.VerifyIDToken(r.Context(), idToken)
+		if err != nil {
+			http.Error(w, "Invalid ID token", http.StatusUnauthorized)
+			return
+		}
+		// Return error if the sign-in is older than 5 minutes.
+		if time.Now().Unix()-decoded.Claims["auth_time"].(int64) > 5*60 {
+			http.Error(w, "Recent sign-in required", http.StatusUnauthorized)
+			return
+		}
+
+		expiresIn := time.Hour * 24 * 5
+		cookie, err := client.SessionCookie(r.Context(), idToken, expiresIn)
+		if err != nil {
+			http.Error(w, "Failed to create a session cookie", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    cookie,
+			MaxAge:   int(expiresIn.Seconds()),
+			HttpOnly: true,
+			Secure:   true,
+		})
+		w.Write([]byte(`{"status": "success"}`))
+	}
+	// [END check_auth_time]
+}
+
+func userProfileHandler(client *auth.Client) http.HandlerFunc {
+	serveContentForUser := func(w http.ResponseWriter, r *http.Request, claims *auth.Token) {
+		log.Println("Serving content")
+	}
+
+	// [START session_verify]
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the ID token sent by the client
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			// Session cookie is unavailable. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		// Verify the session cookie. In this case an additional check is added to detect
+		// if the user's Firebase session was revoked, user deleted/disabled, etc.
+		decoded, err := client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
+		if err != nil {
+			// Session cookie is invalid. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		serveContentForUser(w, r, decoded)
+	}
+	// [END session_verify]
+}
+
+func adminUserHandler(client *auth.Client) http.HandlerFunc {
+	serveContentForAdmin := func(w http.ResponseWriter, r *http.Request, claims *auth.Token) {
+		log.Println("Serving content")
+	}
+
+	// [START session_verify_with_permission_check]
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			// Session cookie is unavailable. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		decoded, err := client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
+		if err != nil {
+			// Session cookie is invalid. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		// Check custom claims to confirm user is an admin.
+		if decoded.Claims["admin"] != true {
+			http.Error(w, "Insufficient permissions", http.StatusUnauthorized)
+			return
+		}
+
+		serveContentForAdmin(w, r, decoded)
+	}
+	// [END session_verify_with_permission_check]
+}
+
+func sessionLogoutHandler() http.HandlerFunc {
+	// [START session_clear]
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:   "session",
+			Value:  "",
+			MaxAge: 0,
+		})
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+	// [END session_clear]
+}
+
+func sessionLogoutHandlerWithRevocation(client *auth.Client) http.HandlerFunc {
+	// [START session_clear_and_revoke]
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			// Session cookie is unavailable. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		decoded, err := client.VerifySessionCookie(r.Context(), cookie.Value)
+		if err != nil {
+			// Session cookie is invalid. Force user to login.
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		if err := client.RevokeRefreshTokens(r.Context(), decoded.UID); err != nil {
+			http.Error(w, "Failed to revoke refresh token", http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:   "session",
+			Value:  "",
+			MaxAge: 0,
+		})
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+	// [END session_clear_and_revoke]
+}
+
+func getIDTokenFromBody(r *http.Request) (string, error) {
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var parsedBody struct {
+		IDToken string `json:"idToken"`
+	}
+	err = json.Unmarshal(b, &parsedBody)
+	return parsedBody.IDToken, err
 }
