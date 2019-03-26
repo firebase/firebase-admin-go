@@ -275,9 +275,6 @@ func checkRequest(t *testing.T, got, want *testReq) {
 	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
 	}
-	if h := got.Header.Get("X-Firebase-Decoding"); h != "1" {
-		t.Errorf("X-Firebase-Decoding = %q; want = %q", h, "1")
-	}
 	if h := got.Header.Get("User-Agent"); h != testUserAgent {
 		t.Errorf("User-Agent = %q; want = %q", h, testUserAgent)
 	}
