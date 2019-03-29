@@ -46,15 +46,15 @@ func (c *Client) setHeader(ic identitytoolkitCall) {
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
-	DisplayName string
-	Email       string
-	PhoneNumber string
-	PhotoURL    string
+	DisplayName string `json:"displayName,omitempty"`
+	Email       string `json:"email,omitempty"`
+	PhoneNumber string `json:"phoneNumber,omitempty"`
+	PhotoURL    string `json:"photoUrl,omitempty"`
 	// In the ProviderUserInfo[] ProviderID can be a short domain name (e.g. google.com),
 	// or the identity of an OpenID identity provider.
 	// In UserRecord.UserInfo it will return the constant string "firebase".
-	ProviderID string
-	UID        string
+	ProviderID string `json:"providerId,omitempty"`
+	UID        string `json:"rawId,omitempty"`
 }
 
 // UserMetadata contains additional metadata associated with a user account.
@@ -350,17 +350,6 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	return nil
 }
 
-// GetUser gets the user data corresponding to the specified user ID.
-func (c *Client) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
-	if err := validateUID(uid); err != nil {
-		return nil, err
-	}
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
-		LocalId: []string{uid},
-	}
-	return c.getUser(ctx, request)
-}
-
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
 func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
 	if err := validatePhone(phone); err != nil {
@@ -639,6 +628,100 @@ func (c *Client) getUser(ctx context.Context, request *identitytoolkit.Identityt
 
 const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
 
+type responseUserRecord struct {
+	UID                string      `json:"localId,omitempty"`
+	DisplayName        string      `json:"displayName,omitempty"`
+	Email              string      `json:"email,omitempty"`
+	PhoneNumber        string      `json:"phoneNumber,omitempty"`
+	PhotoURL           string      `json:"photoUrl,omitempty"`
+	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
+	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
+	ProviderID         string      `json:"providerId,omitempty"`
+	CustomAttributes   string      `json:"customAttributes,omitempty"`
+	Disabled           bool        `json:"disabled,omitempty"`
+	EmailVerified      bool        `json:"emailVerified,omitempty"`
+	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
+	PasswordHash       string      `json:"passwordHash,omitempty"`
+	PasswordSalt       string      `json:"salt,omitempty"`
+	ValidSince         int64       `json:"validSince,string,omitempty"`
+}
+
+func (r responseUserRecord) makeUserRecord() (*UserRecord, error) {
+	exported, err := r.makeExportedUserRecord()
+	if err != nil {
+		return nil, err
+	}
+	return exported.UserRecord, nil
+}
+
+func (r responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error) {
+	var customClaims map[string]interface{}
+	if r.CustomAttributes != "" {
+		err := json.Unmarshal([]byte(r.CustomAttributes), &customClaims)
+		if err != nil {
+			return nil, err
+		}
+		if len(customClaims) == 0 {
+			customClaims = nil
+		}
+	}
+
+	var providerUserInfo []*UserInfo
+	for _, u := range r.ProviderUserInfo {
+		info := &UserInfo{
+			DisplayName: u.DisplayName,
+			Email:       u.Email,
+			PhoneNumber: u.PhoneNumber,
+			PhotoURL:    u.PhotoURL,
+			ProviderID:  u.ProviderID,
+			UID:         u.UID,
+		}
+		providerUserInfo = append(providerUserInfo, info)
+	}
+
+	resp := &ExportedUserRecord{
+		UserRecord: &UserRecord{
+			UserInfo: &UserInfo{
+				DisplayName: r.DisplayName,
+				Email:       r.Email,
+				PhoneNumber: r.PhoneNumber,
+				PhotoURL:    r.PhotoURL,
+				UID:         r.UID,
+				ProviderID:  defaultProviderID,
+			},
+			CustomClaims:           customClaims,
+			Disabled:               r.Disabled,
+			EmailVerified:          r.EmailVerified,
+			ProviderUserInfo:       providerUserInfo,
+			TokensValidAfterMillis: r.ValidSince * 1000,
+			UserMetadata: &UserMetadata{
+				LastLogInTimestamp: r.LastLogInTimestamp,
+				CreationTimestamp:  r.CreationTimestamp,
+			},
+		},
+		PasswordHash: r.PasswordHash,
+		PasswordSalt: r.PasswordSalt,
+	}
+	return resp, nil
+}
+
+type userQuery interface {
+	build() map[string]interface{}
+	name() string
+}
+
+type queryByUID string
+
+func (q queryByUID) build() map[string]interface{} {
+	return map[string]interface{}{
+		"localId": []string{string(q)},
+	}
+}
+
+func (q queryByUID) name() string {
+	return fmt.Sprintf("uid: %q", q)
+}
+
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 //
 // Currently it is only used for some user management operations (e.g. session cookie
@@ -650,6 +733,34 @@ type userManagementClient struct {
 	projectID  string
 	version    string
 	httpClient *internal.HTTPClient
+}
+
+// GetUser gets the user data corresponding to the specified user ID.
+func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	return c.getUser(ctx, queryByUID(uid))
+}
+
+func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*UserRecord, error) {
+	resp, err := c.post(ctx, "/accounts:lookup", query.build())
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != http.StatusOK {
+		return nil, handleHTTPError(resp)
+	}
+
+	var parsed struct {
+		RequestType string               `json:"kind,omitempty"`
+		Users       []responseUserRecord `json:"users,omitempty"`
+	}
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+		return nil, err
+	}
+	if len(parsed.Users) == 0 {
+		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.name())
+	}
+	return parsed.Users[0].makeUserRecord()
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry

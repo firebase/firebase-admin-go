@@ -1143,6 +1143,7 @@ func TestSessionCookieLongExpiresIn(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
+	s.Client.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
@@ -1150,7 +1151,7 @@ func TestHTTPError(t *testing.T) {
 		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 	}
 
-	want := `googleapi: got HTTP response code 500 with body: {"error":"test"}`
+	want := `http error status: 500; body: {"error":"test"}`
 	if err.Error() != want || !IsUnknown(err) {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
 	}
@@ -1168,6 +1169,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 	}
 	s := echoServer(nil, t)
 	defer s.Close()
+	s.Client.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	for code, check := range errorCodes {
@@ -1177,7 +1179,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 			t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 		}
 
-		want := fmt.Sprintf("googleapi: Error 500: %s", code)
+		want := fmt.Sprintf(`http error status: 500; body: {"error":{"message":"%s"}}`, code)
 		if err.Error() != want || !check(err) {
 			t.Errorf("GetUser() = %v; want = %q", err, want)
 		}
