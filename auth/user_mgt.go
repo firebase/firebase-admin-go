@@ -593,14 +593,30 @@ type userManagementClient struct {
 	httpClient *internal.HTTPClient
 }
 
-type userQuery interface {
-	name() string
-	build() map[string]interface{}
-}
-
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
 	return c.getUser(ctx, uidQuery(uid))
+}
+
+// GetUserByEmail gets the user data corresponding to the specified email.
+func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
+	return c.getUser(ctx, emailQuery(email))
+}
+
+// GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
+func (c *userManagementClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+	if err := validatePhone(phone); err != nil {
+		return nil, err
+	}
+	return c.getUser(ctx, phoneNumberQuery(phone))
+}
+
+type userQuery interface {
+	name() string
+	build() map[string]interface{}
 }
 
 type uidQuery string
@@ -615,14 +631,6 @@ func (q uidQuery) build() map[string]interface{} {
 	}
 }
 
-// GetUserByEmail gets the user data corresponding to the specified email.
-func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
-	if err := validateEmail(email); err != nil {
-		return nil, err
-	}
-	return c.getUser(ctx, emailQuery(email))
-}
-
 type emailQuery string
 
 func (q emailQuery) name() string {
@@ -633,14 +641,6 @@ func (q emailQuery) build() map[string]interface{} {
 	return map[string]interface{}{
 		"email": []string{string(q)},
 	}
-}
-
-// GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
-func (c *userManagementClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
-	if err := validatePhone(phone); err != nil {
-		return nil, err
-	}
-	return c.getUser(ctx, phoneNumberQuery(phone))
 }
 
 type phoneNumberQuery string
