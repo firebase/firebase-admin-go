@@ -38,6 +38,7 @@ var (
 		Opts: []option.ClientOption{
 			option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
 		},
+		Version: "test-version",
 	}
 
 	ttlWithNanos = time.Duration(1500) * time.Millisecond
@@ -1226,6 +1227,11 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	if h := tr.Header.Get("X-GOOG-API-FORMAT-VERSION"); h != "2" {
 		t.Errorf("X-GOOG-API-FORMAT-VERSION = %q; want = %q", h, "2")
 	}
+
+	clientVersion := "fire-admin-go/" + testMessagingConfig.Version
+	if h := tr.Header.Get("X-FIREBASE-CLIENT"); h != clientVersion {
+		t.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
+	}
 }
 
 func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
@@ -1234,7 +1240,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"to":                  "/topics/test-topic",
+		"to": "/topics/test-topic",
 		"registration_tokens": []interface{}{"id1", "id2"},
 	}
 	if !reflect.DeepEqual(parsed, want) {
