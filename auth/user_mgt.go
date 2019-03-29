@@ -350,28 +350,6 @@ func (c *Client) DeleteUser(ctx context.Context, uid string) error {
 	return nil
 }
 
-// GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
-func (c *Client) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
-	if err := validatePhone(phone); err != nil {
-		return nil, err
-	}
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
-		PhoneNumber: []string{phone},
-	}
-	return c.getUser(ctx, request)
-}
-
-// GetUserByEmail gets the user data corresponding to the specified email.
-func (c *Client) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
-	if err := validateEmail(email); err != nil {
-		return nil, err
-	}
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest{
-		Email: []string{email},
-	}
-	return c.getUser(ctx, request)
-}
-
 // RevokeRefreshTokens revokes all refresh tokens issued to a user.
 //
 // RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
@@ -600,35 +578,108 @@ func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate)
 	return nil
 }
 
-func (c *Client) getUser(ctx context.Context, request *identitytoolkit.IdentitytoolkitRelyingpartyGetAccountInfoRequest) (*UserRecord, error) {
-	call := c.is.Relyingparty.GetAccountInfo(request)
-	c.setHeader(call)
-	resp, err := call.Context(ctx).Do()
-	if err != nil {
-		return nil, handleServerError(err)
-	}
-	if len(resp.Users) == 0 {
-		var msg string
-		if len(request.LocalId) == 1 {
-			msg = fmt.Sprintf("cannot find user from uid: %q", request.LocalId[0])
-		} else if len(request.Email) == 1 {
-			msg = fmt.Sprintf("cannot find user from email: %q", request.Email[0])
-		} else {
-			msg = fmt.Sprintf("cannot find user from phone number: %q", request.PhoneNumber[0])
-		}
-		return nil, internal.Error(userNotFound, msg)
-	}
+const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
 
-	eu, err := makeExportedUser(resp.Users[0])
+// userManagementClient is a helper for interacting with the Identity Toolkit REST API.
+//
+// Currently it is only used for some user management operations (e.g. session cookie
+// generation). We will gradually migrate all the user management functionality to this
+// type, and remove our dependency on the google.golang.org/api/identitytoolkit/v3
+// package.
+type userManagementClient struct {
+	baseURL    string
+	projectID  string
+	version    string
+	httpClient *internal.HTTPClient
+}
+
+type userQuery interface {
+	name() string
+	build() map[string]interface{}
+}
+
+// GetUser gets the user data corresponding to the specified user ID.
+func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	return c.getUser(ctx, uidQuery(uid))
+}
+
+type uidQuery string
+
+func (q uidQuery) name() string {
+	return fmt.Sprintf("uid: %q", q)
+}
+
+func (q uidQuery) build() map[string]interface{} {
+	return map[string]interface{}{
+		"localId": []string{string(q)},
+	}
+}
+
+// GetUserByEmail gets the user data corresponding to the specified email.
+func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
+	return c.getUser(ctx, emailQuery(email))
+}
+
+type emailQuery string
+
+func (q emailQuery) name() string {
+	return fmt.Sprintf("email: %q", q)
+}
+
+func (q emailQuery) build() map[string]interface{} {
+	return map[string]interface{}{
+		"email": []string{string(q)},
+	}
+}
+
+// GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
+func (c *userManagementClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+	if err := validatePhone(phone); err != nil {
+		return nil, err
+	}
+	return c.getUser(ctx, phoneNumberQuery(phone))
+}
+
+type phoneNumberQuery string
+
+func (q phoneNumberQuery) name() string {
+	return fmt.Sprintf("phone number: %q", q)
+}
+
+func (q phoneNumberQuery) build() map[string]interface{} {
+	return map[string]interface{}{
+		"phoneNumber": []string{string(q)},
+	}
+}
+
+func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*UserRecord, error) {
+	resp, err := c.post(ctx, "/accounts:lookup", query.build())
 	if err != nil {
 		return nil, err
 	}
-	return eu.UserRecord, nil
+
+	if resp.Status != http.StatusOK {
+		return nil, handleHTTPError(resp)
+	}
+
+	var parsed struct {
+		Users []*userQueryResponse `json:"users"`
+	}
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+		return nil, err
+	}
+
+	if len(parsed.Users) == 0 {
+		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.name())
+	}
+
+	return parsed.Users[0].makeUserRecord()
 }
 
-const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
-
-type responseUserRecord struct {
+type userQueryResponse struct {
 	UID                string      `json:"localId,omitempty"`
 	DisplayName        string      `json:"displayName,omitempty"`
 	Email              string      `json:"email,omitempty"`
@@ -646,15 +697,16 @@ type responseUserRecord struct {
 	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
 }
 
-func (r *responseUserRecord) makeUserRecord() (*UserRecord, error) {
+func (r *userQueryResponse) makeUserRecord() (*UserRecord, error) {
 	exported, err := r.makeExportedUserRecord()
 	if err != nil {
 		return nil, err
 	}
+
 	return exported.UserRecord, nil
 }
 
-func (r *responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error) {
+func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error) {
 	var customClaims map[string]interface{}
 	if r.CustomAttributes != "" {
 		err := json.Unmarshal([]byte(r.CustomAttributes), &customClaims)
@@ -689,63 +741,6 @@ func (r *responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, erro
 		PasswordHash: r.PasswordHash,
 		PasswordSalt: r.PasswordSalt,
 	}, nil
-}
-
-type userQuery interface {
-	build() map[string]interface{}
-	name() string
-}
-
-type queryByUID string
-
-func (q queryByUID) build() map[string]interface{} {
-	return map[string]interface{}{
-		"localId": []string{string(q)},
-	}
-}
-
-func (q queryByUID) name() string {
-	return fmt.Sprintf("uid: %q", q)
-}
-
-// userManagementClient is a helper for interacting with the Identity Toolkit REST API.
-//
-// Currently it is only used for some user management operations (e.g. session cookie
-// generation). We will gradually migrate all the user management functionality to this
-// type, and remove our dependency on the google.golang.org/api/identitytoolkit/v3
-// package.
-type userManagementClient struct {
-	baseURL    string
-	projectID  string
-	version    string
-	httpClient *internal.HTTPClient
-}
-
-// GetUser gets the user data corresponding to the specified user ID.
-func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
-	return c.getUser(ctx, queryByUID(uid))
-}
-
-func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*UserRecord, error) {
-	resp, err := c.post(ctx, "/accounts:lookup", query.build())
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != http.StatusOK {
-		return nil, handleHTTPError(resp)
-	}
-
-	var parsed struct {
-		Users []*responseUserRecord `json:"users"`
-	}
-	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
-		return nil, err
-	}
-	if len(parsed.Users) == 0 {
-		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.name())
-	}
-	return parsed.Users[0].makeUserRecord()
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
