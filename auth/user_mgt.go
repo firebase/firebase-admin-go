@@ -643,10 +643,10 @@ type responseUserRecord struct {
 	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
 	PasswordHash       string      `json:"passwordHash,omitempty"`
 	PasswordSalt       string      `json:"salt,omitempty"`
-	ValidSince         int64       `json:"validSince,string,omitempty"`
+	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
 }
 
-func (r responseUserRecord) makeUserRecord() (*UserRecord, error) {
+func (r *responseUserRecord) makeUserRecord() (*UserRecord, error) {
 	exported, err := r.makeExportedUserRecord()
 	if err != nil {
 		return nil, err
@@ -654,7 +654,7 @@ func (r responseUserRecord) makeUserRecord() (*UserRecord, error) {
 	return exported.UserRecord, nil
 }
 
-func (r responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error) {
+func (r *responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error) {
 	var customClaims map[string]interface{}
 	if r.CustomAttributes != "" {
 		err := json.Unmarshal([]byte(r.CustomAttributes), &customClaims)
@@ -666,20 +666,7 @@ func (r responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error
 		}
 	}
 
-	var providerUserInfo []*UserInfo
-	for _, u := range r.ProviderUserInfo {
-		info := &UserInfo{
-			DisplayName: u.DisplayName,
-			Email:       u.Email,
-			PhoneNumber: u.PhoneNumber,
-			PhotoURL:    u.PhotoURL,
-			ProviderID:  u.ProviderID,
-			UID:         u.UID,
-		}
-		providerUserInfo = append(providerUserInfo, info)
-	}
-
-	resp := &ExportedUserRecord{
+	return &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
 				DisplayName: r.DisplayName,
@@ -692,8 +679,8 @@ func (r responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error
 			CustomClaims:           customClaims,
 			Disabled:               r.Disabled,
 			EmailVerified:          r.EmailVerified,
-			ProviderUserInfo:       providerUserInfo,
-			TokensValidAfterMillis: r.ValidSince * 1000,
+			ProviderUserInfo:       r.ProviderUserInfo,
+			TokensValidAfterMillis: r.ValidSinceSeconds * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLogInTimestamp,
 				CreationTimestamp:  r.CreationTimestamp,
@@ -701,8 +688,7 @@ func (r responseUserRecord) makeExportedUserRecord() (*ExportedUserRecord, error
 		},
 		PasswordHash: r.PasswordHash,
 		PasswordSalt: r.PasswordSalt,
-	}
-	return resp, nil
+	}, nil
 }
 
 type userQuery interface {
@@ -751,8 +737,7 @@ func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*U
 	}
 
 	var parsed struct {
-		RequestType string               `json:"kind,omitempty"`
-		Users       []responseUserRecord `json:"users,omitempty"`
+		Users []*responseUserRecord `json:"users"`
 	}
 	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
 		return nil, err
