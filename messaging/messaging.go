@@ -662,7 +662,7 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		iidEndpoint: iidEndpoint,
 		client:      hc,
 		project:     c.ProjectID,
-		version:     "Go/Admin/" + c.Version,
+		version:     "fire-admin-go/" + c.Version,
 	}, nil
 }
 
@@ -807,7 +807,10 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		Method: http.MethodPost,
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project),
 		Body:   internal.NewJSONEntity(req),
-		Opts:   []internal.HTTPOption{internal.WithHeader("X-GOOG-API-FORMAT-VERSION", "2")},
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-GOOG-API-FORMAT-VERSION", "2"),
+			internal.WithHeader("X-FIREBASE-CLIENT", c.version),
+		},
 	}
 
 	resp, err := c.client.Do(ctx, request)
