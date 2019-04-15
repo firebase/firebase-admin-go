@@ -595,7 +595,11 @@ type userManagementClient struct {
 
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
-	return c.getUser(ctx, uidQuery(uid))
+	return c.getUser(ctx, &userQuery{
+		field: "localId",
+		value: uid,
+		label: "uid",
+	})
 }
 
 // GetUserByEmail gets the user data corresponding to the specified email.
@@ -603,7 +607,10 @@ func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string)
 	if err := validateEmail(email); err != nil {
 		return nil, err
 	}
-	return c.getUser(ctx, emailQuery(email))
+	return c.getUser(ctx, &userQuery{
+		field: "email",
+		value: email,
+	})
 }
 
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
@@ -611,51 +618,34 @@ func (c *userManagementClient) GetUserByPhoneNumber(ctx context.Context, phone s
 	if err := validatePhone(phone); err != nil {
 		return nil, err
 	}
-	return c.getUser(ctx, phoneNumberQuery(phone))
+	return c.getUser(ctx, &userQuery{
+		field: "phoneNumber",
+		value: phone,
+		label: "phone number",
+	})
 }
 
-type userQuery interface {
-	name() string
-	build() map[string]interface{}
+type userQuery struct {
+	field string
+	value string
+	label string
 }
 
-type uidQuery string
-
-func (q uidQuery) name() string {
-	return fmt.Sprintf("uid: %q", q)
+func (q *userQuery) description() string {
+	label := q.label
+	if label == "" {
+		label = q.field
+	}
+	return fmt.Sprintf("%s: %q", label, q.value)
 }
 
-func (q uidQuery) build() map[string]interface{} {
+func (q *userQuery) build() map[string]interface{} {
 	return map[string]interface{}{
-		"localId": []string{string(q)},
+		q.field: []string{q.value},
 	}
 }
 
-type emailQuery string
-
-func (q emailQuery) name() string {
-	return fmt.Sprintf("email: %q", q)
-}
-
-func (q emailQuery) build() map[string]interface{} {
-	return map[string]interface{}{
-		"email": []string{string(q)},
-	}
-}
-
-type phoneNumberQuery string
-
-func (q phoneNumberQuery) name() string {
-	return fmt.Sprintf("phone number: %q", q)
-}
-
-func (q phoneNumberQuery) build() map[string]interface{} {
-	return map[string]interface{}{
-		"phoneNumber": []string{string(q)},
-	}
-}
-
-func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*UserRecord, error) {
+func (c *userManagementClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
 	resp, err := c.post(ctx, "/accounts:lookup", query.build())
 	if err != nil {
 		return nil, err
@@ -673,7 +663,7 @@ func (c *userManagementClient) getUser(ctx context.Context, query userQuery) (*U
 	}
 
 	if len(parsed.Users) == 0 {
-		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.name())
+		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.description())
 	}
 
 	return parsed.Users[0].makeUserRecord()
