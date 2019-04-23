@@ -77,6 +77,7 @@ type UserRecord struct {
 
 // UserToCreate is the parameter struct for the CreateUser function.
 type UserToCreate struct {
+	params      map[string]interface{}
 	createReq   *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest
 	uid         bool
 	displayName bool
@@ -85,107 +86,91 @@ type UserToCreate struct {
 	phoneNumber bool
 }
 
-func (u *UserToCreate) request() *identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest {
-	if u.createReq == nil {
-		u.createReq = &identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest{}
-	}
-	return u.createReq
-}
-
-func (u *UserToCreate) validatedRequest() (*identitytoolkit.IdentitytoolkitRelyingpartySignupNewUserRequest, error) {
-	req := u.request() // creating a user without any parameters is allowed
-	if u.uid {
-		if err := validateUID(req.LocalId); err != nil {
-			return nil, err
-		}
-	}
-	if u.displayName {
-		if err := validateDisplayName(req.DisplayName); err != nil {
-			return nil, err
-		}
-	}
-	if u.email {
-		if err := validateEmail(req.Email); err != nil {
-			return nil, err
-		}
-	}
-	if u.phoneNumber {
-		if err := validatePhone(req.PhoneNumber); err != nil {
-			return nil, err
-		}
-	}
-	if u.photoURL {
-		if err := validatePhotoURL(req.PhotoUrl); err != nil {
-			return nil, err
-		}
-	}
-	if req.Password != "" {
-		if err := validatePassword(req.Password); err != nil {
-			return nil, err
-		}
-	}
-	return req, nil
-}
-
 // Disabled setter.
 func (u *UserToCreate) Disabled(disabled bool) *UserToCreate {
-	req := u.request()
-	req.Disabled = disabled
-	if !disabled {
-		req.ForceSendFields = append(req.ForceSendFields, "Disabled")
-	}
-	return u
+	return u.set("disabled", disabled)
 }
 
 // DisplayName setter.
 func (u *UserToCreate) DisplayName(name string) *UserToCreate {
-	u.request().DisplayName = name
-	u.displayName = true
-	return u
+	return u.set("displayName", name)
 }
 
 // Email setter.
 func (u *UserToCreate) Email(email string) *UserToCreate {
-	u.request().Email = email
-	u.email = true
-	return u
+	return u.set("email", email)
 }
 
 // EmailVerified setter.
 func (u *UserToCreate) EmailVerified(verified bool) *UserToCreate {
-	req := u.request()
-	req.EmailVerified = verified
-	if !verified {
-		req.ForceSendFields = append(req.ForceSendFields, "EmailVerified")
-	}
-	return u
+	return u.set("emailVerified", verified)
 }
 
 // Password setter.
 func (u *UserToCreate) Password(pw string) *UserToCreate {
-	u.request().Password = pw
-	return u
+	return u.set("password", pw)
 }
 
 // PhoneNumber setter.
 func (u *UserToCreate) PhoneNumber(phone string) *UserToCreate {
-	u.request().PhoneNumber = phone
-	u.phoneNumber = true
-	return u
+	return u.set("phoneNumber", phone)
 }
 
 // PhotoURL setter.
 func (u *UserToCreate) PhotoURL(url string) *UserToCreate {
-	u.request().PhotoUrl = url
-	u.photoURL = true
-	return u
+	return u.set("photoUrl", url)
 }
 
 // UID setter.
 func (u *UserToCreate) UID(uid string) *UserToCreate {
-	u.request().LocalId = uid
-	u.uid = true
+	return u.set("localId", uid)
+}
+
+func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 	return u
+}
+
+func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
+	if u.params == nil {
+		return map[string]interface{}{}, nil
+	}
+
+	if uid, ok := u.params["localId"]; ok {
+		if err := validateUID(uid.(string)); err != nil {
+			return nil, err
+		}
+	}
+	if name, ok := u.params["displayName"]; ok {
+		if err := validateDisplayName(name.(string)); err != nil {
+			return nil, err
+		}
+	}
+	if email, ok := u.params["email"]; ok {
+		if err := validateEmail(email.(string)); err != nil {
+			return nil, err
+		}
+	}
+	if phone, ok := u.params["phoneNumber"]; ok {
+		if err := validatePhone(phone.(string)); err != nil {
+			return nil, err
+		}
+	}
+	if url, ok := u.params["photoUrl"]; ok {
+		if err := validatePhotoURL(url.(string)); err != nil {
+			return nil, err
+		}
+	}
+	if pw, ok := u.params["password"]; ok {
+		if err := validatePassword(pw.(string)); err != nil {
+			return nil, err
+		}
+	}
+
+	return u.params, nil
 }
 
 // UserToUpdate is the parameter struct for the UpdateUser function.
@@ -312,15 +297,6 @@ func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate {
 func (u *UserToUpdate) revokeRefreshTokens() *UserToUpdate {
 	u.request().ValidSince = time.Now().Unix()
 	return u
-}
-
-// CreateUser creates a new user with the specified properties.
-func (c *Client) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
-	uid, err := c.createUser(ctx, user)
-	if err != nil {
-		return nil, err
-	}
-	return c.GetUser(ctx, uid)
 }
 
 // UpdateUser updates an existing user account with the specified properties.
@@ -540,24 +516,6 @@ func validatePhone(phone string) error {
 
 // Helper functions for retrieval and HTTP calls.
 
-func (c *Client) createUser(ctx context.Context, user *UserToCreate) (string, error) {
-	if user == nil {
-		user = &UserToCreate{}
-	}
-
-	request, err := user.validatedRequest()
-	if err != nil {
-		return "", err
-	}
-	call := c.is.Relyingparty.SignupNewUser(request)
-	c.setHeader(call)
-	resp, err := call.Context(ctx).Do()
-	if err != nil {
-		return "", handleServerError(err)
-	}
-	return resp.LocalId, nil
-}
-
 func (c *Client) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
 	if err := validateUID(uid); err != nil {
 		return err
@@ -731,6 +689,41 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		PasswordHash: r.PasswordHash,
 		PasswordSalt: r.PasswordSalt,
 	}, nil
+}
+
+// CreateUser creates a new user with the specified properties.
+func (c *userManagementClient) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
+	uid, err := c.createUser(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	return c.GetUser(ctx, uid)
+}
+
+func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreate) (string, error) {
+	if user == nil {
+		user = &UserToCreate{}
+	}
+
+	request, err := user.validatedRequest()
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.post(ctx, "/accounts", request)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
+	var result struct {
+		UID string `json:"localId"`
+	}
+	err = json.Unmarshal(resp.Body, &result)
+	return result.UID, err
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry

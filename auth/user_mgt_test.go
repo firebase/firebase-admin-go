@@ -350,14 +350,14 @@ func TestCreateUser(t *testing.T) {
 	for _, tc := range cases {
 		uid, err := s.Client.createUser(context.Background(), tc.params)
 		if uid != "expectedUserID" || err != nil {
-			t.Errorf("createUser(%v) = (%q, %v); want = (%q, nil)", tc.params, uid, err, "expectedUserID")
+			t.Errorf("createUser(%#v) = (%q, %v); want = (%q, nil)", tc.params, uid, err, "expectedUserID")
 		}
 		want, err := json.Marshal(tc.req)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(s.Rbody, want) {
-			t.Errorf("createUser() request = %v; want = %v", string(s.Rbody), string(want))
+			t.Errorf("createUser(%#v) request = %v; want = %v", tc.params, string(s.Rbody), string(want))
 		}
 	}
 }
