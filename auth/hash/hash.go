@@ -31,8 +31,8 @@ import (
 type Bcrypt struct{}
 
 // Config returns the validated hash configuration.
-func (b Bcrypt) Config() (*internal.HashConfig, error) {
-	return &internal.HashConfig{HashAlgorithm: "BCRYPT"}, nil
+func (b Bcrypt) Config() (internal.HashConfig, error) {
+	return internal.HashConfig{"hashAlgorithm": "BCRYPT"}, nil
 }
 
 // StandardScrypt represents the standard scrypt hash algorithm.
@@ -47,14 +47,13 @@ type StandardScrypt struct {
 }
 
 // Config returns the validated hash configuration.
-func (s StandardScrypt) Config() (*internal.HashConfig, error) {
-	return &internal.HashConfig{
-		HashAlgorithm:    "STANDARD_SCRYPT",
-		DerivedKeyLength: int64(s.DerivedKeyLength),
-		BlockSize:        int64(s.BlockSize),
-		Parallelization:  int64(s.Parallelization),
-		MemoryCost:       int64(s.MemoryCost),
-		ForceSendFields:  []string{"BlockSize", "Parallelization", "MemoryCost", "DkLen"},
+func (s StandardScrypt) Config() (internal.HashConfig, error) {
+	return internal.HashConfig{
+		"hashAlgorithm":   "STANDARD_SCRYPT",
+		"dkLen":           s.DerivedKeyLength,
+		"blockSize":       s.BlockSize,
+		"parallelization": s.Parallelization,
+		"memoryCost":      s.MemoryCost,
 	}, nil
 }
 
@@ -72,7 +71,7 @@ type Scrypt struct {
 }
 
 // Config returns the validated hash configuration.
-func (s Scrypt) Config() (*internal.HashConfig, error) {
+func (s Scrypt) Config() (internal.HashConfig, error) {
 	if len(s.Key) == 0 {
 		return nil, errors.New("signer key not specified")
 	}
@@ -82,12 +81,12 @@ func (s Scrypt) Config() (*internal.HashConfig, error) {
 	if s.MemoryCost < 1 || s.MemoryCost > 14 {
 		return nil, errors.New("memory cost must be between 1 and 14")
 	}
-	return &internal.HashConfig{
-		HashAlgorithm: "SCRYPT",
-		SignerKey:     base64.RawURLEncoding.EncodeToString(s.Key),
-		SaltSeparator: base64.RawURLEncoding.EncodeToString(s.SaltSeparator),
-		Rounds:        int64(s.Rounds),
-		MemoryCost:    int64(s.MemoryCost),
+	return internal.HashConfig{
+		"hashAlgorithm": "SCRYPT",
+		"signerKey":     base64.RawURLEncoding.EncodeToString(s.Key),
+		"saltSeparator": base64.RawURLEncoding.EncodeToString(s.SaltSeparator),
+		"rounds":        s.Rounds,
+		"memoryCost":    s.MemoryCost,
 	}, nil
 }
 
@@ -100,7 +99,7 @@ type HMACMD5 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h HMACMD5) Config() (*internal.HashConfig, error) {
+func (h HMACMD5) Config() (internal.HashConfig, error) {
 	return hmacConfig("HMAC_MD5", h.Key)
 }
 
@@ -114,7 +113,7 @@ type HMACSHA1 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h HMACSHA1) Config() (*internal.HashConfig, error) {
+func (h HMACSHA1) Config() (internal.HashConfig, error) {
 	return hmacConfig("HMAC_SHA1", h.Key)
 }
 
@@ -128,7 +127,7 @@ type HMACSHA256 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h HMACSHA256) Config() (*internal.HashConfig, error) {
+func (h HMACSHA256) Config() (internal.HashConfig, error) {
 	return hmacConfig("HMAC_SHA256", h.Key)
 }
 
@@ -142,7 +141,7 @@ type HMACSHA512 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h HMACSHA512) Config() (*internal.HashConfig, error) {
+func (h HMACSHA512) Config() (internal.HashConfig, error) {
 	return hmacConfig("HMAC_SHA512", h.Key)
 }
 
@@ -156,7 +155,7 @@ type MD5 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h MD5) Config() (*internal.HashConfig, error) {
+func (h MD5) Config() (internal.HashConfig, error) {
 	return basicConfig("MD5", h.Rounds)
 }
 
@@ -170,7 +169,7 @@ type PBKDF2SHA256 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h PBKDF2SHA256) Config() (*internal.HashConfig, error) {
+func (h PBKDF2SHA256) Config() (internal.HashConfig, error) {
 	return basicConfig("PBKDF2_SHA256", h.Rounds)
 }
 
@@ -184,7 +183,7 @@ type PBKDFSHA1 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h PBKDFSHA1) Config() (*internal.HashConfig, error) {
+func (h PBKDFSHA1) Config() (internal.HashConfig, error) {
 	return basicConfig("PBKDF_SHA1", h.Rounds)
 }
 
@@ -198,7 +197,7 @@ type SHA1 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h SHA1) Config() (*internal.HashConfig, error) {
+func (h SHA1) Config() (internal.HashConfig, error) {
 	return basicConfig("SHA1", h.Rounds)
 }
 
@@ -212,7 +211,7 @@ type SHA256 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h SHA256) Config() (*internal.HashConfig, error) {
+func (h SHA256) Config() (internal.HashConfig, error) {
 	return basicConfig("SHA256", h.Rounds)
 }
 
@@ -226,27 +225,26 @@ type SHA512 struct {
 }
 
 // Config returns the validated hash configuration.
-func (h SHA512) Config() (*internal.HashConfig, error) {
+func (h SHA512) Config() (internal.HashConfig, error) {
 	return basicConfig("SHA512", h.Rounds)
 }
 
-func hmacConfig(name string, key []byte) (*internal.HashConfig, error) {
+func hmacConfig(name string, key []byte) (internal.HashConfig, error) {
 	if len(key) == 0 {
 		return nil, errors.New("signer key not specified")
 	}
-	return &internal.HashConfig{
-		HashAlgorithm: name,
-		SignerKey:     base64.RawURLEncoding.EncodeToString(key),
+	return internal.HashConfig{
+		"hashAlgorithm": name,
+		"signerKey":     base64.RawURLEncoding.EncodeToString(key),
 	}, nil
 }
 
-func basicConfig(name string, rounds int) (*internal.HashConfig, error) {
+func basicConfig(name string, rounds int) (internal.HashConfig, error) {
 	if rounds < 0 || rounds > 120000 {
 		return nil, errors.New("rounds must be between 0 and 120000")
 	}
-	return &internal.HashConfig{
-		HashAlgorithm:   name,
-		Rounds:          int64(rounds),
-		ForceSendFields: []string{"Rounds"},
+	return internal.HashConfig{
+		"hashAlgorithm": name,
+		"rounds":        rounds,
 	}, nil
 }
