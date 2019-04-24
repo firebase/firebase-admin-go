@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -518,6 +519,7 @@ func TestUpdateUser(t *testing.T) {
 		}
 	}
 }
+
 func TestRevokeRefreshTokens(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
@@ -531,12 +533,20 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	}
 	after := time.Now().Unix()
 
-	req := &identitytoolkit.IdentitytoolkitRelyingpartySetAccountInfoRequest{}
-	if err := json.Unmarshal(s.Rbody, &req); err != nil {
-		t.Error(err)
+	var req struct {
+		ValidSince string `json:"validSince"`
 	}
-	if req.ValidSince > after || req.ValidSince < before {
-		t.Errorf("validSince = %d, expecting time between %d and %d", req.ValidSince, before, after)
+	if err := json.Unmarshal(s.Rbody, &req); err != nil {
+		t.Fatal(err)
+	}
+
+	validSince, err := strconv.ParseInt(req.ValidSince, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if validSince > after || validSince < before {
+		t.Errorf("validSince = %d, expecting time between %d and %d", validSince, before, after)
 	}
 }
 

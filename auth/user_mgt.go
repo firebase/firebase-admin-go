@@ -27,7 +27,6 @@ import (
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/identitytoolkit/v3"
 )
 
 const (
@@ -295,23 +294,6 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 		}
 	}
 	return req, nil
-}
-
-// DeleteUser deletes the user by the given UID.
-func (c *Client) DeleteUser(ctx context.Context, uid string) error {
-	if err := validateUID(uid); err != nil {
-		return err
-	}
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyDeleteAccountRequest{
-		LocalId: uid,
-	}
-
-	call := c.is.Relyingparty.DeleteAccount(request)
-	c.setHeader(call)
-	if _, err := call.Context(ctx).Do(); err != nil {
-		return handleServerError(err)
-	}
-	return nil
 }
 
 // RevokeRefreshTokens revokes all refresh tokens issued to a user.
@@ -716,6 +698,26 @@ func (c *userManagementClient) updateUser(ctx context.Context, uid string, user 
 	request["localId"] = uid
 
 	resp, err := c.post(ctx, "/accounts:update", request)
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != http.StatusOK {
+		return handleHTTPError(resp)
+	}
+	return nil
+}
+
+// DeleteUser deletes the user by the given UID.
+func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error {
+	if err := validateUID(uid); err != nil {
+		return err
+	}
+
+	payload := map[string]interface{}{
+		"localId": uid,
+	}
+	resp, err := c.post(ctx, "/accounts:delete", payload)
 	if err != nil {
 		return err
 	}
