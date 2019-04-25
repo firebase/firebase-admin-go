@@ -17,8 +17,11 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
 
-	identitytoolkit "google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
 )
 
@@ -28,7 +31,7 @@ const maxReturnedResults = 1000
 //
 // If nextPageToken is empty, the iterator will start at the beginning.
 // If the nextPageToken is not empty, the iterator starts after the token.
-func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator {
+func (c *userManagementClient) Users(ctx context.Context, nextPageToken string) *UserIterator {
 	it := &UserIterator{
 		ctx:    ctx,
 		client: c,
@@ -46,7 +49,7 @@ func (c *Client) Users(ctx context.Context, nextPageToken string) *UserIterator 
 //
 // Also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
 type UserIterator struct {
-	client   *Client
+	client   *userManagementClient
 	ctx      context.Context
 	nextFunc func() error
 	pageInfo *iterator.PageInfo
@@ -70,26 +73,43 @@ func (it *UserIterator) Next() (*ExportedUserRecord, error) {
 }
 
 func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
-	request := &identitytoolkit.IdentitytoolkitRelyingpartyDownloadAccountRequest{
-		MaxResults:    int64(pageSize),
-		NextPageToken: pageToken,
-	}
-	call := it.client.is.Relyingparty.DownloadAccount(request)
-	it.client.setHeader(call)
-	resp, err := call.Context(it.ctx).Do()
-	if err != nil {
-		return "", handleServerError(err)
+	query := make(url.Values)
+	query.Set("maxResults", strconv.Itoa(pageSize))
+	if pageToken != "" {
+		query.Set("nextPageToken", pageToken)
 	}
 
-	for _, u := range resp.Users {
-		eu, err := makeExportedUser(u)
+	req, err := it.client.newRequest(http.MethodGet, fmt.Sprintf("/accounts:batchGet?%s", query.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := it.client.httpClient.Do(it.ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
+	var parsed struct {
+		Users         []userQueryResponse `json:"users"`
+		NextPageToken string              `json:"nextPageToken"`
+	}
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+		return "", err
+	}
+
+	for _, u := range parsed.Users {
+		eu, err := u.makeExportedUserRecord()
 		if err != nil {
 			return "", err
 		}
 		it.users = append(it.users, eu)
 	}
-	it.pageInfo.Token = resp.NextPageToken
-	return resp.NextPageToken, nil
+	it.pageInfo.Token = parsed.NextPageToken
+	return parsed.NextPageToken, nil
 }
 
 // ExportedUserRecord is the returned user value used when listing all the users.
@@ -97,54 +117,4 @@ type ExportedUserRecord struct {
 	*UserRecord
 	PasswordHash string
 	PasswordSalt string
-}
-
-func makeExportedUser(r *identitytoolkit.UserInfo) (*ExportedUserRecord, error) {
-	var cc map[string]interface{}
-	if r.CustomAttributes != "" {
-		if err := json.Unmarshal([]byte(r.CustomAttributes), &cc); err != nil {
-			return nil, err
-		}
-		if len(cc) == 0 {
-			cc = nil
-		}
-	}
-
-	var providerUserInfo []*UserInfo
-	for _, u := range r.ProviderUserInfo {
-		info := &UserInfo{
-			DisplayName: u.DisplayName,
-			Email:       u.Email,
-			PhoneNumber: u.PhoneNumber,
-			PhotoURL:    u.PhotoUrl,
-			ProviderID:  u.ProviderId,
-			UID:         u.RawId,
-		}
-		providerUserInfo = append(providerUserInfo, info)
-	}
-
-	resp := &ExportedUserRecord{
-		UserRecord: &UserRecord{
-			UserInfo: &UserInfo{
-				DisplayName: r.DisplayName,
-				Email:       r.Email,
-				PhoneNumber: r.PhoneNumber,
-				PhotoURL:    r.PhotoUrl,
-				ProviderID:  defaultProviderID,
-				UID:         r.LocalId,
-			},
-			CustomClaims:           cc,
-			Disabled:               r.Disabled,
-			EmailVerified:          r.EmailVerified,
-			ProviderUserInfo:       providerUserInfo,
-			TokensValidAfterMillis: r.ValidSince * 1000,
-			UserMetadata: &UserMetadata{
-				LastLogInTimestamp: r.LastLoginAt,
-				CreationTimestamp:  r.CreatedAt,
-			},
-		},
-		PasswordHash: r.PasswordHash,
-		PasswordSalt: r.Salt,
-	}
-	return resp, nil
 }
