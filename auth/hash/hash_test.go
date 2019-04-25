@@ -255,7 +255,7 @@ func TestValidHash(t *testing.T) {
 		got, err := tc.alg.Config()
 		if err != nil {
 			t.Errorf("[%d] Config() = %v", idx, err)
-		} else if !reflect.DeepEqual(map[string]interface{}(got), map[string]interface{}(tc.want)) {
+		} else if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("[%d] Config() = %#v; want = %#v", idx, got, tc.want)
 		}
 	}
