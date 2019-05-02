@@ -648,40 +648,40 @@ func TestSetCustomUserClaims(t *testing.T) {
 func TestUserToImport(t *testing.T) {
 	cases := []struct {
 		user *UserToImport
-		want *identitytoolkit.UserInfo
+		want map[string]interface{}
 	}{
 		{
 			user: (&UserToImport{}).UID("test"),
-			want: &identitytoolkit.UserInfo{
-				LocalId: "test",
+			want: map[string]interface{}{
+				"localId": "test",
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").DisplayName("name"),
-			want: &identitytoolkit.UserInfo{
-				LocalId:     "test",
-				DisplayName: "name",
+			want: map[string]interface{}{
+				"localId":     "test",
+				"displayName": "name",
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").Email("test@example.com"),
-			want: &identitytoolkit.UserInfo{
-				LocalId: "test",
-				Email:   "test@example.com",
+			want: map[string]interface{}{
+				"localId": "test",
+				"email":   "test@example.com",
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").PhotoURL("https://test.com/user.png"),
-			want: &identitytoolkit.UserInfo{
-				LocalId:  "test",
-				PhotoUrl: "https://test.com/user.png",
+			want: map[string]interface{}{
+				"localId":  "test",
+				"photoUrl": "https://test.com/user.png",
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").PhoneNumber("+1234567890"),
-			want: &identitytoolkit.UserInfo{
-				LocalId:     "test",
-				PhoneNumber: "+1234567890",
+			want: map[string]interface{}{
+				"localId":     "test",
+				"phoneNumber": "+1234567890",
 			},
 		},
 		{
@@ -689,37 +689,37 @@ func TestUserToImport(t *testing.T) {
 				CreationTimestamp:  int64(100),
 				LastLogInTimestamp: int64(150),
 			}),
-			want: &identitytoolkit.UserInfo{
-				LocalId:     "test",
-				CreatedAt:   int64(100),
-				LastLoginAt: int64(150),
+			want: map[string]interface{}{
+				"localId":     "test",
+				"createdAt":   int64(100),
+				"lastLoginAt": int64(150),
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").PasswordHash([]byte("password")),
-			want: &identitytoolkit.UserInfo{
-				LocalId:      "test",
-				PasswordHash: base64.RawURLEncoding.EncodeToString([]byte("password")),
+			want: map[string]interface{}{
+				"localId":      "test",
+				"passwordHash": base64.RawURLEncoding.EncodeToString([]byte("password")),
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").PasswordSalt([]byte("nacl")),
-			want: &identitytoolkit.UserInfo{
-				LocalId: "test",
-				Salt:    base64.RawURLEncoding.EncodeToString([]byte("nacl")),
+			want: map[string]interface{}{
+				"localId": "test",
+				"salt":    base64.RawURLEncoding.EncodeToString([]byte("nacl")),
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").CustomClaims(map[string]interface{}{"admin": true}),
-			want: &identitytoolkit.UserInfo{
-				LocalId:          "test",
-				CustomAttributes: `{"admin":true}`,
+			want: map[string]interface{}{
+				"localId":          "test",
+				"customAttributes": `{"admin":true}`,
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").CustomClaims(map[string]interface{}{}),
-			want: &identitytoolkit.UserInfo{
-				LocalId: "test",
+			want: map[string]interface{}{
+				"localId": "test",
 			},
 		},
 		{
@@ -729,44 +729,42 @@ func TestUserToImport(t *testing.T) {
 					UID:        "test",
 				},
 			}),
-			want: &identitytoolkit.UserInfo{
-				LocalId: "test",
-				ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
+			want: map[string]interface{}{
+				"localId": "test",
+				"providerUserInfo": []*UserProvider{
 					{
-						ProviderId: "google.com",
-						RawId:      "test",
+						ProviderID: "google.com",
+						UID:        "test",
 					},
 				},
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").EmailVerified(true),
-			want: &identitytoolkit.UserInfo{
-				LocalId:       "test",
-				EmailVerified: true,
+			want: map[string]interface{}{
+				"localId":       "test",
+				"emailVerified": true,
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").EmailVerified(false),
-			want: &identitytoolkit.UserInfo{
-				LocalId:         "test",
-				EmailVerified:   false,
-				ForceSendFields: []string{"EmailVerified"},
+			want: map[string]interface{}{
+				"localId":       "test",
+				"emailVerified": false,
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").Disabled(true),
-			want: &identitytoolkit.UserInfo{
-				LocalId:  "test",
-				Disabled: true,
+			want: map[string]interface{}{
+				"localId":  "test",
+				"disabled": true,
 			},
 		},
 		{
 			user: (&UserToImport{}).UID("test").Disabled(false),
-			want: &identitytoolkit.UserInfo{
-				LocalId:         "test",
-				Disabled:        false,
-				ForceSendFields: []string{"Disabled"},
+			want: map[string]interface{}{
+				"localId":  "test",
+				"disabled": false,
 			},
 		},
 	}
@@ -916,13 +914,13 @@ type mockHash struct {
 	rounds, memoryCost int64
 }
 
-func (h mockHash) Config() (*internal.HashConfig, error) {
-	return &internal.HashConfig{
-		HashAlgorithm: "MOCKHASH",
-		SignerKey:     h.key,
-		SaltSeparator: h.saltSep,
-		Rounds:        h.rounds,
-		MemoryCost:    h.memoryCost,
+func (h mockHash) Config() (internal.HashConfig, error) {
+	return internal.HashConfig{
+		"hashAlgorithm": "MOCKHASH",
+		"signerKey":     h.key,
+		"saltSeparator": h.saltSep,
+		"rounds":        h.rounds,
+		"memoryCost":    h.memoryCost,
 	}, nil
 }
 

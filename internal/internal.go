@@ -47,17 +47,7 @@ type AuthConfig struct {
 }
 
 // HashConfig represents a hash algorithm configuration used to generate password hashes.
-type HashConfig struct {
-	HashAlgorithm    string
-	MemoryCost       int64
-	Rounds           int64
-	SaltSeparator    string
-	SignerKey        string
-	BlockSize        int64
-	DerivedKeyLength int64
-	Parallelization  int64
-	ForceSendFields  []string
-}
+type HashConfig map[string]interface{}
 
 // InstanceIDConfig represents the configuration of Firebase Instance ID service.
 type InstanceIDConfig struct {

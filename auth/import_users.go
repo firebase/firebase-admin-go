@@ -17,24 +17,19 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"firebase.google.com/go/internal"
-	identitytoolkit "google.golang.org/api/identitytoolkit/v3"
 )
 
 const maxImportUsers = 1000
 
-// UserToImport represents a user account that can be bulk imported into Firebase Auth.
-type UserToImport struct {
-	info   *identitytoolkit.UserInfo
-	claims map[string]interface{}
-}
-
 // UserImportOption is an option for the ImportUsers() function.
 type UserImportOption interface {
-	applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest) error
+	applyTo(req map[string]interface{}) error
 }
 
 // UserImportResult represents the result of an ImportUsers() call.
@@ -57,7 +52,9 @@ type ErrorInfo struct {
 //
 // No more than 1000 users can be imported in a single call. If at least one user specifies a
 // password, a UserImportHash must be specified as an option.
-func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ...UserImportOption) (*UserImportResult, error) {
+func (c *userManagementClient) ImportUsers(
+	ctx context.Context, users []*UserToImport, opts ...UserImportOption) (*UserImportResult, error) {
+
 	if len(users) == 0 {
 		return nil, errors.New("users list must not be empty")
 	}
@@ -65,39 +62,57 @@ func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ..
 		return nil, fmt.Errorf("users list must not contain more than %d elements", maxImportUsers)
 	}
 
-	req := &identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest{}
+	var validatedUsers []map[string]interface{}
 	hashRequired := false
 	for _, u := range users {
 		vu, err := u.validatedUserInfo()
 		if err != nil {
 			return nil, err
 		}
-		if vu.PasswordHash != "" {
+		if pw, ok := vu["passwordHash"]; ok && pw != "" {
 			hashRequired = true
 		}
-		req.Users = append(req.Users, vu)
+		validatedUsers = append(validatedUsers, vu)
 	}
 
+	req := map[string]interface{}{
+		"users": validatedUsers,
+	}
 	for _, opt := range opts {
 		if err := opt.applyTo(req); err != nil {
 			return nil, err
 		}
 	}
-	if hashRequired && req.HashAlgorithm == "" {
-		return nil, errors.New("hash algorithm option is required to import users with passwords")
+	if hashRequired {
+		if algo, ok := req["hashAlgorithm"]; !ok || algo == "" {
+			return nil, errors.New("hash algorithm option is required to import users with passwords")
+		}
 	}
 
-	call := c.is.Relyingparty.UploadAccount(req)
-	c.setHeader(call)
-	resp, err := call.Context(ctx).Do()
+	resp, err := c.post(ctx, "/accounts:batchCreate", req)
 	if err != nil {
-		return nil, handleServerError(err)
+		return nil, err
 	}
+
+	if resp.Status != http.StatusOK {
+		return nil, handleHTTPError(resp)
+	}
+
+	var parsed struct {
+		Error []struct {
+			Index   int    `json:"index"`
+			Message string `json:"message"`
+		} `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+		return nil, err
+	}
+
 	result := &UserImportResult{
-		SuccessCount: len(users) - len(resp.Error),
-		FailureCount: len(resp.Error),
+		SuccessCount: len(users) - len(parsed.Error),
+		FailureCount: len(parsed.Error),
 	}
-	for _, e := range resp.Error {
+	for _, e := range parsed.Error {
 		result.Errors = append(result.Errors, &ErrorInfo{
 			Index:  int(e.Index),
 			Reason: e.Message,
@@ -106,41 +121,73 @@ func (c *Client) ImportUsers(ctx context.Context, users []*UserToImport, opts ..
 	return result, nil
 }
 
+// UserToImport represents a user account that can be bulk imported into Firebase Auth.
+type UserToImport struct {
+	params map[string]interface{}
+}
+
 // UID setter. This field is required.
 func (u *UserToImport) UID(uid string) *UserToImport {
-	u.userInfo().LocalId = uid
-	return u
+	return u.set("localId", uid)
 }
 
 // Email setter.
 func (u *UserToImport) Email(email string) *UserToImport {
-	u.userInfo().Email = email
-	return u
+	return u.set("email", email)
 }
 
 // DisplayName setter.
 func (u *UserToImport) DisplayName(displayName string) *UserToImport {
-	u.userInfo().DisplayName = displayName
-	return u
+	return u.set("displayName", displayName)
 }
 
 // PhotoURL setter.
 func (u *UserToImport) PhotoURL(url string) *UserToImport {
-	u.userInfo().PhotoUrl = url
-	return u
+	return u.set("photoUrl", url)
 }
 
 // PhoneNumber setter.
 func (u *UserToImport) PhoneNumber(phoneNumber string) *UserToImport {
-	u.userInfo().PhoneNumber = phoneNumber
-	return u
+	return u.set("phoneNumber", phoneNumber)
 }
 
 // Metadata setter.
 func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
-	info := u.userInfo()
-	info.CreatedAt = metadata.CreationTimestamp
-	info.LastLoginAt = metadata.LastLogInTimestamp
+	u.set("createdAt", metadata.CreationTimestamp)
+	return u.set("lastLoginAt", metadata.LastLogInTimestamp)
+}
+
+// CustomClaims setter.
+func (u *UserToImport) CustomClaims(claims map[string]interface{}) *UserToImport {
+	return u.set("customClaims", claims)
+}
+
+// Disabled setter.
+func (u *UserToImport) Disabled(disabled bool) *UserToImport {
+	return u.set("disabled", disabled)
+}
+
+// EmailVerified setter.
+func (u *UserToImport) EmailVerified(emailVerified bool) *UserToImport {
+	return u.set("emailVerified", emailVerified)
+}
+
+// PasswordHash setter. When set, a UserImportHash must be specified as an option to call
+// ImportUsers().
+func (u *UserToImport) PasswordHash(password []byte) *UserToImport {
+	return u.set("passwordHash", base64.RawURLEncoding.EncodeToString(password))
+}
+
+// PasswordSalt setter.
+func (u *UserToImport) PasswordSalt(salt []byte) *UserToImport {
+	return u.set("salt", base64.RawURLEncoding.EncodeToString(salt))
+}
+
+func (u *UserToImport) set(key string, value interface{}) *UserToImport {
+	if u.params == nil {
+		u.params = make(map[string]interface{})
+	}
+	u.params[key] = value
 	return u
 }
 
@@ -149,107 +196,62 @@ func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
 // One or more user providers can be specified for each user when importing in bulk.
 // See UserToImport type.
 type UserProvider struct {
-	UID         string
-	ProviderID  string
-	Email       string
-	DisplayName string
-	PhotoURL    string
+	UID         string `json:"rawId"`
+	ProviderID  string `json:"providerId"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	PhotoURL    string `json:"photoUrl"`
 }
 
 // ProviderData setter.
 func (u *UserToImport) ProviderData(providers []*UserProvider) *UserToImport {
-	var providerUserInfo []*identitytoolkit.UserInfoProviderUserInfo
-	for _, p := range providers {
-		providerUserInfo = append(providerUserInfo, &identitytoolkit.UserInfoProviderUserInfo{
-			ProviderId:  p.ProviderID,
-			RawId:       p.UID,
-			Email:       p.Email,
-			DisplayName: p.DisplayName,
-			PhotoUrl:    p.PhotoURL,
-		})
-	}
-	u.userInfo().ProviderUserInfo = providerUserInfo
-	return u
+	return u.set("providerUserInfo", providers)
 }
 
-// CustomClaims setter.
-func (u *UserToImport) CustomClaims(claims map[string]interface{}) *UserToImport {
-	u.claims = claims
-	return u
-}
-
-// Disabled setter.
-func (u *UserToImport) Disabled(disabled bool) *UserToImport {
-	info := u.userInfo()
-	info.Disabled = disabled
-	if !disabled {
-		info.ForceSendFields = append(info.ForceSendFields, "Disabled")
-	}
-	return u
-}
-
-// EmailVerified setter.
-func (u *UserToImport) EmailVerified(emailVerified bool) *UserToImport {
-	info := u.userInfo()
-	info.EmailVerified = emailVerified
-	if !emailVerified {
-		info.ForceSendFields = append(info.ForceSendFields, "EmailVerified")
-	}
-	return u
-}
-
-// PasswordHash setter. When set a UserImportHash must be specified as an option to call
-// ImportUsers().
-func (u *UserToImport) PasswordHash(password []byte) *UserToImport {
-	u.userInfo().PasswordHash = base64.RawURLEncoding.EncodeToString(password)
-	return u
-}
-
-// PasswordSalt setter.
-func (u *UserToImport) PasswordSalt(salt []byte) *UserToImport {
-	u.userInfo().Salt = base64.RawURLEncoding.EncodeToString(salt)
-	return u
-}
-
-func (u *UserToImport) userInfo() *identitytoolkit.UserInfo {
-	if u.info == nil {
-		u.info = &identitytoolkit.UserInfo{}
-	}
-	return u.info
-}
-
-func (u *UserToImport) validatedUserInfo() (*identitytoolkit.UserInfo, error) {
-	if u.info == nil {
+func (u *UserToImport) validatedUserInfo() (map[string]interface{}, error) {
+	if len(u.params) == 0 {
 		return nil, fmt.Errorf("no parameters are set on the user to import")
 	}
-	info := u.info
-	if err := validateUID(info.LocalId); err != nil {
-		return nil, err
-	}
-	if info.Email != "" {
-		if err := validateEmail(info.Email); err != nil {
-			return nil, err
-		}
-	}
-	if info.PhoneNumber != "" {
-		if err := validatePhone(info.PhoneNumber); err != nil {
-			return nil, err
-		}
-	}
-	if len(u.claims) > 0 {
-		cc, err := marshalCustomClaims(u.claims)
-		if err != nil {
-			return nil, err
-		}
-		info.CustomAttributes = cc
+
+	info := make(map[string]interface{})
+	for k, v := range u.params {
+		info[k] = v
 	}
 
-	for _, p := range info.ProviderUserInfo {
-		if p.RawId == "" {
-			return nil, fmt.Errorf("user provdier must specify a uid")
+	if err := validateUID(info["localId"].(string)); err != nil {
+		return nil, err
+	}
+	if email, ok := info["email"]; ok {
+		if err := validateEmail(email.(string)); err != nil {
+			return nil, err
 		}
-		if p.ProviderId == "" {
-			return nil, fmt.Errorf("user provider must specify a provider ID")
+	}
+	if phone, ok := info["phoneNumber"]; ok {
+		if err := validatePhone(phone.(string)); err != nil {
+			return nil, err
+		}
+	}
+
+	if claims, ok := info["customClaims"]; ok {
+		claimsMap := claims.(map[string]interface{})
+		if len(claimsMap) > 0 {
+			cc, err := marshalCustomClaims(claimsMap)
+			if err != nil {
+				return nil, err
+			}
+			info["customAttributes"] = cc
+		}
+		delete(info, "customClaims")
+	}
+
+	if providers, ok := info["providerUserInfo"]; ok {
+		for _, p := range providers.([]*UserProvider) {
+			if p.UID == "" {
+				return nil, fmt.Errorf("user provdier must specify a uid")
+			}
+			if p.ProviderID == "" {
+				return nil, fmt.Errorf("user provider must specify a provider ID")
+			}
 		}
 	}
 	return info, nil
@@ -266,26 +268,21 @@ func WithHash(hash UserImportHash) UserImportOption {
 // A UserImportHash must be specified in the form of a UserImportOption when importing users with
 // passwords. See ImportUsers() and WithHash() functions.
 type UserImportHash interface {
-	Config() (*internal.HashConfig, error)
+	Config() (internal.HashConfig, error)
 }
 
 type withHash struct {
 	hash UserImportHash
 }
 
-func (w withHash) applyTo(req *identitytoolkit.IdentitytoolkitRelyingpartyUploadAccountRequest) error {
+func (w withHash) applyTo(req map[string]interface{}) error {
 	conf, err := w.hash.Config()
 	if err != nil {
 		return err
 	}
-	req.HashAlgorithm = conf.HashAlgorithm
-	req.SignerKey = conf.SignerKey
-	req.SaltSeparator = conf.SaltSeparator
-	req.Rounds = conf.Rounds
-	req.MemoryCost = conf.MemoryCost
-	req.DkLen = conf.DerivedKeyLength
-	req.Parallelization = conf.Parallelization
-	req.BlockSize = conf.BlockSize
-	req.ForceSendFields = conf.ForceSendFields
+
+	for k, v := range conf {
+		req[k] = v
+	}
 	return nil
 }

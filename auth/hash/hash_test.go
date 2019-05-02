@@ -34,7 +34,7 @@ var validHashes = []struct {
 }{
 	{
 		alg:  Bcrypt{},
-		want: internal.HashConfig{HashAlgorithm: "BCRYPT"},
+		want: internal.HashConfig{"hashAlgorithm": "BCRYPT"},
 	},
 	{
 		alg: StandardScrypt{
@@ -44,12 +44,11 @@ var validHashes = []struct {
 			MemoryCost:       4,
 		},
 		want: internal.HashConfig{
-			HashAlgorithm:    "STANDARD_SCRYPT",
-			BlockSize:        1,
-			DerivedKeyLength: 2,
-			Parallelization:  3,
-			MemoryCost:       4,
-			ForceSendFields:  []string{"BlockSize", "Parallelization", "MemoryCost", "DkLen"},
+			"hashAlgorithm":   "STANDARD_SCRYPT",
+			"blockSize":       1,
+			"dkLen":           2,
+			"parallelization": 3,
+			"memoryCost":      4,
 		},
 	},
 	{
@@ -60,87 +59,81 @@ var validHashes = []struct {
 			MemoryCost:    14,
 		},
 		want: internal.HashConfig{
-			HashAlgorithm: "SCRYPT",
-			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
-			SaltSeparator: base64.RawURLEncoding.EncodeToString(saltSeparator),
-			Rounds:        8,
-			MemoryCost:    14,
+			"hashAlgorithm": "SCRYPT",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
+			"saltSeparator": base64.RawURLEncoding.EncodeToString(saltSeparator),
+			"rounds":        8,
+			"memoryCost":    14,
 		},
 	},
 	{
 		alg: HMACMD5{signerKey},
 		want: internal.HashConfig{
-			HashAlgorithm: "HMAC_MD5",
-			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
+			"hashAlgorithm": "HMAC_MD5",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
 		alg: HMACSHA1{signerKey},
 		want: internal.HashConfig{
-			HashAlgorithm: "HMAC_SHA1",
-			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
+			"hashAlgorithm": "HMAC_SHA1",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
 		alg: HMACSHA256{signerKey},
 		want: internal.HashConfig{
-			HashAlgorithm: "HMAC_SHA256",
-			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
+			"hashAlgorithm": "HMAC_SHA256",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
 		alg: HMACSHA512{signerKey},
 		want: internal.HashConfig{
-			HashAlgorithm: "HMAC_SHA512",
-			SignerKey:     base64.RawURLEncoding.EncodeToString(signerKey),
+			"hashAlgorithm": "HMAC_SHA512",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
 		alg: MD5{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "MD5",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "MD5",
+			"rounds":        42,
 		},
 	},
 	{
 		alg: SHA1{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "SHA1",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "SHA1",
+			"rounds":        42,
 		},
 	},
 	{
 		alg: SHA256{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "SHA256",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "SHA256",
+			"rounds":        42,
 		},
 	},
 	{
 		alg: SHA512{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "SHA512",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "SHA512",
+			"rounds":        42,
 		},
 	},
 	{
 		alg: PBKDFSHA1{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "PBKDF_SHA1",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "PBKDF_SHA1",
+			"rounds":        42,
 		},
 	},
 	{
 		alg: PBKDF2SHA256{42},
 		want: internal.HashConfig{
-			HashAlgorithm:   "PBKDF2_SHA256",
-			Rounds:          42,
-			ForceSendFields: []string{"Rounds"},
+			"hashAlgorithm": "PBKDF2_SHA256",
+			"rounds":        42,
 		},
 	},
 }
@@ -262,7 +255,7 @@ func TestValidHash(t *testing.T) {
 		got, err := tc.alg.Config()
 		if err != nil {
 			t.Errorf("[%d] Config() = %v", idx, err)
-		} else if !reflect.DeepEqual(*got, tc.want) {
+		} else if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("[%d] Config() = %#v; want = %#v", idx, got, tc.want)
 		}
 	}
