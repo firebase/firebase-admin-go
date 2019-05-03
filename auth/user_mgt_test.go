@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
-	"google.golang.org/api/identitytoolkit/v3"
 	"google.golang.org/api/iterator"
 )
 
@@ -181,7 +180,7 @@ func TestListUsers(t *testing.T) {
 		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
-	testIterator := func(iter *UserIterator, token string, req map[string]interface{}) {
+	testIterator := func(iter *UserIterator, token string, req string) {
 		count := 0
 		for i := 0; i < len(want); i++ {
 			user, err := iter.Next()
@@ -209,20 +208,20 @@ func TestListUsers(t *testing.T) {
 			t.Errorf("Users(%q) = %v, want = %v", token, err, iterator.Done)
 		}
 
-		b, err := json.Marshal(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(s.Rbody) != string(b) {
-			t.Errorf("Users(%q) = %v, want = %v", token, string(s.Rbody), string(b))
+		// Check the query string of the last HTTP request made.
+		gotReq := s.Req[len(s.Req)-1].URL.Query().Encode()
+		if gotReq != req {
+			t.Errorf("Users(%q) = %q, want = %v", token, gotReq, req)
 		}
 	}
 	testIterator(
 		s.Client.Users(context.Background(), ""),
-		"", map[string]interface{}{"maxResults": 1000})
+		"",
+		"maxResults=1000")
 	testIterator(
 		s.Client.Users(context.Background(), "pageToken"),
-		"pageToken", map[string]interface{}{"maxResults": 1000, "nextPageToken": "pageToken"})
+		"pageToken",
+		"maxResults=1000&nextPageToken=pageToken")
 }
 
 func TestInvalidCreateUser(t *testing.T) {
@@ -996,31 +995,31 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-	rur := &identitytoolkit.UserInfo{
-		LocalId:          "testuser",
-		Email:            "testuser@example.com",
-		PhoneNumber:      "+1234567890",
-		EmailVerified:    true,
-		DisplayName:      "Test User",
-		Salt:             "salt",
-		PhotoUrl:         "http://www.example.com/testuser/photo.png",
-		PasswordHash:     "passwordhash",
-		ValidSince:       1494364393,
-		Disabled:         false,
-		CreatedAt:        1234567890000,
-		LastLoginAt:      1233211232000,
-		CustomAttributes: `{"admin": true, "package": "gold"}`,
-		ProviderUserInfo: []*identitytoolkit.UserInfoProviderUserInfo{
+	rur := &userQueryResponse{
+		UID:                "testuser",
+		Email:              "testuser@example.com",
+		PhoneNumber:        "+1234567890",
+		EmailVerified:      true,
+		DisplayName:        "Test User",
+		PasswordSalt:       "salt",
+		PhotoURL:           "http://www.example.com/testuser/photo.png",
+		PasswordHash:       "passwordhash",
+		ValidSinceSeconds:  1494364393,
+		Disabled:           false,
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211232000,
+		CustomAttributes:   `{"admin": true, "package": "gold"}`,
+		ProviderUserInfo: []*UserInfo{
 			{
-				ProviderId:  "password",
+				ProviderID:  "password",
 				DisplayName: "Test User",
-				PhotoUrl:    "http://www.example.com/testuser/photo.png",
+				PhotoURL:    "http://www.example.com/testuser/photo.png",
 				Email:       "testuser@example.com",
-				RawId:       "testuid",
+				UID:         "testuid",
 			}, {
-				ProviderId:  "phone",
+				ProviderID:  "phone",
 				PhoneNumber: "+1234567890",
-				RawId:       "testuid",
+				UID:         "testuid",
 			}},
 	}
 
@@ -1029,7 +1028,7 @@ func TestMakeExportedUser(t *testing.T) {
 		PasswordHash: "passwordhash",
 		PasswordSalt: "salt",
 	}
-	exported, err := makeExportedUser(rur)
+	exported, err := rur.makeExportedUserRecord()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1271,7 +1270,6 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.is.BasePath = s.Srv.URL + "/"
 	authClient.baseURL = s.Srv.URL
 	s.Client = authClient
 	return &s
