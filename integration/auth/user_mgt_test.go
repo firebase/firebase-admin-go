@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,6 +30,8 @@ import (
 	"firebase.google.com/go/auth/hash"
 	"google.golang.org/api/iterator"
 )
+
+const continueURL = "http://localhost/?a=1&b=2#c=3"
 
 func TestGetUser(t *testing.T) {
 	want := newUserWithParams(t)
@@ -444,6 +447,36 @@ func TestSessionCookie(t *testing.T) {
 	// Does not return error for revoked token.
 	if _, err = client.VerifySessionCookie(context.Background(), cookie); err != nil {
 		t.Errorf("VerifySessionCookie() = %v; want = nil", err)
+	}
+}
+
+func TestEmailVerificationLink(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	link, err := client.EmailVerificationLinkWithSettings(context.Background(), user.Email, &auth.ActionCodeSettings{
+		URL:             continueURL,
+		HandleCodeInApp: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parsed, err := url.ParseRequestURI(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		continueURLKey = "continueUrl"
+		modeKey        = "mode"
+		verifyEmail    = "verifyEmail"
+	)
+	query := parsed.Query()
+	if got := query.Get(continueURLKey); got != continueURL {
+		t.Errorf("EmailVerificationLinkWithSettings() %s = %q; want = %q", continueURLKey, got, continueURL)
+	}
+	if got := query.Get(modeKey); got != verifyEmail {
+		t.Errorf("EmailVerificationLinkWithSettings() %s = %q; want = %q", modeKey, got, verifyEmail)
 	}
 }
 

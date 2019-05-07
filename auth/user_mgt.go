@@ -350,10 +350,12 @@ const (
 	emailAlreadyExists       = "email-already-exists"
 	idTokenRevoked           = "id-token-revoked"
 	insufficientPermission   = "insufficient-permission"
+	invalidDynamicLinkDomain = "invalid-dynamic-link-domain"
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
 	uidAlreadyExists         = "uid-already-exists"
+	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
 )
@@ -371,6 +373,11 @@ func IsIDTokenRevoked(err error) bool {
 // IsInsufficientPermission checks if the given error was due to insufficient permissions.
 func IsInsufficientPermission(err error) bool {
 	return internal.HasErrorCode(err, insufficientPermission)
+}
+
+// IsInvalidDynamicLinkDomain checks if the given error was due to an invalid dynamic link domain.
+func IsInvalidDynamicLinkDomain(err error) bool {
+	return internal.HasErrorCode(err, invalidDynamicLinkDomain)
 }
 
 // IsPhoneNumberAlreadyExists checks if the given error was due to a duplicate phone number.
@@ -393,6 +400,11 @@ func IsUIDAlreadyExists(err error) bool {
 	return internal.HasErrorCode(err, uidAlreadyExists)
 }
 
+// IsUnauthorizedContinueURI checks if the given error was due to an unauthorized continue URI domain.
+func IsUnauthorizedContinueURI(err error) bool {
+	return internal.HasErrorCode(err, unauthorizedContinueURI)
+}
+
 // IsUnknown checks if the given error was due to a unknown server error.
 func IsUnknown(err error) bool {
 	return internal.HasErrorCode(err, unknown)
@@ -404,15 +416,17 @@ func IsUserNotFound(err error) bool {
 }
 
 var serverError = map[string]string{
-	"CONFIGURATION_NOT_FOUND": projectNotFound,
-	"DUPLICATE_EMAIL":         emailAlreadyExists,
-	"DUPLICATE_LOCAL_ID":      uidAlreadyExists,
-	"EMAIL_EXISTS":            emailAlreadyExists,
-	"INSUFFICIENT_PERMISSION": insufficientPermission,
-	"PERMISSION_DENIED":       insufficientPermission,
-	"PHONE_NUMBER_EXISTS":     phoneNumberAlreadyExists,
-	"PROJECT_NOT_FOUND":       projectNotFound,
-	"USER_NOT_FOUND":          userNotFound,
+	"CONFIGURATION_NOT_FOUND":     projectNotFound,
+	"DUPLICATE_EMAIL":             emailAlreadyExists,
+	"DUPLICATE_LOCAL_ID":          uidAlreadyExists,
+	"EMAIL_EXISTS":                emailAlreadyExists,
+	"INSUFFICIENT_PERMISSION":     insufficientPermission,
+	"INVALID_DYNAMIC_LINK_DOMAIN": invalidDynamicLinkDomain,
+	"PERMISSION_DENIED":           insufficientPermission,
+	"PHONE_NUMBER_EXISTS":         phoneNumberAlreadyExists,
+	"PROJECT_NOT_FOUND":           projectNotFound,
+	"UNAUTHORIZED_DOMAIN":         unauthorizedContinueURI,
+	"USER_NOT_FOUND":              userNotFound,
 }
 
 func handleServerError(err error) error {

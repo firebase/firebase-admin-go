@@ -1,5 +1,8 @@
 # Unreleased
 
+- [added] Implemented `auth.EmailVerificationLink()` function for
+  generating email verification action links.
+
 # v3.7.0
 
 - [added] Implemented `auth.SessionCookie()` function for creating
