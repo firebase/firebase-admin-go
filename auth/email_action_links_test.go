@@ -130,11 +130,93 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 	}
 }
 
-func TestEmailVerificationLinkNoEmail(t *testing.T) {
+func TestPasswordResetLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	link, err := s.Client.PasswordResetLink(context.Background(), testEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("PasswordResetLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "PASSWORD_RESET",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPasswordResetLinkWithSettings(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("PasswordResetLinkWithSettings() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "PASSWORD_RESET",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	for k, v := range testActionCodeSettingsMap {
+		want[k] = v
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmailSignInLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "EMAIL_SIGNIN",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	for k, v := range testActionCodeSettingsMap {
+		want[k] = v
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmailActionLinkNoEmail(t *testing.T) {
 	client := &Client{}
 	_, err := client.EmailVerificationLink(context.Background(), "")
 	if err == nil {
 		t.Errorf("EmailVerificationLink('') = nil; want error")
+	}
+
+	_, err = client.PasswordResetLink(context.Background(), "")
+	if err == nil {
+		t.Errorf("PasswordResetLink('') = nil; want error")
+	}
+
+	_, err = client.EmailSignInLink(context.Background(), "", testActionCodeSettings)
+	if err == nil {
+		t.Errorf("EmailSignInLink('') = nil; want error")
 	}
 }
 
@@ -145,6 +227,34 @@ func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
 		if err == nil || err.Error() != tc.want {
 			t.Errorf("EmailVerificationLinkWithSettings(%q) = %v; want = %q", tc.name, err, tc.want)
 		}
+	}
+}
+
+func TestPasswordResetLinkInvalidSettings(t *testing.T) {
+	client := &Client{}
+	for _, tc := range invalidActionCodeSettings {
+		_, err := client.PasswordResetLinkWithSettings(context.Background(), testEmail, tc.settings)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("PasswordResetLinkWithSettings(%q) = %v; want = %q", tc.name, err, tc.want)
+		}
+	}
+}
+
+func TestEmailSignInLinkInvalidSettings(t *testing.T) {
+	client := &Client{}
+	for _, tc := range invalidActionCodeSettings {
+		_, err := client.EmailSignInLink(context.Background(), testEmail, tc.settings)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("EmailSignInLink(%q) = %v; want = %q", tc.name, err, tc.want)
+		}
+	}
+}
+
+func TestEmailSignInLinkNoSettings(t *testing.T) {
+	client := &Client{}
+	_, err := client.EmailSignInLink(context.Background(), testEmail, nil)
+	if err == nil {
+		t.Errorf("EmailSignInLink(nil) = %v; want = error", err)
 	}
 }
 

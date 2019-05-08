@@ -2,6 +2,10 @@
 
 - [added] Implemented `auth.EmailVerificationLink()` function for
   generating email verification action links.
+- [added] Implemented `auth.PasswordResetLink()` function for
+  generating password reset action links.
+- [added] Implemented `auth.EmailSignInLink()` function for generating
+  email sign in action links.
 
 # v3.7.0
 
