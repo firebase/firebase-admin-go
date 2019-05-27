@@ -1,7 +1,5 @@
 # Unreleased
 
-# v3.7.0
-
 - [added] Implemented `auth.SessionCookie()` function for creating
   new Firebase session cookies given an ID token.
 - [added] Implemented `auth.VerifySessionCookie()` and
