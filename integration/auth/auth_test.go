@@ -42,6 +42,7 @@ const (
 )
 
 var client *auth.Client
+var apiKey string
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -55,6 +56,10 @@ func TestMain(m *testing.M) {
 		log.Fatalln(err)
 	}
 	client, err = app.Auth(context.Background())
+	if err != nil {
+		log.Fatalln(err)
+	}
+	apiKey, err = internal.APIKey()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -207,10 +212,6 @@ func signInWithCustomToken(token string) (string, error) {
 		return "", err
 	}
 
-	apiKey, err := internal.APIKey()
-	if err != nil {
-		return "", err
-	}
 	resp, err := postRequest(fmt.Sprintf(verifyCustomTokenURL, apiKey), req)
 	if err != nil {
 		return "", err
@@ -233,10 +234,6 @@ func signInWithPassword(email, password string) (string, error) {
 		return "", err
 	}
 
-	apiKey, err := internal.APIKey()
-	if err != nil {
-		return "", err
-	}
 	resp, err := postRequest(fmt.Sprintf(verifyPasswordURL, apiKey), req)
 	if err != nil {
 		return "", err

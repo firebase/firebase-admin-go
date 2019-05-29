@@ -18,6 +18,7 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -31,7 +32,14 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const continueURL = "http://localhost/?a=1&b=2#c=3"
+const (
+	continueURL        = "http://localhost/?a=1&b=2#c=3"
+	continueURLKey     = "continueUrl"
+	oobCodeKey         = "oobCode"
+	modeKey            = "mode"
+	resetPasswordURL   = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/resetPassword?key=%s"
+	emailLinkSignInURL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/emailLinkSignin?key=%s"
+)
 
 func TestGetUser(t *testing.T) {
 	want := newUserWithParams(t)
@@ -466,18 +474,131 @@ func TestEmailVerificationLink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const (
-		continueURLKey = "continueUrl"
-		modeKey        = "mode"
-		verifyEmail    = "verifyEmail"
-	)
 	query := parsed.Query()
 	if got := query.Get(continueURLKey); got != continueURL {
 		t.Errorf("EmailVerificationLinkWithSettings() %s = %q; want = %q", continueURLKey, got, continueURL)
 	}
+
+	const verifyEmail = "verifyEmail"
 	if got := query.Get(modeKey); got != verifyEmail {
 		t.Errorf("EmailVerificationLinkWithSettings() %s = %q; want = %q", modeKey, got, verifyEmail)
 	}
+}
+
+func TestPasswordResetLink(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	link, err := client.PasswordResetLinkWithSettings(context.Background(), user.Email, &auth.ActionCodeSettings{
+		URL:             continueURL,
+		HandleCodeInApp: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parsed, err := url.ParseRequestURI(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := parsed.Query()
+	if got := query.Get(continueURLKey); got != continueURL {
+		t.Errorf("PasswordResetLinkWithSettings() %s = %q; want = %q", continueURLKey, got, continueURL)
+	}
+
+	oobCode := query.Get(oobCodeKey)
+	if err := resetPassword(user.Email, "password", "newPassword", oobCode); err != nil {
+		t.Fatalf("PasswordResetLinkWithSettings() reset = %v; want = nil", err)
+	}
+
+	// Password reset also verifies the user's email
+	user, err = client.GetUser(context.Background(), user.UID)
+	if err != nil {
+		t.Fatalf("GetUser() = %v; want = nil", err)
+	}
+	if !user.EmailVerified {
+		t.Error("PasswordResetLinkWithSettings() EmailVerified = false; want = true")
+	}
+}
+
+func TestEmailSignInLink(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	link, err := client.EmailSignInLink(context.Background(), user.Email, &auth.ActionCodeSettings{
+		URL:             continueURL,
+		HandleCodeInApp: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parsed, err := url.ParseRequestURI(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := parsed.Query()
+	if got := query.Get(continueURLKey); got != continueURL {
+		t.Errorf("EmailSignInLink() %s = %q; want = %q", continueURLKey, got, continueURL)
+	}
+
+	oobCode := query.Get(oobCodeKey)
+	idToken, err := signInWithEmailLink(user.Email, oobCode)
+	if err != nil {
+		t.Fatalf("EmailSignInLink() signIn = %v; want = nil", err)
+	}
+	if idToken == "" {
+		t.Errorf("ID Token = empty; want = non-empty")
+	}
+
+	// Signing in with email link also verifies the user's email
+	user, err = client.GetUser(context.Background(), user.UID)
+	if err != nil {
+		t.Fatalf("GetUser() = %v; want = nil", err)
+	}
+	if !user.EmailVerified {
+		t.Error("EmailSignInLink() EmailVerified = false; want = true")
+	}
+}
+
+func resetPassword(email, oldPassword, newPassword, oobCode string) error {
+	req := map[string]interface{}{
+		"email":       email,
+		"oldPassword": oldPassword,
+		"newPassword": newPassword,
+		"oobCode":     oobCode,
+	}
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	_, err = postRequest(fmt.Sprintf(resetPasswordURL, apiKey), reqBytes)
+	return err
+}
+
+func signInWithEmailLink(email, oobCode string) (string, error) {
+	req := map[string]interface{}{
+		"email":   email,
+		"oobCode": oobCode,
+	}
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		return "", err
+	}
+
+	b, err := postRequest(fmt.Sprintf(emailLinkSignInURL, apiKey), reqBytes)
+	if err != nil {
+		return "", err
+	}
+
+	var parsed struct {
+		IDToken string `json:"idToken"`
+	}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		return "", err
+	}
+	return parsed.IDToken, nil
 }
 
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -514,7 +635,6 @@ func newUserWithParams(t *testing.T) *auth.UserRecord {
 		PhoneNumber(phone).
 		DisplayName("Random User").
 		PhotoURL("https://example.com/photo.png").
-		EmailVerified(true).
 		Password("password")
 	user, err := client.CreateUser(context.Background(), params)
 	if err != nil {
