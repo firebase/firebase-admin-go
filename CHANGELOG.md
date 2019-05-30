@@ -1,5 +1,7 @@
 # Unreleased
 
+# v3.8.0
+
 - [added] Implemented `auth.EmailVerificationLink()` function for
   generating email verification action links.
 - [added] Implemented `auth.PasswordResetLink()` function for
