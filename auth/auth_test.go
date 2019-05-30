@@ -119,8 +119,9 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
@@ -147,8 +148,9 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
@@ -172,6 +174,16 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 }
 
+func TestMe(t *testing.T) {
+	creds, err := transport.Creds(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds != nil {
+		t.Fatalf("Creds = %#v", creds)
+	}
+}
+
 func TestNewClientWithUserCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte(`{
@@ -181,12 +193,14 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	}
 	conf := &internal.AuthConfig{
 		Creds:   creds,
+		Opts:    []option.ClientOption{option.WithCredentials(creds)},
 		Version: "test-version",
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
