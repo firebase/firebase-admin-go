@@ -772,3 +772,70 @@ func getIDTokenFromBody(r *http.Request) (string, error) {
 	err = json.Unmarshal(b, &parsedBody)
 	return parsedBody.IDToken, err
 }
+
+func newActionCodeSettings() *auth.ActionCodeSettings {
+	// [START init_action_code_settings]
+	actionCodeSettings := &auth.ActionCodeSettings{
+		URL:                   "https://www.example.com/checkout?cartId=1234",
+		HandleCodeInApp:       true,
+		IOSBundleID:           "com.example.ios",
+		AndroidPackageName:    "com.example.android",
+		AndroidInstallApp:     true,
+		AndroidMinimumVersion: "12",
+		DynamicLinkDomain:     "coolapp.page.link",
+	}
+	// [END init_action_code_settings]
+	return actionCodeSettings
+}
+
+func generatePasswordResetLink(ctx context.Context, client *auth.Client) {
+	actionCodeSettings := newActionCodeSettings()
+	displayName := "Example User"
+	// [START password_reset_link]
+	email := "user@example.com"
+	link, err := client.PasswordResetLinkWithSettings(ctx, email, actionCodeSettings)
+	if err != nil {
+		log.Fatalf("error generating email link: %v\n", err)
+	}
+
+	// Construct password reset template, embed the link and send
+	// using custom SMTP server.
+	sendCustomEmail(email, displayName, link)
+	// [END password_reset_link]
+}
+
+func generateEmailVerificationLink(ctx context.Context, client *auth.Client) {
+	actionCodeSettings := newActionCodeSettings()
+	displayName := "Example User"
+	// [START email_verification_link]
+	email := "user@example.com"
+	link, err := client.EmailVerificationLinkWithSettings(ctx, email, actionCodeSettings)
+	if err != nil {
+		log.Fatalf("error generating email link: %v\n", err)
+	}
+
+	// Construct email verification template, embed the link and send
+	// using custom SMTP server.
+	sendCustomEmail(email, displayName, link)
+	// [END email_verification_link]
+}
+
+func generateEmailSignInLink(ctx context.Context, client *auth.Client) {
+	actionCodeSettings := newActionCodeSettings()
+	displayName := "Example User"
+	// [START sign_in_with_email_link]
+	email := "user@example.com"
+	link, err := client.EmailSignInLink(ctx, email, actionCodeSettings)
+	if err != nil {
+		log.Fatalf("error generating email link: %v\n", err)
+	}
+
+	// Construct sign-in with email link template, embed the link and send
+	// using custom SMTP server.
+	sendCustomEmail(email, displayName, link)
+	// [END sign_in_with_email_link]
+}
+
+// Place holder function to make the compiler happy. This is referenced by all email action
+// link snippets.
+func sendCustomEmail(email, displayName, link string) {}
