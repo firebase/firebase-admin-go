@@ -174,16 +174,6 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 }
 
-func TestMe(t *testing.T) {
-	creds, err := transport.Creds(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if creds != nil {
-		t.Fatalf("Creds = %#v", creds)
-	}
-}
-
 func TestNewClientWithUserCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte(`{
