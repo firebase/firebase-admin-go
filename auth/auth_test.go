@@ -119,8 +119,9 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
@@ -147,8 +148,9 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
@@ -181,12 +183,14 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	}
 	conf := &internal.AuthConfig{
 		Creds:   creds,
+		Opts:    []option.ClientOption{option.WithCredentials(creds)},
 		Version: "test-version",
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", client, err)
+		t.Fatal(err)
 	}
+
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
