@@ -1,5 +1,10 @@
 # Unreleased
 
+# v3.8.1
+
+- [fixed] Fixed a test case that was failing in environments without
+  Application Default Credentials support.
+
 # v3.8.0
 
 - [added] Implemented `auth.EmailVerificationLink()` function for
