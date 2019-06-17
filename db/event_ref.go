@@ -41,15 +41,13 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 		return &SnapshotIterator{active: false}, err
 	}
 
-	scanner := bufio.NewScanner(resp.Body)
-
-	snapshot, err := getInitialNodeSnapshot(scanner, resp)
+	snapshot, err := getInitialNodeSnapshot(resp)
 
 	if err != nil {
 		return &SnapshotIterator{active: false}, err
 	}
 
-	go startListening(scanner, resp, sseDataChan)
+	go r.startListeningWithReconnect(ctx, opts, resp, sseDataChan)
 
 	return &SnapshotIterator{
 		Snapshot:    snapshot,
@@ -61,9 +59,11 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 } // Listen()
 
 // return initial snapshot (JSON-encoded string) from Ref.Path node location
-func getInitialNodeSnapshot(scanner *bufio.Scanner, resp *http.Response) (string, error) {
+func getInitialNodeSnapshot(resp *http.Response) (string, error) {
 
 	var b []byte
+
+	scanner := bufio.NewScanner(resp.Body)
 
 	if scanner.Scan() == true {
 
@@ -104,7 +104,9 @@ func getInitialNodeSnapshot(scanner *bufio.Scanner, resp *http.Response) (string
 }
 
 // called with goroutine
-func startListening(scanner *bufio.Scanner, resp *http.Response, sseDataChan chan<- string) { // sseDataChan send only
+func (r *Ref) startListeningWithReconnect(ctx context.Context, opts []internal.HTTPOption, resp *http.Response, sseDataChan chan<- string) {
+
+	scanner := bufio.NewScanner(resp.Body)
 
 	var b []byte
 
@@ -126,17 +128,36 @@ func startListening(scanner *bufio.Scanner, resp *http.Response, sseDataChan cha
 					if s[:5] == "data:" {
 						// trim 'data: '
 						sseDataChan <- s[6:] // {"path":"/","data":{"test3":{"test4":4}}}
-
 					}
 				}
+			} else if "event: auth_revoked" == string(b) {
+
+				// reconnect to re-establish authentication every hour
+				resp, err := r.sendListen(ctx, "GET", opts...)
+
+				if err == nil {
+					// not part of existing continuing listening events, so we don't send to the listening channel
+					snapshot, err := getInitialNodeSnapshot(resp)
+					_ = snapshot
+					_ = err
+				}
+
+				scanner = bufio.NewScanner(resp.Body)
+			}
+		} else {
+			// attemp to reconnect for other connection problems
+			resp, err := r.sendListen(ctx, "GET", opts...)
+
+			if err == nil {
+				// not part of existing continuing listening events, so we don't send to the listening channel
+				snapshot, err := getInitialNodeSnapshot(resp)
+				_ = snapshot
+				_ = err
 			}
 
-		} else {
-
-			break
+			scanner = bufio.NewScanner(resp.Body)
 		}
-
-	} // for
+	}
 }
 
 // returns path and snapshot
