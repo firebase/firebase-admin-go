@@ -17,6 +17,7 @@ package db
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -75,26 +76,19 @@ func getInitialNodeSnapshot(resp *http.Response) (string, error) {
 				b = scanner.Bytes()
 				s := string(b)
 
-				// https://firebase.google.com/docs/reference/rest/database/#section-streaming
-				// JSON encoded data payload
-				// sample
-				// s = data: {"path":"/","data":{"test3":{"test4":4}}}
+				var snapshotMap map[string]interface{}
 
-				// sse data = path + snapshot
-				// we only want snapshot
-				// path is always root for initial json payload, so 1st 25 char/byte is conistent
-				// data: {"path":"/","data":
-				// 1234567890123456789012345
-				if s[:25] != "data: {\"path\":\"/\",\"data\":" {
-					return "", errors.New("sse data json error, 25 char/byte sequence")
+				err := json.Unmarshal([]byte(s[6:]), &snapshotMap)
+				if err != nil {
+					return "", err
+				}
+				snapshotByte, err := json.Marshal(snapshotMap["data"])
+				if err != nil {
+					return "", err
 				}
 
-				if s[:5] == "data:" {
-					ss := s[6:]         // trim first 6 chars:'data: '
-					ss = ss[19:]        // trim first 19 chars:'{path":"/","data":'
-					ss = ss[:len(ss)-1] // trim last char }
-					return ss, nil      // {"test3":{"test4":4}} = snapshot
-				}
+				return string(snapshotByte), nil
+
 			}
 		}
 
@@ -161,39 +155,29 @@ func (r *Ref) startListeningWithReconnect(ctx context.Context, opts []internal.H
 }
 
 // returns path and snapshot
-func splitSSEData(json string) (string, string, error) {
+func splitSSEData(sseData string) (path string, snapshot string, err error) {
 
-	// sse data = path + snapshot
-	// expected json payload string is similar to this:
-	// {"path":"/test2","data":{"test3":{"test4":4}}}
+	var sseDataMap map[string]interface{}
 
-	// IMPORTANT: quote and comma are valid in path, but are escaped in json payload
-	//            so the 3 char/byte sequence used in count "," should only occur once
-
-	count := strings.Count(json, "\",\"") // unique 3 char/byte sequence in json payload
-	index := strings.Index(json, "\",\"")
-
-	if count != 1 {
-		// count must equal to 1 or json payload is incorrect
-		return "", "", errors.New("sse data json count error")
+	err = json.Unmarshal([]byte(sseData), &sseDataMap)
+	if err != nil {
+		return "", "", err
 	}
 
-	if index < 11 { // 11 comes from root path which is minimum '{"path":"/"'
-		return "", "", errors.New("sse data json index error")
+	pathByte, err := json.Marshal(sseDataMap["path"])
+	if err != nil {
+		return "", "", err
 	}
 
-	if json[:8] == "{\"path\":" {
-		path := json
-		path = path[:index]
-		path = path[9:] // 9 = {"path":"
-
-		ss := json
-		ss = ss[index+9:]    // trim  '..."/","data":'
-		ss = ss[:len(ss)-1]  // trim last char }
-		return path, ss, nil // {"test3":{"test4":4}} = snapshot
+	snapshotByte, err := json.Marshal(sseDataMap["data"])
+	if err != nil {
+		return "", "", err
 	}
 
-	return "", "", errors.New("sse data json {\"path\": not found error")
+	path = string(pathByte)
+	snapshot = string(snapshotByte)
+
+	return
 }
 
 func (c *Client) sendListen(
