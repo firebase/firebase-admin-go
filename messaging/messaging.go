@@ -142,6 +142,7 @@ type Message struct {
 	Android      *AndroidConfig    `json:"android,omitempty"`
 	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
 	APNS         *APNSConfig       `json:"apns,omitempty"`
+	FcmOptions   *FcmOptions       `json:"fcm_options,omitempty"`
 	Token        string            `json:"token,omitempty"`
 	Topic        string            `json:"-"`
 	Condition    string            `json:"condition,omitempty"`
@@ -192,6 +193,7 @@ type AndroidConfig struct {
 	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
 	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
 	Notification          *AndroidNotification `json:"notification,omitempty"`
+	FcmOptions            *AndroidFcmOptions   `json:"fcm_options,omitempty"`
 }
 
 // MarshalJSON marshals an AndroidConfig into JSON (for internal use only).
@@ -268,6 +270,11 @@ type AndroidNotification struct {
 	ChannelID    string   `json:"channel_id,omitempty"`
 }
 
+// AndroidFcmOptions contains additional options for features provided by the FCM Android SDK.
+type AndroidFcmOptions struct {
+	AnalyticsLabel string `json:"analytics_label,omitempty"`
+}
+
 // WebpushConfig contains messaging options specific to the WebPush protocol.
 //
 // See https://tools.ietf.org/html/rfc8030#section-5 for additional details, and supported
@@ -276,7 +283,7 @@ type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
-	FcmOptions   *WebpushFcmOptions   `json:"fcmOptions,omitempty"`
+	FcmOptions   *WebpushFcmOptions   `json:"fcm_options,omitempty"`
 }
 
 // WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
@@ -392,8 +399,9 @@ type WebpushFcmOptions struct {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
 // for more details on supported headers and payload keys.
 type APNSConfig struct {
-	Headers map[string]string `json:"headers,omitempty"`
-	Payload *APNSPayload      `json:"payload,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Payload    *APNSPayload      `json:"payload,omitempty"`
+	FcmOptions *APNSFcmOptions   `json:"fcm_options,omitempty"`
 }
 
 // APNSPayload is the payload that can be included in an APNS message.
@@ -600,6 +608,16 @@ type ApsAlert struct {
 	SubTitleLocArgs []string `json:"subtitle-loc-args,omitempty"`
 	ActionLocKey    string   `json:"action-loc-key,omitempty"`
 	LaunchImage     string   `json:"launch-image,omitempty"`
+}
+
+// APNSFcmOptions contains additional options for features provided by the FCM Aps SDK.
+type APNSFcmOptions struct {
+	AnalyticsLabel string `json:"analytics_label,omitempty"`
+}
+
+// FcmOptions contains additional options.
+type FcmOptions struct {
+	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 
 // ErrorInfo is a topic management error.
