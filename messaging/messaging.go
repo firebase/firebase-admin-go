@@ -615,7 +615,7 @@ type APNSFcmOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 
-// FcmOptions contains additional options.
+// FcmOptions contains additional options to use across all platforms.
 type FcmOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
