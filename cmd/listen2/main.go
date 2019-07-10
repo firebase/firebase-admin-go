@@ -86,6 +86,11 @@ func main() {
 
 	go func() {
 		for {
+
+			if iter.Done() {
+				break
+			}
+
 			event, err := iter.Next()
 
 			if err != nil {
@@ -123,6 +128,11 @@ func main() {
 
 	go func() {
 		for {
+
+			if iter2.Done() {
+				break
+			}
+
 			event, err := iter2.Next()
 
 			if err != nil {
@@ -136,11 +146,15 @@ func main() {
 
 	fmt.Printf("\n >>> open a new separate command line terminal, to trigger events, run: go run . anyvalue\n")
 	fmt.Printf("\n >>> OR edit value of any key from %s in firebase console to trigger events\n\n", testpath)
-	fmt.Printf("\n >>> press <enter> to close http connection\n\n")
+	fmt.Printf("\n >>> press <enter> to stop 1st Listener and close http connection\n\n")
 	fmt.Printf("Waiting for events...\n\n")
 
 	fmt.Scanln()
 	iter.Stop()
+
+	fmt.Printf("\n >>> press <enter> to stop 2nd Listener and close http connection\n\n")
+	fmt.Scanln()
+	iter2.Stop()
 
 	fmt.Printf("\n >>> press <enter> to exit app\n\n\n")
 	fmt.Scanln()

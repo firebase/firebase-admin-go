@@ -36,8 +36,15 @@ func TestListen(t *testing.T) {
 	_ = event
 	_ = err
 
+	if iter.Done() {
+		// break
+	}
+
 	if err == nil {
 		iter.Stop()
 	}
+
+	b := iter.Done()
+	_ = b
 
 }

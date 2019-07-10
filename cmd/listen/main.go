@@ -73,6 +73,11 @@ func main() {
 
 	go func() {
 		for {
+
+			if iter.Done() {
+				break
+			}
+
 			event, err := iter.Next()
 
 			if err != nil {

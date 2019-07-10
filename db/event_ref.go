@@ -26,7 +26,7 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-// Listen ...
+// Listen returns an iterator that listens to realtime events
 func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 
 	sseDataChan := make(chan string) // server-sent event data channel
@@ -38,23 +38,26 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 
 	resp, err := r.sendListen(ctx, "GET", opts...)
 
+	done := true
+
 	if err != nil {
-		return &SnapshotIterator{active: false}, err
+		return &SnapshotIterator{done: &done}, err
 	}
 
 	snapshot, err := getInitialNodeSnapshot(resp)
 
 	if err != nil {
-		return &SnapshotIterator{active: false}, err
+		return &SnapshotIterator{done: &done}, err
 	}
 
-	go r.startListeningWithReconnect(ctx, opts, resp, sseDataChan)
+	done = false
+	go r.startListeningWithReconnect(ctx, opts, resp, &done, sseDataChan)
 
 	return &SnapshotIterator{
 		Snapshot:    snapshot,
 		SSEDataChan: sseDataChan,
-		resp:        resp, //*http.Response
-		active:      true,
+		done:        &done,
+		resp:        resp, // *http.Response
 	}, err
 
 } // Listen()
@@ -76,19 +79,24 @@ func getInitialNodeSnapshot(resp *http.Response) (string, error) {
 				b = scanner.Bytes()
 				s := string(b)
 
+				// sample sse data
+				// s = 'data: {"path":"/","data":{"test3":{"test4":4}}}'
+
 				var snapshotMap map[string]interface{}
 
+				// We only want the well formed json payload
+				// exclude or trim the first 6 chars 'data: '
 				err := json.Unmarshal([]byte(s[6:]), &snapshotMap)
 				if err != nil {
 					return "", err
 				}
+
 				snapshotByte, err := json.Marshal(snapshotMap["data"])
 				if err != nil {
 					return "", err
 				}
 
 				return string(snapshotByte), nil
-
 			}
 		}
 
@@ -98,13 +106,23 @@ func getInitialNodeSnapshot(resp *http.Response) (string, error) {
 }
 
 // called with goroutine
-func (r *Ref) startListeningWithReconnect(ctx context.Context, opts []internal.HTTPOption, resp *http.Response, sseDataChan chan<- string) {
+func (r *Ref) startListeningWithReconnect(
+	ctx context.Context,
+	opts []internal.HTTPOption,
+	resp *http.Response,
+	done *bool,
+	sseDataChan chan<- string) {
 
 	scanner := bufio.NewScanner(resp.Body)
 
 	var b []byte
 
 	for {
+
+		if *done {
+			break
+		}
+
 		if scanner.Scan() == true {
 
 			b = scanner.Bytes()
@@ -127,7 +145,8 @@ func (r *Ref) startListeningWithReconnect(ctx context.Context, opts []internal.H
 			} else if "event: auth_revoked" == string(b) {
 
 				// reconnect to re-establish authentication every hour
-				resp, err := r.sendListen(ctx, "GET", opts...)
+				var err error
+				resp, err = r.sendListen(ctx, "GET", opts...)
 
 				if err == nil {
 					// not part of existing continuing listening events, so we don't send to the listening channel
@@ -139,8 +158,10 @@ func (r *Ref) startListeningWithReconnect(ctx context.Context, opts []internal.H
 				scanner = bufio.NewScanner(resp.Body)
 			}
 		} else {
+
 			// attemp to reconnect for other connection problems
-			resp, err := r.sendListen(ctx, "GET", opts...)
+			var err error
+			resp, err = r.sendListen(ctx, "GET", opts...)
 
 			if err == nil {
 				// not part of existing continuing listening events, so we don't send to the listening channel

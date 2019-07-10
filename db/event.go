@@ -22,7 +22,7 @@ import (
 
 // SSE = Sever-Sent Events = ssevent
 
-// EventType ...
+// EventType specific event type changes
 type EventType uint
 
 // EventType ...
@@ -41,16 +41,17 @@ type Event struct {
 	Path string // snapshot path
 }
 
-// SnapshotIterator iterator for continuous event
+// SnapshotIterator iterator for continuous events
 type SnapshotIterator struct {
 	Snapshot    string         // initial snapshot, JSON-encoded, returned from http Respoonse, server sent event, data part
 	SSEDataChan <-chan string  // continuous event snapshot, channel receive only, directional channel
+	done        *bool          // Done listening to events, also used to prevent channel block
 	resp        *http.Response // http connection keep alive
-	active      bool           // false when resp is closed, used to prevent channel block, defaults to false
 }
 
 // Snapshot ssevent data, data part
 func (e *Event) Snapshot() string {
+
 	return e.Data // ssevent data (snapshot), snapshot only, data part of ssevent data
 }
 
@@ -60,32 +61,38 @@ func (e *Event) Unmarshal(v interface{}) error {
 	return json.Unmarshal([]byte(e.Data), v)
 }
 
-// Next ...
-func (i *SnapshotIterator) Next() (*Event, error) {
+// Next realtime event
+func (it *SnapshotIterator) Next() (*Event, error) {
 
 	// prevent channel block
-	if i.active == false {
-		return nil, errors.New("SnapshotIterator is not active")
+	if *it.done == true {
+		return nil, errors.New("SnapshotIterator is done or no longer active")
 	}
 
-	sseDataString := <-i.SSEDataChan
+	sseDataString := <-it.SSEDataChan
 
 	// todo: determine EventType
 
-	path, ss, err := splitSSEData(sseDataString)
+	path, snapshot, err := splitSSEData(sseDataString)
 
 	return &Event{
 		EventType: ChildChanged,
-		Data:      ss, // snapshot
+		Data:      snapshot,
 		Path:      path,
 	}, err
 
 } // Next()
 
-// Stop ...
-func (i *SnapshotIterator) Stop() {
-	i.active = false
-	if i.resp != nil {
-		i.resp.Body.Close()
+// Stop listening for realtime events
+// close http connection
+func (it *SnapshotIterator) Stop() {
+	*it.done = true
+	if it.resp != nil {
+		it.resp.Body.Close()
 	}
+}
+
+// Done can be used to check if Stop() have been called
+func (it *SnapshotIterator) Done() bool {
+	return *it.done
 }
