@@ -824,6 +824,10 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		return result.Name, err
 	}
 
+	return "", c.handleFCMError(resp)
+}
+
+func (c *Client) handleFCMError(resp *internal.Response) error {
 	var fe fcmError
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	var serverCode string
@@ -848,7 +852,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	if fe.Error.Message != "" {
 		msg += "; details: " + fe.Error.Message
 	}
-	return "", internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
+	return internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
 }
 
 func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest) (*TopicManagementResponse, error) {

@@ -96,6 +96,34 @@ func TestSend(t *testing.T) {
 	}
 }
 
+func TestSendAll(t *testing.T) {
+	messages := []*messaging.Message{
+		&messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Title 1",
+				Body:  "Body 1",
+			},
+			Topic: "foo-bar",
+		},
+		&messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Title 2",
+				Body:  "Body 2",
+			},
+			Topic: "foo-bar",
+		},
+	}
+
+	resp, err := client.SendAll(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp == nil || len(resp.Responses) != 2 {
+		t.Errorf("Not right")
+	}
+}
+
 func TestSendInvalidToken(t *testing.T) {
 	msg := &messaging.Message{Token: "INVALID_TOKEN"}
 	if _, err := client.Send(context.Background(), msg); err == nil {
