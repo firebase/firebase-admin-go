@@ -56,43 +56,23 @@ type BatchResponse struct {
 // this function indicates a total failure -- i.e. none of the messages in the list could be sent.
 // Partial failures are indicated by a `BatchResponse` return value.
 func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+	return c.sendBatch(ctx, messages, false)
+}
+
+func (c *Client) sendBatch(
+	ctx context.Context, messages []*Message, dryRun bool) (*BatchResponse, error) {
+
 	if len(messages) == 0 {
 		return nil, errors.New("messages must not be nil or empty")
 	}
+
 	if len(messages) > 100 {
 		return nil, errors.New("messages must not contain more than 100 elements")
 	}
 
-	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
-	headers := map[string]string{
-		"X-GOOG-API-FORMAT-VERSION": "2",
-		"X-FIREBASE-CLIENT":         c.version,
-	}
-
-	var reqs []*part
-	for idx, m := range messages {
-		if err := validateMessage(m); err != nil {
-			return nil, fmt.Errorf("error validating message at index %d: %v", idx, err)
-		}
-
-		r := &part{
-			method: "POST",
-			url:    url,
-			body: &fcmRequest{
-				Message: m,
-			},
-			headers: headers,
-		}
-		reqs = append(reqs, r)
-	}
-
-	request := &internal.Request{
-		Method: http.MethodPost,
-		URL:    "https://fcm.googleapis.com/batch",
-		Body:   &multipartEntity{reqs},
-		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-FIREBASE-CLIENT", c.version),
-		},
+	request, err := c.newBatchRequest(messages, dryRun)
+	if err != nil {
+		return nil, err
 	}
 
 	resp, err := c.client.Do(ctx, request)
@@ -104,63 +84,7 @@ func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchRespon
 		return nil, handleFCMError(resp)
 	}
 
-	var responses []*SendResponse
-	_, params, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	mr := multipart.NewReader(bytes.NewBuffer(resp.Body), params["boundary"])
-	for {
-		part, err := mr.NextPart()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		b, err := ioutil.ReadAll(part)
-		if err != nil {
-			return nil, err
-		}
-		subResp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(b)), nil)
-		if err != nil {
-			return nil, err
-		}
-
-		sr, err := newSendResponse(subResp)
-		if err != nil {
-			return nil, err
-		}
-		responses = append(responses, sr)
-	}
-	return &BatchResponse{
-		Responses: responses,
-	}, nil
-}
-
-func newSendResponse(subResp *http.Response) (*SendResponse, error) {
-	sb, err := ioutil.ReadAll(subResp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if subResp.StatusCode != http.StatusOK {
-		return &SendResponse{
-			Success: false,
-			Error: handleFCMError(&internal.Response{
-				Status: subResp.StatusCode,
-				Header: subResp.Header,
-				Body:   sb,
-			}),
-		}, nil
-	}
-
-	var result fcmResponse
-	if err := json.Unmarshal(sb, &result); err != nil {
-		return nil, err
-	}
-
-	return &SendResponse{
-		Success:   true,
-		MessageID: result.Name,
-	}, nil
+	return newBatchResponse(resp)
 }
 
 type part struct {
@@ -229,4 +153,113 @@ func writePart(idx int, part *part, writer *multipart.Writer) error {
 
 	_, err = p.Write(body)
 	return err
+}
+
+func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Request, error) {
+	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
+	headers := map[string]string{
+		"X-GOOG-API-FORMAT-VERSION": "2",
+		"X-FIREBASE-CLIENT":         c.version,
+	}
+
+	var parts []*part
+	for idx, m := range messages {
+		if err := validateMessage(m); err != nil {
+			return nil, fmt.Errorf("error validating message at index %d: %v", idx, err)
+		}
+
+		p := &part{
+			method: http.MethodPost,
+			url:    url,
+			body: &fcmRequest{
+				Message:      m,
+				ValidateOnly: dryRun,
+			},
+			headers: headers,
+		}
+		parts = append(parts, p)
+	}
+
+	return &internal.Request{
+		Method: http.MethodPost,
+		URL:    c.batchEndpoint,
+		Body:   &multipartEntity{parts: parts},
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-FIREBASE-CLIENT", c.version),
+		},
+	}, nil
+}
+
+func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
+	_, params, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	mr := multipart.NewReader(bytes.NewBuffer(resp.Body), params["boundary"])
+	var responses []*SendResponse
+	successCount := 0
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		sr, err := handlePart(part)
+		if err != nil {
+			return nil, err
+		}
+
+		responses = append(responses, sr)
+		if sr.Success {
+			successCount++
+		}
+	}
+
+	return &BatchResponse{
+		Responses:    responses,
+		SuccessCount: successCount,
+		FailureCount: len(responses) - successCount,
+	}, nil
+}
+
+func handlePart(part *multipart.Part) (*SendResponse, error) {
+	b, err := ioutil.ReadAll(part)
+	if err != nil {
+		return nil, err
+	}
+
+	subResp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(b)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return newSendResponse(subResp)
+}
+
+func newSendResponse(subResp *http.Response) (*SendResponse, error) {
+	sb, err := ioutil.ReadAll(subResp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if subResp.StatusCode != http.StatusOK {
+		resp := &internal.Response{
+			Status: subResp.StatusCode,
+			Header: subResp.Header,
+			Body:   sb,
+		}
+		return &SendResponse{
+			Success: false,
+			Error:   handleFCMError(resp),
+		}, nil
+	}
+
+	var result fcmResponse
+	if err := json.Unmarshal(sb, &result); err != nil {
+		return nil, err
+	}
+
+	return &SendResponse{
+		Success:   true,
+		MessageID: result.Name,
+	}, nil
 }

@@ -32,6 +32,7 @@ import (
 
 const (
 	messagingEndpoint = "https://fcm.googleapis.com/v1"
+	batchEndpoint     = "https://fcm.googleapis.com/batch"
 	iidEndpoint       = "https://iid.googleapis.com"
 	iidSubscribe      = "iid/v1:batchAdd"
 	iidUnsubscribe    = "iid/v1:batchRemove"
@@ -122,11 +123,12 @@ var (
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
 type Client struct {
-	fcmEndpoint string // to enable testing against arbitrary endpoints
-	iidEndpoint string // to enable testing against arbitrary endpoints
-	client      *internal.HTTPClient
-	project     string
-	version     string
+	fcmEndpoint   string // to enable testing against arbitrary endpoints
+	batchEndpoint string // to enable testing against arbitrary endpoints
+	iidEndpoint   string // to enable testing against arbitrary endpoints
+	client        *internal.HTTPClient
+	project       string
+	version       string
 }
 
 // Message to be sent via Firebase Cloud Messaging.
@@ -658,11 +660,12 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}
 
 	return &Client{
-		fcmEndpoint: messagingEndpoint,
-		iidEndpoint: iidEndpoint,
-		client:      hc,
-		project:     c.ProjectID,
-		version:     "fire-admin-go/" + c.Version,
+		fcmEndpoint:   messagingEndpoint,
+		batchEndpoint: batchEndpoint,
+		iidEndpoint:   iidEndpoint,
+		client:        hc,
+		project:       c.ProjectID,
+		version:       "fire-admin-go/" + c.Version,
 	}, nil
 }
 

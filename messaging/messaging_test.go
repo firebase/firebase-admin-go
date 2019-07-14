@@ -965,70 +965,7 @@ func TestSendError(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 	client.client.RetryConfig = nil
 
-	cases := []struct {
-		resp, want string
-		check      func(error) bool
-	}{
-		{
-			resp:  "{}",
-			want:  "http error status: 500; reason: server responded with an unknown error; response: {}",
-			check: IsUnknown,
-		},
-		{
-			resp:  "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
-			want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument; details: test error",
-			check: IsInvalidArgument,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
-				"details: test error",
-			check: IsRegistrationTokenNotRegistered,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"QUOTA_EXCEEDED\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: messaging service quota exceeded; code: message-rate-exceeded; " +
-				"details: test error",
-			check: IsMessageRateExceeded,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"UNAVAILABLE\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: backend servers are temporarily unavailable; code: server-unavailable; " +
-				"details: test error",
-			check: IsServerUnavailable,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"INTERNAL\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: backend servers encountered an unknown internl error; code: internal-error; " +
-				"details: test error",
-			check: IsInternal,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"APNS_AUTH_ERROR\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: apns certificate or auth key was invalid; code: invalid-apns-credentials; " +
-				"details: test error",
-			check: IsInvalidAPNSCredentials,
-		},
-		{
-			resp: "{\"error\": {\"status\": \"SENDER_ID_MISMATCH\", \"message\": \"test error\"}}",
-			want: "http error status: 500; reason: sender id does not match regisration token; code: mismatched-credential; " +
-				"details: test error",
-			check: IsMismatchedCredential,
-		},
-		{
-			resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
-				`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}`,
-			want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
-				"details: test error",
-			check: IsRegistrationTokenNotRegistered,
-		},
-		{
-			resp:  "not json",
-			want:  "http error status: 500; reason: server responded with an unknown error; response: not json",
-			check: IsUnknown,
-		},
-	}
-	for _, tc := range cases {
+	for _, tc := range httpErrors {
 		resp = tc.resp
 		name, err := client.Send(ctx, &Message{Topic: "topic"})
 		if err == nil || err.Error() != tc.want || !tc.check(err) {
@@ -1276,4 +1213,68 @@ func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
 	if e.Reason != "unknown-error" {
 		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "unknown-error")
 	}
+}
+
+var httpErrors = []struct {
+	resp, want string
+	check      func(error) bool
+}{
+	{
+		resp:  "{}",
+		want:  "http error status: 500; reason: server responded with an unknown error; response: {}",
+		check: IsUnknown,
+	},
+	{
+		resp:  "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
+		want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument; details: test error",
+		check: IsInvalidArgument,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+			"details: test error",
+		check: IsRegistrationTokenNotRegistered,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"QUOTA_EXCEEDED\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: messaging service quota exceeded; code: message-rate-exceeded; " +
+			"details: test error",
+		check: IsMessageRateExceeded,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"UNAVAILABLE\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: backend servers are temporarily unavailable; code: server-unavailable; " +
+			"details: test error",
+		check: IsServerUnavailable,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"INTERNAL\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: backend servers encountered an unknown internl error; code: internal-error; " +
+			"details: test error",
+		check: IsInternal,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"APNS_AUTH_ERROR\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: apns certificate or auth key was invalid; code: invalid-apns-credentials; " +
+			"details: test error",
+		check: IsInvalidAPNSCredentials,
+	},
+	{
+		resp: "{\"error\": {\"status\": \"SENDER_ID_MISMATCH\", \"message\": \"test error\"}}",
+		want: "http error status: 500; reason: sender id does not match regisration token; code: mismatched-credential; " +
+			"details: test error",
+		check: IsMismatchedCredential,
+	},
+	{
+		resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}`,
+		want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
+			"details: test error",
+		check: IsRegistrationTokenNotRegistered,
+	},
+	{
+		resp:  "not json",
+		want:  "http error status: 500; reason: server responded with an unknown error; response: not json",
+		check: IsUnknown,
+	},
 }

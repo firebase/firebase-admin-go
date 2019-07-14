@@ -98,14 +98,14 @@ func TestSend(t *testing.T) {
 
 func TestSendAll(t *testing.T) {
 	messages := []*messaging.Message{
-		&messaging.Message{
+		{
 			Notification: &messaging.Notification{
 				Title: "Title 1",
 				Body:  "Body 1",
 			},
 			Topic: "foo-bar",
 		},
-		&messaging.Message{
+		{
 			Notification: &messaging.Notification{
 				Title: "Title 2",
 				Body:  "Body 2",
