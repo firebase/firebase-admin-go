@@ -16,15 +16,24 @@ package messaging
 
 import "testing"
 
-func TestMultipartSerializationSingle(t *testing.T) {
-	reqs := []*subRequest{
-		&subRequest{
-			url: "http://example.com",
-			body: map[string]interface{}{"key": "value"},
+func TestMultipartEntitySingle(t *testing.T) {
+	entity := &multipartEntity{
+		parts: []*part{
+			{
+				method: "POST",
+				url:    "http://example.com",
+				body:   map[string]interface{}{"key": "value"},
+			},
 		},
 	}
 
-	b, err := multipartPayload(reqs)
+	const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
+	mime := entity.Mime()
+	if mime != wantMime {
+		t.Errorf("Mime() = %q; want = %q", mime, wantMime)
+	}
+
+	b, err := entity.Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,24 +51,34 @@ func TestMultipartSerializationSingle(t *testing.T) {
 		"{\"key\":\"value\"}\r\n" +
 		"--__END_OF_PART__--\r\n"
 	if string(b) != want {
-		t.Errorf("multipartPayload() = %q; want = %q", string(b), want)
+		t.Errorf("Bytes() = %q; want = %q", string(b), want)
 	}
 }
 
-func TestMultipartSerializationArray(t *testing.T) {
-	reqs := []*subRequest{
-		&subRequest{
-			url: "http://example1.com",
-			body: map[string]interface{}{"key1": "value"},
-		},
-		&subRequest{
-			url: "http://example2.com",
-			body: map[string]interface{}{"key2": "value"},
-			headers: map[string]string{"Custom-Header": "custom-value"},
+func TestMultipartEntity(t *testing.T) {
+	entity := &multipartEntity{
+		parts: []*part{
+			{
+				method: "POST",
+				url:    "http://example1.com",
+				body:   map[string]interface{}{"key1": "value"},
+			},
+			{
+				method:  "POST",
+				url:     "http://example2.com",
+				body:    map[string]interface{}{"key2": "value"},
+				headers: map[string]string{"Custom-Header": "custom-value"},
+			},
 		},
 	}
 
-	b, err := multipartPayload(reqs)
+	const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
+	mime := entity.Mime()
+	if mime != wantMime {
+		t.Errorf("Mime() = %q; want = %q", mime, wantMime)
+	}
+
+	b, err := entity.Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}

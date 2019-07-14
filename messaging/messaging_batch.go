@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -32,7 +31,10 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-// SendResponse represents the status of an individual message that was sent as part of a batch request.
+const multipartBoundary = "__END_OF_PART__"
+
+// SendResponse represents the status of an individual message that was sent as part of a batch
+// request.
 type SendResponse struct {
 	Success   bool
 	MessageID string
@@ -67,14 +69,15 @@ func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchRespon
 		"X-FIREBASE-CLIENT":         c.version,
 	}
 
-	var reqs []*subRequest
+	var reqs []*part
 	for idx, m := range messages {
 		if err := validateMessage(m); err != nil {
 			return nil, fmt.Errorf("error validating message at index %d: %v", idx, err)
 		}
 
-		r := &subRequest{
-			url: url,
+		r := &part{
+			method: "POST",
+			url:    url,
 			body: &fcmRequest{
 				Message: m,
 			},
@@ -98,9 +101,10 @@ func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchRespon
 	}
 
 	if resp.Status != http.StatusOK {
-		return nil, c.handleFCMError(resp)
+		return nil, handleFCMError(resp)
 	}
 
+	var responses []*SendResponse
 	_, params, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	mr := multipart.NewReader(bytes.NewBuffer(resp.Body), params["boundary"])
 	for {
@@ -120,90 +124,109 @@ func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchRespon
 			return nil, err
 		}
 
-		sb, _ := ioutil.ReadAll(subResp.Body)
-		if subResp.StatusCode == http.StatusOK {
-			var result fcmResponse
-			json.Unmarshal(sb, &result)
-			sr := &SendResponse{
-				Success:   true,
-				MessageID: result.Name,
-			}
-			log.Println("SUCCESS", sr)
-		} else {
-
-			sr := &SendResponse{
-				Success: false,
-				Error: c.handleFCMError(&internal.Response{
-					Status: subResp.StatusCode,
-					Header: subResp.Header,
-					Body:   sb,
-				}),
-			}
-			log.Println(sr)
+		sr, err := newSendResponse(subResp)
+		if err != nil {
+			return nil, err
 		}
-
+		responses = append(responses, sr)
 	}
-	return nil, nil
+	return &BatchResponse{
+		Responses: responses,
+	}, nil
 }
 
-type multipartEntity struct {
-	reqs []*subRequest
-}
-
-func (e *multipartEntity) Bytes() ([]byte, error) {
-	return multipartPayload(e.reqs)
-}
-
-func (e *multipartEntity) Mime() string {
-	return "multipart/mixed; boundary=__END_OF_PART__"
-}
-
-type subRequest struct {
-	url     string
-	body    interface{}
-	headers map[string]string
-}
-
-func (req *subRequest) serialize() ([]byte, error) {
-	b, err := json.Marshal(req.body)
+func newSendResponse(subResp *http.Response) (*SendResponse, error) {
+	sb, err := ioutil.ReadAll(subResp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := fmt.Sprintf("POST %s HTTP/1.1\r\n", req.url)
-	payload += fmt.Sprintf("Content-Length: %d\r\n", len(b))
-	payload += "Content-Type: application/json; charset=UTF-8\r\n"
-	for key, value := range req.headers {
-		payload += fmt.Sprintf("%s: %s\r\n", key, value)
+	if subResp.StatusCode != http.StatusOK {
+		return &SendResponse{
+			Success: false,
+			Error: handleFCMError(&internal.Response{
+				Status: subResp.StatusCode,
+				Header: subResp.Header,
+				Body:   sb,
+			}),
+		}, nil
 	}
-	payload += "\r\n"
-	payload += string(b)
-	return []byte(payload), nil
+
+	var result fcmResponse
+	if err := json.Unmarshal(sb, &result); err != nil {
+		return nil, err
+	}
+
+	return &SendResponse{
+		Success:   true,
+		MessageID: result.Name,
+	}, nil
 }
 
-func multipartPayload(requests []*subRequest) ([]byte, error) {
-	body := new(bytes.Buffer)
-	writer := multipart.NewWriter(body)
-	writer.SetBoundary("__END_OF_PART__")
-	for idx, req := range requests {
-		body, err := req.serialize()
-		if err != nil {
-			return nil, err
-		}
+type part struct {
+	method  string
+	url     string
+	headers map[string]string
+	body    interface{}
+}
 
-		header := make(textproto.MIMEHeader)
-		header.Add("Content-Length", fmt.Sprintf("%d", len(body)))
-		header.Add("Content-Type", "application/http")
-		header.Add("Content-Id", fmt.Sprintf("%d", idx+1))
-		header.Add("Content-Transfer-Encoding", "binary")
-		part, err := writer.CreatePart(header)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := part.Write(body); err != nil {
+func (p *part) serialize() ([]byte, error) {
+	b, err := json.Marshal(p.body)
+	if err != nil {
+		return nil, err
+	}
+
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("%s %s HTTP/1.1\r\n", p.method, p.url))
+	buffer.WriteString(fmt.Sprintf("Content-Length: %d\r\n", len(b)))
+	buffer.WriteString("Content-Type: application/json; charset=UTF-8\r\n")
+	for key, value := range p.headers {
+		buffer.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
+	}
+	buffer.WriteString("\r\n")
+	buffer.Write(b)
+	return buffer.Bytes(), nil
+}
+
+type multipartEntity struct {
+	parts []*part
+}
+
+func (e *multipartEntity) Mime() string {
+	return fmt.Sprintf("multipart/mixed; boundary=%s", multipartBoundary)
+}
+
+func (e *multipartEntity) Bytes() ([]byte, error) {
+	var buffer bytes.Buffer
+	writer := multipart.NewWriter(&buffer)
+	writer.SetBoundary(multipartBoundary)
+	for idx, part := range e.parts {
+		if err := writePart(idx, part, writer); err != nil {
 			return nil, err
 		}
 	}
+
 	writer.Close()
-	return body.Bytes(), nil
+	return buffer.Bytes(), nil
+}
+
+func writePart(idx int, part *part, writer *multipart.Writer) error {
+	body, err := part.serialize()
+	if err != nil {
+		return err
+	}
+
+	header := make(textproto.MIMEHeader)
+	header.Add("Content-Length", fmt.Sprintf("%d", len(body)))
+	header.Add("Content-Type", "application/http")
+	header.Add("Content-Id", fmt.Sprintf("%d", idx+1))
+	header.Add("Content-Transfer-Encoding", "binary")
+
+	p, err := writer.CreatePart(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Write(body)
+	return err
 }

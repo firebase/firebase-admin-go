@@ -824,10 +824,10 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		return result.Name, err
 	}
 
-	return "", c.handleFCMError(resp)
+	return "", handleFCMError(resp)
 }
 
-func (c *Client) handleFCMError(resp *internal.Response) error {
+func handleFCMError(resp *internal.Response) error {
 	var fe fcmError
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	var serverCode string
