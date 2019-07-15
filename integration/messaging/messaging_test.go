@@ -122,6 +122,9 @@ func TestSendAll(t *testing.T) {
 	if resp == nil || len(resp.Responses) != 2 {
 		t.Errorf("Not right")
 	}
+	if resp.SuccessCount != 2 {
+		t.Errorf("Success = %d", resp.SuccessCount)
+	}
 }
 
 func TestSendInvalidToken(t *testing.T) {

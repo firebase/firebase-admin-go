@@ -50,10 +50,11 @@ type BatchResponse struct {
 
 // SendAll sends all the messages in the given array via Firebase Cloud Messaging.
 //
-// Employs batching to send the entire list as a single RPC call. Compared to the `Send()` function,
+// The messages array may contain up to 100 messages. SendAll employs batching to send the entire
+// array of mssages as a single RPC call. Compared to the `Send()` function,
 // this is a significantly more efficient way to send multiple messages. The responses
 // list obtained from the return value corresponds to the order of input messages. An error from
-// this function indicates a total failure -- i.e. none of the messages in the list could be sent.
+// SendAll indicates a total failure -- i.e. none of the messages in the array could be sent.
 // Partial failures are indicated by a `BatchResponse` return value.
 func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, false)
@@ -94,72 +95,15 @@ type part struct {
 	body    interface{}
 }
 
-func (p *part) serialize() ([]byte, error) {
-	b, err := json.Marshal(p.body)
-	if err != nil {
-		return nil, err
-	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("%s %s HTTP/1.1\r\n", p.method, p.url))
-	buffer.WriteString(fmt.Sprintf("Content-Length: %d\r\n", len(b)))
-	buffer.WriteString("Content-Type: application/json; charset=UTF-8\r\n")
-	for key, value := range p.headers {
-		buffer.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
-	}
-	buffer.WriteString("\r\n")
-	buffer.Write(b)
-	return buffer.Bytes(), nil
-}
-
 type multipartEntity struct {
 	parts []*part
-}
-
-func (e *multipartEntity) Mime() string {
-	return fmt.Sprintf("multipart/mixed; boundary=%s", multipartBoundary)
-}
-
-func (e *multipartEntity) Bytes() ([]byte, error) {
-	var buffer bytes.Buffer
-	writer := multipart.NewWriter(&buffer)
-	writer.SetBoundary(multipartBoundary)
-	for idx, part := range e.parts {
-		if err := writePart(idx, part, writer); err != nil {
-			return nil, err
-		}
-	}
-
-	writer.Close()
-	return buffer.Bytes(), nil
-}
-
-func writePart(idx int, part *part, writer *multipart.Writer) error {
-	body, err := part.serialize()
-	if err != nil {
-		return err
-	}
-
-	header := make(textproto.MIMEHeader)
-	header.Add("Content-Length", fmt.Sprintf("%d", len(body)))
-	header.Add("Content-Type", "application/http")
-	header.Add("Content-Id", fmt.Sprintf("%d", idx+1))
-	header.Add("Content-Transfer-Encoding", "binary")
-
-	p, err := writer.CreatePart(header)
-	if err != nil {
-		return err
-	}
-
-	_, err = p.Write(body)
-	return err
 }
 
 func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Request, error) {
 	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
 	headers := map[string]string{
 		"X-GOOG-API-FORMAT-VERSION": "2",
-		"X-FIREBASE-CLIENT":         c.version,
+		firebaseClientHeader:        c.version,
 	}
 
 	var parts []*part
@@ -185,13 +129,17 @@ func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Re
 		URL:    c.batchEndpoint,
 		Body:   &multipartEntity{parts: parts},
 		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-FIREBASE-CLIENT", c.version),
+			internal.WithHeader(firebaseClientHeader, c.version),
 		},
 	}, nil
 }
 
 func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
-	_, params, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		return nil, err
+	}
+
 	mr := multipart.NewReader(bytes.NewBuffer(resp.Body), params["boundary"])
 	var responses []*SendResponse
 	successCount := 0
@@ -203,7 +151,7 @@ func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
 			return nil, err
 		}
 
-		sr, err := handlePart(part)
+		sr, err := newSendResponse(part)
 		if err != nil {
 			return nil, err
 		}
@@ -221,31 +169,22 @@ func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
 	}, nil
 }
 
-func handlePart(part *multipart.Part) (*SendResponse, error) {
-	b, err := ioutil.ReadAll(part)
+func newSendResponse(part *multipart.Part) (*SendResponse, error) {
+	hr, err := http.ReadResponse(bufio.NewReader(part), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	subResp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(b)), nil)
+	b, err := ioutil.ReadAll(hr.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return newSendResponse(subResp)
-}
-
-func newSendResponse(subResp *http.Response) (*SendResponse, error) {
-	sb, err := ioutil.ReadAll(subResp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if subResp.StatusCode != http.StatusOK {
+	if hr.StatusCode != http.StatusOK {
 		resp := &internal.Response{
-			Status: subResp.StatusCode,
-			Header: subResp.Header,
-			Body:   sb,
+			Status: hr.StatusCode,
+			Header: hr.Header,
+			Body:   b,
 		}
 		return &SendResponse{
 			Success: false,
@@ -254,7 +193,7 @@ func newSendResponse(subResp *http.Response) (*SendResponse, error) {
 	}
 
 	var result fcmResponse
-	if err := json.Unmarshal(sb, &result); err != nil {
+	if err := json.Unmarshal(b, &result); err != nil {
 		return nil, err
 	}
 
@@ -262,4 +201,68 @@ func newSendResponse(subResp *http.Response) (*SendResponse, error) {
 		Success:   true,
 		MessageID: result.Name,
 	}, nil
+}
+
+func (e *multipartEntity) Mime() string {
+	return fmt.Sprintf("multipart/mixed; boundary=%s", multipartBoundary)
+}
+
+func (e *multipartEntity) Bytes() ([]byte, error) {
+	var buffer bytes.Buffer
+	writer := multipart.NewWriter(&buffer)
+	writer.SetBoundary(multipartBoundary)
+	for idx, part := range e.parts {
+		if err := part.writeTo(writer, idx); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Close()
+	return buffer.Bytes(), nil
+}
+
+func (p *part) writeTo(writer *multipart.Writer, idx int) error {
+	b, err := p.bytes()
+	if err != nil {
+		return err
+	}
+
+	header := make(textproto.MIMEHeader)
+	header.Add("Content-Length", fmt.Sprintf("%d", len(b)))
+	header.Add("Content-Type", "application/http")
+	header.Add("Content-Id", fmt.Sprintf("%d", idx+1))
+	header.Add("Content-Transfer-Encoding", "binary")
+
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = part.Write(b)
+	return err
+}
+
+func (p *part) bytes() ([]byte, error) {
+	b, err := json.Marshal(p.body)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(p.method, p.url, bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range p.headers {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Set("User-Agent", "")
+
+	var buffer bytes.Buffer
+	if err := req.Write(&buffer); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }

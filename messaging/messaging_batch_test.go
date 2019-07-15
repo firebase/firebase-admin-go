@@ -26,6 +26,11 @@ import (
 	"testing"
 )
 
+var testMessages = []*Message{
+	{Topic: "topic1"},
+	{Topic: "topic2"},
+}
+
 func TestMultipartEntitySingle(t *testing.T) {
 	entity := &multipartEntity{
 		parts: []*part{
@@ -50,11 +55,12 @@ func TestMultipartEntitySingle(t *testing.T) {
 
 	want := "--__END_OF_PART__\r\n" +
 		"Content-Id: 1\r\n" +
-		"Content-Length: 118\r\n" +
+		"Content-Length: 120\r\n" +
 		"Content-Transfer-Encoding: binary\r\n" +
 		"Content-Type: application/http\r\n" +
 		"\r\n" +
-		"POST http://example.com HTTP/1.1\r\n" +
+		"POST / HTTP/1.1\r\n" +
+		"Host: example.com\r\n" +
 		"Content-Length: 15\r\n" +
 		"Content-Type: application/json; charset=UTF-8\r\n" +
 		"\r\n" +
@@ -95,22 +101,24 @@ func TestMultipartEntity(t *testing.T) {
 
 	want := "--__END_OF_PART__\r\n" +
 		"Content-Id: 1\r\n" +
-		"Content-Length: 120\r\n" +
+		"Content-Length: 122\r\n" +
 		"Content-Transfer-Encoding: binary\r\n" +
 		"Content-Type: application/http\r\n" +
 		"\r\n" +
-		"POST http://example1.com HTTP/1.1\r\n" +
+		"POST / HTTP/1.1\r\n" +
+		"Host: example1.com\r\n" +
 		"Content-Length: 16\r\n" +
 		"Content-Type: application/json; charset=UTF-8\r\n" +
 		"\r\n" +
 		"{\"key1\":\"value\"}\r\n" +
 		"--__END_OF_PART__\r\n" +
 		"Content-Id: 2\r\n" +
-		"Content-Length: 149\r\n" +
+		"Content-Length: 151\r\n" +
 		"Content-Transfer-Encoding: binary\r\n" +
 		"Content-Type: application/http\r\n" +
 		"\r\n" +
-		"POST http://example2.com HTTP/1.1\r\n" +
+		"POST / HTTP/1.1\r\n" +
+		"Host: example2.com\r\n" +
 		"Content-Length: 16\r\n" +
 		"Content-Type: application/json; charset=UTF-8\r\n" +
 		"Custom-Header: custom-value\r\n" +
@@ -119,6 +127,23 @@ func TestMultipartEntity(t *testing.T) {
 		"--__END_OF_PART__--\r\n"
 	if string(b) != want {
 		t.Errorf("multipartPayload() = %q; want = %q", string(b), want)
+	}
+}
+
+func TestMultipartEntityError(t *testing.T) {
+	entity := &multipartEntity{
+		parts: []*part{
+			{
+				method: "POST",
+				url:    "http://example.com",
+				body:   func() {},
+			},
+		},
+	}
+
+	b, err := entity.Bytes()
+	if b != nil || err == nil {
+		t.Errorf("Bytes() = (%v, %v); want = (nil, error)", b, nil)
 	}
 }
 
@@ -201,14 +226,7 @@ func TestSendAll(t *testing.T) {
 	}
 	client.batchEndpoint = ts.URL
 
-	br, err := client.SendAll(ctx, []*Message{
-		{
-			Topic: "topic1",
-		},
-		{
-			Topic: "topic2",
-		},
-	})
+	br, err := client.SendAll(ctx, testMessages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,14 +276,7 @@ func TestSendAllPartialFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		br, err := client.SendAll(ctx, []*Message{
-			{
-				Topic: "topic1",
-			},
-			{
-				Topic: "topic2",
-			},
-		})
+		br, err := client.SendAll(ctx, testMessages)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -333,6 +344,26 @@ func TestSendAllTotalFailure(t *testing.T) {
 		if err == nil || err.Error() != tc.want || !tc.check(err) {
 			t.Errorf("SendAll() = (%v, %v); want = (nil, %q)", br, err, tc.want)
 		}
+	}
+}
+
+func TestSendAllNonMultipartResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	_, err = client.SendAll(ctx, testMessages)
+	if err == nil {
+		t.Fatal("SendAll() = nil; want = error")
 	}
 }
 
