@@ -31,6 +31,8 @@ var testMessages = []*Message{
 	{Topic: "topic2"},
 }
 
+const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
+
 func TestMultipartEntitySingle(t *testing.T) {
 	entity := &multipartEntity{
 		parts: []*part{
@@ -42,7 +44,6 @@ func TestMultipartEntitySingle(t *testing.T) {
 		},
 	}
 
-	const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
 	mime := entity.Mime()
 	if mime != wantMime {
 		t.Errorf("Mime() = %q; want = %q", mime, wantMime)
@@ -88,7 +89,6 @@ func TestMultipartEntity(t *testing.T) {
 		},
 	}
 
-	const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
 	mime := entity.Mime()
 	if mime != wantMime {
 		t.Errorf("Mime() = %q; want = %q", mime, wantMime)
@@ -166,7 +166,7 @@ func TestSendAllEmptyArray(t *testing.T) {
 	}
 }
 
-func TestSendAllTooManyElements(t *testing.T) {
+func TestSendAllTooManyMessages(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
@@ -192,7 +192,7 @@ func TestSendAllInvalidMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "error validating message at index 0: message must not be nil"
+	want := "invalid message at index 0: message must not be nil"
 	br, err := client.SendAll(ctx, []*Message{nil})
 	if err == nil || err.Error() != want {
 		t.Errorf("SendAll(nil) = (%v, %v); want = (nil, %q)", br, err, want)
@@ -214,7 +214,7 @@ func TestSendAll(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "multipart/mixed; boundary="+multipartBoundary)
+		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
 	defer ts.Close()
@@ -238,12 +238,12 @@ func TestSendAll(t *testing.T) {
 		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
 	}
 	if len(br.Responses) != 2 {
-		t.Errorf("len(Responses) =%d; want = 2", len(br.Responses))
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
 	}
 
 	for idx, r := range br.Responses {
 		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
-			t.Errorf("Responses[%d] = %v", idx, err)
+			t.Errorf("Responses[%d]: %v", idx, err)
 		}
 	}
 }
@@ -254,10 +254,10 @@ func TestSendAllPartialFailure(t *testing.T) {
 			Name: "projects/test-project/messages/1",
 		},
 	}
-	var resp []byte
 
+	var resp []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "multipart/mixed; boundary="+multipartBoundary)
+		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
 	defer ts.Close()
@@ -292,33 +292,20 @@ func TestSendAllPartialFailure(t *testing.T) {
 		}
 
 		if err := checkSuccessfulSendResponse(br.Responses[0], success[0].Name); err != nil {
-			t.Errorf("Responses[0] = %v", err)
+			t.Errorf("Responses[0]: %v", err)
 		}
 
 		r := br.Responses[1]
 		if r.Success {
-			t.Errorf("Responses[1].Success = true; want = false")
+			t.Errorf("Responses[1]: Success = true; want = false")
 		}
 		if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
-			t.Errorf("Responses[1].Error = %v; want = %q", r.Error, tc.want)
+			t.Errorf("Responses[1]: Error = %v; want = %q", r.Error, tc.want)
 		}
 		if r.MessageID != "" {
-			t.Errorf("Responses[1].MessageID = %q; want = %q", r.MessageID, "")
+			t.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
 		}
 	}
-}
-
-func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
-	if !r.Success {
-		return fmt.Errorf("Success = false; want = true")
-	}
-	if r.Error != nil {
-		return fmt.Errorf("Error = %v; want = nil", r.Error)
-	}
-	if r.MessageID != wantID {
-		return fmt.Errorf("MessageID = %q; want = %q", r.MessageID, wantID)
-	}
-	return nil
 }
 
 func TestSendAllTotalFailure(t *testing.T) {
@@ -365,6 +352,65 @@ func TestSendAllNonMultipartResponse(t *testing.T) {
 	if err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
+}
+
+func TestSendAllMalformedContentType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "invalid content-type")
+		w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	_, err = client.SendAll(ctx, testMessages)
+	if err == nil {
+		t.Fatal("SendAll() = nil; want = error")
+	}
+}
+
+func TestSendAllMalformedMultipartResponse(t *testing.T) {
+	malformedResp := "--__END_OF_PART__\r\n" +
+		"Content-Id: 1\r\n" +
+		"Content-Type: application/http\r\n" +
+		"\r\n" +
+		"Malformed Response\r\n" +
+		"--__END_OF_PART__--\r\n"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", wantMime)
+		w.Write([]byte(malformedResp))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	_, err = client.SendAll(ctx, testMessages)
+	if err == nil {
+		t.Fatal("SendAll() = nil; want = error")
+	}
+}
+
+func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
+	if !r.Success {
+		return fmt.Errorf("Success = false; want = true")
+	}
+	if r.Error != nil {
+		return fmt.Errorf("Error = %v; want = nil", r.Error)
+	}
+	if r.MessageID != wantID {
+		return fmt.Errorf("MessageID = %q; want = %q", r.MessageID, wantID)
+	}
+	return nil
 }
 
 func createMultipartResponse(success []fcmResponse, failure []string) ([]byte, error) {

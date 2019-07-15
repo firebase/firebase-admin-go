@@ -88,6 +88,10 @@ func (c *Client) sendBatch(
 	return newBatchResponse(resp)
 }
 
+// part represents a HTTP request that can be sent embedded in a multipart batch request.
+//
+// See https://cloud.google.com/compute/docs/api/how-tos/batch for details on how GCP APIs support multipart batch
+// requests.
 type part struct {
 	method  string
 	url     string
@@ -95,6 +99,7 @@ type part struct {
 	body    interface{}
 }
 
+// multipartEntity represents an HTTP entity that consists of multiple HTTP requests (parts).
 type multipartEntity struct {
 	parts []*part
 }
@@ -109,7 +114,7 @@ func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Re
 	var parts []*part
 	for idx, m := range messages {
 		if err := validateMessage(m); err != nil {
-			return nil, fmt.Errorf("error validating message at index %d: %v", idx, err)
+			return nil, fmt.Errorf("invalid message at index %d: %v", idx, err)
 		}
 
 		p := &part{
@@ -137,7 +142,7 @@ func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Re
 func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
 	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing content-type header: %v", err)
 	}
 
 	mr := multipart.NewReader(bytes.NewBuffer(resp.Body), params["boundary"])
@@ -172,7 +177,7 @@ func newBatchResponse(resp *internal.Response) (*BatchResponse, error) {
 func newSendResponse(part *multipart.Part) (*SendResponse, error) {
 	hr, err := http.ReadResponse(bufio.NewReader(part), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing multipart body: %v", err)
 	}
 
 	b, err := ioutil.ReadAll(hr.Body)
