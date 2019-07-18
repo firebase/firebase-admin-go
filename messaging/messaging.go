@@ -37,7 +37,9 @@ const (
 	iidSubscribe      = "iid/v1:batchAdd"
 	iidUnsubscribe    = "iid/v1:batchRemove"
 
-	firebaseClientHeader = "X-Firebase-Client"
+	firebaseClientHeader   = "X-Firebase-Client"
+	apiFormatVersionHeader = "X-GOOG-API-FORMAT-VERSION"
+	apiFormatVersion       = "2"
 
 	internalError                  = "internal-error"
 	invalidAPNSCredentials         = "invalid-apns-credentials"
@@ -813,7 +815,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project),
 		Body:   internal.NewJSONEntity(req),
 		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-GOOG-API-FORMAT-VERSION", "2"),
+			internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 			internal.WithHeader(firebaseClientHeader, c.version),
 		},
 	}

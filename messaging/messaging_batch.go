@@ -107,8 +107,8 @@ type multipartEntity struct {
 func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Request, error) {
 	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
 	headers := map[string]string{
-		"X-GOOG-API-FORMAT-VERSION": "2",
-		firebaseClientHeader:        c.version,
+		apiFormatVersionHeader: apiFormatVersion,
+		firebaseClientHeader:   c.version,
 	}
 
 	var parts []*part
