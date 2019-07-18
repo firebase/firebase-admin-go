@@ -15,10 +15,13 @@
 package messaging
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -30,8 +33,12 @@ var testMessages = []*Message{
 	{Topic: "topic1"},
 	{Topic: "topic2"},
 }
+var testMulticastMessage = &MulticastMessage{
+	Tokens: []string{"token1", "token2"},
+}
 
 const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
+const wantSendURL = "/v1/projects/test-project/messages:send"
 
 func TestMultipartEntitySingle(t *testing.T) {
 	entity := &multipartEntity{
@@ -181,7 +188,7 @@ func TestSendAllTooManyMessages(t *testing.T) {
 	want := "messages must not contain more than 100 elements"
 	br, err := client.SendAll(ctx, messages)
 	if err == nil || err.Error() != want {
-		t.Errorf("SendAll(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+		t.Errorf("SendAll() = (%v, %v); want = (nil, %q)", br, err, want)
 	}
 }
 
@@ -195,7 +202,7 @@ func TestSendAllInvalidMessage(t *testing.T) {
 	want := "invalid message at index 0: message must not be nil"
 	br, err := client.SendAll(ctx, []*Message{nil})
 	if err == nil || err.Error() != want {
-		t.Errorf("SendAll(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+		t.Errorf("SendAll() = (%v, %v); want = (nil, %q)", br, err, want)
 	}
 }
 
@@ -213,7 +220,9 @@ func TestSendAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -246,6 +255,65 @@ func TestSendAll(t *testing.T) {
 			t.Errorf("Responses[%d]: %v", idx, err)
 		}
 	}
+
+	if err := checkMultipartRequest(req, false); err != nil {
+		t.Errorf("MultipartRequest: %v", err)
+	}
+}
+
+func TestSendAllDryRun(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+		{
+			Name: "projects/test-project/messages/2",
+		},
+	}
+	resp, err := createMultipartResponse(success, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var req []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", wantMime)
+		w.Write(resp)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	br, err := client.SendAllDryRun(ctx, testMessages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if br.SuccessCount != 2 {
+		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for idx, r := range br.Responses {
+		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
+			t.Errorf("Responses[%d]: %v", idx, err)
+		}
+	}
+
+	if err := checkMultipartRequest(req, true); err != nil {
+		t.Errorf("MultipartRequest: %v", err)
+	}
 }
 
 func TestSendAllPartialFailure(t *testing.T) {
@@ -255,8 +323,9 @@ func TestSendAllPartialFailure(t *testing.T) {
 		},
 	}
 
-	var resp []byte
+	var req, resp []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -304,6 +373,10 @@ func TestSendAllPartialFailure(t *testing.T) {
 		}
 		if r.MessageID != "" {
 			t.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
+		}
+
+		if err := checkMultipartRequest(req, false); err != nil {
+			t.Errorf("MultipartRequest: %v", err)
 		}
 	}
 }
@@ -400,6 +473,239 @@ func TestSendAllMalformedMultipartResponse(t *testing.T) {
 	}
 }
 
+func TestSendMulticastNil(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "message must not be nil"
+	br, err := client.SendMulticast(ctx, nil)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	br, err = client.SendMulticastDryRun(ctx, nil)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendMulticastEmptyArray(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "tokens must not be nil or empty"
+	mm := &MulticastMessage{}
+	br, err := client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast(Tokens: nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	var tokens []string
+	mm = &MulticastMessage{
+		Tokens: tokens,
+	}
+	br, err = client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast(Tokens: []) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendMulticastTooManyTokens(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var tokens []string
+	for i := 0; i < 101; i++ {
+		tokens = append(tokens, fmt.Sprintf("token%d", i))
+	}
+
+	want := "tokens must not contain more than 100 elements"
+	mm := &MulticastMessage{Tokens: tokens}
+	br, err := client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendMulticast(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+		{
+			Name: "projects/test-project/messages/2",
+		},
+	}
+	resp, err := createMultipartResponse(success, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var req []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", wantMime)
+		w.Write(resp)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	br, err := client.SendMulticast(ctx, testMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if br.SuccessCount != 2 {
+		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for idx, r := range br.Responses {
+		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
+			t.Errorf("Responses[%d]: %v", idx, err)
+		}
+	}
+
+	if err := checkMultipartRequest(req, false); err != nil {
+		t.Errorf("MultipartRequest: %v", err)
+	}
+}
+
+func TestSendMulticastDryRun(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+		{
+			Name: "projects/test-project/messages/2",
+		},
+	}
+	resp, err := createMultipartResponse(success, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var req []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", wantMime)
+		w.Write(resp)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	br, err := client.SendMulticastDryRun(ctx, testMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if br.SuccessCount != 2 {
+		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for idx, r := range br.Responses {
+		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
+			t.Errorf("Responses[%d]: %v", idx, err)
+		}
+	}
+
+	if err := checkMultipartRequest(req, true); err != nil {
+		t.Errorf("MultipartRequest: %v", err)
+	}
+}
+
+func TestSendMulticastPartialFailure(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+	}
+
+	var resp []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", wantMime)
+		w.Write(resp)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.batchEndpoint = ts.URL
+
+	for _, tc := range httpErrors {
+		failures := []string{tc.resp}
+		resp, err = createMultipartResponse(success, failures)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		br, err := client.SendMulticast(ctx, testMulticastMessage)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if br.SuccessCount != 1 {
+			t.Errorf("SuccessCount = %d; want = 1", br.SuccessCount)
+		}
+		if br.FailureCount != 1 {
+			t.Errorf("FailureCount = %d; want = 1", br.FailureCount)
+		}
+		if len(br.Responses) != 2 {
+			t.Errorf("len(Responses) =%d; want = 2", len(br.Responses))
+		}
+
+		if err := checkSuccessfulSendResponse(br.Responses[0], success[0].Name); err != nil {
+			t.Errorf("Responses[0]: %v", err)
+		}
+
+		r := br.Responses[1]
+		if r.Success {
+			t.Errorf("Responses[1]: Success = true; want = false")
+		}
+		if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
+			t.Errorf("Responses[1]: Error = %v; want = %q", r.Error, tc.want)
+		}
+		if r.MessageID != "" {
+			t.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
+		}
+	}
+}
+
 func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
 	if !r.Success {
 		return fmt.Errorf("Success = false; want = true")
@@ -410,6 +716,72 @@ func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
 	if r.MessageID != wantID {
 		return fmt.Errorf("MessageID = %q; want = %q", r.MessageID, wantID)
 	}
+	return nil
+}
+
+func checkMultipartRequest(b []byte, dryRun bool) error {
+	reader := multipart.NewReader(bytes.NewBuffer((b)), multipartBoundary)
+	count := 0
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if err := checkRequestPart(part, dryRun); err != nil {
+			return fmt.Errorf("[%d] %v", count, err)
+		}
+		count++
+	}
+
+	if count != 2 {
+		return fmt.Errorf("PartsCount = %d; want = 2", count)
+	}
+	return nil
+}
+
+func checkRequestPart(part *multipart.Part, dryRun bool) error {
+	r, err := http.ReadRequest(bufio.NewReader(part))
+	if err != nil {
+		return err
+	}
+
+	if r.Method != http.MethodPost {
+		return fmt.Errorf("Method = %q; want = %q", r.Method, http.MethodPost)
+	}
+	if r.RequestURI != wantSendURL {
+		return fmt.Errorf("URL = %q; want = %q", r.RequestURI, wantSendURL)
+	}
+	if h := r.Header.Get("X-GOOG-API-FORMAT-VERSION"); h != "2" {
+		return fmt.Errorf("X-GOOG-API-FORMAT-VERSION = %q; want = %q", h, "2")
+	}
+
+	clientVersion := "fire-admin-go/" + testMessagingConfig.Version
+	if h := r.Header.Get("X-FIREBASE-CLIENT"); h != clientVersion {
+		return fmt.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
+	}
+
+	b, _ := ioutil.ReadAll(r.Body)
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		return err
+	}
+
+	if _, ok := parsed["message"]; !ok {
+		return fmt.Errorf("Invalid message body = %v", parsed)
+	}
+
+	validate, ok := parsed["validate_only"]
+	if dryRun {
+		if !ok || validate != true {
+			return fmt.Errorf("ValidateOnly = %v; want = true", validate)
+		}
+	} else if ok {
+		return fmt.Errorf("ValidateOnly = %v; want none", validate)
+	}
+
 	return nil
 }
 
