@@ -475,6 +475,26 @@ func TestSendMulticastTooManyTokens(t *testing.T) {
 	}
 }
 
+func TestSendMulticastInvalidMessage(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "invalid message at index 0: priority must be 'normal' or 'high'"
+	mm := &MulticastMessage{
+		Tokens: []string{"token1"},
+		Android: &AndroidConfig{
+			Priority: "invalid",
+		},
+	}
+	br, err := client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
 func TestSendMulticast(t *testing.T) {
 	resp, err := createMultipartResponse(testSuccessResponse, nil)
 	if err != nil {
