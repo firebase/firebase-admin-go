@@ -142,7 +142,7 @@ type Message struct {
 	Android      *AndroidConfig    `json:"android,omitempty"`
 	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
 	APNS         *APNSConfig       `json:"apns,omitempty"`
-	FcmOptions   *FcmOptions       `json:"fcm_options,omitempty"`
+	FCMOptions   *FCMOptions       `json:"fcm_options,omitempty"`
 	Token        string            `json:"token,omitempty"`
 	Topic        string            `json:"-"`
 	Condition    string            `json:"condition,omitempty"`
@@ -193,7 +193,7 @@ type AndroidConfig struct {
 	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
 	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
 	Notification          *AndroidNotification `json:"notification,omitempty"`
-	FcmOptions            *AndroidFcmOptions   `json:"fcm_options,omitempty"`
+	FCMOptions            *AndroidFCMOptions   `json:"fcm_options,omitempty"`
 }
 
 // MarshalJSON marshals an AndroidConfig into JSON (for internal use only).
@@ -270,8 +270,8 @@ type AndroidNotification struct {
 	ChannelID    string   `json:"channel_id,omitempty"`
 }
 
-// AndroidFcmOptions contains additional options for features provided by the FCM Android SDK.
-type AndroidFcmOptions struct {
+// AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.
+type AndroidFCMOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 
@@ -401,7 +401,7 @@ type WebpushFcmOptions struct {
 type APNSConfig struct {
 	Headers    map[string]string `json:"headers,omitempty"`
 	Payload    *APNSPayload      `json:"payload,omitempty"`
-	FcmOptions *APNSFcmOptions   `json:"fcm_options,omitempty"`
+	FCMOptions *APNSFCMOptions   `json:"fcm_options,omitempty"`
 }
 
 // APNSPayload is the payload that can be included in an APNS message.
@@ -610,13 +610,13 @@ type ApsAlert struct {
 	LaunchImage     string   `json:"launch-image,omitempty"`
 }
 
-// APNSFcmOptions contains additional options for features provided by the FCM Aps SDK.
-type APNSFcmOptions struct {
+// APNSFCMOptions contains additional options for features provided by the FCM Aps SDK.
+type APNSFCMOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 
-// FcmOptions contains additional options to use across all platforms.
-type FcmOptions struct {
+// FCMOptions contains additional options to use across all platforms.
+type FCMOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 

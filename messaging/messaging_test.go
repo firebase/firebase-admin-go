@@ -82,7 +82,7 @@ var validMessages = []struct {
 				"k1": "v1",
 				"k2": "v2",
 			},
-			FcmOptions: &FcmOptions{
+			FCMOptions: &FCMOptions{
 				AnalyticsLabel: "Analytics",
 			},
 			Topic: "test-topic",
@@ -159,7 +159,7 @@ var validMessages = []struct {
 					ChannelID:    "channel",
 				},
 				TTL: &ttlWithNanos,
-				FcmOptions: &AndroidFcmOptions{
+				FCMOptions: &AndroidFCMOptions{
 					AnalyticsLabel: "Analytics",
 				},
 			},
@@ -320,7 +320,7 @@ var validMessages = []struct {
 						"k2": true,
 					},
 				},
-				FcmOptions: &APNSFcmOptions{
+				FCMOptions: &APNSFCMOptions{
 					AnalyticsLabel: "Analytics",
 				},
 			},
