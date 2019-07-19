@@ -32,9 +32,14 @@ import (
 
 const (
 	messagingEndpoint = "https://fcm.googleapis.com/v1"
+	batchEndpoint     = "https://fcm.googleapis.com/batch"
 	iidEndpoint       = "https://iid.googleapis.com"
 	iidSubscribe      = "iid/v1:batchAdd"
 	iidUnsubscribe    = "iid/v1:batchRemove"
+
+	firebaseClientHeader   = "X-Firebase-Client"
+	apiFormatVersionHeader = "X-GOOG-API-FORMAT-VERSION"
+	apiFormatVersion       = "2"
 
 	internalError                  = "internal-error"
 	invalidAPNSCredentials         = "invalid-apns-credentials"
@@ -122,11 +127,12 @@ var (
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
 type Client struct {
-	fcmEndpoint string // to enable testing against arbitrary endpoints
-	iidEndpoint string // to enable testing against arbitrary endpoints
-	client      *internal.HTTPClient
-	project     string
-	version     string
+	fcmEndpoint   string // to enable testing against arbitrary endpoints
+	batchEndpoint string // to enable testing against arbitrary endpoints
+	iidEndpoint   string // to enable testing against arbitrary endpoints
+	client        *internal.HTTPClient
+	project       string
+	version       string
 }
 
 // Message to be sent via Firebase Cloud Messaging.
@@ -270,6 +276,11 @@ type AndroidNotification struct {
 	TitleLocArgs []string `json:"title_loc_args,omitempty"`
 	ChannelID    string   `json:"channel_id,omitempty"`
 	Image        string   `json:"image,omitempty"`
+}
+
+// AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.
+type AndroidFCMOptions struct {
+	AnalyticsLabel string `json:"analytics_label,omitempty"`
 }
 
 // AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.
@@ -679,11 +690,12 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}
 
 	return &Client{
-		fcmEndpoint: messagingEndpoint,
-		iidEndpoint: iidEndpoint,
-		client:      hc,
-		project:     c.ProjectID,
-		version:     "fire-admin-go/" + c.Version,
+		fcmEndpoint:   messagingEndpoint,
+		batchEndpoint: batchEndpoint,
+		iidEndpoint:   iidEndpoint,
+		client:        hc,
+		project:       c.ProjectID,
+		version:       "fire-admin-go/" + c.Version,
 	}, nil
 }
 
@@ -829,8 +841,8 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		URL:    fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project),
 		Body:   internal.NewJSONEntity(req),
 		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-GOOG-API-FORMAT-VERSION", "2"),
-			internal.WithHeader("X-FIREBASE-CLIENT", c.version),
+			internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
+			internal.WithHeader(firebaseClientHeader, c.version),
 		},
 	}
 
@@ -845,6 +857,10 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 		return result.Name, err
 	}
 
+	return "", handleFCMError(resp)
+}
+
+func handleFCMError(resp *internal.Response) error {
 	var fe fcmError
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
 	var serverCode string
@@ -869,7 +885,7 @@ func (c *Client) makeSendRequest(ctx context.Context, req *fcmRequest) (string, 
 	if fe.Error.Message != "" {
 		msg += "; details: " + fe.Error.Message
 	}
-	return "", internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
+	return internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
 }
 
 func (c *Client) makeTopicManagementRequest(ctx context.Context, req *iidRequest) (*TopicManagementResponse, error) {

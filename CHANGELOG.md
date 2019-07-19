@@ -1,5 +1,8 @@
 # Unreleased
 
+- [added] Implemented `messaging.SendAll()` function for sending
+  up to 100 FCM messages at a time.
+
 # v3.8.1
 
 - [fixed] Fixed a test case that was failing in environments without
