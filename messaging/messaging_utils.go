@@ -44,6 +44,11 @@ func validateMessage(message *Message) error {
 		}
 	}
 
+	// validate Notification
+	if err := validateNotification(message.Notification); err != nil {
+		return err
+	}
+
 	// validate AndroidConfig
 	if err := validateAndroidConfig(message.Android); err != nil {
 		return err
@@ -58,6 +63,21 @@ func validateMessage(message *Message) error {
 	return validateAPNSConfig(message.APNS)
 }
 
+func validateNotification(notification *Notification) error {
+	if notification == nil {
+		return nil
+	}
+
+	if notification.Image != "" {
+		image := notification.Image
+		_, err := url.ParseRequestURI(image)
+		if err != nil {
+			return fmt.Errorf("invalid image URL: %q", image)
+		}
+	}
+	return nil
+}
+
 func validateAndroidConfig(config *AndroidConfig) error {
 	if config == nil {
 		return nil
@@ -69,6 +89,7 @@ func validateAndroidConfig(config *AndroidConfig) error {
 	if config.Priority != "" && config.Priority != "normal" && config.Priority != "high" {
 		return fmt.Errorf("priority must be 'normal' or 'high'")
 	}
+
 	// validate AndroidNotification
 	return validateAndroidNotification(config.Notification)
 }
@@ -86,11 +107,28 @@ func validateAndroidNotification(notification *AndroidNotification) error {
 	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
 		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
 	}
+	if notification.Image != "" {
+		image := notification.Image
+		_, err := url.ParseRequestURI(image)
+		if err != nil {
+			return fmt.Errorf("invalid image URL: %q", image)
+		}
+	}
 	return nil
 }
 
 func validateAPNSConfig(config *APNSConfig) error {
 	if config != nil {
+		// validate FCMOptions
+		if config.FCMOptions != nil {
+			if config.FCMOptions.Image != "" {
+				image := config.FCMOptions.Image
+				_, err := url.ParseRequestURI(image)
+				if err != nil {
+					return fmt.Errorf("invalid image URL: %q", image)
+				}
+			}
+		}
 		return validateAPNSPayload(config.Payload)
 	}
 	return nil
