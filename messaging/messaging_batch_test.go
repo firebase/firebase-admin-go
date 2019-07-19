@@ -36,6 +36,14 @@ var testMessages = []*Message{
 var testMulticastMessage = &MulticastMessage{
 	Tokens: []string{"token1", "token2"},
 }
+var testSuccessResponse = []fcmResponse{
+	{
+		Name: "projects/test-project/messages/1",
+	},
+	{
+		Name: "projects/test-project/messages/2",
+	},
+}
 
 const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
 const wantSendURL = "/v1/projects/test-project/messages:send"
@@ -207,15 +215,7 @@ func TestSendAllInvalidMessage(t *testing.T) {
 }
 
 func TestSendAll(t *testing.T) {
-	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
-		{
-			Name: "projects/test-project/messages/2",
-		},
-	}
-	resp, err := createMultipartResponse(success, nil)
+	resp, err := createMultipartResponse(testSuccessResponse, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,37 +240,13 @@ func TestSendAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if br.SuccessCount != 2 {
-		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
-	}
-	if br.FailureCount != 0 {
-		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
-	}
-	if len(br.Responses) != 2 {
-		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
-	}
-
-	for idx, r := range br.Responses {
-		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
-			t.Errorf("Responses[%d]: %v", idx, err)
-		}
-	}
-
-	if err := checkMultipartRequest(req, false); err != nil {
-		t.Errorf("MultipartRequest: %v", err)
+	if err := checkSuccessfulBatchResponse(br, req, false); err != nil {
+		t.Errorf("SendAll() = %v", err)
 	}
 }
 
 func TestSendAllDryRun(t *testing.T) {
-	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
-		{
-			Name: "projects/test-project/messages/2",
-		},
-	}
-	resp, err := createMultipartResponse(success, nil)
+	resp, err := createMultipartResponse(testSuccessResponse, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,24 +271,8 @@ func TestSendAllDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if br.SuccessCount != 2 {
-		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
-	}
-	if br.FailureCount != 0 {
-		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
-	}
-	if len(br.Responses) != 2 {
-		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
-	}
-
-	for idx, r := range br.Responses {
-		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
-			t.Errorf("Responses[%d]: %v", idx, err)
-		}
-	}
-
-	if err := checkMultipartRequest(req, true); err != nil {
-		t.Errorf("MultipartRequest: %v", err)
+	if err := checkSuccessfulBatchResponse(br, req, true); err != nil {
+		t.Errorf("SendAll() = %v", err)
 	}
 }
 
@@ -338,7 +298,7 @@ func TestSendAllPartialFailure(t *testing.T) {
 	}
 	client.batchEndpoint = ts.URL
 
-	for _, tc := range httpErrors {
+	for idx, tc := range httpErrors {
 		failures := []string{tc.resp}
 		resp, err = createMultipartResponse(success, failures)
 		if err != nil {
@@ -350,33 +310,12 @@ func TestSendAllPartialFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if br.SuccessCount != 1 {
-			t.Errorf("SuccessCount = %d; want = 1", br.SuccessCount)
-		}
-		if br.FailureCount != 1 {
-			t.Errorf("FailureCount = %d; want = 1", br.FailureCount)
-		}
-		if len(br.Responses) != 2 {
-			t.Errorf("len(Responses) =%d; want = 2", len(br.Responses))
-		}
-
-		if err := checkSuccessfulSendResponse(br.Responses[0], success[0].Name); err != nil {
-			t.Errorf("Responses[0]: %v", err)
-		}
-
-		r := br.Responses[1]
-		if r.Success {
-			t.Errorf("Responses[1]: Success = true; want = false")
-		}
-		if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
-			t.Errorf("Responses[1]: Error = %v; want = %q", r.Error, tc.want)
-		}
-		if r.MessageID != "" {
-			t.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
+		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
+			t.Errorf("[%d] SendAll() = %v", idx, err)
 		}
 
 		if err := checkMultipartRequest(req, false); err != nil {
-			t.Errorf("MultipartRequest: %v", err)
+			t.Errorf("[%d] MultipartRequest: %v", idx, err)
 		}
 	}
 }
@@ -537,15 +476,7 @@ func TestSendMulticastTooManyTokens(t *testing.T) {
 }
 
 func TestSendMulticast(t *testing.T) {
-	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
-		{
-			Name: "projects/test-project/messages/2",
-		},
-	}
-	resp, err := createMultipartResponse(success, nil)
+	resp, err := createMultipartResponse(testSuccessResponse, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,37 +501,13 @@ func TestSendMulticast(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if br.SuccessCount != 2 {
-		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
-	}
-	if br.FailureCount != 0 {
-		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
-	}
-	if len(br.Responses) != 2 {
-		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
-	}
-
-	for idx, r := range br.Responses {
-		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
-			t.Errorf("Responses[%d]: %v", idx, err)
-		}
-	}
-
-	if err := checkMultipartRequest(req, false); err != nil {
-		t.Errorf("MultipartRequest: %v", err)
+	if err := checkSuccessfulBatchResponse(br, req, false); err != nil {
+		t.Errorf("SendMulticast() = %v", err)
 	}
 }
 
 func TestSendMulticastDryRun(t *testing.T) {
-	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
-		{
-			Name: "projects/test-project/messages/2",
-		},
-	}
-	resp, err := createMultipartResponse(success, nil)
+	resp, err := createMultipartResponse(testSuccessResponse, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -625,32 +532,14 @@ func TestSendMulticastDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if br.SuccessCount != 2 {
-		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
-	}
-	if br.FailureCount != 0 {
-		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
-	}
-	if len(br.Responses) != 2 {
-		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
-	}
-
-	for idx, r := range br.Responses {
-		if err := checkSuccessfulSendResponse(r, success[idx].Name); err != nil {
-			t.Errorf("Responses[%d]: %v", idx, err)
-		}
-	}
-
-	if err := checkMultipartRequest(req, true); err != nil {
-		t.Errorf("MultipartRequest: %v", err)
+	if err := checkSuccessfulBatchResponse(br, req, true); err != nil {
+		t.Errorf("SendMulticastDryRun() = %v", err)
 	}
 }
 
 func TestSendMulticastPartialFailure(t *testing.T) {
 	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
+		testSuccessResponse[0],
 	}
 
 	var resp []byte
@@ -667,7 +556,7 @@ func TestSendMulticastPartialFailure(t *testing.T) {
 	}
 	client.batchEndpoint = ts.URL
 
-	for _, tc := range httpErrors {
+	for idx, tc := range httpErrors {
 		failures := []string{tc.resp}
 		resp, err = createMultipartResponse(success, failures)
 		if err != nil {
@@ -679,31 +568,66 @@ func TestSendMulticastPartialFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if br.SuccessCount != 1 {
-			t.Errorf("SuccessCount = %d; want = 1", br.SuccessCount)
-		}
-		if br.FailureCount != 1 {
-			t.Errorf("FailureCount = %d; want = 1", br.FailureCount)
-		}
-		if len(br.Responses) != 2 {
-			t.Errorf("len(Responses) =%d; want = 2", len(br.Responses))
-		}
-
-		if err := checkSuccessfulSendResponse(br.Responses[0], success[0].Name); err != nil {
-			t.Errorf("Responses[0]: %v", err)
-		}
-
-		r := br.Responses[1]
-		if r.Success {
-			t.Errorf("Responses[1]: Success = true; want = false")
-		}
-		if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
-			t.Errorf("Responses[1]: Error = %v; want = %q", r.Error, tc.want)
-		}
-		if r.MessageID != "" {
-			t.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
+		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
+			t.Errorf("[%d] SendMulticast() = %v", idx, err)
 		}
 	}
+}
+
+func checkSuccessfulBatchResponse(br *BatchResponse, req []byte, dryRun bool) error {
+	if br.SuccessCount != 2 {
+		return fmt.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		return fmt.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		return fmt.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for idx, r := range br.Responses {
+		if err := checkSuccessfulSendResponse(r, testSuccessResponse[idx].Name); err != nil {
+			return fmt.Errorf("Responses[%d]: %v", idx, err)
+		}
+	}
+
+	if err := checkMultipartRequest(req, dryRun); err != nil {
+		return fmt.Errorf("MultipartRequest: %v", err)
+	}
+
+	return nil
+}
+
+func checkPartialErrorBatchResponse(br *BatchResponse, tc struct {
+	resp, want string
+	check      func(error) bool
+}) error {
+	if br.SuccessCount != 1 {
+		return fmt.Errorf("SuccessCount = %d; want = 1", br.SuccessCount)
+	}
+	if br.FailureCount != 1 {
+		return fmt.Errorf("FailureCount = %d; want = 1", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		return fmt.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	if err := checkSuccessfulSendResponse(br.Responses[0], testSuccessResponse[0].Name); err != nil {
+		return fmt.Errorf("Responses[0]: %v", err)
+	}
+
+	r := br.Responses[1]
+	if r.Success {
+		return fmt.Errorf("Responses[1]: Success = true; want = false")
+	}
+	if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
+		return fmt.Errorf("Responses[1]: Error = %v; want = %q", r.Error, tc.want)
+	}
+	if r.MessageID != "" {
+		return fmt.Errorf("Responses[1]: MessageID = %q; want = %q", r.MessageID, "")
+	}
+
+	return nil
 }
 
 func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
