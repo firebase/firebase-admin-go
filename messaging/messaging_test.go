@@ -82,12 +82,18 @@ var validMessages = []struct {
 				"k1": "v1",
 				"k2": "v2",
 			},
+			FCMOptions: &FCMOptions{
+				AnalyticsLabel: "Analytics",
+			},
 			Topic: "test-topic",
 		},
 		want: map[string]interface{}{
 			"data": map[string]interface{}{
 				"k1": "v1",
 				"k2": "v2",
+			},
+			"fcm_options": map[string]interface{}{
+				"analytics_label": "Analytics",
 			},
 			"topic": "test-topic",
 		},
@@ -153,6 +159,9 @@ var validMessages = []struct {
 					ChannelID:    "channel",
 				},
 				TTL: &ttlWithNanos,
+				FCMOptions: &AndroidFCMOptions{
+					AnalyticsLabel: "Analytics",
+				},
 			},
 			Topic: "test-topic",
 		},
@@ -171,6 +180,9 @@ var validMessages = []struct {
 					"channel_id":     "channel",
 				},
 				"ttl": "1.500000000s",
+				"fcm_options": map[string]interface{}{
+					"analytics_label": "Analytics",
+				},
 			},
 			"topic": "test-topic",
 		},
@@ -260,7 +272,7 @@ var validMessages = []struct {
 					"k1":                 "v1",
 					"k2":                 "v2",
 				},
-				"fcmOptions": map[string]interface{}{
+				"fcm_options": map[string]interface{}{
 					"link": "https://link.com",
 				},
 			},
@@ -308,6 +320,9 @@ var validMessages = []struct {
 						"k2": true,
 					},
 				},
+				FCMOptions: &APNSFCMOptions{
+					AnalyticsLabel: "Analytics",
+				},
 			},
 			Topic: "test-topic",
 		},
@@ -326,6 +341,9 @@ var validMessages = []struct {
 					},
 					"k1": "v1",
 					"k2": true,
+				},
+				"fcm_options": map[string]interface{}{
+					"analytics_label": "Analytics",
 				},
 			},
 			"topic": "test-topic",
