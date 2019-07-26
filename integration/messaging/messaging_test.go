@@ -16,7 +16,9 @@ package messaging
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -32,6 +34,7 @@ import (
 const testRegistrationToken = "fGw0qy4TGgk:APA91bGtWGjuhp4WRhHXgbabIYp1jxEKI08ofj_v1bKhWAGJQ4e3a" +
 	"rRCWzeTfHaLz83mBnDh0aPWB1AykXAVUUGl2h1wT4XI6XazWpvY7RBUSYfoxtqSWGIm2nvWh2BOP1YG501SsRoE"
 
+var messageIDPattern = regexp.MustCompile("^projects/.*/messages/.*$")
 var client *messaging.Client
 
 // Enable API before testing
@@ -90,16 +93,106 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const pattern = "^projects/.*/messages/.*$"
-	if !regexp.MustCompile(pattern).MatchString(name) {
-		t.Errorf("Send() = %q; want = %q", name, pattern)
+	if !messageIDPattern.MatchString(name) {
+		t.Errorf("Send() = %q; want = %q", name, messageIDPattern.String())
 	}
 }
 
 func TestSendInvalidToken(t *testing.T) {
 	msg := &messaging.Message{Token: "INVALID_TOKEN"}
-	if _, err := client.Send(context.Background(), msg); err == nil {
-		t.Errorf("Send() = nil; want error")
+	if _, err := client.Send(context.Background(), msg); err == nil || !messaging.IsInvalidArgument(err) {
+		t.Errorf("Send() = %v; want InvalidArgumentError", err)
+	}
+}
+
+func TestSendAll(t *testing.T) {
+	messages := []*messaging.Message{
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 1",
+				Body:  "Body 1",
+			},
+			Topic: "foo-bar",
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 2",
+				Body:  "Body 2",
+			},
+			Topic: "foo-bar",
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 3",
+				Body:  "Body 3",
+			},
+			Token: "INVALID_TOKEN",
+		},
+	}
+
+	br, err := client.SendAll(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 3 {
+		t.Errorf("len(Responses) = %d; want = 3", len(br.Responses))
+	}
+	if br.SuccessCount != 2 {
+		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 1 {
+		t.Errorf("FailureCount = %d; want = 1", br.FailureCount)
+	}
+
+	for i := 0; i < 2; i++ {
+		sr := br.Responses[i]
+		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+
+	sr := br.Responses[2]
+	if sr.Success {
+		t.Errorf("Responses[2]: Success = true; want = false")
+	}
+	if sr.MessageID != "" {
+		t.Errorf("Responses[2]: MessageID = %q; want = %q", sr.MessageID, "")
+	}
+	if sr.Error == nil || !messaging.IsInvalidArgument(sr.Error) {
+		t.Errorf("Responses[2]: Error = %v; want = InvalidArgumentError", sr.Error)
+	}
+}
+
+func TestSendHundred(t *testing.T) {
+	var messages []*messaging.Message
+	for i := 0; i < 100; i++ {
+		m := &messaging.Message{
+			Topic: fmt.Sprintf("foo-bar-%d", i%10),
+		}
+		messages = append(messages, m)
+	}
+
+	br, err := client.SendAll(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 100 {
+		t.Errorf("len(Responses) = %d; want = 100", len(br.Responses))
+	}
+	if br.SuccessCount != 100 {
+		t.Errorf("SuccessCount = %d; want = 100", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+
+	for i := 0; i < 100; i++ {
+		sr := br.Responses[i]
+		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
 	}
 }
 
@@ -121,4 +214,18 @@ func TestUnsubscribe(t *testing.T) {
 	if tmr.SuccessCount+tmr.FailureCount != 1 {
 		t.Errorf("UnsubscribeFromTopic() = %v; want total 1", tmr)
 	}
+}
+
+func checkSuccessfulSendResponse(sr *messaging.SendResponse) error {
+	if !sr.Success {
+		return errors.New("Success = false; want = true")
+	}
+	if !messageIDPattern.MatchString(sr.MessageID) {
+		return fmt.Errorf("MessageID = %q; want = %q", sr.MessageID, messageIDPattern.String())
+	}
+	if sr.Error != nil {
+		return fmt.Errorf("Error = %v; want = nil", sr.Error)
+	}
+
+	return nil
 }
