@@ -31,7 +31,46 @@ import (
 	"firebase.google.com/go/internal"
 )
 
+const maxMessages = 100
 const multipartBoundary = "__END_OF_PART__"
+
+// MulticastMessage represents a message that can be sent to multiple devices via Firebase Cloud
+// Messaging (FCM).
+//
+// It contains payload information as well as the list of device registration tokens to which the
+// message should be sent. A single MulticastMessage may contain up to 100 registration tokens.
+type MulticastMessage struct {
+	Tokens       []string
+	Data         map[string]string
+	Notification *Notification
+	Android      *AndroidConfig
+	Webpush      *WebpushConfig
+	APNS         *APNSConfig
+}
+
+func (mm *MulticastMessage) toMessages() ([]*Message, error) {
+	if len(mm.Tokens) == 0 {
+		return nil, errors.New("tokens must not be nil or empty")
+	}
+	if len(mm.Tokens) > maxMessages {
+		return nil, fmt.Errorf("tokens must not contain more than %d elements", maxMessages)
+	}
+
+	var messages []*Message
+	for _, token := range mm.Tokens {
+		temp := &Message{
+			Token:        token,
+			Data:         mm.Data,
+			Notification: mm.Notification,
+			Android:      mm.Android,
+			Webpush:      mm.Webpush,
+			APNS:         mm.APNS,
+		}
+		messages = append(messages, temp)
+	}
+
+	return messages, nil
+}
 
 // SendResponse represents the status of an individual message that was sent as part of a batch
 // request.
@@ -48,16 +87,76 @@ type BatchResponse struct {
 	Responses    []*SendResponse
 }
 
-// SendAll sends all the messages in the given array via Firebase Cloud Messaging.
+// SendAll sends the messages in the given array via Firebase Cloud Messaging.
 //
 // The messages array may contain up to 100 messages. SendAll employs batching to send the entire
 // array of mssages as a single RPC call. Compared to the `Send()` function,
-// this is a significantly more efficient way to send multiple messages. The responses
-// list obtained from the return value corresponds to the order of input messages. An error from
+// this is a significantly more efficient way to send multiple messages. The responses list
+// obtained from the return value corresponds to the order of the input messages. An error from
 // SendAll indicates a total failure -- i.e. none of the messages in the array could be sent.
 // Partial failures are indicated by a `BatchResponse` return value.
 func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, false)
+}
+
+// SendAllDryRun sends the messages in the given array via Firebase Cloud Messaging in the
+// dry run (validation only) mode.
+//
+// This function does not actually deliver any messages to target devices. Instead, it performs all
+// the SDK-level and backend validations on the messages, and emulates the send operation.
+//
+// The messages array may contain up to 100 messages. SendAllDryRun employs batching to send the
+// entire array of mssages as a single RPC call. Compared to the `SendDryRun()` function, this
+// is a significantly more efficient way to validate sending multiple messages. The responses list
+// obtained from the return value corresponds to the order of the input messages. An error from
+// SendAllDryRun indicates a total failure -- i.e. none of the messages in the array could be sent
+// for validation. Partial failures are indicated by a `BatchResponse` return value.
+func (c *Client) SendAllDryRun(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+	return c.sendBatch(ctx, messages, true)
+}
+
+// SendMulticast sends the given multicast message to all the FCM registration tokens specified.
+//
+// The tokens array in MulticastMessage may contain up to 100 tokens. SendMulticast uses the
+// `SendAll()` function to send the given message to all the target recipients. The
+// responses list obtained from the return value corresponds to the order of the input tokens. An
+// error from SendMulticast indicates a total failure -- i.e. the message could not be sent to any
+// of the recipients. Partial failures are indicated by a `BatchResponse` return value.
+func (c *Client) SendMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+	messages, err := toMessages(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.SendAll(ctx, messages)
+}
+
+// SendMulticastDryRun sends the given multicast message to all the specified FCM registration
+// tokens in the dry run (validation only) mode.
+//
+// This function does not actually deliver any messages to target devices. Instead, it performs all
+// the SDK-level and backend validations on the messages, and emulates the send operation.
+//
+// The tokens array in MulticastMessage may contain up to 100 tokens. SendMulticastDryRun uses the
+// `SendAllDryRun()` function to send the given message. The responses list obtained from
+// the return value corresponds to the order of the input tokens. An error from SendMulticastDryRun
+// indicates a total failure -- i.e. none of the messages were sent to FCM for validation. Partial
+// failures are indicated by a `BatchResponse` return value.
+func (c *Client) SendMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+	messages, err := toMessages(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.SendAllDryRun(ctx, messages)
+}
+
+func toMessages(message *MulticastMessage) ([]*Message, error) {
+	if message == nil {
+		return nil, errors.New("message must not be nil")
+	}
+
+	return message.toMessages()
 }
 
 func (c *Client) sendBatch(
@@ -67,8 +166,8 @@ func (c *Client) sendBatch(
 		return nil, errors.New("messages must not be nil or empty")
 	}
 
-	if len(messages) > 100 {
-		return nil, errors.New("messages must not contain more than 100 elements")
+	if len(messages) > maxMessages {
+		return nil, fmt.Errorf("messages must not contain more than %d elements", maxMessages)
 	}
 
 	request, err := c.newBatchRequest(messages, dryRun)
