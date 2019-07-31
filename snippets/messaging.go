@@ -20,7 +20,7 @@ import (
 	"log"
 	"time"
 
-	"firebase.google.com/go"
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 )
 
@@ -104,6 +104,40 @@ func sendToCondition(ctx context.Context, client *messaging.Client) {
 	// Response is a message ID string.
 	fmt.Println("Successfully sent message:", response)
 	// [END send_to_condition_golang]
+}
+
+func sendAll(ctx context.Context, client *messaging.Client) {
+	// This registration token comes from the client FCM SDKs.
+	registrationToken := "YOUR_REGISTRATION_TOKEN"
+
+	// [START send_a_batch_golang]
+	// Create a list containing up to 100 messages.
+	messages := []*messaging.Message{
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "5% off all electronics",
+			},
+			Token: registrationToken,
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "2% off all books",
+			},
+			Topic: "readers-club",
+		},
+	}
+
+	br, err := client.SendAll(context.Background(), messages)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// See the BatchResponse reference documentation
+	// for the contents of response.
+	fmt.Println(br.SuccessCount, " messages were sent successfully")
+	// [END send_a_batch_golang]
 }
 
 func sendDryRun(ctx context.Context, client *messaging.Client) {
