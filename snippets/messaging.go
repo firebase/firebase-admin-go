@@ -194,7 +194,7 @@ func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client)
 		var failedTokens []string
 		for idx, resp := range br.Responses {
 			if !resp.Success {
-				// The order of responses corresponds to the order of the registration tokens
+				// The order of responses corresponds to the order of the registration tokens.
 				failedTokens = append(failedTokens, registrationTokens[idx])
 			}
 		}
