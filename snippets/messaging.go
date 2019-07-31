@@ -152,7 +152,7 @@ func sendMulticast(ctx context.Context, client *messaging.Client) {
 	message := &messaging.MulticastMessage{
 		Data: map[string]string{
 			"score": "850",
-			"time": "2:45",
+			"time":  "2:45",
 		},
 		Tokens: registrationTokens,
 	}
@@ -180,7 +180,7 @@ func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client)
 	message := &messaging.MulticastMessage{
 		Data: map[string]string{
 			"score": "850",
-			"time": "2:45",
+			"time":  "2:45",
 		},
 		Tokens: registrationTokens,
 	}
