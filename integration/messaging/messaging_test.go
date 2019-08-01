@@ -130,7 +130,7 @@ func TestSendAll(t *testing.T) {
 		},
 	}
 
-	br, err := client.SendAll(context.Background(), messages)
+	br, err := client.SendAllDryRun(context.Background(), messages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestSendHundred(t *testing.T) {
 		messages = append(messages, m)
 	}
 
-	br, err := client.SendAll(context.Background(), messages)
+	br, err := client.SendAllDryRun(context.Background(), messages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,6 +191,38 @@ func TestSendHundred(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		sr := br.Responses[i]
 		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+}
+
+func TestSendMulticast(t *testing.T) {
+	message := &messaging.MulticastMessage{
+		Notification: &messaging.Notification{
+			Title: "title",
+			Body:  "body",
+		},
+		Tokens: []string{"INVALID_TOKEN", "ANOTHER_INVALID_TOKEN"},
+	}
+
+	br, err := client.SendMulticastDryRun(context.Background(), message)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+	if br.SuccessCount != 0 {
+		t.Errorf("SuccessCount = %d; want = 0", br.SuccessCount)
+	}
+	if br.FailureCount != 2 {
+		t.Errorf("FailureCount = %d; want = 2", br.FailureCount)
+	}
+
+	for i := 0; i < 2; i++ {
+		sr := br.Responses[i]
+		if err := checkErrorSendResponse(sr); err != nil {
 			t.Errorf("Responses[%d]: %v", i, err)
 		}
 	}
@@ -225,6 +257,20 @@ func checkSuccessfulSendResponse(sr *messaging.SendResponse) error {
 	}
 	if sr.Error != nil {
 		return fmt.Errorf("Error = %v; want = nil", sr.Error)
+	}
+
+	return nil
+}
+
+func checkErrorSendResponse(sr *messaging.SendResponse) error {
+	if sr.Success {
+		return fmt.Errorf("Success = true; want = false")
+	}
+	if sr.MessageID != "" {
+		return fmt.Errorf("MessageID = %q; want = %q", sr.MessageID, "")
+	}
+	if sr.Error == nil || !messaging.IsInvalidArgument(sr.Error) {
+		return fmt.Errorf("Error = %v; want = InvalidArgumentError", sr.Error)
 	}
 
 	return nil

@@ -20,7 +20,7 @@ import (
 	"log"
 	"time"
 
-	"firebase.google.com/go"
+	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 )
 
@@ -104,6 +104,104 @@ func sendToCondition(ctx context.Context, client *messaging.Client) {
 	// Response is a message ID string.
 	fmt.Println("Successfully sent message:", response)
 	// [END send_to_condition_golang]
+}
+
+func sendAll(ctx context.Context, client *messaging.Client) {
+	// This registration token comes from the client FCM SDKs.
+	registrationToken := "YOUR_REGISTRATION_TOKEN"
+
+	// [START send_all]
+	// Create a list containing up to 100 messages.
+	messages := []*messaging.Message{
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "5% off all electronics",
+			},
+			Token: registrationToken,
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "2% off all books",
+			},
+			Topic: "readers-club",
+		},
+	}
+
+	br, err := client.SendAll(context.Background(), messages)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// See the BatchResponse reference documentation
+	// for the contents of response.
+	fmt.Printf("%d messages were sent successfully\n", br.SuccessCount)
+	// [END send_all]
+}
+
+func sendMulticast(ctx context.Context, client *messaging.Client) {
+	// [START send_multicast]
+	// Create a list containing up to 100 registration tokens.
+	// This registration tokens come from the client FCM SDKs.
+	registrationTokens := []string{
+		"YOUR_REGISTRATION_TOKEN_1",
+		// ...
+		"YOUR_REGISTRATION_TOKEN_n",
+	}
+	message := &messaging.MulticastMessage{
+		Data: map[string]string{
+			"score": "850",
+			"time":  "2:45",
+		},
+		Tokens: registrationTokens,
+	}
+
+	br, err := client.SendMulticast(context.Background(), message)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// See the BatchResponse reference documentation
+	// for the contents of response.
+	fmt.Printf("%d messages were sent successfully\n", br.SuccessCount)
+	// [END send_multicast]
+}
+
+func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client) {
+	// [START send_multicast_error]
+	// Create a list containing up to 100 registration tokens.
+	// This registration tokens come from the client FCM SDKs.
+	registrationTokens := []string{
+		"YOUR_REGISTRATION_TOKEN_1",
+		// ...
+		"YOUR_REGISTRATION_TOKEN_n",
+	}
+	message := &messaging.MulticastMessage{
+		Data: map[string]string{
+			"score": "850",
+			"time":  "2:45",
+		},
+		Tokens: registrationTokens,
+	}
+
+	br, err := client.SendMulticast(context.Background(), message)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if br.FailureCount > 0 {
+		var failedTokens []string
+		for idx, resp := range br.Responses {
+			if !resp.Success {
+				// The order of responses corresponds to the order of the registration tokens.
+				failedTokens = append(failedTokens, registrationTokens[idx])
+			}
+		}
+
+		fmt.Printf("List of tokens that caused failures: %v\n", failedTokens)
+	}
+	// [END send_multicast_error]
 }
 
 func sendDryRun(ctx context.Context, client *messaging.Client) {
