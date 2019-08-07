@@ -1,5 +1,7 @@
 # Unreleased
 
+# v3.9.0
+
 - [added] Implemented `messaging.MulticastMessage` type and the
   `messaging.SendMulticast()` function for sending the same
   message to multiple recipients.
