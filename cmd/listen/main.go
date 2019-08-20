@@ -81,7 +81,10 @@ func main() {
 			event, err := iter.Next()
 
 			if err != nil {
-				break
+				// Handle error here based on specific usecase
+				// We can continue Listening
+				log.Printf("%v\n", err)
+				continue // go back to beginning of for loop
 			}
 
 			fmt.Printf("client app | Ref Path: %s | event.Path %s | event.Snapshot() = %v\n", ref.Path, event.Path, event.Snapshot())

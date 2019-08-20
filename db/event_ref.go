@@ -38,6 +38,7 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 
 	resp, err := r.sendListen(ctx, "GET", opts...)
 
+	// This is temporary true in case initialization fails
 	done := true
 
 	if err != nil {
@@ -50,6 +51,7 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 		return &SnapshotIterator{done: &done}, err
 	}
 
+	// Initialization passed, we can continue with Listening
 	done = false
 	go r.startListeningWithReconnect(ctx, opts, resp, &done, sseDataChan)
 

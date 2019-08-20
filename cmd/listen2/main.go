@@ -94,7 +94,10 @@ func main() {
 			event, err := iter.Next()
 
 			if err != nil {
-				break
+				// Handle error here based on specific usecase
+				// We can continue Listening
+				log.Printf("%v\n", err)
+				continue // go back to beginning of for loop
 			}
 
 			err = event.Unmarshal(&key)
@@ -136,7 +139,10 @@ func main() {
 			event, err := iter2.Next()
 
 			if err != nil {
-				break
+				// Handle error here based on specific usecase
+				// We can continue Listening
+				log.Printf("%v\n", err)
+				continue // go back to beginning of for loop
 			}
 
 			fmt.Printf("2nd Listener | Ref Path: %s | event.Path %s | event.Snapshot() = %v\n", ref2.Path, event.Path, event.Snapshot())
