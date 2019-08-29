@@ -100,10 +100,16 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	version := "Go/Admin/" + conf.Version
 	return &Client{
 		userManagementClient: userManagementClient{
-			baseURL:    idToolkitEndpoint,
-			projectID:  conf.ProjectID,
-			version:    version,
-			httpClient: hc,
+			OnePlatformClient: &internal.OnePlatformClient{
+				BaseURL:    idToolkitEndpoint,
+				APIVersion: "v1",
+				ProjectID:  conf.ProjectID,
+				Opts: []internal.HTTPOption{
+					internal.WithHeader("X-Client-Version", version),
+				},
+				HTTPClient: hc,
+				CreateErr:  handleHTTPError,
+			},
 		},
 		idTokenVerifier: idTokenVerifier,
 		cookieVerifier:  cookieVerifier,

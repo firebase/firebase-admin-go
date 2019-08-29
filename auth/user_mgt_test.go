@@ -1072,7 +1072,7 @@ func TestSessionCookie(t *testing.T) {
 			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
 		}
 
-		wantURL := "/mock-project-id:createSessionCookie"
+		wantURL := "/v1/projects/mock-project-id:createSessionCookie"
 		if s.Req[0].URL.Path != wantURL {
 			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
 		}
@@ -1113,7 +1113,11 @@ func TestSessionCookieError(t *testing.T) {
 }
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		userManagementClient: userManagementClient{
+			OnePlatformClient: &internal.OnePlatformClient{},
+		},
+	}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
 	if err == nil || err.Error() != want {
@@ -1150,7 +1154,7 @@ func TestSessionCookieLongExpiresIn(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
-	s.Client.httpClient.RetryConfig = nil
+	s.Client.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
@@ -1176,7 +1180,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 	}
 	s := echoServer(nil, t)
 	defer s.Close()
-	s.Client.httpClient.RetryConfig = nil
+	s.Client.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	for code, check := range errorCodes {
@@ -1270,7 +1274,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.baseURL = s.Srv.URL
+	authClient.BaseURL = s.Srv.URL
 	s.Client = authClient
 	return &s
 }
