@@ -16,9 +16,7 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 
@@ -79,25 +77,12 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		query.Set("nextPageToken", pageToken)
 	}
 
-	req, err := it.client.newRequest(http.MethodGet, fmt.Sprintf("/accounts:batchGet?%s", query.Encode()))
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := it.client.httpClient.Do(it.ctx, req)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.Status != http.StatusOK {
-		return "", handleHTTPError(resp)
-	}
-
 	var parsed struct {
 		Users         []userQueryResponse `json:"users"`
 		NextPageToken string              `json:"nextPageToken"`
 	}
-	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+	_, err := it.client.Get(it.ctx, fmt.Sprintf("/accounts:batchGet?%s", query.Encode()), &parsed)
+	if err != nil {
 		return "", err
 	}
 

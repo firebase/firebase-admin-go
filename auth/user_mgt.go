@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -33,16 +32,6 @@ const (
 	maxLenPayloadCC   = 1000
 	defaultProviderID = "firebase"
 )
-
-// Create a new interface
-type identitytoolkitCall interface {
-	Header() http.Header
-}
-
-// set header
-func (c *Client) setHeader(ic identitytoolkitCall) {
-	ic.Header().Set("X-Client-Version", c.version)
-}
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
@@ -304,7 +293,7 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 // While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
 // from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
 // To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
-func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
+func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
 
@@ -316,7 +305,8 @@ func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
 // can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
 // iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
 // when serialized into a JSON string.
-func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
+func (c *userManagementClient) SetCustomUserClaims(
+	ctx context.Context, uid string, customClaims map[string]interface{}) error {
 	if customClaims == nil || len(customClaims) == 0 {
 		customClaims = map[string]interface{}{}
 	}
@@ -498,18 +488,18 @@ func validatePhone(phone string) error {
 
 // End of validators
 
-const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
+const idToolkitEndpoint = "https://identitytoolkit.googleapis.com"
 
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 type userManagementClient struct {
-	baseURL    string
-	projectID  string
-	version    string
-	httpClient *internal.HTTPClient
+	*internal.OnePlatformClient
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	if err := validateUID(uid); err != nil {
+		return nil, err
+	}
 	return c.getUser(ctx, &userQuery{
 		field: "localId",
 		value: uid,
@@ -561,19 +551,11 @@ func (q *userQuery) build() map[string]interface{} {
 }
 
 func (c *userManagementClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
-	resp, err := c.post(ctx, "/accounts:lookup", query.build())
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != http.StatusOK {
-		return nil, handleHTTPError(resp)
-	}
-
 	var parsed struct {
 		Users []*userQueryResponse `json:"users"`
 	}
-	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+	_, err := c.Post(ctx, "/accounts:lookup", query.build(), &parsed)
+	if err != nil {
 		return nil, err
 	}
 
@@ -667,20 +649,15 @@ func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreat
 		return "", err
 	}
 
-	resp, err := c.post(ctx, "/accounts", request)
+	var result struct {
+		UID string `json:"localId"`
+	}
+	_, err = c.Post(ctx, "/accounts", request, &result)
 	if err != nil {
 		return "", err
 	}
 
-	if resp.Status != http.StatusOK {
-		return "", handleHTTPError(resp)
-	}
-
-	var result struct {
-		UID string `json:"localId"`
-	}
-	err = json.Unmarshal(resp.Body, &result)
-	return result.UID, err
+	return result.UID, nil
 }
 
 // UpdateUser updates an existing user account with the specified properties.
@@ -706,15 +683,8 @@ func (c *userManagementClient) updateUser(ctx context.Context, uid string, user 
 	}
 	request["localId"] = uid
 
-	resp, err := c.post(ctx, "/accounts:update", request)
-	if err != nil {
-		return err
-	}
-
-	if resp.Status != http.StatusOK {
-		return handleHTTPError(resp)
-	}
-	return nil
+	_, err = c.Post(ctx, "/accounts:update", request, nil)
+	return err
 }
 
 // DeleteUser deletes the user by the given UID.
@@ -726,15 +696,8 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 	payload := map[string]interface{}{
 		"localId": uid,
 	}
-	resp, err := c.post(ctx, "/accounts:delete", payload)
-	if err != nil {
-		return err
-	}
-
-	if resp.Status != http.StatusOK {
-		return handleHTTPError(resp)
-	}
-	return nil
+	_, err := c.Post(ctx, "/accounts:delete", payload, nil)
+	return err
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
@@ -758,47 +721,24 @@ func (c *userManagementClient) SessionCookie(
 		"idToken":       idToken,
 		"validDuration": int64(expiresIn.Seconds()),
 	}
-	resp, err := c.post(ctx, ":createSessionCookie", payload)
+	var result struct {
+		SessionCookie string `json:"sessionCookie"`
+	}
+	_, err := c.post(ctx, ":createSessionCookie", payload, &result)
 	if err != nil {
 		return "", err
 	}
 
-	if resp.Status != http.StatusOK {
-		return "", handleHTTPError(resp)
-	}
-
-	var result struct {
-		SessionCookie string `json:"sessionCookie"`
-	}
-	err = json.Unmarshal(resp.Body, &result)
 	return result.SessionCookie, err
 }
 
 func (c *userManagementClient) post(
-	ctx context.Context,
-	path string,
-	payload interface{},
-) (*internal.Response, error) {
-
-	req, err := c.newRequest(http.MethodPost, path)
-	if err != nil {
-		return nil, err
-	}
-	req.Body = internal.NewJSONEntity(payload)
-	return c.httpClient.Do(ctx, req)
-}
-
-func (c *userManagementClient) newRequest(method, path string) (*internal.Request, error) {
-	if c.projectID == "" {
+	ctx context.Context, path string, body interface{}, v interface{}) (*internal.Response, error) {
+	if c.ProjectID == "" {
 		return nil, errors.New("project id not available")
 	}
 
-	versionHeader := internal.WithHeader("X-Client-Version", c.version)
-	return &internal.Request{
-		Method: method,
-		URL:    fmt.Sprintf("%s/%s%s", c.baseURL, c.projectID, path),
-		Opts:   []internal.HTTPOption{versionHeader},
-	}, nil
+	return c.Post(ctx, path, body, v)
 }
 
 func handleHTTPError(resp *internal.Response) error {
