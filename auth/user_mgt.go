@@ -724,11 +724,8 @@ func (c *userManagementClient) SessionCookie(
 	var result struct {
 		SessionCookie string `json:"sessionCookie"`
 	}
-	_, err := c.post(ctx, ":createSessionCookie", payload, &result)
-	if err != nil {
-		return "", err
-	}
 
+	_, err := c.post(ctx, ":createSessionCookie", payload, &result)
 	return result.SessionCookie, err
 }
 
