@@ -93,7 +93,7 @@ func (c *userManagementClient) ImportUsers(
 			Message string `json:"message"`
 		} `json:"error,omitempty"`
 	}
-	_, err := c.Post(ctx, "/accounts:batchCreate", req, &parsed)
+	_, err := c.post(ctx, "/accounts:batchCreate", req, &parsed)
 	if err != nil {
 		return nil, err
 	}

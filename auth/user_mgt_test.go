@@ -1072,7 +1072,7 @@ func TestSessionCookie(t *testing.T) {
 			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
 		}
 
-		wantURL := "/v1/projects/mock-project-id:createSessionCookie"
+		wantURL := "/projects/mock-project-id:createSessionCookie"
 		if s.Req[0].URL.Path != wantURL {
 			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
 		}
@@ -1113,11 +1113,7 @@ func TestSessionCookieError(t *testing.T) {
 }
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
-	client := &Client{
-		userManagementClient: userManagementClient{
-			OnePlatformClient: &internal.OnePlatformClient{},
-		},
-	}
+	client := &Client{}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
 	if err == nil || err.Error() != want {
@@ -1274,7 +1270,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.BaseURL = s.Srv.URL
+	authClient.baseURL = s.Srv.URL
 	s.Client = authClient
 	return &s
 }

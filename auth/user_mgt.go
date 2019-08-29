@@ -285,34 +285,6 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 	return req, nil
 }
 
-// RevokeRefreshTokens revokes all refresh tokens issued to a user.
-//
-// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
-// It is important that the server on which this is called has its clock set correctly and synchronized.
-//
-// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
-// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
-// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
-func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
-	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
-}
-
-// SetCustomUserClaims sets additional claims on an existing user account.
-//
-// Custom claims set via this function can be used to define user roles and privilege levels.
-// These claims propagate to all the devices where the user is already signed in (after token
-// expiration or when token refresh is forced), and next time the user signs in. The claims
-// can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
-// iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
-// when serialized into a JSON string.
-func (c *userManagementClient) SetCustomUserClaims(
-	ctx context.Context, uid string, customClaims map[string]interface{}) error {
-	if customClaims == nil || len(customClaims) == 0 {
-		customClaims = map[string]interface{}{}
-	}
-	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
-}
-
 func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
@@ -488,11 +460,33 @@ func validatePhone(phone string) error {
 
 // End of validators
 
-const idToolkitEndpoint = "https://identitytoolkit.googleapis.com"
+const idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 type userManagementClient struct {
-	*internal.OnePlatformClient
+	*internal.JSONHTTPClient
+	projectID string
+	baseURL   string
+}
+
+func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*userManagementClient, error) {
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonHTTPClient := &internal.JSONHTTPClient{
+		HTTPClient: hc,
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
+		},
+		CreateErr: handleHTTPError,
+	}
+	return &userManagementClient{
+		projectID:      conf.ProjectID,
+		baseURL:        idToolkitV1Endpoint,
+		JSONHTTPClient: jsonHTTPClient,
+	}, nil
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -554,7 +548,7 @@ func (c *userManagementClient) getUser(ctx context.Context, query *userQuery) (*
 	var parsed struct {
 		Users []*userQueryResponse `json:"users"`
 	}
-	_, err := c.Post(ctx, "/accounts:lookup", query.build(), &parsed)
+	_, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
 	if err != nil {
 		return nil, err
 	}
@@ -652,7 +646,7 @@ func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreat
 	var result struct {
 		UID string `json:"localId"`
 	}
-	_, err = c.Post(ctx, "/accounts", request, &result)
+	_, err = c.post(ctx, "/accounts", request, &result)
 	if err != nil {
 		return "", err
 	}
@@ -669,6 +663,34 @@ func (c *userManagementClient) UpdateUser(
 	return c.GetUser(ctx, uid)
 }
 
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
+//
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
+func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+}
+
+// SetCustomUserClaims sets additional claims on an existing user account.
+//
+// Custom claims set via this function can be used to define user roles and privilege levels.
+// These claims propagate to all the devices where the user is already signed in (after token
+// expiration or when token refresh is forced), and next time the user signs in. The claims
+// can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
+// iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
+// when serialized into a JSON string.
+func (c *userManagementClient) SetCustomUserClaims(
+	ctx context.Context, uid string, customClaims map[string]interface{}) error {
+	if customClaims == nil || len(customClaims) == 0 {
+		customClaims = map[string]interface{}{}
+	}
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
+}
+
 func (c *userManagementClient) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
 	if err := validateUID(uid); err != nil {
 		return err
@@ -683,7 +705,7 @@ func (c *userManagementClient) updateUser(ctx context.Context, uid string, user 
 	}
 	request["localId"] = uid
 
-	_, err = c.Post(ctx, "/accounts:update", request, nil)
+	_, err = c.post(ctx, "/accounts:update", request, nil)
 	return err
 }
 
@@ -696,7 +718,7 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 	payload := map[string]interface{}{
 		"localId": uid,
 	}
-	_, err := c.Post(ctx, "/accounts:delete", payload, nil)
+	_, err := c.post(ctx, "/accounts:delete", payload, nil)
 	return err
 }
 
@@ -734,11 +756,21 @@ func (c *userManagementClient) SessionCookie(
 
 func (c *userManagementClient) post(
 	ctx context.Context, path string, body interface{}, v interface{}) (*internal.Response, error) {
-	if c.ProjectID == "" {
-		return nil, errors.New("project id not available")
+	url, err := c.makeURL(path)
+	if err != nil {
+		return nil, err
 	}
 
-	return c.Post(ctx, path, body, v)
+	return c.Post(ctx, url, body, v)
+}
+
+func (c *userManagementClient) makeURL(path string) (string, error) {
+	if c.projectID == "" {
+		return "", errors.New("project id not available")
+	}
+
+	url := fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+	return url, nil
 }
 
 func handleHTTPError(resp *internal.Response) error {

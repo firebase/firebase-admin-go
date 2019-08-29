@@ -82,7 +82,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	userManager, err := newUserManagementClient(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -97,24 +97,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	version := "Go/Admin/" + conf.Version
 	return &Client{
-		userManagementClient: userManagementClient{
-			OnePlatformClient: &internal.OnePlatformClient{
-				BaseURL:    idToolkitEndpoint,
-				APIVersion: "v1",
-				ProjectID:  conf.ProjectID,
-				Opts: []internal.HTTPOption{
-					internal.WithHeader("X-Client-Version", version),
-				},
-				HTTPClient: hc,
-				CreateErr:  handleHTTPError,
-			},
-		},
-		idTokenVerifier: idTokenVerifier,
-		cookieVerifier:  cookieVerifier,
-		signer:          signer,
-		clock:           internal.SystemClock,
+		userManagementClient: *userManager,
+		idTokenVerifier:      idTokenVerifier,
+		cookieVerifier:       cookieVerifier,
+		signer:               signer,
+		clock:                internal.SystemClock,
 	}, nil
 }
 

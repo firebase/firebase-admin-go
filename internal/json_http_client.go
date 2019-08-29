@@ -21,36 +21,35 @@ import (
 	"net/http"
 )
 
-// OnePlatformClient provides APIs for interacting with GCP/Firebase OnePlatform APIs.
-type OnePlatformClient struct {
+// JSONHTTPClient provides APIs for interacting with JSON APIs over HTTP.
+//
+// This client handles transport errors, JSON parsing errors, and other HTTP error conditions.
+type JSONHTTPClient struct {
 	*HTTPClient
-	BaseURL    string
-	APIVersion string
-	ProjectID  string
-	Opts       []HTTPOption
-	CreateErr  func(*Response) error
+	Opts      []HTTPOption
+	CreateErr func(*Response) error
 }
 
 // Get makes a GET request.
-func (c *OnePlatformClient) Get(
-	ctx context.Context, path string, v interface{}) (*Response, error) {
-	return c.MakeRequest(ctx, http.MethodGet, path, nil, v)
+func (c *JSONHTTPClient) Get(
+	ctx context.Context, url string, v interface{}) (*Response, error) {
+	return c.MakeRequest(ctx, http.MethodGet, url, nil, v)
 }
 
 // Post makes a POST request.
-func (c *OnePlatformClient) Post(
-	ctx context.Context, path string, body interface{}, v interface{}) (*Response, error) {
-	return c.MakeRequest(ctx, http.MethodPost, path, body, v)
+func (c *JSONHTTPClient) Post(
+	ctx context.Context, url string, body interface{}, v interface{}) (*Response, error) {
+	return c.MakeRequest(ctx, http.MethodPost, url, body, v)
 }
 
-// MakeRequest invokes the remote OnePlatform API, handles any errors and unmarshals the response payload
+// MakeRequest invokes the remote API, handles any errors and unmarshals the response payload
 // into the given variable.
-func (c *OnePlatformClient) MakeRequest(
-	ctx context.Context, method, path string, body interface{}, v interface{}) (*Response, error) {
+func (c *JSONHTTPClient) MakeRequest(
+	ctx context.Context, method, url string, body interface{}, v interface{}) (*Response, error) {
 
 	req := &Request{
 		Method: method,
-		URL:    fmt.Sprintf("%s/%s/projects/%s%s", c.BaseURL, c.APIVersion, c.ProjectID, path),
+		URL:    url,
 		Opts:   c.Opts,
 	}
 	if body != nil {
@@ -75,7 +74,7 @@ func (c *OnePlatformClient) MakeRequest(
 	return resp, nil
 }
 
-func (c *OnePlatformClient) handleError(resp *Response) error {
+func (c *JSONHTTPClient) handleError(resp *Response) error {
 	if c.CreateErr != nil {
 		if err := c.CreateErr(resp); err != nil {
 			return err

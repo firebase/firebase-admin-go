@@ -25,6 +25,8 @@ import (
 	"testing"
 )
 
+const wantURL = "/test"
+
 func TestGet(t *testing.T) {
 	var req *http.Request
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,17 +39,13 @@ func TestGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
-	var data struct {
-		Name string `json:"name"`
-	}
-	resp, err := client.Get(context.Background(), "/test", &data)
+	var data responseBody
+	resp, err := client.Get(context.Background(), url, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,8 +59,6 @@ func TestGet(t *testing.T) {
 	if req.Method != http.MethodGet {
 		t.Errorf("Method = %q; want = %q", req.Method, http.MethodGet)
 	}
-
-	wantURL := "/v1/projects/project-id/test"
 	if req.URL.Path != wantURL {
 		t.Errorf("URL = %q; want = %q", req.URL.Path, wantURL)
 	}
@@ -82,22 +78,18 @@ func TestPost(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	entity := struct {
 		Input string `json:"input"`
 	}{
 		Input: "test-input",
 	}
-	var data struct {
-		Name string `json:"name"`
-	}
-	resp, err := client.Post(context.Background(), "/test", &entity, &data)
+	var data responseBody
+	resp, err := client.Post(context.Background(), url, &entity, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,8 +103,6 @@ func TestPost(t *testing.T) {
 	if req.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", req.Method, http.MethodGet)
 	}
-
-	wantURL := "/v1/projects/project-id/test"
 	if req.URL.Path != wantURL {
 		t.Errorf("URL = %q; want = %q", req.URL.Path, wantURL)
 	}
@@ -135,16 +125,14 @@ func TestNonJsonResponse(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	var data interface{}
 	wantPrefix := "error while parsing response: "
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, "/test", nil, &data)
+	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
 		t.Errorf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
@@ -159,16 +147,14 @@ func TestTransportError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	var data interface{}
 	wantPrefix := "error while calling remote service: "
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, "/test", nil, &data)
+	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
 		t.Errorf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
@@ -193,15 +179,13 @@ func TestPlatformError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "Requested entity not found"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
@@ -219,15 +203,13 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "unexpected http response with status: 404; body: {}"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
@@ -245,19 +227,21 @@ func TestCustomErrorHandler(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &OnePlatformClient{
-		BaseURL:    server.URL,
-		APIVersion: "v1",
-		ProjectID:  "project-id",
+	client := &JSONHTTPClient{
 		HTTPClient: &HTTPClient{Client: http.DefaultClient},
 		CreateErr: func(r *Response) error {
 			return fmt.Errorf("custom error with status: %d", r.Status)
 		},
 	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "custom error with status: 404"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
+}
+
+type responseBody struct {
+	Name string `json:"name"`
 }

@@ -77,12 +77,16 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		query.Set("nextPageToken", pageToken)
 	}
 
+	url, err := it.client.makeURL(fmt.Sprintf("/accounts:batchGet?%s", query.Encode()))
+	if err != nil {
+		return "", err
+	}
+
 	var parsed struct {
 		Users         []userQueryResponse `json:"users"`
 		NextPageToken string              `json:"nextPageToken"`
 	}
-	_, err := it.client.Get(it.ctx, fmt.Sprintf("/accounts:batchGet?%s", query.Encode()), &parsed)
-	if err != nil {
+	if _, err = it.client.Get(it.ctx, url, &parsed); err != nil {
 		return "", err
 	}
 

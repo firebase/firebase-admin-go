@@ -131,7 +131,7 @@ func (c *userManagementClient) generateEmailActionLink(
 	var result struct {
 		OOBLink string `json:"oobLink"`
 	}
-	_, err := c.Post(ctx, "/accounts:sendOobCode", payload, &result)
+	_, err := c.post(ctx, "/accounts:sendOobCode", payload, &result)
 	if err != nil {
 		return "", err
 	}
