@@ -120,7 +120,45 @@ func TestDoAndUnmarshalPost(t *testing.T) {
 	}
 }
 
-func TestDoAndUnmarshalNotJSON(t *testing.T) {
+func TestOpts(t *testing.T) {
+	var req *http.Request
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req = r
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		Opts: []HTTPOption{
+			WithHeader("Test-Header", "test-value"),
+		},
+	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
+
+	resp, err := client.Get(context.Background(), url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
+	}
+	if req.Method != http.MethodGet {
+		t.Errorf("Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+	if req.URL.Path != wantURL {
+		t.Errorf("URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	header := req.Header.Get("Test-Header")
+	if header != "test-value" {
+		t.Errorf("Test-Header = %q; want = %q", header, "test-value")
+	}
+}
+
+func TestNonJsonResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not json"))
 	})

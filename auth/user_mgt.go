@@ -492,7 +492,27 @@ const idToolkitEndpoint = "https://identitytoolkit.googleapis.com"
 
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 type userManagementClient struct {
-	*internal.OnePlatformClient
+	httpClient *internal.HTTPClient
+	projectID  string
+	baseURL    string
+}
+
+func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*userManagementClient, error) {
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	hc.CreateErr = handleHTTPError
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
+	}
+
+	return &userManagementClient{
+		projectID:  conf.ProjectID,
+		baseURL:    idToolkitV1Endpoint,
+		httpClient: hc,
+	}, nil
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -731,8 +751,17 @@ func (c *userManagementClient) SessionCookie(
 
 func (c *userManagementClient) post(
 	ctx context.Context, path string, body interface{}, v interface{}) (*internal.Response, error) {
-	if c.ProjectID == "" {
-		return nil, errors.New("project id not available")
+	url, err := c.makeURL(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.httpClient.Post(ctx, url, body, v)
+}
+
+func (c *userManagementClient) makeURL(path string) (string, error) {
+	if c.projectID == "" {
+		return "", errors.New("project id not available")
 	}
 
 	return c.Post(ctx, path, body, v)
