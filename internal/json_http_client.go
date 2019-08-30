@@ -21,30 +21,21 @@ import (
 	"net/http"
 )
 
-// JSONHTTPClient provides APIs for interacting with JSON APIs over HTTP.
-//
-// This client handles transport errors, JSON parsing errors, and other HTTP error conditions.
-type JSONHTTPClient struct {
-	*HTTPClient
-	Opts      []HTTPOption
-	CreateErr func(*Response) error
-}
-
 // Get makes a GET request.
-func (c *JSONHTTPClient) Get(
+func (c *HTTPClient) Get(
 	ctx context.Context, url string, v interface{}) (*Response, error) {
-	return c.MakeRequest(ctx, http.MethodGet, url, nil, v)
+	return c.MakeJSONRequest(ctx, http.MethodGet, url, nil, v)
 }
 
 // Post makes a POST request.
-func (c *JSONHTTPClient) Post(
+func (c *HTTPClient) Post(
 	ctx context.Context, url string, body interface{}, v interface{}) (*Response, error) {
-	return c.MakeRequest(ctx, http.MethodPost, url, body, v)
+	return c.MakeJSONRequest(ctx, http.MethodPost, url, body, v)
 }
 
-// MakeRequest invokes the remote API, handles any errors and unmarshals the response payload
+// MakeJSONRequest invokes the remote API, handles any errors and unmarshals the response payload
 // into the given variable.
-func (c *JSONHTTPClient) MakeRequest(
+func (c *HTTPClient) MakeJSONRequest(
 	ctx context.Context, method, url string, body interface{}, v interface{}) (*Response, error) {
 
 	req := &Request{
@@ -74,7 +65,7 @@ func (c *JSONHTTPClient) MakeRequest(
 	return resp, nil
 }
 
-func (c *JSONHTTPClient) handleError(resp *Response) error {
+func (c *HTTPClient) handleError(resp *Response) error {
 	if c.CreateErr != nil {
 		if err := c.CreateErr(resp); err != nil {
 			return err

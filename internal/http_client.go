@@ -41,7 +41,9 @@ import (
 type HTTPClient struct {
 	Client      *http.Client
 	RetryConfig *RetryConfig
-	ErrParser   ErrorParser
+	ErrParser   ErrorParser // Deprecated. Use CreateErr instead.
+	CreateErr   func(r *Response) error
+	Opts        []HTTPOption
 }
 
 // NewHTTPClient creates a new HTTPClient using the provided client options and the default
@@ -97,7 +99,7 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 }
 
 func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*attemptResult, error) {
-	hr, err := req.buildHTTPRequest()
+	hr, err := req.buildHTTPRequest(c.Opts)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +158,7 @@ type Request struct {
 	Opts   []HTTPOption
 }
 
-func (r *Request) buildHTTPRequest() (*http.Request, error) {
-	var opts []HTTPOption
+func (r *Request) buildHTTPRequest(opts []HTTPOption) (*http.Request, error) {
 	var data io.Reader
 	if r.Body != nil {
 		b, err := r.Body.Bytes()

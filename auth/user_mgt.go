@@ -464,9 +464,9 @@ const idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 type userManagementClient struct {
-	*internal.JSONHTTPClient
-	projectID string
-	baseURL   string
+	httpClient *internal.HTTPClient
+	projectID  string
+	baseURL    string
 }
 
 func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*userManagementClient, error) {
@@ -475,17 +475,15 @@ func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*u
 		return nil, err
 	}
 
-	jsonHTTPClient := &internal.JSONHTTPClient{
-		HTTPClient: hc,
-		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-		},
-		CreateErr: handleHTTPError,
+	hc.CreateErr = handleHTTPError
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
+
 	return &userManagementClient{
-		projectID:      conf.ProjectID,
-		baseURL:        idToolkitV1Endpoint,
-		JSONHTTPClient: jsonHTTPClient,
+		projectID:  conf.ProjectID,
+		baseURL:    idToolkitV1Endpoint,
+		httpClient: hc,
 	}, nil
 }
 
@@ -758,7 +756,7 @@ func (c *userManagementClient) post(
 		return nil, err
 	}
 
-	return c.Post(ctx, url, body, v)
+	return c.httpClient.Post(ctx, url, body, v)
 }
 
 func (c *userManagementClient) makeURL(path string) (string, error) {

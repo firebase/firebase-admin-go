@@ -204,7 +204,10 @@ type mockHTTPResponse struct {
 }
 
 func (m *mockHTTPResponse) RoundTrip(*http.Request) (*http.Response, error) {
-	return &m.Response, m.Err
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return &m.Response, nil
 }
 
 type mockReadCloser struct {

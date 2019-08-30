@@ -39,8 +39,8 @@ func TestGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
@@ -78,8 +78,8 @@ func TestPost(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
@@ -118,6 +118,44 @@ func TestPost(t *testing.T) {
 	}
 }
 
+func TestOpts(t *testing.T) {
+	var req *http.Request
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req = r
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		Opts: []HTTPOption{
+			WithHeader("Test-Header", "test-value"),
+		},
+	}
+	url := fmt.Sprintf("%s%s", server.URL, wantURL)
+
+	resp, err := client.Get(context.Background(), url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
+	}
+	if req.Method != http.MethodGet {
+		t.Errorf("Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+	if req.URL.Path != wantURL {
+		t.Errorf("URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	header := req.Header.Get("Test-Header")
+	if header != "test-value" {
+		t.Errorf("Test-Header = %q; want = %q", header, "test-value")
+	}
+}
+
 func TestNonJsonResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not json"))
@@ -125,16 +163,16 @@ func TestNonJsonResponse(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	var data interface{}
 	wantPrefix := "error while parsing response: "
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, &data)
+	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
@@ -147,16 +185,16 @@ func TestTransportError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	var data interface{}
 	wantPrefix := "error while calling remote service: "
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, &data)
+	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
@@ -179,15 +217,15 @@ func TestPlatformError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "Requested entity not found"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
+	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
 	if !HasErrorCode(err, "NOT_FOUND") {
@@ -203,15 +241,15 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 	}
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "unexpected http response with status: 404; body: {}"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
+	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
 	if !HasErrorCode(err, "UNKNOWN") {
@@ -227,8 +265,8 @@ func TestCustomErrorHandler(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := &JSONHTTPClient{
-		HTTPClient: &HTTPClient{Client: http.DefaultClient},
+	client := &HTTPClient{
+		Client: http.DefaultClient,
 		CreateErr: func(r *Response) error {
 			return fmt.Errorf("custom error with status: %d", r.Status)
 		},
@@ -236,9 +274,9 @@ func TestCustomErrorHandler(t *testing.T) {
 	url := fmt.Sprintf("%s%s", server.URL, wantURL)
 
 	want := "custom error with status: 404"
-	resp, err := client.MakeRequest(context.Background(), http.MethodGet, url, nil, nil)
+	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 }
 
