@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -756,7 +757,15 @@ func (c *userManagementClient) post(
 		return nil, err
 	}
 
-	return c.httpClient.Post(ctx, url, body, v)
+	req := &internal.Request{
+		Method: http.MethodPost,
+		URL:    url,
+	}
+	if body != nil {
+		req.Body = internal.NewJSONEntity(body)
+	}
+
+	return c.httpClient.DoJSON(ctx, req, v)
 }
 
 func (c *userManagementClient) makeURL(path string) (string, error) {

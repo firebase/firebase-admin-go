@@ -42,10 +42,13 @@ func TestGet(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    fmt.Sprintf("%s%s", server.URL, wantURL),
+	}
 	var data responseBody
-	resp, err := client.Get(context.Background(), url, &data)
+
+	resp, err := client.DoJSON(context.Background(), get, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,15 +84,14 @@ func TestPost(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
-	entity := struct {
-		Input string `json:"input"`
-	}{
-		Input: "test-input",
+	post := &Request{
+		Method: http.MethodPost,
+		URL:    fmt.Sprintf("%s%s", server.URL, wantURL),
+		Body:   NewJSONEntity(map[string]string{"input": "test-input"}),
 	}
 	var data responseBody
-	resp, err := client.Post(context.Background(), url, &entity, &data)
+
+	resp, err := client.DoJSON(context.Background(), post, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,13 +130,16 @@ func TestNonJsonResponse(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
 	var data interface{}
 	wantPrefix := "error while parsing response: "
-	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, &data)
+
+	resp, err := client.DoJSON(context.Background(), get, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
@@ -150,13 +155,16 @@ func TestTransportError(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
 	var data interface{}
 	wantPrefix := "error while calling remote service: "
-	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, &data)
+
+	resp, err := client.DoJSON(context.Background(), get, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
@@ -182,12 +190,15 @@ func TestPlatformError(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
 	want := "Requested entity not found"
-	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
+
+	resp, err := client.DoJSON(context.Background(), get, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
 	if !HasErrorCode(err, "NOT_FOUND") {
@@ -206,12 +217,15 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 	client := &HTTPClient{
 		Client: http.DefaultClient,
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
 	want := "unexpected http response with status: 404; body: {}"
-	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
+
+	resp, err := client.DoJSON(context.Background(), get, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
 	if !HasErrorCode(err, "UNKNOWN") {
@@ -233,12 +247,15 @@ func TestCustomErrorHandler(t *testing.T) {
 			return fmt.Errorf("custom error with status: %d", r.Status)
 		},
 	}
-	url := fmt.Sprintf("%s%s", server.URL, wantURL)
-
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
 	want := "custom error with status: 404"
-	resp, err := client.MakeJSONRequest(context.Background(), http.MethodGet, url, nil, nil)
+
+	resp, err := client.DoJSON(context.Background(), get, nil)
 	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("MakeJSONRequest() = (%v, %v); want = (nil, %q)", resp, err, want)
+		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 }
 

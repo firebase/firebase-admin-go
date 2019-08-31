@@ -21,32 +21,9 @@ import (
 	"net/http"
 )
 
-// Get makes a GET request.
-func (c *HTTPClient) Get(
-	ctx context.Context, url string, v interface{}) (*Response, error) {
-	return c.MakeJSONRequest(ctx, http.MethodGet, url, nil, v)
-}
-
-// Post makes a POST request.
-func (c *HTTPClient) Post(
-	ctx context.Context, url string, body interface{}, v interface{}) (*Response, error) {
-	return c.MakeJSONRequest(ctx, http.MethodPost, url, body, v)
-}
-
-// MakeJSONRequest invokes the remote API, handles any errors and unmarshals the response payload
+// DoJSON invokes the remote API, handles any errors and unmarshals the response payload
 // into the given variable.
-func (c *HTTPClient) MakeJSONRequest(
-	ctx context.Context, method, url string, body interface{}, v interface{}) (*Response, error) {
-
-	req := &Request{
-		Method: method,
-		URL:    url,
-		Opts:   c.Opts,
-	}
-	if body != nil {
-		req.Body = NewJSONEntity(body)
-	}
-
+func (c *HTTPClient) DoJSON(ctx context.Context, req *Request, v interface{}) (*Response, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling remote service: %v", err)
