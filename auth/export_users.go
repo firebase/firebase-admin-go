@@ -16,9 +16,12 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 
+	"firebase.google.com/go/internal"
 	"google.golang.org/api/iterator"
 )
 
@@ -76,11 +79,20 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		query.Set("nextPageToken", pageToken)
 	}
 
+	url, err := it.client.makeURL(fmt.Sprintf("/accounts:batchGet?%s", query.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    url,
+	}
 	var parsed struct {
 		Users         []userQueryResponse `json:"users"`
 		NextPageToken string              `json:"nextPageToken"`
 	}
-	if _, err = it.client.httpClient.Get(it.ctx, url, &parsed); err != nil {
+	if _, err = it.client.httpClient.DoAndUnmarshal(it.ctx, req, &parsed); err != nil {
 		return "", err
 	}
 
