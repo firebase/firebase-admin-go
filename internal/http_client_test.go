@@ -185,6 +185,185 @@ func TestHTTPClient(t *testing.T) {
 	}
 }
 
+func TestSuccessFn(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		SuccessFn: func(r *Response) bool {
+			return false
+		},
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+	want := "unexpected http response with status: 200; body: {}"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	if !HasErrorCode(err, "UNKNOWN") {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	}
+}
+
+func TestSuccessFnOnRequest(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client:    http.DefaultClient,
+		SuccessFn: HasSuccessStatus,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+		SuccessFn: func(r *Response) bool {
+			return false
+		},
+	}
+	want := "unexpected http response with status: 200; body: {}"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	if !HasErrorCode(err, "UNKNOWN") {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	}
+}
+
+func TestPlatformError(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := `{
+			"error": {
+				"status": "NOT_FOUND",
+				"message": "Requested entity not found"
+			}
+		}`
+
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(resp))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client:    http.DefaultClient,
+		SuccessFn: HasSuccessStatus,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+	want := "Requested entity not found"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	if !HasErrorCode(err, "NOT_FOUND") {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "NOT_FOUND")
+	}
+}
+
+func TestPlatformErrorWithoutDetails(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client:    http.DefaultClient,
+		SuccessFn: HasSuccessStatus,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+	want := "unexpected http response with status: 404; body: {}"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	if !HasErrorCode(err, "UNKNOWN") {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	}
+}
+
+func TestCreateErrFn(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		CreateErrFn: func(r *Response) error {
+			return fmt.Errorf("custom error with status: %d", r.Status)
+		},
+		SuccessFn: HasSuccessStatus,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+	want := "custom error with status: 404"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+}
+
+func TestCreateErrFnOnRequest(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		CreateErrFn: func(r *Response) error {
+			return fmt.Errorf("custom error with status: %d", r.Status)
+		},
+		SuccessFn: HasSuccessStatus,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+		CreateErrFn: func(r *Response) error {
+			return fmt.Errorf("custom error from req with status: %d", r.Status)
+		},
+	}
+	want := "custom error from req with status: 404"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+}
+
 func TestContext(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

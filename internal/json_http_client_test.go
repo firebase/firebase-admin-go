@@ -27,7 +27,7 @@ import (
 
 const wantURL = "/test"
 
-func TestGet(t *testing.T) {
+func TestDoAndUnmarshalGet(t *testing.T) {
 	var req *http.Request
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req = r
@@ -48,7 +48,7 @@ func TestGet(t *testing.T) {
 	}
 	var data responseBody
 
-	resp, err := client.DoJSON(context.Background(), get, &data)
+	resp, err := client.DoAndUnmarshal(context.Background(), get, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestPost(t *testing.T) {
+func TestDoAndUnmarshalPost(t *testing.T) {
 	var req *http.Request
 	var b []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +91,7 @@ func TestPost(t *testing.T) {
 	}
 	var data responseBody
 
-	resp, err := client.DoJSON(context.Background(), post, &data)
+	resp, err := client.DoAndUnmarshal(context.Background(), post, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestPost(t *testing.T) {
 	}
 }
 
-func TestNonJsonResponse(t *testing.T) {
+func TestDoAndUnmarshalNotJSON(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not json"))
 	})
@@ -137,9 +137,9 @@ func TestNonJsonResponse(t *testing.T) {
 	var data interface{}
 	wantPrefix := "error while parsing response: "
 
-	resp, err := client.DoJSON(context.Background(), get, &data)
+	resp, err := client.DoAndUnmarshal(context.Background(), get, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("DoAndUnmarshal() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
@@ -147,7 +147,32 @@ func TestNonJsonResponse(t *testing.T) {
 	}
 }
 
-func TestTransportError(t *testing.T) {
+func TestDoAndUnmarshalNilPointer(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("not json"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+
+	resp, err := client.DoAndUnmarshal(context.Background(), get, nil)
+	if err != nil {
+		t.Fatalf("DoAndUnmarshal() = %v; want = nil", err)
+	}
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
+	}
+}
+
+func TestDoAndUnmarshalTransportError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 	server := httptest.NewServer(handler)
 	server.Close()
@@ -160,102 +185,15 @@ func TestTransportError(t *testing.T) {
 		URL:    server.URL,
 	}
 	var data interface{}
-	wantPrefix := "error while calling remote service: "
+	wantPrefix := "error while making http call: "
 
-	resp, err := client.DoJSON(context.Background(), get, &data)
+	resp, err := client.DoAndUnmarshal(context.Background(), get, &data)
 	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+		t.Errorf("DoAndUnmarshal() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
 	}
 
 	if data != nil {
 		t.Errorf("Data = %v; want = nil", data)
-	}
-}
-
-func TestPlatformError(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := `{
-			"error": {
-				"status": "NOT_FOUND",
-				"message": "Requested entity not found"
-			}
-		}`
-
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(resp))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client: http.DefaultClient,
-	}
-	get := &Request{
-		Method: http.MethodGet,
-		URL:    server.URL,
-	}
-	want := "Requested entity not found"
-
-	resp, err := client.DoJSON(context.Background(), get, nil)
-	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
-	}
-
-	if !HasErrorCode(err, "NOT_FOUND") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "NOT_FOUND")
-	}
-}
-
-func TestPlatformErrorWithoutDetails(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client: http.DefaultClient,
-	}
-	get := &Request{
-		Method: http.MethodGet,
-		URL:    server.URL,
-	}
-	want := "unexpected http response with status: 404; body: {}"
-
-	resp, err := client.DoJSON(context.Background(), get, nil)
-	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
-	}
-
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
-	}
-}
-
-func TestCustomErrorHandler(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client: http.DefaultClient,
-		CreateErr: func(r *Response) error {
-			return fmt.Errorf("custom error with status: %d", r.Status)
-		},
-	}
-	get := &Request{
-		Method: http.MethodGet,
-		URL:    server.URL,
-	}
-	want := "custom error with status: 404"
-
-	resp, err := client.DoJSON(context.Background(), get, nil)
-	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("DoJSON() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 }
 

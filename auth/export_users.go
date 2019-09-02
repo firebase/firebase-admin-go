@@ -92,7 +92,7 @@ func (it *UserIterator) fetch(pageSize int, pageToken string) (string, error) {
 		Users         []userQueryResponse `json:"users"`
 		NextPageToken string              `json:"nextPageToken"`
 	}
-	if _, err = it.client.httpClient.DoJSON(it.ctx, req, &parsed); err != nil {
+	if _, err = it.client.httpClient.DoAndUnmarshal(it.ctx, req, &parsed); err != nil {
 		return "", err
 	}
 
