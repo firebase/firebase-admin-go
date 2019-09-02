@@ -431,39 +431,6 @@ func TestContext(t *testing.T) {
 	}
 }
 
-func TestDefaultOpts(t *testing.T) {
-	var header string
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header = r.Header.Get("Test-Header")
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client: http.DefaultClient,
-		Opts: []HTTPOption{
-			WithHeader("Test-Header", "test-value"),
-		},
-	}
-	req := &Request{
-		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s%s", server.URL, wantURL),
-	}
-
-	resp, err := client.Do(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if resp.Status != http.StatusOK {
-		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
-	}
-	if header != "test-value" {
-		t.Errorf("Test-Header = %q; want = %q", header, "test-value")
-	}
-}
-
 func TestErrorParser(t *testing.T) {
 	data := map[string]interface{}{
 		"error": "test error",
