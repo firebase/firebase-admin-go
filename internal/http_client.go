@@ -235,21 +235,6 @@ func (r *attemptResult) waitForRetry(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (r *attemptResult) handleResponse() (*Response, error) {
-	if r.Err != nil {
-		return nil, r.Err
-	}
-	return newResponse(r.Resp, r.ErrParser)
-}
-
-// Request contains all the parameters required to construct an outgoing HTTP request.
-type Request struct {
-	Method string
-	URL    string
-	Body   HTTPEntity
-	Opts   []HTTPOption
-}
-
 func (r *Request) buildHTTPRequest(opts []HTTPOption) (*http.Request, error) {
 	var data io.Reader
 	if r.Body != nil {

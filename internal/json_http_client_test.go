@@ -120,7 +120,7 @@ func TestDoAndUnmarshalPost(t *testing.T) {
 	}
 }
 
-func TestNonJsonResponse(t *testing.T) {
+func TestDoAndUnmarshalNotJSON(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not json"))
 	})

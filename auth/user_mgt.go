@@ -504,7 +504,8 @@ func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*u
 		return nil, err
 	}
 
-	hc.CreateErr = handleHTTPError
+	hc.CreateErrFn = handleHTTPError
+	hc.SuccessFn = internal.HasSuccessStatus // TODO: Remove once this becomes the default
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
@@ -765,7 +766,7 @@ func (c *userManagementClient) post(
 		req.Body = internal.NewJSONEntity(body)
 	}
 
-	return c.httpClient.DoJSON(ctx, req, v)
+	return c.httpClient.DoAndUnmarshal(ctx, req, v)
 }
 
 func (c *userManagementClient) makeURL(path string) (string, error) {
