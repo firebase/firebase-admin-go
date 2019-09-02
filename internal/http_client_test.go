@@ -22,11 +22,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"google.golang.org/api/option"
 )
+
+const defaultMaxRetries = 4
 
 var (
 	testRetryConfig = RetryConfig{
@@ -182,6 +185,39 @@ func TestHTTPClient(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Body = %v; want = %v", got, want)
 		}
+	}
+}
+
+func TestDefaultOpts(t *testing.T) {
+	var header string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header = r.Header.Get("Test-Header")
+		w.Write([]byte("{}"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+		Opts: []HTTPOption{
+			WithHeader("Test-Header", "test-value"),
+		},
+	}
+	req := &Request{
+		Method: http.MethodGet,
+		URL:    fmt.Sprintf("%s%s", server.URL, wantURL),
+	}
+
+	resp, err := client.Do(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
+	}
+	if header != "test-value" {
+		t.Errorf("Test-Header = %q; want = %q", header, "test-value")
 	}
 }
 
@@ -395,39 +431,6 @@ func TestContext(t *testing.T) {
 	}
 }
 
-func TestDefaultOpts(t *testing.T) {
-	var header string
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header = r.Header.Get("Test-Header")
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client: http.DefaultClient,
-		Opts: []HTTPOption{
-			WithHeader("Test-Header", "test-value"),
-		},
-	}
-	req := &Request{
-		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s%s", server.URL, wantURL),
-	}
-
-	resp, err := client.Do(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if resp.Status != http.StatusOK {
-		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
-	}
-	if header != "test-value" {
-		t.Errorf("Test-Header = %q; want = %q", header, "test-value")
-	}
-}
-
 func TestErrorParser(t *testing.T) {
 	data := map[string]interface{}{
 		"error": "test error",
@@ -591,6 +594,21 @@ func TestNoRetryOnRequestBuildError(t *testing.T) {
 	}
 	if entity.RequestAttempts != 1 {
 		t.Errorf("Request attempts = %d; want = 1", entity.RequestAttempts)
+	}
+}
+
+func TestNoRetryOnInvalidMethod(t *testing.T) {
+	client := &HTTPClient{
+		Client:      http.DefaultClient,
+		RetryConfig: &testRetryConfig,
+	}
+
+	req := &Request{
+		Method: "Invalid/Method",
+		URL:    "https://firebase.google.com",
+	}
+	if _, err := client.Do(context.Background(), req); err == nil {
+		t.Errorf("Do(<faultyEntity>) = nil; want = error")
 	}
 }
 
@@ -809,7 +827,6 @@ func TestNewHTTPClientRetryOnNetworkErrors(t *testing.T) {
 		t.Errorf("Do() = (%v, %v); want = (nil, error)", resp, err)
 	}
 
-	const defaultMaxRetries = 4
 	wantRequests := 1 + defaultMaxRetries
 	if tansport.RequestAttempts != wantRequests {
 		t.Errorf("Total requests = %d; want = %d", tansport.RequestAttempts, wantRequests)
@@ -833,7 +850,6 @@ func TestNewHTTPClientRetryOnHTTPErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.RetryConfig.ExpBackoffFactor = 0
-	const defaultMaxRetries = 4
 	for _, status = range []int{http.StatusInternalServerError, http.StatusServiceUnavailable} {
 		requests = 0
 		req := &Request{Method: http.MethodGet, URL: server.URL}
@@ -876,6 +892,35 @@ func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
 	}
 	if requests != 1 {
 		t.Errorf("Total requests = %d; want = 1", requests)
+	}
+}
+
+func TestNewHttpClientRetryOnResponseReadError(t *testing.T) {
+	requests := 0
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		// Lie about the content-length forcing a read error on the client
+		w.Header().Set("Content-Length", "1")
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.RetryConfig.ExpBackoffFactor = 0
+	wantPrefix := "error while making http call: "
+
+	req := &Request{Method: http.MethodGet, URL: server.URL}
+	resp, err := client.Do(context.Background(), req)
+	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
+		t.Errorf("Do() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+	}
+
+	wantRequests := 1 + defaultMaxRetries
+	if requests != wantRequests {
+		t.Errorf("Total requests = %d; want = %d", requests, wantRequests)
 	}
 }
 

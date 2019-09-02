@@ -157,22 +157,24 @@ func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*a
 	}
 
 	resp, err := c.Client.Do(hr.WithContext(ctx))
-	result := &attemptResult{
-		Resp:      resp,
-		Err:       err,
-		ErrParser: c.ErrParser,
+	result := &attemptResult{}
+	if err != nil {
+		result.Err = err
+	} else {
+		// Read the response body here forcing any I/O errors to occur so that retry logic will
+		// cover them as well.
+		ir, err := newResponse(resp, c.ErrParser)
+		result.Resp = ir
+		result.Err = err
 	}
 
 	// If a RetryConfig is available, always consult it to determine if the request should be retried
 	// or not. Even if there was a network error, we may not want to retry the request based on the
 	// RetryConfig that is in effect.
 	if c.RetryConfig != nil {
-		delay, retry := c.RetryConfig.retryDelay(retries, resp, err)
+		delay, retry := c.RetryConfig.retryDelay(retries, resp, result.Err)
 		result.RetryAfter = delay
 		result.Retry = retry
-		if retry && resp != nil {
-			defer resp.Body.Close()
-		}
 	}
 	return result, nil
 }
@@ -182,16 +184,11 @@ func (c *HTTPClient) handleResult(req *Request, result *attemptResult) (*Respons
 		return nil, fmt.Errorf("error while making http call: %v", result.Err)
 	}
 
-	resp, err := newResponse(result.Resp, result.ErrParser)
-	if err != nil {
-		return nil, err
+	if !c.success(req, result.Resp) {
+		return nil, c.newError(req, result.Resp)
 	}
 
-	if !c.success(req, resp) {
-		return nil, c.newError(req, resp)
-	}
-
-	return resp, nil
+	return result.Resp, nil
 }
 
 func (c *HTTPClient) success(req *Request, resp *Response) bool {
@@ -222,11 +219,10 @@ func (c *HTTPClient) newError(req *Request, resp *Response) error {
 }
 
 type attemptResult struct {
-	Resp       *http.Response
+	Resp       *Response
 	Err        error
 	Retry      bool
 	RetryAfter time.Duration
-	ErrParser  ErrorParser
 }
 
 func (r *attemptResult) waitForRetry(ctx context.Context) error {
