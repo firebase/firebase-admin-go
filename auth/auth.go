@@ -82,7 +82,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	userManager, err := newUserManagementClient(ctx, conf)
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,12 +97,18 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
+	version := "Go/Admin/" + conf.Version
 	return &Client{
-		userManagementClient: *userManager,
-		idTokenVerifier:      idTokenVerifier,
-		cookieVerifier:       cookieVerifier,
-		signer:               signer,
-		clock:                internal.SystemClock,
+		userManagementClient: userManagementClient{
+			baseURL:    idToolkitEndpoint,
+			projectID:  conf.ProjectID,
+			version:    version,
+			httpClient: hc,
+		},
+		idTokenVerifier: idTokenVerifier,
+		cookieVerifier:  cookieVerifier,
+		signer:          signer,
+		clock:           internal.SystemClock,
 	}, nil
 }
 

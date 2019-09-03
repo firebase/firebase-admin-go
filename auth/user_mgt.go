@@ -34,6 +34,16 @@ const (
 	defaultProviderID = "firebase"
 )
 
+// Create a new interface
+type identitytoolkitCall interface {
+	Header() http.Header
+}
+
+// set header
+func (c *Client) setHeader(ic identitytoolkitCall) {
+	ic.Header().Set("X-Client-Version", c.version)
+}
+
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
 	DisplayName string `json:"displayName,omitempty"`
@@ -286,6 +296,33 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 	return req, nil
 }
 
+// RevokeRefreshTokens revokes all refresh tokens issued to a user.
+//
+// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
+// It is important that the server on which this is called has its clock set correctly and synchronized.
+//
+// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
+// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
+// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
+func (c *Client) RevokeRefreshTokens(ctx context.Context, uid string) error {
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
+}
+
+// SetCustomUserClaims sets additional claims on an existing user account.
+//
+// Custom claims set via this function can be used to define user roles and privilege levels.
+// These claims propagate to all the devices where the user is already signed in (after token
+// expiration or when token refresh is forced), and next time the user signs in. The claims
+// can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
+// iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
+// when serialized into a JSON string.
+func (c *Client) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
+	if customClaims == nil || len(customClaims) == 0 {
+		customClaims = map[string]interface{}{}
+	}
+	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
+}
+
 func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 	for _, key := range reservedClaims {
 		if _, ok := claims[key]; ok {
@@ -461,39 +498,18 @@ func validatePhone(phone string) error {
 
 // End of validators
 
-const idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
+const idToolkitEndpoint = "https://identitytoolkit.googleapis.com/v1/projects"
 
 // userManagementClient is a helper for interacting with the Identity Toolkit REST API.
 type userManagementClient struct {
-	httpClient *internal.HTTPClient
-	projectID  string
 	baseURL    string
-}
-
-func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*userManagementClient, error) {
-	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus // TODO: Remove once this becomes the default
-	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-	}
-
-	return &userManagementClient{
-		projectID:  conf.ProjectID,
-		baseURL:    idToolkitV1Endpoint,
-		httpClient: hc,
-	}, nil
+	projectID  string
+	version    string
+	httpClient *internal.HTTPClient
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
 func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
-	if err := validateUID(uid); err != nil {
-		return nil, err
-	}
 	return c.getUser(ctx, &userQuery{
 		field: "localId",
 		value: uid,
@@ -545,11 +561,19 @@ func (q *userQuery) build() map[string]interface{} {
 }
 
 func (c *userManagementClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
+	resp, err := c.post(ctx, "/accounts:lookup", query.build())
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != http.StatusOK {
+		return nil, handleHTTPError(resp)
+	}
+
 	var parsed struct {
 		Users []*userQueryResponse `json:"users"`
 	}
-	_, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
-	if err != nil {
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
 		return nil, err
 	}
 
@@ -643,15 +667,20 @@ func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreat
 		return "", err
 	}
 
-	var result struct {
-		UID string `json:"localId"`
-	}
-	_, err = c.post(ctx, "/accounts", request, &result)
+	resp, err := c.post(ctx, "/accounts", request)
 	if err != nil {
 		return "", err
 	}
 
-	return result.UID, nil
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
+	var result struct {
+		UID string `json:"localId"`
+	}
+	err = json.Unmarshal(resp.Body, &result)
+	return result.UID, err
 }
 
 // UpdateUser updates an existing user account with the specified properties.
@@ -661,34 +690,6 @@ func (c *userManagementClient) UpdateUser(
 		return nil, err
 	}
 	return c.GetUser(ctx, uid)
-}
-
-// RevokeRefreshTokens revokes all refresh tokens issued to a user.
-//
-// RevokeRefreshTokens updates the user's TokensValidAfterMillis to the current UTC second.
-// It is important that the server on which this is called has its clock set correctly and synchronized.
-//
-// While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
-// from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
-// To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
-func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
-	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
-}
-
-// SetCustomUserClaims sets additional claims on an existing user account.
-//
-// Custom claims set via this function can be used to define user roles and privilege levels.
-// These claims propagate to all the devices where the user is already signed in (after token
-// expiration or when token refresh is forced), and next time the user signs in. The claims
-// can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
-// iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
-// when serialized into a JSON string.
-func (c *userManagementClient) SetCustomUserClaims(
-	ctx context.Context, uid string, customClaims map[string]interface{}) error {
-	if customClaims == nil || len(customClaims) == 0 {
-		customClaims = map[string]interface{}{}
-	}
-	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 }
 
 func (c *userManagementClient) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
@@ -705,8 +706,15 @@ func (c *userManagementClient) updateUser(ctx context.Context, uid string, user 
 	}
 	request["localId"] = uid
 
-	_, err = c.post(ctx, "/accounts:update", request, nil)
-	return err
+	resp, err := c.post(ctx, "/accounts:update", request)
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != http.StatusOK {
+		return handleHTTPError(resp)
+	}
+	return nil
 }
 
 // DeleteUser deletes the user by the given UID.
@@ -718,8 +726,15 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 	payload := map[string]interface{}{
 		"localId": uid,
 	}
-	_, err := c.post(ctx, "/accounts:delete", payload, nil)
-	return err
+	resp, err := c.post(ctx, "/accounts:delete", payload)
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != http.StatusOK {
+		return handleHTTPError(resp)
+	}
+	return nil
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
@@ -743,39 +758,47 @@ func (c *userManagementClient) SessionCookie(
 		"idToken":       idToken,
 		"validDuration": int64(expiresIn.Seconds()),
 	}
+	resp, err := c.post(ctx, ":createSessionCookie", payload)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
 	var result struct {
 		SessionCookie string `json:"sessionCookie"`
 	}
-
-	_, err := c.post(ctx, ":createSessionCookie", payload, &result)
+	err = json.Unmarshal(resp.Body, &result)
 	return result.SessionCookie, err
 }
 
 func (c *userManagementClient) post(
-	ctx context.Context, path string, body interface{}, v interface{}) (*internal.Response, error) {
-	url, err := c.makeURL(path)
+	ctx context.Context,
+	path string,
+	payload interface{},
+) (*internal.Response, error) {
+
+	req, err := c.newRequest(http.MethodPost, path)
 	if err != nil {
 		return nil, err
 	}
-
-	req := &internal.Request{
-		Method: http.MethodPost,
-		URL:    url,
-	}
-	if body != nil {
-		req.Body = internal.NewJSONEntity(body)
-	}
-
-	return c.httpClient.DoAndUnmarshal(ctx, req, v)
+	req.Body = internal.NewJSONEntity(payload)
+	return c.httpClient.Do(ctx, req)
 }
 
-func (c *userManagementClient) makeURL(path string) (string, error) {
+func (c *userManagementClient) newRequest(method, path string) (*internal.Request, error) {
 	if c.projectID == "" {
-		return "", errors.New("project id not available")
+		return nil, errors.New("project id not available")
 	}
 
-	url := fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
-	return url, nil
+	versionHeader := internal.WithHeader("X-Client-Version", c.version)
+	return &internal.Request{
+		Method: method,
+		URL:    fmt.Sprintf("%s/%s%s", c.baseURL, c.projectID, path),
+		Opts:   []internal.HTTPOption{versionHeader},
+	}, nil
 }
 
 func handleHTTPError(resp *internal.Response) error {

@@ -1072,7 +1072,7 @@ func TestSessionCookie(t *testing.T) {
 			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
 		}
 
-		wantURL := "/projects/mock-project-id:createSessionCookie"
+		wantURL := "/mock-project-id:createSessionCookie"
 		if s.Req[0].URL.Path != wantURL {
 			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
 		}

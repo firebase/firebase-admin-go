@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 )
 
@@ -128,13 +129,18 @@ func (c *userManagementClient) generateEmailActionLink(
 		}
 	}
 
-	var result struct {
-		OOBLink string `json:"oobLink"`
-	}
-	_, err := c.post(ctx, "/accounts:sendOobCode", payload, &result)
+	resp, err := c.post(ctx, "/accounts:sendOobCode", payload)
 	if err != nil {
 		return "", err
 	}
 
+	if resp.Status != http.StatusOK {
+		return "", handleHTTPError(resp)
+	}
+
+	var result struct {
+		OOBLink string `json:"oobLink"`
+	}
+	err = json.Unmarshal(resp.Body, &result)
 	return result.OOBLink, err
 }
