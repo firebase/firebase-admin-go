@@ -105,10 +105,11 @@ type Response struct {
 // Do executes the given Request, and returns a Response.
 //
 // If a RetryConfig is specified on the client, Do attempts to retry failing requests.
-// If a SuccessFn is set on the client or on the request, the response is validated against that
-// function. If this validation fails, a custom error is returned. These custom errors are created
-// using the CreatePlatformError function. The default error constructor can be specified by
-// setting the CreateErrorFn on the client or the request.
+//
+// If SuccessFn is set on the client or on the request, the response is validated against that
+// function. If this validation fails, returns an error. These errors are created using the
+// CreateErrFn on the client or on the request. If neither is set, CreatePlatformError is
+// used as the default error function.
 func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 	var result *attemptResult
 	var err error
@@ -128,12 +129,11 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 	return c.handleResult(req, result)
 }
 
-// DoAndUnmarshal behaves similar to Do, but additionally also attempts to unmarshal the
-// response payload into the given pointer.
+// DoAndUnmarshal behaves similar to Do, but additionally unmarshals the response payload into
+// the given pointer.
 //
-// Unmarshal happens only if the response does not represent an error (as determined by
-// the Do function). If the pointer is nil, no unmarshalling is attempted, thus providing
-// identical semantics to Do. If the unmarshal fails an error is returned even if the
+// Unmarshal takes place only if the response does not represent an error (as determined by
+// the Do function) and v is not nil. If the unmarshal fails, an error is returned even if the
 // original response indicated success.
 func (c *HTTPClient) DoAndUnmarshal(ctx context.Context, req *Request, v interface{}) (*Response, error) {
 	resp, err := c.Do(ctx, req)
@@ -208,7 +208,7 @@ func (c *HTTPClient) success(req *Request, resp *Response) bool {
 }
 
 func (c *HTTPClient) newError(req *Request, resp *Response) error {
-	createErr := CreatePlatformErr
+	createErr := CreatePlatformError
 	if req.CreateErrFn != nil {
 		createErr = req.CreateErrFn
 	} else if c.CreateErrFn != nil {
@@ -299,6 +299,8 @@ func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) 
 //
 // Returns an error if the status code does not match. If an ErrorParser is specified, uses that to
 // construct the returned error message. Otherwise includes the full response body in the error.
+//
+// Deprecated. Directly verify the Status field on the Response instead.
 func (r *Response) CheckStatus(want int) error {
 	if r.Status == want {
 		return nil
@@ -319,6 +321,8 @@ func (r *Response) CheckStatus(want int) error {
 //
 // Unmarshal uses https://golang.org/pkg/encoding/json/#Unmarshal internally, and hence v has the
 // same requirements as the json package.
+//
+// Deprecated. Use DoAndUnmarshal function instead.
 func (r *Response) Unmarshal(want int, v interface{}) error {
 	if err := r.CheckStatus(want); err != nil {
 		return err
@@ -364,30 +368,31 @@ func WithQueryParams(qp map[string]string) HTTPOption {
 
 // HasSuccessStatus returns true if the response status code is in the 2xx range.
 func HasSuccessStatus(r *Response) bool {
-	return r.Status >= http.StatusOK && r.Status <= http.StatusNotModified
+	return r.Status >= http.StatusOK && r.Status < http.StatusNotModified
 }
 
-// CreatePlatformErr attempts to parse the response payload as a GCP error response
+// CreatePlatformError parses the response payload as a GCP error response
 // and create an error from the details extracted.
 //
 // If the response failes to parse, or otherwise doesn't provide any useful details
-// CreatePlatformErr creates an error with some sensible defaults.
-func CreatePlatformErr(resp *Response) error {
-	var httpErr struct {
+// CreatePlatformError creates an error with some sensible defaults.
+func CreatePlatformError(resp *Response) error {
+	var gcpError struct {
 		Error struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	json.Unmarshal(resp.Body, &httpErr) // ignore any json parse errors at this level
-	code := httpErr.Error.Status
+	json.Unmarshal(resp.Body, &gcpError) // ignore any json parse errors at this level
+	code := gcpError.Error.Status
 	if code == "" {
 		code = "UNKNOWN"
 	}
 
-	message := httpErr.Error.Message
+	message := gcpError.Error.Message
 	if message == "" {
-		message = fmt.Sprintf("unexpected http response with status: %d; body: %s", resp.Status, string(resp.Body))
+		message = fmt.Sprintf(
+			"unexpected http response with status: %d; body: %s", resp.Status, string(resp.Body))
 	}
 
 	return Error(code, message)
