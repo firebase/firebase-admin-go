@@ -106,6 +106,10 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
 	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
+	}
 }
 
 func TestNewClientWithoutCredentials(t *testing.T) {
@@ -129,6 +133,10 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
 	}
 }
 
@@ -154,6 +162,10 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
 	}
 
 	email, err := client.signer.Email(context.Background())
@@ -190,6 +202,10 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
+	}
+	wantVersion := "Go/Admin/test-version"
+	if client.version != wantVersion {
+		t.Errorf("NewClient().version = %q; want = %q", client.version, wantVersion)
 	}
 }
 
