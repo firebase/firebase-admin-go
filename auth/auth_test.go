@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -30,6 +31,11 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
+)
+
+const (
+	testProjectID = "mock-project-id"
+	testVersion   = "test-version"
 )
 
 var (
@@ -48,31 +54,22 @@ var (
 			AccessToken: "test.token",
 		}),
 	}
-	testClock     = &internal.MockClock{Timestamp: time.Now()}
-	testProjectID = "mock-project-id"
+	testClock = &internal.MockClock{Timestamp: time.Now()}
 )
 
 func TestMain(m *testing.M) {
 	var err error
 	testSigner, err = signerForTests(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
+	logFatal(err)
 
 	testIDTokenVerifier, err = idTokenVerifierForTests(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
+	logFatal(err)
 
 	testCookieVerifier, err = cookieVerifierForTests(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
+	logFatal(err)
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
-	if err != nil {
-		log.Fatalln(err)
-	}
+	logFatal(err)
 
 	testIDToken = getIDToken(nil)
 	testSessionCookie = getSessionCookie(nil)
@@ -88,7 +85,7 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 		Creds:     creds,
 		Opts:      optsWithServiceAcct,
 		ProjectID: creds.ProjectID,
-		Version:   "test-version",
+		Version:   testVersion,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +100,9 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	if err := checkCookieVerifier(client.cookieVerifier, creds.ProjectID); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
+	if err := checkUserManagementClient(client, creds.ProjectID); err != nil {
+		t.Errorf("NewClient().userManagementClient: %v", err)
+	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
 	}
@@ -111,7 +111,7 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 func TestNewClientWithoutCredentials(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:    optsWithTokenSource,
-		Version: "test-version",
+		Version: testVersion,
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
@@ -126,6 +126,9 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	}
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
+	}
+	if err := checkUserManagementClient(client, ""); err != nil {
+		t.Errorf("NewClient().userManagementClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -136,7 +139,7 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:             optsWithTokenSource,
 		ServiceAccountID: "explicit-service-account",
-		Version:          "test-version",
+		Version:          testVersion,
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
@@ -151,6 +154,9 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
+	}
+	if err := checkUserManagementClient(client, ""); err != nil {
+		t.Errorf("NewClient().userManagementClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -172,7 +178,7 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Creds:   creds,
 		Opts:    []option.ClientOption{option.WithCredentials(creds)},
-		Version: "test-version",
+		Version: testVersion,
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
@@ -187,6 +193,9 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	}
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
+	}
+	if err := checkUserManagementClient(client, ""); err != nil {
+		t.Errorf("NewClient().userManagementClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -901,9 +910,7 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 		payload: pCopy,
 	}
 	token, err := info.Token(context.Background(), testSigner)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	logFatal(err)
 	return token
 }
 
@@ -930,6 +937,31 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 	if tv.shortName != "session cookie" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "session cookie")
 	}
+	return nil
+}
+
+func checkUserManagementClient(client *Client, wantProjectID string) error {
+	if client.baseURL != idToolkitV1Endpoint {
+		return fmt.Errorf("baseURL = %q; want = %q", client.baseURL, idToolkitV1Endpoint)
+	}
+	if client.projectID != wantProjectID {
+		return fmt.Errorf("projectID = %q; want = %q", client.projectID, wantProjectID)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, "https://firebase.google.com", nil)
+	if err != nil {
+		return err
+	}
+
+	for _, opt := range client.httpClient.Opts {
+		opt(req)
+	}
+	version := req.Header.Get("X-Client-Version")
+	wantVersion := fmt.Sprintf("Go/Admin/%s", testVersion)
+	if version != wantVersion {
+		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
+	}
+
 	return nil
 }
 
@@ -978,5 +1010,11 @@ func verifyCustomToken(ctx context.Context, token string, expected map[string]in
 		if payload.Claims[k] != v {
 			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
+	}
+}
+
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
 	}
 }
