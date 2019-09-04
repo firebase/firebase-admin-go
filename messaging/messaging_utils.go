@@ -44,6 +44,11 @@ func validateMessage(message *Message) error {
 		}
 	}
 
+	// validate Notification
+	if err := validateNotification(message.Notification); err != nil {
+		return err
+	}
+
 	// validate AndroidConfig
 	if err := validateAndroidConfig(message.Android); err != nil {
 		return err
@@ -56,6 +61,21 @@ func validateMessage(message *Message) error {
 
 	// validate APNSConfig
 	return validateAPNSConfig(message.APNS)
+}
+
+func validateNotification(notification *Notification) error {
+	if notification == nil {
+		return nil
+	}
+
+	if notification.Image != "" {
+		image := notification.Image
+		_, err := url.ParseRequestURI(image)
+		if err != nil {
+			return fmt.Errorf("invalid image URL: %q", image)
+		}
+	}
+	return nil
 }
 
 func validateAndroidConfig(config *AndroidConfig) error {

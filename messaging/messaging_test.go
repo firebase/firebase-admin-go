@@ -809,6 +809,16 @@ var invalidMessages = []struct {
 		},
 		want: `invalid link URL: "http://link.com"; want scheme: "https"`,
 	},
+	{
+		name: "InvalidWebpushFcmOptionsLinkScheme",
+		req: &Message{
+			Notification: &Notification{
+				Image: "bad-url",
+			},
+			Topic: "topic",
+		},
+		want: `invalid image URL: "bad-url"`,
+	},
 }
 
 var invalidTopicMgtArgs = []struct {
