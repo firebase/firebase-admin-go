@@ -116,6 +116,25 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "NotificationImageMessage",
+		req: &Message{
+			Notification: &Notification{
+				Title: "t",
+				Body:  "b",
+				Image: "https://example.com/image.png",
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"notification": map[string]interface{}{
+				"title": "t",
+				"body":  "b",
+				"image": "https://example.com/image.png",
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
 		name: "AndroidDataMessage",
 		req: &Message{
 			Android: &AndroidConfig{

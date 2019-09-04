@@ -189,6 +189,7 @@ func (m *Message) UnmarshalJSON(b []byte) error {
 type Notification struct {
 	Title string `json:"title,omitempty"`
 	Body  string `json:"body,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // AndroidConfig contains messaging options specific to the Android platform.
