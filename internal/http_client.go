@@ -91,7 +91,7 @@ type Request struct {
 	Body        HTTPEntity
 	Opts        []HTTPOption
 	SuccessFn   SuccessFn
-	CreateErrFn func(r *Response) error
+	CreateErrFn CreateErrFn
 }
 
 // Response contains information extracted from an HTTP response.
