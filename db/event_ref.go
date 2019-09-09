@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"firebase.google.com/go/internal"
 )
@@ -67,42 +68,45 @@ func (r *Ref) Listen(ctx context.Context) (*SnapshotIterator, error) {
 // return initial snapshot (JSON-encoded string) from Ref.Path node location
 func getInitialNodeSnapshot(resp *http.Response) (string, error) {
 
-	var b []byte
+	var scannerText string
 
 	scanner := bufio.NewScanner(resp.Body)
 
-	if scanner.Scan() == true {
+	if scanner != nil {
 
-		b = scanner.Bytes()
+		if scanner.Scan() == true {
 
-		if "event: put" == string(b) {
+			scannerText = scanner.Text()
 
-			if scanner.Scan() == true {
-				b = scanner.Bytes()
-				s := string(b)
+			if "event: put" == scannerText {
 
-				// sample sse data
-				// s = 'data: {"path":"/","data":{"test3":{"test4":4}}}'
+				if scanner.Scan() == true {
 
-				var snapshotMap map[string]interface{}
+					s := scanner.Text()
 
-				// We only want the well formed json payload
-				// exclude or trim the first 6 chars 'data: '
-				err := json.Unmarshal([]byte(s[6:]), &snapshotMap)
-				if err != nil {
-					return "", err
+					// sample sse data
+					// s = 'data: {"path":"/","data":{"test3":{"test4":4}}}'
+
+					var snapshotMap map[string]interface{}
+
+					// We only want the well formed json payload
+					// exclude or trim the first 6 chars 'data: '
+					err := json.Unmarshal([]byte(s[6:]), &snapshotMap)
+					if err != nil {
+						return "", err
+					}
+					snapshotBytes, err := json.Marshal(snapshotMap["data"])
+					if err != nil {
+						return "", err
+					}
+
+					return string(snapshotBytes), nil
 				}
-
-				snapshotByte, err := json.Marshal(snapshotMap["data"])
-				if err != nil {
-					return "", err
-				}
-
-				return string(snapshotByte), nil
 			}
-		}
 
-	}
+		} // if scanner.Scan() == true
+
+	} // if scanner != nil
 
 	return "", errors.New("sse data json error, event: put")
 }
@@ -115,9 +119,12 @@ func (r *Ref) startListeningWithReconnect(
 	done *bool,
 	sseDataChan chan<- string) {
 
+	// We'll use this flag to simplify the code and have reconnect code in one block
+	reconnectState := false
+
 	scanner := bufio.NewScanner(resp.Body)
 
-	var b []byte
+	var scannerText string
 
 	for {
 
@@ -125,56 +132,65 @@ func (r *Ref) startListeningWithReconnect(
 			break
 		}
 
-		if scanner.Scan() == true {
+		if reconnectState == true {
 
-			b = scanner.Bytes()
-
-			if "event: put" == string(b) {
-
-				if scanner.Scan() == true {
-					b = scanner.Bytes()
-					s := string(b)
-
-					// sample data
-					// s = 'data: {"path":"/","data":{"test3":{"test4":4}}}'
-
-					// sse data = path + snapshot
-					if s[:5] == "data:" {
-						// trim 'data: '
-						sseDataChan <- s[6:] // {"path":"/","data":{"test3":{"test4":4}}}
-					}
-				}
-			} else if "event: auth_revoked" == string(b) {
-
-				// reconnect to re-establish authentication every hour
-				var err error
-				resp, err = r.sendListen(ctx, "GET", opts...)
-
-				if err == nil {
-					// not part of existing continuing listening events, so we don't send to the listening channel
-					snapshot, err := getInitialNodeSnapshot(resp)
-					_ = snapshot
-					_ = err
-				}
-
-				scanner = bufio.NewScanner(resp.Body)
-			}
-		} else {
-
-			// attemp to reconnect for other connection problems
 			var err error
 			resp, err = r.sendListen(ctx, "GET", opts...)
+			if err != nil {
+				time.Sleep(time.Second)
+				continue // try again
+			} else {
+				// Not part of existing continuing listening events, so we don't send to the listening channel
+				_, err := getInitialNodeSnapshot(resp)
 
-			if err == nil {
-				// not part of existing continuing listening events, so we don't send to the listening channel
-				snapshot, err := getInitialNodeSnapshot(resp)
-				_ = snapshot
-				_ = err
+				if err != nil {
+					time.Sleep(time.Second)
+					continue // try again
+				}
 			}
 
 			scanner = bufio.NewScanner(resp.Body)
 		}
-	}
+
+		if scanner == nil {
+			time.Sleep(time.Second)
+			continue // try again
+		}
+
+		reconnectState = false
+
+		if scanner != nil {
+
+			if scanner.Scan() == true {
+
+				scannerText = scanner.Text()
+
+				if "event: put" == scannerText {
+
+					if scanner.Scan() == true {
+						s := scanner.Text()
+
+						// sample data
+						// s = 'data: {"path":"/","data":{"test3":{"test4":4}}}'
+
+						// sse data = path + snapshot
+						if s[:5] == "data:" {
+							// trim 'data: '
+							sseDataChan <- s[6:] // {"path":"/","data":{"test3":{"test4":4}}}
+						}
+					}
+				} else if "event: auth_revoked" == scannerText {
+					reconnectState = true
+					continue // go back to beginning of for loop
+				}
+			} else { // if scanner.Scan() == true
+				reconnectState = true
+				continue // go back to beginning of for loop
+			}
+		} else { // if scanner != nil
+			reconnectState = true
+		}
+	} // for
 }
 
 // returns path and snapshot
