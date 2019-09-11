@@ -1114,9 +1114,7 @@ func TestSessionCookieError(t *testing.T) {
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
 	client := &Client{
-		userManagementClient: userManagementClient{
-			OnePlatformClient: &internal.OnePlatformClient{},
-		},
+		userManagementClient: userManagementClient{},
 	}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
@@ -1274,7 +1272,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.BaseURL = s.Srv.URL
+	authClient.baseURL = s.Srv.URL
 	s.Client = authClient
 	return &s
 }
