@@ -204,18 +204,16 @@ func TestEmailSignInLink(t *testing.T) {
 
 func TestEmailActionLinkNoEmail(t *testing.T) {
 	client := &Client{}
-	_, err := client.EmailVerificationLink(context.Background(), "")
-	if err == nil {
+
+	if _, err := client.EmailVerificationLink(context.Background(), ""); err == nil {
 		t.Errorf("EmailVerificationLink('') = nil; want error")
 	}
 
-	_, err = client.PasswordResetLink(context.Background(), "")
-	if err == nil {
+	if _, err := client.PasswordResetLink(context.Background(), ""); err == nil {
 		t.Errorf("PasswordResetLink('') = nil; want error")
 	}
 
-	_, err = client.EmailSignInLink(context.Background(), "", testActionCodeSettings)
-	if err == nil {
+	if _, err := client.EmailSignInLink(context.Background(), "", testActionCodeSettings); err == nil {
 		t.Errorf("EmailSignInLink('') = nil; want error")
 	}
 }
@@ -252,8 +250,7 @@ func TestEmailSignInLinkInvalidSettings(t *testing.T) {
 
 func TestEmailSignInLinkNoSettings(t *testing.T) {
 	client := &Client{}
-	_, err := client.EmailSignInLink(context.Background(), testEmail, nil)
-	if err == nil {
+	if _, err := client.EmailSignInLink(context.Background(), testEmail, nil); err == nil {
 		t.Errorf("EmailSignInLink(nil) = %v; want = error", err)
 	}
 }

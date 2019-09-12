@@ -486,8 +486,7 @@ func TestInvalidURL(t *testing.T) {
 		URL:    "http://localhost:250/mock.url",
 	}
 	client := &HTTPClient{Client: http.DefaultClient}
-	_, err := client.Do(context.Background(), req)
-	if err == nil {
+	if _, err := client.Do(context.Background(), req); err == nil {
 		t.Errorf("Send() = nil; want error")
 	}
 }
