@@ -187,9 +187,9 @@ func (m *Message) UnmarshalJSON(b []byte) error {
 
 // Notification is the basic notification template to use across all platforms.
 type Notification struct {
-	Title string `json:"title,omitempty"`
-	Body  string `json:"body,omitempty"`
-	Image string `json:"image,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Body     string `json:"body,omitempty"`
+	ImageURL string `json:"image,omitempty"`
 }
 
 // AndroidConfig contains messaging options specific to the Android platform.
@@ -621,7 +621,7 @@ type ApsAlert struct {
 // APNSFCMOptions contains additional options for features provided by the FCM Aps SDK.
 type APNSFCMOptions struct {
 	AnalyticsLabel string `json:"analytics_label,omitempty"`
-	Image          string `json:"image,omitempty"`
+	ImageURL       string `json:"image,omitempty"`
 }
 
 // FCMOptions contains additional options to use across all platforms.

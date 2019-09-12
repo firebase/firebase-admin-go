@@ -102,9 +102,9 @@ var validMessages = []struct {
 		name: "NotificationMessage",
 		req: &Message{
 			Notification: &Notification{
-				Title: "t",
-				Body:  "b",
-				Image: "http://image.jpg",
+				Title:    "t",
+				Body:     "b",
+				ImageURL: "http://image.jpg",
 			},
 			Topic: "test-topic",
 		},
@@ -326,7 +326,7 @@ var validMessages = []struct {
 				},
 				FCMOptions: &APNSFCMOptions{
 					AnalyticsLabel: "Analytics",
-					Image:          "http://image.jpg",
+					ImageURL:       "http://image.jpg",
 				},
 			},
 			Topic: "test-topic",
@@ -535,7 +535,7 @@ var invalidMessages = []struct {
 		name: "InvalidNotificationImage",
 		req: &Message{
 			Notification: &Notification{
-				Image: "image.jpg",
+				ImageURL: "image.jpg",
 			},
 			Topic: "topic",
 		},
@@ -721,7 +721,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			APNS: &APNSConfig{
 				FCMOptions: &APNSFCMOptions{
-					Image: "image.jpg",
+					ImageURL: "image.jpg",
 				},
 			},
 			Topic: "topic",
