@@ -159,7 +159,7 @@ var validMessages = []struct {
 					BodyLocKey:   "blk",
 					BodyLocArgs:  []string{"b1", "b2"},
 					ChannelID:    "channel",
-					Image:        "http://image.jpg",
+					ImageURL:     "http://image.jpg",
 				},
 				TTL: &ttlWithNanos,
 				FCMOptions: &AndroidFCMOptions{
@@ -614,7 +614,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			Android: &AndroidConfig{
 				Notification: &AndroidNotification{
-					Image: "image.jpg",
+					ImageURL: "image.jpg",
 				},
 			},
 			Topic: "topic",

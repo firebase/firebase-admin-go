@@ -275,7 +275,7 @@ type AndroidNotification struct {
 	TitleLocKey  string   `json:"title_loc_key,omitempty"`
 	TitleLocArgs []string `json:"title_loc_args,omitempty"`
 	ChannelID    string   `json:"channel_id,omitempty"`
-	Image        string   `json:"image,omitempty"`
+	ImageURL     string   `json:"image,omitempty"`
 }
 
 // AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.

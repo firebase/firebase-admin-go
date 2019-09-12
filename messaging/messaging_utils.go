@@ -70,8 +70,7 @@ func validateNotification(notification *Notification) error {
 
 	if notification.Image != "" {
 		image := notification.Image
-		_, err := url.ParseRequestURI(image)
-		if err != nil {
+		if _, err := url.ParseRequestURI(image); err != nil {
 			return fmt.Errorf("invalid image URL: %q", image)
 		}
 	}
@@ -107,10 +106,9 @@ func validateAndroidNotification(notification *AndroidNotification) error {
 	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
 		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
 	}
-	if notification.Image != "" {
-		image := notification.Image
-		_, err := url.ParseRequestURI(image)
-		if err != nil {
+	if notification.ImageURL != "" {
+		image := notification.ImageURL
+		if _, err := url.ParseRequestURI(image); err != nil {
 			return fmt.Errorf("invalid image URL: %q", image)
 		}
 	}
@@ -123,8 +121,7 @@ func validateAPNSConfig(config *APNSConfig) error {
 		if config.FCMOptions != nil {
 			if config.FCMOptions.Image != "" {
 				image := config.FCMOptions.Image
-				_, err := url.ParseRequestURI(image)
-				if err != nil {
+				if _, err := url.ParseRequestURI(image); err != nil {
 					return fmt.Errorf("invalid image URL: %q", image)
 				}
 			}
