@@ -359,9 +359,7 @@ func TestSendAllNonMultipartResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
@@ -379,9 +377,7 @@ func TestSendAllMalformedContentType(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
@@ -405,9 +401,7 @@ func TestSendAllMalformedMultipartResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
