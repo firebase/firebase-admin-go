@@ -102,8 +102,9 @@ var validMessages = []struct {
 		name: "NotificationMessage",
 		req: &Message{
 			Notification: &Notification{
-				Title: "t",
-				Body:  "b",
+				Title:    "t",
+				Body:     "b",
+				ImageURL: "http://image.jpg",
 			},
 			Topic: "test-topic",
 		},
@@ -111,6 +112,7 @@ var validMessages = []struct {
 			"notification": map[string]interface{}{
 				"title": "t",
 				"body":  "b",
+				"image": "http://image.jpg",
 			},
 			"topic": "test-topic",
 		},
@@ -157,6 +159,7 @@ var validMessages = []struct {
 					BodyLocKey:   "blk",
 					BodyLocArgs:  []string{"b1", "b2"},
 					ChannelID:    "channel",
+					ImageURL:     "http://image.jpg",
 				},
 				TTL: &ttlWithNanos,
 				FCMOptions: &AndroidFCMOptions{
@@ -178,6 +181,7 @@ var validMessages = []struct {
 					"body_loc_key":   "blk",
 					"body_loc_args":  []interface{}{"b1", "b2"},
 					"channel_id":     "channel",
+					"image":          "http://image.jpg",
 				},
 				"ttl": "1.500000000s",
 				"fcm_options": map[string]interface{}{
@@ -322,6 +326,7 @@ var validMessages = []struct {
 				},
 				FCMOptions: &APNSFCMOptions{
 					AnalyticsLabel: "Analytics",
+					ImageURL:       "http://image.jpg",
 				},
 			},
 			Topic: "test-topic",
@@ -344,6 +349,7 @@ var validMessages = []struct {
 				},
 				"fcm_options": map[string]interface{}{
 					"analytics_label": "Analytics",
+					"image":           "http://image.jpg",
 				},
 			},
 			"topic": "test-topic",
@@ -526,6 +532,16 @@ var invalidMessages = []struct {
 		want: "malformed topic name",
 	},
 	{
+		name: "InvalidNotificationImage",
+		req: &Message{
+			Notification: &Notification{
+				ImageURL: "image.jpg",
+			},
+			Topic: "topic",
+		},
+		want: `invalid image URL: "image.jpg"`,
+	},
+	{
 		name: "InvalidAndroidTTL",
 		req: &Message{
 			Android: &AndroidConfig{
@@ -592,6 +608,18 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "bodyLocKey is required when specifying bodyLocArgs",
+	},
+	{
+		name: "InvalidAndroidImage",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					ImageURL: "image.jpg",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid image URL: "image.jpg"`,
 	},
 	{
 		name: "APNSMultipleAps",
@@ -687,6 +715,18 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "locKey is required when specifying locArgs",
+	},
+	{
+		name: "InvalidAPNSImage",
+		req: &Message{
+			APNS: &APNSConfig{
+				FCMOptions: &APNSFCMOptions{
+					ImageURL: "image.jpg",
+				},
+			},
+			Topic: "topic",
+		},
+		want: `invalid image URL: "image.jpg"`,
 	},
 	{
 		name: "MultipleSoundSpecifications",
