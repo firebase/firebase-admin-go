@@ -17,10 +17,8 @@ package auth
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"firebase.google.com/go/internal"
 )
@@ -89,22 +87,14 @@ func (c *userManagementClient) ImportUsers(
 		}
 	}
 
-	resp, err := c.post(ctx, "/accounts:batchCreate", req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != http.StatusOK {
-		return nil, handleHTTPError(resp)
-	}
-
 	var parsed struct {
 		Error []struct {
 			Index   int    `json:"index"`
 			Message string `json:"message"`
 		} `json:"error,omitempty"`
 	}
-	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+	_, err := c.post(ctx, "/accounts:batchCreate", req, &parsed)
+	if err != nil {
 		return nil, err
 	}
 

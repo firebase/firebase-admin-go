@@ -167,7 +167,7 @@ func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner,
 		mutex:        &sync.Mutex{},
 		httpClient:   &internal.HTTPClient{Client: hc},
 		serviceAcct:  config.ServiceAccountID,
-		metadataHost: "http://metadata",
+		metadataHost: "http://metadata.google.internal",
 		iamHost:      "https://iam.googleapis.com",
 	}, nil
 }
