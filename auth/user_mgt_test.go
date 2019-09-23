@@ -1273,6 +1273,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		t.Fatal(err)
 	}
 	authClient.baseURL = s.Srv.URL
+	authClient.pcc.endpoint = s.Srv.URL
 	s.Client = authClient
 	return &s
 }
