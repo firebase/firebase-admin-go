@@ -62,6 +62,7 @@ func newProviderConfigClient(hc *http.Client, conf *internal.AuthConfig) *provid
 	}
 }
 
+// SAMLProviderConfig returns the SAMLProviderConfig with the given ID.
 func (c *providerConfigClient) SAMLProviderConfig(ctx context.Context, id string) (*SAMLProviderConfig, error) {
 	if err := validateSAMLConfigID(id); err != nil {
 		return nil, err
@@ -77,6 +78,21 @@ func (c *providerConfigClient) SAMLProviderConfig(ctx context.Context, id string
 	}
 
 	return result.toSAMLProviderConfig(), nil
+}
+
+// DeleteSAMLProviderConfig deletes the SAMLProviderConfig with the given ID.
+func (c *providerConfigClient) DeleteSAMLProviderConfig(ctx context.Context, id string) error {
+	if err := validateSAMLConfigID(id); err != nil {
+		return err
+	}
+
+	req := &internal.Request{
+		Method: http.MethodDelete,
+		URL:    fmt.Sprintf("/inboundSamlConfigs/%s", id),
+	}
+	var result samlProviderConfigDAO
+	_, err := c.makeRequest(ctx, req, &result)
+	return err
 }
 
 func (c *providerConfigClient) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {

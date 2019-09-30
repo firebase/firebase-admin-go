@@ -1168,7 +1168,7 @@ func TestHTTPError(t *testing.T) {
 
 func TestHTTPErrorWithCode(t *testing.T) {
 	errorCodes := map[string]func(error) bool{
-		"CONFIGURATION_NOT_FOUND": IsProjectNotFound,
+		"CONFIGURATION_NOT_FOUND": IsConfigurationNotFound,
 		"DUPLICATE_EMAIL":         IsEmailAlreadyExists,
 		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
 		"EMAIL_EXISTS":            IsEmailAlreadyExists,
