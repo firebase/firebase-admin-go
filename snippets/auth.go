@@ -79,7 +79,7 @@ func createCustomTokenWithClaims(ctx context.Context, app *firebase.App) string 
 
 func verifyIDToken(ctx context.Context, app *firebase.App, idToken string) *auth.Token {
 	// [START verify_id_token_golang]
-	client, err := app.Auth(context.Background())
+	client, err := app.Auth(ctx)
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
