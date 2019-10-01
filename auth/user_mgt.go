@@ -16,6 +16,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,9 @@ const (
 	defaultProviderID   = "firebase"
 	idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 )
+
+// 'REDACTED', encoded as a base64 string.
+var b64Redacted = base64.StdEncoding.EncodeToString([]byte("REDACTED"))
 
 // UserInfo is a collection of standard profile information for a user.
 type UserInfo struct {
@@ -595,6 +599,14 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		}
 	}
 
+	// If the password hash is redacted (probably due to missing permissions)
+	// then clear it out, similar to how the salt is returned. (Otherwise, it
+	// *looks* like a b64-encoded hash is present, which is confusing.)
+	hash := r.PasswordHash
+	if hash == b64Redacted {
+		hash = ""
+	}
+
 	return &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -615,7 +627,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				CreationTimestamp:  r.CreationTimestamp,
 			},
 		},
-		PasswordHash: r.PasswordHash,
+		PasswordHash: hash,
 		PasswordSalt: r.PasswordSalt,
 	}, nil
 }
