@@ -90,8 +90,7 @@ func (c *providerConfigClient) DeleteSAMLProviderConfig(ctx context.Context, id 
 		Method: http.MethodDelete,
 		URL:    fmt.Sprintf("/inboundSamlConfigs/%s", id),
 	}
-	var result samlProviderConfigDAO
-	_, err := c.makeRequest(ctx, req, &result)
+	_, err := c.makeRequest(ctx, req, nil)
 	return err
 }
 
