@@ -335,7 +335,7 @@ func TestSendAllTotalFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-	client.client.RetryConfig = nil
+	client.fcmClient.httpClient.RetryConfig = nil
 
 	for _, tc := range httpErrors {
 		resp = tc.resp

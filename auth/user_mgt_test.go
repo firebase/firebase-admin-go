@@ -995,7 +995,7 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-	rur := &userQueryResponse{
+	queryResponse := &userQueryResponse{
 		UID:                "testuser",
 		Email:              "testuser@example.com",
 		PhoneNumber:        "+1234567890",
@@ -1028,7 +1028,7 @@ func TestMakeExportedUser(t *testing.T) {
 		PasswordHash: "passwordhash",
 		PasswordSalt: "salt",
 	}
-	exported, err := rur.makeExportedUserRecord()
+	exported, err := queryResponse.makeExportedUserRecord()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1042,6 +1042,21 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if exported.PasswordSalt != want.PasswordSalt {
 		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
+	}
+}
+
+func TestExportedUserRecordShouldClearRedacted(t *testing.T) {
+	queryResponse := &userQueryResponse{
+		UID:          "uid1",
+		PasswordHash: base64.StdEncoding.EncodeToString([]byte("REDACTED")),
+	}
+
+	exported, err := queryResponse.makeExportedUserRecord()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exported.PasswordHash != "" {
+		t.Errorf("PasswordHash = %q; want = ''", exported.PasswordHash)
 	}
 }
 

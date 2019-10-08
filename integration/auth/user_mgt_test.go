@@ -107,6 +107,9 @@ func TestDeleteNonExistingUser(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
+	errMsgTemplate := "Users() %s = empty; want = non-empty. A common cause would be " +
+		"forgetting to add the 'Firebase Authentication Admin' permission. See " +
+		"instructions in CONTRIBUTING.md"
 	newUsers := map[string]bool{}
 	user := newUserWithParams(t)
 	defer deleteUser(user.UID)
@@ -133,7 +136,10 @@ func TestListUsers(t *testing.T) {
 		if _, ok := newUsers[u.UID]; ok {
 			count++
 			if u.PasswordHash == "" {
-				t.Errorf("Users() PasswordHash = empty; want = non-empty")
+				t.Errorf(errMsgTemplate, "PasswordHash")
+			}
+			if u.PasswordSalt == "" {
+				t.Errorf(errMsgTemplate, "PasswordSalt")
 			}
 		}
 	}

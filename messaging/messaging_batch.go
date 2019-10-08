@@ -95,7 +95,7 @@ type BatchResponse struct {
 // obtained from the return value corresponds to the order of the input messages. An error from
 // SendAll indicates a total failure -- i.e. none of the messages in the array could be sent.
 // Partial failures are indicated by a `BatchResponse` return value.
-func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+func (c *fcmClient) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, false)
 }
 
@@ -111,7 +111,7 @@ func (c *Client) SendAll(ctx context.Context, messages []*Message) (*BatchRespon
 // obtained from the return value corresponds to the order of the input messages. An error from
 // SendAllDryRun indicates a total failure -- i.e. none of the messages in the array could be sent
 // for validation. Partial failures are indicated by a `BatchResponse` return value.
-func (c *Client) SendAllDryRun(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+func (c *fcmClient) SendAllDryRun(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, true)
 }
 
@@ -122,7 +122,7 @@ func (c *Client) SendAllDryRun(ctx context.Context, messages []*Message) (*Batch
 // responses list obtained from the return value corresponds to the order of the input tokens. An
 // error from SendMulticast indicates a total failure -- i.e. the message could not be sent to any
 // of the recipients. Partial failures are indicated by a `BatchResponse` return value.
-func (c *Client) SendMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
 	messages, err := toMessages(message)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *Client) SendMulticast(ctx context.Context, message *MulticastMessage) (
 // the return value corresponds to the order of the input tokens. An error from SendMulticastDryRun
 // indicates a total failure -- i.e. none of the messages were sent to FCM for validation. Partial
 // failures are indicated by a `BatchResponse` return value.
-func (c *Client) SendMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+func (c *fcmClient) SendMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
 	messages, err := toMessages(message)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func toMessages(message *MulticastMessage) ([]*Message, error) {
 	return message.toMessages()
 }
 
-func (c *Client) sendBatch(
+func (c *fcmClient) sendBatch(
 	ctx context.Context, messages []*Message, dryRun bool) (*BatchResponse, error) {
 
 	if len(messages) == 0 {
@@ -175,7 +175,7 @@ func (c *Client) sendBatch(
 		return nil, err
 	}
 
-	resp, err := c.client.Do(ctx, request)
+	resp, err := c.httpClient.Do(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ type multipartEntity struct {
 	parts []*part
 }
 
-func (c *Client) newBatchRequest(messages []*Message, dryRun bool) (*internal.Request, error) {
+func (c *fcmClient) newBatchRequest(messages []*Message, dryRun bool) (*internal.Request, error) {
 	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
 	headers := map[string]string{
 		apiFormatVersionHeader: apiFormatVersion,

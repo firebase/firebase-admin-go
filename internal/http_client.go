@@ -56,10 +56,6 @@ type CreateErrFn func(r *Response) error
 // NewHTTPClient creates a new HTTPClient using the provided client options and the default
 // RetryConfig.
 //
-// The default RetryConfig retries requests on all low-level network errors as well as on HTTP
-// InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
-// retried up to 4 times with exponential backoff. Retry delay is never longer than 2 minutes.
-//
 // NewHTTPClient returns the created HTTPClient along with the target endpoint URL. The endpoint
 // is obtained from the client options passed into the function.
 func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClient, string, error) {
@@ -68,8 +64,18 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 		return nil, "", err
 	}
 
+	return WithDefaultRetryConfig(hc), endpoint, nil
+}
+
+// WithDefaultRetryConfig creates a new HTTPClient using the provided client and the default
+// RetryConfig.
+//
+// The default RetryConfig retries requests on all low-level network errors as well as on HTTP
+// InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
+// retried up to 4 times with exponential backoff. Retry delay is never longer than 2 minutes.
+func WithDefaultRetryConfig(hc *http.Client) *HTTPClient {
 	twoMinutes := time.Duration(2) * time.Minute
-	client := &HTTPClient{
+	return &HTTPClient{
 		Client: hc,
 		RetryConfig: &RetryConfig{
 			MaxRetries: 4,
@@ -81,7 +87,6 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 			MaxDelay:         &twoMinutes,
 		},
 	}
-	return client, endpoint, nil
 }
 
 // Request contains all the parameters required to construct an outgoing HTTP request.
