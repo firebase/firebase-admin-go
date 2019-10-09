@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"google.golang.org/api/iterator"
 )
 
 const samlConfigResponse = `{
@@ -621,6 +623,78 @@ func TestDeleteSAMLProviderConfigError(t *testing.T) {
 	err := client.DeleteSAMLProviderConfig(context.Background(), "saml.provider")
 	if err == nil || !IsConfigurationNotFound(err) {
 		t.Errorf("DeleteSAMLProviderConfig() = %v; want = ConfigurationNotFound", err)
+	}
+}
+
+func TestSAMLProviderConfigs(t *testing.T) {
+	template := `{
+                "inboundSamlConfigs": [
+                    %s,
+                    %s,
+                    %s
+                ],
+                "nextPageToken": ""
+        }`
+	response := fmt.Sprintf(template, samlConfigResponse, samlConfigResponse, samlConfigResponse)
+	s := echoServer([]byte(response), t)
+	defer s.Close()
+
+	want := []*SAMLProviderConfig{
+		samlProviderConfig,
+		samlProviderConfig,
+		samlProviderConfig,
+	}
+
+	testIterator := func(iter *SAMLProviderConfigIterator, token string, req string) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			config, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(config, want[i]) {
+				t.Errorf("SAMLProviderConfigs(%q) = %#v; want = %#v", token, config, want[i])
+			}
+			count++
+		}
+		if count != len(want) {
+			t.Errorf("SAMLProviderConfigs(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("SAMLProviderConfigs(%q) = %v, want = %v", token, err, iterator.Done)
+		}
+
+		// Check the query string of the last HTTP request made.
+		gotReq := s.Req[len(s.Req)-1].URL.Query().Encode()
+		if gotReq != req {
+			t.Errorf("SAMLProviderConfigs(%q) = %q, want = %v", token, gotReq, req)
+		}
+	}
+
+	client := s.Client.pcc
+	testIterator(
+		client.SAMLProviderConfigs(context.Background(), ""),
+		"",
+		"pageSize=100")
+	testIterator(
+		client.SAMLProviderConfigs(context.Background(), "pageToken"),
+		"pageToken",
+		"pageSize=100&pageToken=pageToken")
+}
+
+func TestSAMLProviderConfigsError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	s.Status = http.StatusInternalServerError
+
+	client := s.Client.pcc
+	it := client.SAMLProviderConfigs(context.Background(), "")
+	config, err := it.Next()
+	if config != nil || err == nil || !IsUnknown(err) {
+		t.Errorf("SAMLProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
 	}
 }
 

@@ -20,13 +20,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/iterator"
 )
 
 const (
 	providerConfigEndpoint = "https://identitytoolkit.googleapis.com/v2beta1"
+
+	maxConfigs = 100
 
 	idpEntityIDKey = "idpConfig.idpEntityId"
 	ssoURLKey      = "idpConfig.ssoUrl"
@@ -337,6 +341,65 @@ func (config *SAMLProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 	return config.params, nil
 }
 
+// SAMLProviderConfigIterator is an iterator over SAML provider configurations.
+type SAMLProviderConfigIterator struct {
+	client   *providerConfigClient
+	ctx      context.Context
+	nextFunc func() error
+	pageInfo *iterator.PageInfo
+	configs  []*SAMLProviderConfig
+}
+
+// PageInfo supports pagination.
+func (it *SAMLProviderConfigIterator) PageInfo() *iterator.PageInfo {
+	return it.pageInfo
+}
+
+// Next returns the next SAMLProviderConfig. The error value of [iterator.Done] is
+// returned if there are no more results. Once Next returns [iterator.Done], all
+// subsequent calls will return [iterator.Done].
+func (it *SAMLProviderConfigIterator) Next() (*SAMLProviderConfig, error) {
+	if err := it.nextFunc(); err != nil {
+		return nil, err
+	}
+
+	config := it.configs[0]
+	it.configs = it.configs[1:]
+	return config, nil
+}
+
+func (it *SAMLProviderConfigIterator) fetch(pageSize int, pageToken string) (string, error) {
+	params := map[string]string{
+		"pageSize": strconv.Itoa(pageSize),
+	}
+	if pageToken != "" {
+		params["pageToken"] = pageToken
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    "/inboundSamlConfigs",
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParams(params),
+		},
+	}
+
+	var result struct {
+		Configs       []samlProviderConfigDAO `json:"inboundSamlConfigs"`
+		NextPageToken string                  `json:"nextPageToken"`
+	}
+	if _, err := it.client.makeRequest(it.ctx, req, &result); err != nil {
+		return "", err
+	}
+
+	for _, config := range result.Configs {
+		it.configs = append(it.configs, config.toSAMLProviderConfig())
+	}
+
+	it.pageInfo.Token = result.NextPageToken
+	return result.NextPageToken, nil
+}
+
 type providerConfigClient struct {
 	endpoint   string
 	projectID  string
@@ -451,6 +514,24 @@ func (c *providerConfigClient) DeleteSAMLProviderConfig(ctx context.Context, id 
 	}
 	_, err := c.makeRequest(ctx, req, nil)
 	return err
+}
+
+// SAMLProviderConfigs returns an iterator over SAML provider configurations.
+//
+// If nextPageToken is empty, the iterator will start at the beginning. Otherwise,
+// iterator starts after the token.
+func (c *providerConfigClient) SAMLProviderConfigs(ctx context.Context, nextPageToken string) *SAMLProviderConfigIterator {
+	it := &SAMLProviderConfigIterator{
+		ctx:    ctx,
+		client: c,
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
+		it.fetch,
+		func() int { return len(it.configs) },
+		func() interface{} { b := it.configs; it.configs = nil; return b })
+	it.pageInfo.MaxSize = maxConfigs
+	it.pageInfo.Token = nextPageToken
+	return it
 }
 
 func (c *providerConfigClient) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
