@@ -315,6 +315,7 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 // Error handlers.
 
 const (
+	configurationNotFound    = "configuration-not-found"
 	emailAlreadyExists       = "email-already-exists"
 	idTokenRevoked           = "id-token-revoked"
 	insufficientPermission   = "insufficient-permission"
@@ -327,6 +328,11 @@ const (
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
 )
+
+// IsConfigurationNotFound checks if the given error was due to a non-existing IdP configuration.
+func IsConfigurationNotFound(err error) bool {
+	return internal.HasErrorCode(err, configurationNotFound)
+}
 
 // IsEmailAlreadyExists checks if the given error was due to a duplicate email.
 func IsEmailAlreadyExists(err error) bool {
@@ -384,7 +390,7 @@ func IsUserNotFound(err error) bool {
 }
 
 var serverError = map[string]string{
-	"CONFIGURATION_NOT_FOUND":     projectNotFound,
+	"CONFIGURATION_NOT_FOUND":     configurationNotFound,
 	"DUPLICATE_EMAIL":             emailAlreadyExists,
 	"DUPLICATE_LOCAL_ID":          uidAlreadyExists,
 	"EMAIL_EXISTS":                emailAlreadyExists,
