@@ -109,6 +109,16 @@ func buildMask(data map[string]interface{}) []string {
 	return mask
 }
 
+// OIDCProviderConfig is the OIDC auth provider configuration.
+// See https://openid.net/specs/openid-connect-core-1_0-final.html.
+type OIDCProviderConfig struct {
+	ID          string
+	DisplayName string
+	Enabled     bool
+	ClientID    string
+	Issuer      string
+}
+
 // SAMLProviderConfig is the SAML auth provider configuration.
 // See http://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html.
 type SAMLProviderConfig struct {
@@ -422,6 +432,38 @@ func newProviderConfigClient(hc *http.Client, conf *internal.AuthConfig) *provid
 	}
 }
 
+// OIDCProviderConfig returns the OIDCProviderConfig with the given ID.
+func (c *providerConfigClient) OIDCProviderConfig(ctx context.Context, id string) (*OIDCProviderConfig, error) {
+	if err := validateOIDCConfigID(id); err != nil {
+		return nil, err
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    fmt.Sprintf("/oauthIdpConfigs/%s", id),
+	}
+	var result oidcProviderConfigDAO
+	if _, err := c.makeRequest(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	return result.toOIDCProviderConfig(), nil
+}
+
+// DeleteOIDCProviderConfig deletes the OIDCProviderConfig with the given ID.
+func (c *providerConfigClient) DeleteOIDCProviderConfig(ctx context.Context, id string) error {
+	if err := validateOIDCConfigID(id); err != nil {
+		return err
+	}
+
+	req := &internal.Request{
+		Method: http.MethodDelete,
+		URL:    fmt.Sprintf("/oauthIdpConfigs/%s", id),
+	}
+	_, err := c.makeRequest(ctx, req, nil)
+	return err
+}
+
 // SAMLProviderConfig returns the SAMLProviderConfig with the given ID.
 func (c *providerConfigClient) SAMLProviderConfig(ctx context.Context, id string) (*SAMLProviderConfig, error) {
 	if err := validateSAMLConfigID(id); err != nil {
@@ -543,6 +585,24 @@ func (c *providerConfigClient) makeRequest(ctx context.Context, req *internal.Re
 	return c.httpClient.DoAndUnmarshal(ctx, req, v)
 }
 
+type oidcProviderConfigDAO struct {
+	Name        string `json:"name"`
+	ClientID    string `json:"clientId"`
+	Issuer      string `json:"issuer"`
+	DisplayName string `json:"displayName"`
+	Enabled     bool   `json:"enabled"`
+}
+
+func (dao *oidcProviderConfigDAO) toOIDCProviderConfig() *OIDCProviderConfig {
+	return &OIDCProviderConfig{
+		ID:          extractResourceID(dao.Name),
+		DisplayName: dao.DisplayName,
+		Enabled:     dao.Enabled,
+		ClientID:    dao.ClientID,
+		Issuer:      dao.Issuer,
+	}
+}
+
 type idpCertificate struct {
 	X509Certificate string `json:"x509Certificate"`
 }
@@ -580,6 +640,14 @@ func (dao *samlProviderConfigDAO) toSAMLProviderConfig() *SAMLProviderConfig {
 		RPEntityID:            dao.SPConfig.SPEntityID,
 		CallbackURL:           dao.SPConfig.CallbackURI,
 	}
+}
+
+func validateOIDCConfigID(id string) error {
+	if !strings.HasPrefix(id, "oidc.") {
+		return fmt.Errorf("invalid OIDC provider id: %q", id)
+	}
+
+	return nil
 }
 
 func validateSAMLConfigID(id string) error {
