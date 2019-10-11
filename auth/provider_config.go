@@ -133,20 +133,17 @@ func (config *SAMLProviderConfigToCreate) ID(id string) *SAMLProviderConfigToCre
 
 // IDPEntityID sets the IDPEntityID field of the new config.
 func (config *SAMLProviderConfigToCreate) IDPEntityID(entityID string) *SAMLProviderConfigToCreate {
-	config.set(idpEntityIDKey, entityID)
-	return config
+	return config.set(idpEntityIDKey, entityID)
 }
 
 // SSOURL sets the SSOURL field of the new config.
 func (config *SAMLProviderConfigToCreate) SSOURL(url string) *SAMLProviderConfigToCreate {
-	config.set(ssoURLKey, url)
-	return config
+	return config.set(ssoURLKey, url)
 }
 
 // RequestSigningEnabled enables or disables the request signing support.
 func (config *SAMLProviderConfigToCreate) RequestSigningEnabled(enabled bool) *SAMLProviderConfigToCreate {
-	config.set(signRequestKey, enabled)
-	return config
+	return config.set(signRequestKey, enabled)
 }
 
 // X509Certificates sets the certificates for the new config.
@@ -156,40 +153,36 @@ func (config *SAMLProviderConfigToCreate) X509Certificates(certs []string) *SAML
 		result = append(result, idpCertificate{cert})
 	}
 
-	config.set(idpCertsKey, result)
-	return config
+	return config.set(idpCertsKey, result)
 }
 
 // RPEntityID sets the RPEntityID field of the new config.
 func (config *SAMLProviderConfigToCreate) RPEntityID(entityID string) *SAMLProviderConfigToCreate {
-	config.set(spEntityIDKey, entityID)
-	return config
+	return config.set(spEntityIDKey, entityID)
 }
 
 // CallbackURL sets the CallbackURL field of the new config.
 func (config *SAMLProviderConfigToCreate) CallbackURL(url string) *SAMLProviderConfigToCreate {
-	config.set(callbackURIKey, url)
-	return config
+	return config.set(callbackURIKey, url)
 }
 
 // DisplayName sets the DisplayName field of the new config.
 func (config *SAMLProviderConfigToCreate) DisplayName(name string) *SAMLProviderConfigToCreate {
-	config.set(displayNameKey, name)
-	return config
+	return config.set(displayNameKey, name)
 }
 
 // Enabled enables or disables the new config.
 func (config *SAMLProviderConfigToCreate) Enabled(enabled bool) *SAMLProviderConfigToCreate {
-	config.set(enabledKey, enabled)
-	return config
+	return config.set(enabledKey, enabled)
 }
 
-func (config *SAMLProviderConfigToCreate) set(key string, value interface{}) {
+func (config *SAMLProviderConfigToCreate) set(key string, value interface{}) *SAMLProviderConfigToCreate {
 	if config.params == nil {
 		config.params = make(nestedMap)
 	}
 
 	config.params.Set(key, value)
+	return config
 }
 
 func (config *SAMLProviderConfigToCreate) buildRequest() (nestedMap, string, error) {
