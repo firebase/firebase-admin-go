@@ -508,6 +508,84 @@ func TestDeleteOIDCProviderConfigError(t *testing.T) {
 	}
 }
 
+func TestOIDCProviderConfigs(t *testing.T) {
+	template := `{
+                "oauthIdpConfigs": [
+                    %s,
+                    %s,
+                    %s
+                ],
+                "nextPageToken": ""
+        }`
+	response := fmt.Sprintf(template, oidcConfigResponse, oidcConfigResponse, oidcConfigResponse)
+	s := echoServer([]byte(response), t)
+	defer s.Close()
+
+	want := []*OIDCProviderConfig{
+		oidcProviderConfig,
+		oidcProviderConfig,
+		oidcProviderConfig,
+	}
+	wantPath := "/projects/mock-project-id/oauthIdpConfigs"
+
+	testIterator := func(iter *OIDCProviderConfigIterator, token string, req string) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			config, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(config, want[i]) {
+				t.Errorf("OIDCProviderConfigs(%q) = %#v; want = %#v", token, config, want[i])
+			}
+			count++
+		}
+		if count != len(want) {
+			t.Errorf("OIDCProviderConfigs(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("OIDCProviderConfigs(%q) = %v; want = %v", token, err, iterator.Done)
+		}
+
+		url := s.Req[len(s.Req)-1].URL
+		if url.Path != wantPath {
+			t.Errorf("OIDCProviderConfigs(%q) = %q; want = %q", token, url.Path, wantPath)
+		}
+
+		// Check the query string of the last HTTP request made.
+		gotReq := url.Query().Encode()
+		if gotReq != req {
+			t.Errorf("OIDCProviderConfigs(%q) = %q; want = %v", token, gotReq, req)
+		}
+	}
+
+	client := s.Client.pcc
+	testIterator(
+		client.OIDCProviderConfigs(context.Background(), ""),
+		"",
+		"pageSize=100")
+	testIterator(
+		client.OIDCProviderConfigs(context.Background(), "pageToken"),
+		"pageToken",
+		"pageSize=100&pageToken=pageToken")
+}
+
+func TestOIDCProviderConfigsError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	s.Status = http.StatusInternalServerError
+
+	client := s.Client.pcc
+	it := client.OIDCProviderConfigs(context.Background(), "")
+	config, err := it.Next()
+	if config != nil || err == nil || !IsUnknown(err) {
+		t.Errorf("OIDCProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
+	}
+}
+
 func TestSAMLProviderConfig(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
@@ -1074,6 +1152,7 @@ func TestSAMLProviderConfigs(t *testing.T) {
 		samlProviderConfig,
 		samlProviderConfig,
 	}
+	wantPath := "/projects/mock-project-id/inboundSamlConfigs"
 
 	testIterator := func(iter *SAMLProviderConfigIterator, token string, req string) {
 		count := 0
@@ -1094,13 +1173,18 @@ func TestSAMLProviderConfigs(t *testing.T) {
 			t.Errorf("SAMLProviderConfigs(%q) = %d; want = %d", token, count, len(want))
 		}
 		if _, err := iter.Next(); err != iterator.Done {
-			t.Errorf("SAMLProviderConfigs(%q) = %v, want = %v", token, err, iterator.Done)
+			t.Errorf("SAMLProviderConfigs(%q) = %v; want = %v", token, err, iterator.Done)
+		}
+
+		url := s.Req[len(s.Req)-1].URL
+		if url.Path != wantPath {
+			t.Errorf("SAMLProviderConfigs(%q) = %q; want = %q", token, url.Path, wantPath)
 		}
 
 		// Check the query string of the last HTTP request made.
-		gotReq := s.Req[len(s.Req)-1].URL.Query().Encode()
+		gotReq := url.Query().Encode()
 		if gotReq != req {
-			t.Errorf("SAMLProviderConfigs(%q) = %q, want = %v", token, gotReq, req)
+			t.Errorf("SAMLProviderConfigs(%q) = %q; want = %v", token, gotReq, req)
 		}
 	}
 
