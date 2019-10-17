@@ -27,8 +27,16 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+const oidcConfigResponse = `{
+    "name":"projects/mock-project-id/oauthIdpConfigs/oidc.provider",
+    "clientId": "CLIENT_ID",
+    "issuer": "https://oidc.com/issuer",
+    "displayName": "oidcProviderName",
+    "enabled": true
+}`
+
 const samlConfigResponse = `{
-    "name":"projects/mock-project-id/inboundSamlConfigs/saml.provider",
+    "name": "projects/mock-project-id/inboundSamlConfigs/saml.provider",
     "idpConfig": {
         "idpEntityId": "IDP_ENTITY_ID",
         "ssoUrl": "https://example.com/login",
@@ -57,6 +65,14 @@ var idpCertsMap = []interface{}{
 	map[string]interface{}{"x509Certificate": "CERT2"},
 }
 
+var oidcProviderConfig = &OIDCProviderConfig{
+	ID:          "oidc.provider",
+	DisplayName: "oidcProviderName",
+	Enabled:     true,
+	ClientID:    "CLIENT_ID",
+	Issuer:      "https://oidc.com/issuer",
+}
+
 var samlProviderConfig = &SAMLProviderConfig{
 	ID:                    "saml.provider",
 	DisplayName:           "samlProviderName",
@@ -69,10 +85,109 @@ var samlProviderConfig = &SAMLProviderConfig{
 	CallbackURL:           "https://projectId.firebaseapp.com/__/auth/handler",
 }
 
+var invalidOIDCConfigIDs = []string{
+	"",
+	"invalid.id",
+	"saml.config",
+}
+
 var invalidSAMLConfigIDs = []string{
 	"",
 	"invalid.id",
 	"oidc.config",
+}
+
+func TestOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	oidc, err := client.OIDCProviderConfig(context.Background(), "oidc.provider")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("OIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodGet {
+		t.Errorf("OIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs/oidc.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("OIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestOIDCProviderConfigInvalidID(t *testing.T) {
+	client := &providerConfigClient{}
+	wantErr := "invalid OIDC provider id: "
+
+	for _, id := range invalidOIDCConfigIDs {
+		saml, err := client.OIDCProviderConfig(context.Background(), id)
+		if saml != nil || err == nil || !strings.HasPrefix(err.Error(), wantErr) {
+			t.Errorf("OIDCProviderConfig(%q) = (%v, %v); want = (nil, %q)", id, saml, err, wantErr)
+		}
+	}
+}
+
+func TestOIDCProviderConfigError(t *testing.T) {
+	s := echoServer([]byte(notFoundResponse), t)
+	defer s.Close()
+	s.Status = http.StatusNotFound
+
+	client := s.Client.pcc
+	saml, err := client.OIDCProviderConfig(context.Background(), "oidc.provider")
+	if saml != nil || err == nil || !IsConfigurationNotFound(err) {
+		t.Errorf("OIDCProviderConfig() = (%v, %v); want = (nil, ConfigurationNotFound)", saml, err)
+	}
+}
+
+func TestDeleteOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	if err := client.DeleteOIDCProviderConfig(context.Background(), "oidc.provider"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodDelete {
+		t.Errorf("DeleteOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodDelete)
+	}
+
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs/oidc.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("DeleteOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestDeleteOIDCProviderConfigInvalidID(t *testing.T) {
+	client := &providerConfigClient{}
+	wantErr := "invalid OIDC provider id: "
+
+	for _, id := range invalidOIDCConfigIDs {
+		err := client.DeleteOIDCProviderConfig(context.Background(), id)
+		if err == nil || !strings.HasPrefix(err.Error(), wantErr) {
+			t.Errorf("DeleteOIDCProviderConfig(%q) = %v; want = %q", id, err, wantErr)
+		}
+	}
+}
+
+func TestDeleteOIDCProviderConfigError(t *testing.T) {
+	s := echoServer([]byte(notFoundResponse), t)
+	defer s.Close()
+	s.Status = http.StatusNotFound
+
+	client := s.Client.pcc
+	err := client.DeleteOIDCProviderConfig(context.Background(), "oidc.provider")
+	if err == nil || !IsConfigurationNotFound(err) {
+		t.Errorf("DeleteOIDCProviderConfig() = %v; want = ConfigurationNotFound", err)
+	}
 }
 
 func TestSAMLProviderConfig(t *testing.T) {
