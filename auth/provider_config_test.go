@@ -36,7 +36,7 @@ const oidcConfigResponse = `{
 }`
 
 const samlConfigResponse = `{
-    "name":"projects/mock-project-id/inboundSamlConfigs/saml.provider",
+    "name": "projects/mock-project-id/inboundSamlConfigs/saml.provider",
     "idpConfig": {
         "idpEntityId": "IDP_ENTITY_ID",
         "ssoUrl": "https://example.com/login",
