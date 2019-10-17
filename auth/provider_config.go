@@ -601,19 +601,18 @@ type providerConfigClient struct {
 	httpClient *internal.HTTPClient
 }
 
-func newProviderConfigClient(hc *http.Client, conf *internal.AuthConfig) *providerConfigClient {
-	client := &internal.HTTPClient{
-		Client:      hc,
-		SuccessFn:   internal.HasSuccessStatus,
-		CreateErrFn: handleHTTPError,
-		Opts: []internal.HTTPOption{
-			internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-		},
+func newProviderConfigClient(client *http.Client, conf *internal.AuthConfig) *providerConfigClient {
+	hc := internal.WithDefaultRetryConfig(client)
+	hc.CreateErrFn = handleHTTPError
+	hc.SuccessFn = internal.HasSuccessStatus
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
+
 	return &providerConfigClient{
 		endpoint:   providerConfigEndpoint,
 		projectID:  conf.ProjectID,
-		httpClient: client,
+		httpClient: hc,
 	}
 }
 

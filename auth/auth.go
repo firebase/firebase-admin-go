@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/transport"
 )
 
 const (
@@ -40,8 +41,8 @@ var reservedClaims = []string{
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	userManagementClient
-	pcc             *providerConfigClient // TODO: Embed this to add the methods to the public API
+	*userManagementClient
+	*providerConfigClient
 	idTokenVerifier *tokenVerifier
 	cookieVerifier  *tokenVerifier
 	signer          cryptoSigner
@@ -83,11 +84,6 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	userMgt, err := newUserManagementClient(ctx, conf)
-	if err != nil {
-		return nil, err
-	}
-
 	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
 	if err != nil {
 		return nil, err
@@ -98,9 +94,14 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
+	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		userManagementClient: *userMgt,
-		pcc:                  newProviderConfigClient(userMgt.httpClient.Client, conf),
+		userManagementClient: newUserManagementClient(hc, conf),
+		providerConfigClient: newProviderConfigClient(hc, conf),
 		idTokenVerifier:      idTokenVerifier,
 		cookieVerifier:       cookieVerifier,
 		signer:               signer,

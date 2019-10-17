@@ -941,11 +941,12 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 }
 
 func checkUserManagementClient(client *Client, wantProjectID string) error {
-	if client.baseURL != idToolkitV1Endpoint {
-		return fmt.Errorf("baseURL = %q; want = %q", client.baseURL, idToolkitV1Endpoint)
+	umc := client.userManagementClient
+	if umc.baseURL != idToolkitV1Endpoint {
+		return fmt.Errorf("baseURL = %q; want = %q", umc.baseURL, idToolkitV1Endpoint)
 	}
-	if client.projectID != wantProjectID {
-		return fmt.Errorf("projectID = %q; want = %q", client.projectID, wantProjectID)
+	if umc.projectID != wantProjectID {
+		return fmt.Errorf("projectID = %q; want = %q", umc.projectID, wantProjectID)
 	}
 
 	req, err := http.NewRequest(http.MethodGet, "https://firebase.google.com", nil)
@@ -953,7 +954,7 @@ func checkUserManagementClient(client *Client, wantProjectID string) error {
 		return err
 	}
 
-	for _, opt := range client.httpClient.Opts {
+	for _, opt := range umc.httpClient.Opts {
 		opt(req)
 	}
 	version := req.Header.Get("X-Client-Version")
