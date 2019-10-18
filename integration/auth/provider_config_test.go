@@ -210,6 +210,7 @@ func TestSAMLProviderConfig(t *testing.T) {
 
 			if saml.ID == id {
 				target = saml
+				break
 			}
 		}
 
