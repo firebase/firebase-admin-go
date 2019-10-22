@@ -40,6 +40,9 @@ const (
 	spEntityIDKey  = "spConfig.spEntityId"
 	callbackURIKey = "spConfig.callbackUri"
 
+	clientIDKey = "clientId"
+	issuerKey   = "issuer"
+
 	displayNameKey = "displayName"
 	enabledKey     = "enabled"
 )
@@ -117,6 +120,129 @@ type OIDCProviderConfig struct {
 	Enabled     bool
 	ClientID    string
 	Issuer      string
+}
+
+// OIDCProviderConfigToCreate represents the options used to create a new OIDCProviderConfig.
+type OIDCProviderConfigToCreate struct {
+	id     string
+	params nestedMap
+}
+
+// ID sets the provider ID of the new config.
+func (config *OIDCProviderConfigToCreate) ID(id string) *OIDCProviderConfigToCreate {
+	config.id = id
+	return config
+}
+
+// ClientID sets the client ID of the new config.
+func (config *OIDCProviderConfigToCreate) ClientID(clientID string) *OIDCProviderConfigToCreate {
+	return config.set(clientIDKey, clientID)
+}
+
+// Issuer sets the issuer of the new config.
+func (config *OIDCProviderConfigToCreate) Issuer(issuer string) *OIDCProviderConfigToCreate {
+	return config.set(issuerKey, issuer)
+}
+
+// DisplayName sets the DisplayName field of the new config.
+func (config *OIDCProviderConfigToCreate) DisplayName(name string) *OIDCProviderConfigToCreate {
+	return config.set(displayNameKey, name)
+}
+
+// Enabled enables or disables the new config.
+func (config *OIDCProviderConfigToCreate) Enabled(enabled bool) *OIDCProviderConfigToCreate {
+	return config.set(enabledKey, enabled)
+}
+
+func (config *OIDCProviderConfigToCreate) set(key string, value interface{}) *OIDCProviderConfigToCreate {
+	if config.params == nil {
+		config.params = make(nestedMap)
+	}
+
+	config.params.Set(key, value)
+	return config
+}
+
+func (config *OIDCProviderConfigToCreate) buildRequest() (nestedMap, string, error) {
+	if err := validateOIDCConfigID(config.id); err != nil {
+		return nil, "", err
+	}
+
+	if len(config.params) == 0 {
+		return nil, "", errors.New("no parameters specified in the create request")
+	}
+
+	if val, ok := config.params.GetString(clientIDKey); !ok || val == "" {
+		return nil, "", errors.New("ClientID must not be empty")
+	}
+
+	if val, ok := config.params.GetString(issuerKey); !ok || val == "" {
+		return nil, "", errors.New("Issuer must not be empty")
+	} else if _, err := url.ParseRequestURI(val); err != nil {
+		return nil, "", fmt.Errorf("failed to parse Issuer: %v", err)
+	}
+
+	return config.params, config.id, nil
+}
+
+// OIDCProviderConfigToUpdate represents the options used to update an existing OIDCProviderConfig.
+type OIDCProviderConfigToUpdate struct {
+	params nestedMap
+}
+
+// ClientID updates the client ID of the config.
+func (config *OIDCProviderConfigToUpdate) ClientID(clientID string) *OIDCProviderConfigToUpdate {
+	return config.set(clientIDKey, clientID)
+}
+
+// Issuer updates the issuer of the config.
+func (config *OIDCProviderConfigToUpdate) Issuer(issuer string) *OIDCProviderConfigToUpdate {
+	return config.set(issuerKey, issuer)
+}
+
+// DisplayName updates the DisplayName field of the config.
+func (config *OIDCProviderConfigToUpdate) DisplayName(name string) *OIDCProviderConfigToUpdate {
+	var nameOrNil interface{}
+	if name != "" {
+		nameOrNil = name
+	}
+
+	return config.set(displayNameKey, nameOrNil)
+}
+
+// Enabled enables or disables the config.
+func (config *OIDCProviderConfigToUpdate) Enabled(enabled bool) *OIDCProviderConfigToUpdate {
+	return config.set(enabledKey, enabled)
+}
+
+func (config *OIDCProviderConfigToUpdate) set(key string, value interface{}) *OIDCProviderConfigToUpdate {
+	if config.params == nil {
+		config.params = make(nestedMap)
+	}
+
+	config.params.Set(key, value)
+	return config
+}
+
+func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
+	if len(config.params) == 0 {
+		return nil, errors.New("no parameters specified in the update request")
+	}
+
+	if val, ok := config.params.GetString(clientIDKey); ok && val == "" {
+		return nil, errors.New("ClientID must not be empty")
+	}
+
+	if val, ok := config.params.GetString(issuerKey); ok {
+		if val == "" {
+			return nil, errors.New("Issuer must not be empty")
+		}
+		if _, err := url.ParseRequestURI(val); err != nil {
+			return nil, fmt.Errorf("failed to parse Issuer: %v", err)
+		}
+	}
+
+	return config.params, nil
 }
 
 // SAMLProviderConfig is the SAML auth provider configuration.
@@ -292,7 +418,7 @@ func (config *SAMLProviderConfigToUpdate) DisplayName(name string) *SAMLProvider
 	return config.set(displayNameKey, nameOrNil)
 }
 
-// Enabled enables or disables the new config.
+// Enabled enables or disables the config.
 func (config *SAMLProviderConfigToUpdate) Enabled(enabled bool) *SAMLProviderConfigToUpdate {
 	return config.set(enabledKey, enabled)
 }
@@ -441,6 +567,68 @@ func (c *providerConfigClient) OIDCProviderConfig(ctx context.Context, id string
 	req := &internal.Request{
 		Method: http.MethodGet,
 		URL:    fmt.Sprintf("/oauthIdpConfigs/%s", id),
+	}
+	var result oidcProviderConfigDAO
+	if _, err := c.makeRequest(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	return result.toOIDCProviderConfig(), nil
+}
+
+// CreateOIDCProviderConfig creates a new OIDC provider config from the given parameters.
+func (c *providerConfigClient) CreateOIDCProviderConfig(ctx context.Context, config *OIDCProviderConfigToCreate) (*OIDCProviderConfig, error) {
+	if config == nil {
+		return nil, errors.New("config must not be nil")
+	}
+
+	body, id, err := config.buildRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &internal.Request{
+		Method: http.MethodPost,
+		URL:    "/oauthIdpConfigs",
+		Body:   internal.NewJSONEntity(body),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("oauthIdpConfigId", id),
+		},
+	}
+	var result oidcProviderConfigDAO
+	if _, err := c.makeRequest(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	return result.toOIDCProviderConfig(), nil
+}
+
+// UpdateOIDCProviderConfig updates an existing OIDC provider config with the given parameters.
+func (c *providerConfigClient) UpdateOIDCProviderConfig(ctx context.Context, id string, config *OIDCProviderConfigToUpdate) (*OIDCProviderConfig, error) {
+	if err := validateOIDCConfigID(id); err != nil {
+		return nil, err
+	}
+	if config == nil {
+		return nil, errors.New("config must not be nil")
+	}
+
+	body, err := config.buildRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	mask, err := body.UpdateMask()
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct update mask: %v", err)
+	}
+
+	req := &internal.Request{
+		Method: http.MethodPatch,
+		URL:    fmt.Sprintf("/oauthIdpConfigs/%s", id),
+		Body:   internal.NewJSONEntity(body),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
+		},
 	}
 	var result oidcProviderConfigDAO
 	if _, err := c.makeRequest(ctx, req, &result); err != nil {

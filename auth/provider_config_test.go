@@ -146,6 +146,324 @@ func TestOIDCProviderConfigError(t *testing.T) {
 	}
 }
 
+func TestCreateOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToCreate{}).
+		ID(oidcProviderConfig.ID).
+		DisplayName(oidcProviderConfig.DisplayName).
+		Enabled(oidcProviderConfig.Enabled).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("CreateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": oidcProviderConfig.DisplayName,
+		"enabled":     oidcProviderConfig.Enabled,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
+	}
+	if err := checkCreateOIDCConfigRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateOIDCProviderConfigMinimal(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToCreate{}).
+		ID(oidcProviderConfig.ID).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("CreateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"clientId": oidcProviderConfig.ClientID,
+		"issuer":   oidcProviderConfig.Issuer,
+	}
+	if err := checkCreateOIDCConfigRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateOIDCProviderConfigZeroValues(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+	client := s.Client.pcc
+
+	options := (&OIDCProviderConfigToCreate{}).
+		ID(oidcProviderConfig.ID).
+		DisplayName("").
+		Enabled(false).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("CreateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": "",
+		"enabled":     false,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
+	}
+	if err := checkCreateOIDCConfigRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateOIDCProviderConfigError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	s.Status = http.StatusInternalServerError
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToCreate{}).
+		ID(oidcProviderConfig.ID).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
+	if oidc != nil || !IsUnknown(err) {
+		t.Errorf("CreateOIDCProviderConfig() = (%v, %v); want = (nil, %q)", oidc, err, "unknown-error")
+	}
+}
+
+func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
+	cases := []struct {
+		name string
+		want string
+		conf *OIDCProviderConfigToCreate
+	}{
+		{
+			name: "NilConfig",
+			want: "config must not be nil",
+			conf: nil,
+		},
+		{
+			name: "EmptyID",
+			want: "invalid OIDC provider id: ",
+			conf: &OIDCProviderConfigToCreate{},
+		},
+		{
+			name: "InvalidID",
+			want: "invalid OIDC provider id: ",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("saml.provider"),
+		},
+		{
+			name: "EmptyOptions",
+			want: "no parameters specified in the create request",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider"),
+		},
+		{
+			name: "EmptyClientID",
+			want: "ClientID must not be empty",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID(""),
+		},
+		{
+			name: "EmptyIssuer",
+			want: "Issuer must not be empty",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID"),
+		},
+		{
+			name: "InvalidIssuer",
+			want: "failed to parse Issuer: ",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID").
+				Issuer("not a url"),
+		},
+	}
+
+	client := &providerConfigClient{}
+	for _, tc := range cases {
+		_, err := client.CreateOIDCProviderConfig(context.Background(), tc.conf)
+		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			t.Errorf("CreateOIDCProviderConfig(%q) = %v; want = %q", tc.name, err, tc.want)
+		}
+	}
+}
+
+func TestUpdateOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToUpdate{}).
+		DisplayName(oidcProviderConfig.DisplayName).
+		Enabled(oidcProviderConfig.Enabled).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("UpdateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": oidcProviderConfig.DisplayName,
+		"enabled":     oidcProviderConfig.Enabled,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
+	}
+	wantMask := []string{
+		"clientId",
+		"displayName",
+		"enabled",
+		"issuer",
+	}
+	if err := checkUpdateOIDCConfigRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateOIDCProviderConfigMinimal(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToUpdate{}).
+		DisplayName("Other name")
+	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("UpdateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": "Other name",
+	}
+	wantMask := []string{
+		"displayName",
+	}
+	if err := checkUpdateOIDCConfigRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client := s.Client.pcc
+	options := (&OIDCProviderConfigToUpdate{}).
+		DisplayName("").
+		Enabled(false)
+	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("UpdateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": nil,
+		"enabled":     false,
+	}
+	wantMask := []string{
+		"displayName",
+		"enabled",
+	}
+	if err := checkUpdateOIDCConfigRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateOIDCProviderConfigInvalidID(t *testing.T) {
+	cases := []string{"", "saml.config"}
+	client := &providerConfigClient{}
+	options := (&OIDCProviderConfigToUpdate{}).
+		DisplayName("")
+	want := "invalid OIDC provider id: "
+	for _, tc := range cases {
+		_, err := client.UpdateOIDCProviderConfig(context.Background(), tc, options)
+		if err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Errorf("UpdateOIDCProviderConfig(%q) = %v; want = %q", tc, err, want)
+		}
+	}
+}
+
+func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
+	cases := []struct {
+		name string
+		want string
+		conf *OIDCProviderConfigToUpdate
+	}{
+		{
+			name: "NilConfig",
+			want: "config must not be nil",
+			conf: nil,
+		},
+		{
+			name: "Empty",
+			want: "no parameters specified in the update request",
+			conf: &OIDCProviderConfigToUpdate{},
+		},
+		{
+			name: "EmptyClientID",
+			want: "ClientID must not be empty",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				ClientID(""),
+		},
+		{
+			name: "EmptyIssuer",
+			want: "Issuer must not be empty",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				Issuer(""),
+		},
+		{
+			name: "InvalidIssuer",
+			want: "failed to parse Issuer: ",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				Issuer("not a url"),
+		},
+	}
+
+	client := &providerConfigClient{}
+	for _, tc := range cases {
+		_, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", tc.conf)
+		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			t.Errorf("UpdateOIDCProviderConfig(%q) = %v; want = %q", tc.name, err, tc.want)
+		}
+	}
+}
+
 func TestDeleteOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
@@ -277,7 +595,7 @@ func TestCreateSAMLProviderConfig(t *testing.T) {
 			"callbackUri": samlProviderConfig.CallbackURL,
 		},
 	}
-	if err := checkCreateRequest(s, wantBody); err != nil {
+	if err := checkCreateSAMLConfigRequest(s, wantBody); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -314,7 +632,7 @@ func TestCreateSAMLProviderConfigMinimal(t *testing.T) {
 			"callbackUri": samlProviderConfig.CallbackURL,
 		},
 	}
-	if err := checkCreateRequest(s, wantBody); err != nil {
+	if err := checkCreateSAMLConfigRequest(s, wantBody); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -326,7 +644,7 @@ func TestCreateSAMLProviderConfigZeroValues(t *testing.T) {
 
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
-		DisplayName(samlProviderConfig.DisplayName).
+		DisplayName("").
 		Enabled(false).
 		IDPEntityID(samlProviderConfig.IDPEntityID).
 		SSOURL(samlProviderConfig.SSOURL).
@@ -344,7 +662,7 @@ func TestCreateSAMLProviderConfigZeroValues(t *testing.T) {
 	}
 
 	wantBody := map[string]interface{}{
-		"displayName": samlProviderConfig.DisplayName,
+		"displayName": "",
 		"enabled":     false,
 		"idpConfig": map[string]interface{}{
 			"idpEntityId":     samlProviderConfig.IDPEntityID,
@@ -357,7 +675,7 @@ func TestCreateSAMLProviderConfigZeroValues(t *testing.T) {
 			"callbackUri": samlProviderConfig.CallbackURL,
 		},
 	}
-	if err := checkCreateRequest(s, wantBody); err != nil {
+	if err := checkCreateSAMLConfigRequest(s, wantBody); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -370,17 +688,14 @@ func TestCreateSAMLProviderConfigError(t *testing.T) {
 	client := s.Client.pcc
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
-		DisplayName(samlProviderConfig.DisplayName).
-		Enabled(samlProviderConfig.Enabled).
 		IDPEntityID(samlProviderConfig.IDPEntityID).
 		SSOURL(samlProviderConfig.SSOURL).
-		RequestSigningEnabled(samlProviderConfig.RequestSigningEnabled).
 		X509Certificates(samlProviderConfig.X509Certificates).
 		RPEntityID(samlProviderConfig.RPEntityID).
 		CallbackURL(samlProviderConfig.CallbackURL)
 	saml, err := client.CreateSAMLProviderConfig(context.Background(), options)
 	if saml != nil || !IsUnknown(err) {
-		t.Errorf("SAMLProviderConfig() = (%v, %v); want = (nil, %q)", saml, err, "unknown-error")
+		t.Errorf("CreateSAMLProviderConfig() = (%v, %v); want = (nil, %q)", saml, err, "unknown-error")
 	}
 }
 
@@ -413,7 +728,7 @@ func TestCreateSAMLProviderConfigInvalidInput(t *testing.T) {
 				ID("saml.provider"),
 		},
 		{
-			name: "EmptyIDPEntityID",
+			name: "EmptyEntityID",
 			want: "IDPEntityID must not be empty",
 			conf: (&SAMLProviderConfigToCreate{}).
 				ID("saml.provider").
@@ -539,7 +854,7 @@ func TestUpdateSAMLProviderConfig(t *testing.T) {
 		"spConfig.callbackUri",
 		"spConfig.spEntityId",
 	}
-	if err := checkUpdateRequest(s, wantBody, wantMask); err != nil {
+	if err := checkUpdateSAMLConfigRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -566,7 +881,7 @@ func TestUpdateSAMLProviderConfigMinimal(t *testing.T) {
 	wantMask := []string{
 		"displayName",
 	}
-	if err := checkUpdateRequest(s, wantBody, wantMask); err != nil {
+	if err := checkUpdateSAMLConfigRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -601,7 +916,7 @@ func TestUpdateSAMLProviderConfigZeroValues(t *testing.T) {
 		"enabled",
 		"idpConfig.signRequest",
 	}
-	if err := checkUpdateRequest(s, wantBody, wantMask); err != nil {
+	if err := checkUpdateSAMLConfigRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -617,7 +932,7 @@ func TestUpdateSAMLProviderConfigInvalidID(t *testing.T) {
 	for _, tc := range cases {
 		_, err := client.UpdateSAMLProviderConfig(context.Background(), tc, options)
 		if err == nil || !strings.HasPrefix(err.Error(), want) {
-			t.Errorf("UpdateSAMLProviderConfig(%q) = %v; want = %q", tc, err, "foo")
+			t.Errorf("UpdateSAMLProviderConfig(%q) = %v; want = %q", tc, err, want)
 		}
 	}
 }
@@ -821,7 +1136,35 @@ func TestSAMLProviderConfigNoProjectID(t *testing.T) {
 	}
 }
 
-func checkCreateRequest(s *mockAuthServer, wantBody interface{}) error {
+func checkCreateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}) error {
+	req := s.Req[0]
+	if req.Method != http.MethodPost {
+		return fmt.Errorf("CreateOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodPost)
+	}
+
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs"
+	if req.URL.Path != wantURL {
+		return fmt.Errorf("CreateOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	wantQuery := "oauthIdpConfigId=oidc.provider"
+	if req.URL.RawQuery != wantQuery {
+		return fmt.Errorf("CreateOIDCProviderConfig() Query = %q; want = %q", req.URL.RawQuery, wantQuery)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &body); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(body, wantBody) {
+		return fmt.Errorf("CreateOIDCProviderConfig() Body = %#v; want = %#v", body, wantBody)
+	}
+
+	return nil
+}
+
+func checkCreateSAMLConfigRequest(s *mockAuthServer, wantBody interface{}) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPost {
 		return fmt.Errorf("CreateSAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodPost)
@@ -849,7 +1192,37 @@ func checkCreateRequest(s *mockAuthServer, wantBody interface{}) error {
 	return nil
 }
 
-func checkUpdateRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
+func checkUpdateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
+	req := s.Req[0]
+	if req.Method != http.MethodPatch {
+		return fmt.Errorf("UpdateOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodPatch)
+	}
+
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs/oidc.provider"
+	if req.URL.Path != wantURL {
+		return fmt.Errorf("UpdateOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	queryParam := req.URL.Query().Get("updateMask")
+	mask := strings.Split(queryParam, ",")
+	sort.Strings(mask)
+	if !reflect.DeepEqual(mask, wantMask) {
+		return fmt.Errorf("UpdateOIDCProviderConfig() Query = %#v; want = %#v", mask, wantMask)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &body); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(body, wantBody) {
+		return fmt.Errorf("UpdateOIDCProviderConfig() Body = %#v; want = %#v", body, wantBody)
+	}
+
+	return nil
+}
+
+func checkUpdateSAMLConfigRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPatch {
 		return fmt.Errorf("UpdateSAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodPatch)
