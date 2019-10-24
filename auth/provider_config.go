@@ -245,6 +245,65 @@ func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 	return config.params, nil
 }
 
+// OIDCProviderConfigIterator is an iterator over OIDC provider configurations.
+type OIDCProviderConfigIterator struct {
+	client   *providerConfigClient
+	ctx      context.Context
+	nextFunc func() error
+	pageInfo *iterator.PageInfo
+	configs  []*OIDCProviderConfig
+}
+
+// PageInfo supports pagination.
+func (it *OIDCProviderConfigIterator) PageInfo() *iterator.PageInfo {
+	return it.pageInfo
+}
+
+// Next returns the next OIDCProviderConfig. The error value of [iterator.Done] is
+// returned if there are no more results. Once Next returns [iterator.Done], all
+// subsequent calls will return [iterator.Done].
+func (it *OIDCProviderConfigIterator) Next() (*OIDCProviderConfig, error) {
+	if err := it.nextFunc(); err != nil {
+		return nil, err
+	}
+
+	config := it.configs[0]
+	it.configs = it.configs[1:]
+	return config, nil
+}
+
+func (it *OIDCProviderConfigIterator) fetch(pageSize int, pageToken string) (string, error) {
+	params := map[string]string{
+		"pageSize": strconv.Itoa(pageSize),
+	}
+	if pageToken != "" {
+		params["pageToken"] = pageToken
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    "/oauthIdpConfigs",
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParams(params),
+		},
+	}
+
+	var result struct {
+		Configs       []oidcProviderConfigDAO `json:"oauthIdpConfigs"`
+		NextPageToken string                  `json:"nextPageToken"`
+	}
+	if _, err := it.client.makeRequest(it.ctx, req, &result); err != nil {
+		return "", err
+	}
+
+	for _, config := range result.Configs {
+		it.configs = append(it.configs, config.toOIDCProviderConfig())
+	}
+
+	it.pageInfo.Token = result.NextPageToken
+	return result.NextPageToken, nil
+}
+
 // SAMLProviderConfig is the SAML auth provider configuration.
 // See http://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html.
 type SAMLProviderConfig struct {
@@ -650,6 +709,24 @@ func (c *providerConfigClient) DeleteOIDCProviderConfig(ctx context.Context, id 
 	}
 	_, err := c.makeRequest(ctx, req, nil)
 	return err
+}
+
+// OIDCProviderConfigs returns an iterator over OIDC provider configurations.
+//
+// If nextPageToken is empty, the iterator will start at the beginning. Otherwise,
+// iterator starts after the token.
+func (c *providerConfigClient) OIDCProviderConfigs(ctx context.Context, nextPageToken string) *OIDCProviderConfigIterator {
+	it := &OIDCProviderConfigIterator{
+		ctx:    ctx,
+		client: c,
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
+		it.fetch,
+		func() int { return len(it.configs) },
+		func() interface{} { b := it.configs; it.configs = nil; return b })
+	it.pageInfo.MaxSize = maxConfigs
+	it.pageInfo.Token = nextPageToken
+	return it
 }
 
 // SAMLProviderConfig returns the SAMLProviderConfig with the given ID.
