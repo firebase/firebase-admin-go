@@ -101,7 +101,7 @@ func TestOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	oidc, err := client.OIDCProviderConfig(context.Background(), "oidc.provider")
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +139,7 @@ func TestOIDCProviderConfigError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusNotFound
 
-	client := s.Client.pcc
+	client := s.Client
 	saml, err := client.OIDCProviderConfig(context.Background(), "oidc.provider")
 	if saml != nil || err == nil || !IsConfigurationNotFound(err) {
 		t.Errorf("OIDCProviderConfig() = (%v, %v); want = (nil, ConfigurationNotFound)", saml, err)
@@ -150,7 +150,7 @@ func TestCreateOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&OIDCProviderConfigToCreate{}).
 		ID(oidcProviderConfig.ID).
 		DisplayName(oidcProviderConfig.DisplayName).
@@ -181,7 +181,7 @@ func TestCreateOIDCProviderConfigMinimal(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&OIDCProviderConfigToCreate{}).
 		ID(oidcProviderConfig.ID).
 		ClientID(oidcProviderConfig.ClientID).
@@ -207,7 +207,7 @@ func TestCreateOIDCProviderConfigMinimal(t *testing.T) {
 func TestCreateOIDCProviderConfigZeroValues(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
-	client := s.Client.pcc
+	client := s.Client
 
 	options := (&OIDCProviderConfigToCreate{}).
 		ID(oidcProviderConfig.ID).
@@ -240,7 +240,8 @@ func TestCreateOIDCProviderConfigError(t *testing.T) {
 	s.Status = http.StatusInternalServerError
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
+	client.providerConfigClient.httpClient.RetryConfig = nil
 	options := (&OIDCProviderConfigToCreate{}).
 		ID(oidcProviderConfig.ID).
 		ClientID(oidcProviderConfig.ClientID).
@@ -316,7 +317,7 @@ func TestUpdateOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName(oidcProviderConfig.DisplayName).
 		Enabled(oidcProviderConfig.Enabled).
@@ -352,7 +353,7 @@ func TestUpdateOIDCProviderConfigMinimal(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("Other name")
 	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
@@ -379,7 +380,7 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("").
 		Enabled(false)
@@ -468,7 +469,7 @@ func TestDeleteOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	if err := client.DeleteOIDCProviderConfig(context.Background(), "oidc.provider"); err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +502,7 @@ func TestDeleteOIDCProviderConfigError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusNotFound
 
-	client := s.Client.pcc
+	client := s.Client
 	err := client.DeleteOIDCProviderConfig(context.Background(), "oidc.provider")
 	if err == nil || !IsConfigurationNotFound(err) {
 		t.Errorf("DeleteOIDCProviderConfig() = %v; want = ConfigurationNotFound", err)
@@ -562,7 +563,7 @@ func TestOIDCProviderConfigs(t *testing.T) {
 		}
 	}
 
-	client := s.Client.pcc
+	client := s.Client
 	testIterator(
 		client.OIDCProviderConfigs(context.Background(), ""),
 		"",
@@ -578,7 +579,8 @@ func TestOIDCProviderConfigsError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusInternalServerError
 
-	client := s.Client.pcc
+	client := s.Client
+	client.providerConfigClient.httpClient.RetryConfig = nil
 	it := client.OIDCProviderConfigs(context.Background(), "")
 	config, err := it.Next()
 	if config != nil || err == nil || !IsUnknown(err) {
@@ -590,7 +592,7 @@ func TestSAMLProviderConfig(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	saml, err := client.SAMLProviderConfig(context.Background(), "saml.provider")
 	if err != nil {
 		t.Fatal(err)
@@ -628,7 +630,7 @@ func TestSAMLProviderConfigError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusNotFound
 
-	client := s.Client.pcc
+	client := s.Client
 	saml, err := client.SAMLProviderConfig(context.Background(), "saml.provider")
 	if saml != nil || err == nil || !IsConfigurationNotFound(err) {
 		t.Errorf("SAMLProviderConfig() = (%v, %v); want = (nil, ConfigurationNotFound)", saml, err)
@@ -639,7 +641,7 @@ func TestCreateSAMLProviderConfig(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
 		DisplayName(samlProviderConfig.DisplayName).
@@ -682,7 +684,7 @@ func TestCreateSAMLProviderConfigMinimal(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
 		IDPEntityID(samlProviderConfig.IDPEntityID).
@@ -718,7 +720,7 @@ func TestCreateSAMLProviderConfigMinimal(t *testing.T) {
 func TestCreateSAMLProviderConfigZeroValues(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
-	client := s.Client.pcc
+	client := s.Client
 
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
@@ -763,7 +765,8 @@ func TestCreateSAMLProviderConfigError(t *testing.T) {
 	s.Status = http.StatusInternalServerError
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
+	client.providerConfigClient.httpClient.RetryConfig = nil
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
 		IDPEntityID(samlProviderConfig.IDPEntityID).
@@ -889,7 +892,7 @@ func TestUpdateSAMLProviderConfig(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&SAMLProviderConfigToUpdate{}).
 		DisplayName(samlProviderConfig.DisplayName).
 		Enabled(samlProviderConfig.Enabled).
@@ -941,7 +944,7 @@ func TestUpdateSAMLProviderConfigMinimal(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&SAMLProviderConfigToUpdate{}).
 		DisplayName("Other name")
 	saml, err := client.UpdateSAMLProviderConfig(context.Background(), "saml.provider", options)
@@ -968,7 +971,7 @@ func TestUpdateSAMLProviderConfigZeroValues(t *testing.T) {
 	s := echoServer([]byte(samlConfigResponse), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	options := (&SAMLProviderConfigToUpdate{}).
 		DisplayName("").
 		Enabled(false).
@@ -1094,7 +1097,7 @@ func TestDeleteSAMLProviderConfig(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
 
-	client := s.Client.pcc
+	client := s.Client
 	if err := client.DeleteSAMLProviderConfig(context.Background(), "saml.provider"); err != nil {
 		t.Fatal(err)
 	}
@@ -1127,7 +1130,7 @@ func TestDeleteSAMLProviderConfigError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusNotFound
 
-	client := s.Client.pcc
+	client := s.Client
 	err := client.DeleteSAMLProviderConfig(context.Background(), "saml.provider")
 	if err == nil || !IsConfigurationNotFound(err) {
 		t.Errorf("DeleteSAMLProviderConfig() = %v; want = ConfigurationNotFound", err)
@@ -1188,7 +1191,7 @@ func TestSAMLProviderConfigs(t *testing.T) {
 		}
 	}
 
-	client := s.Client.pcc
+	client := s.Client
 	testIterator(
 		client.SAMLProviderConfigs(context.Background(), ""),
 		"",
@@ -1204,7 +1207,8 @@ func TestSAMLProviderConfigsError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusInternalServerError
 
-	client := s.Client.pcc
+	client := s.Client
+	client.providerConfigClient.httpClient.RetryConfig = nil
 	it := client.SAMLProviderConfigs(context.Background(), "")
 	config, err := it.Next()
 	if config != nil || err == nil || !IsUnknown(err) {

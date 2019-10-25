@@ -839,3 +839,151 @@ func generateEmailSignInLink(ctx context.Context, client *auth.Client) {
 // Place holder function to make the compiler happy. This is referenced by all email action
 // link snippets.
 func sendCustomEmail(email, displayName, link string) {}
+
+// =====================================================================================
+// https://cloud.google.com/identity-platform/docs/managing-providers-programmatically
+// =====================================================================================
+
+func createSAMLProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START create_saml_provider]
+	newConfig := (&auth.SAMLProviderConfigToCreate{}).
+		DisplayName("SAML provider name").
+		Enabled(true).
+		ID("saml.myProvider").
+		IDPEntityID("IDP_ENTITY_ID").
+		SSOURL("https://example.com/saml/sso/1234/").
+		X509Certificates([]string{
+			"-----BEGIN CERTIFICATE-----\nCERT1...\n-----END CERTIFICATE-----",
+			"-----BEGIN CERTIFICATE-----\nCERT2...\n-----END CERTIFICATE-----",
+		}).
+		RPEntityID("RP_ENTITY_ID").
+		CallbackURL("https://project-id.firebaseapp.com/__/auth/handler")
+	saml, err := client.CreateSAMLProviderConfig(ctx, newConfig)
+	if err != nil {
+		log.Fatalf("error creating SAML provider: %v\n", err)
+	}
+
+	log.Printf("Created new SAML provider: %s", saml.ID)
+	// [END create_saml_provider]
+}
+
+func updateSAMLProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START update_saml_provider]
+	updatedConfig := (&auth.SAMLProviderConfigToUpdate{}).
+		X509Certificates([]string{
+			"-----BEGIN CERTIFICATE-----\nCERT2...\n-----END CERTIFICATE-----",
+			"-----BEGIN CERTIFICATE-----\nCERT3...\n-----END CERTIFICATE-----",
+		})
+	saml, err := client.UpdateSAMLProviderConfig(ctx, "saml.myProvider", updatedConfig)
+	if err != nil {
+		log.Fatalf("error updating SAML provider: %v\n", err)
+	}
+
+	log.Printf("Updated SAML provider: %s", saml.ID)
+	// [END update_saml_provider]
+}
+
+func getSAMLProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START get_saml_provider]
+	saml, err := client.SAMLProviderConfig(ctx, "saml.myProvider")
+	if err != nil {
+		log.Fatalf("error retrieving SAML provider: %v\n", err)
+	}
+
+	log.Printf("%s %t", saml.DisplayName, saml.Enabled)
+	// [END get_saml_provider]
+}
+
+func deleteSAMLProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START delete_saml_provider]
+	if err := client.DeleteSAMLProviderConfig(ctx, "saml.myProvider"); err != nil {
+		log.Fatalf("error deleting SAML provider: %v\n", err)
+	}
+	// [END delete_saml_provider]
+}
+
+func listSAMLProviderConfigs(ctx context.Context, client *auth.Client) {
+	// [START list_saml_providers]
+	iter := client.SAMLProviderConfigs(ctx, "nextPageToken")
+	for {
+		saml, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error retrieving SAML providers: %v\n", err)
+		}
+
+		log.Printf("%s\n", saml.ID)
+	}
+	// [END list_saml_providers]
+}
+
+func createOIDCProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START create_oidc_provider]
+	newConfig := (&auth.OIDCProviderConfigToCreate{}).
+		DisplayName("OIDC provider name").
+		Enabled(true).
+		ID("oidc.myProvider").
+		ClientID("CLIENT_ID2").
+		Issuer("https://oidc.com/CLIENT_ID2")
+	oidc, err := client.CreateOIDCProviderConfig(ctx, newConfig)
+	if err != nil {
+		log.Fatalf("error creating OIDC provider: %v\n", err)
+	}
+
+	log.Printf("Created new OIDC provider: %s", oidc.ID)
+	// [END create_oidc_provider]
+}
+
+func updateOIDCProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START update_oidc_provider]
+	updatedConfig := (&auth.OIDCProviderConfigToUpdate{}).
+		DisplayName("OIDC provider name").
+		Enabled(true).
+		ClientID("CLIENT_ID").
+		Issuer("https://oidc.com")
+	oidc, err := client.UpdateOIDCProviderConfig(ctx, "oidc.myProvider", updatedConfig)
+	if err != nil {
+		log.Fatalf("error updating OIDC provider: %v\n", err)
+	}
+
+	log.Printf("Updated OIDC provider: %s", oidc.ID)
+	// [END update_oidc_provider]
+}
+
+func getOIDCProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START get_oidc_provider]
+	oidc, err := client.OIDCProviderConfig(ctx, "oidc.myProvider")
+	if err != nil {
+		log.Fatalf("error retrieving OIDC provider: %v\n", err)
+	}
+
+	log.Printf("%s %t", oidc.DisplayName, oidc.Enabled)
+	// [END get_oidc_provider]
+}
+
+func deleteOIDCProviderConfig(ctx context.Context, client *auth.Client) {
+	// [START delete_oidc_provider]
+	if err := client.DeleteOIDCProviderConfig(ctx, "oidc.myProvider"); err != nil {
+		log.Fatalf("error deleting OIDC provider: %v\n", err)
+	}
+	// [END delete_oidc_provider]
+}
+
+func listOIDCProviderConfigs(ctx context.Context, client *auth.Client) {
+	// [START list_oidc_providers]
+	iter := client.OIDCProviderConfigs(ctx, "nextPageToken")
+	for {
+		oidc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error retrieving OIDC providers: %v\n", err)
+		}
+
+		log.Printf("%s\n", oidc.ID)
+	}
+	// [END list_oidc_providers]
+}

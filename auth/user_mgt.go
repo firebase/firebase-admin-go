@@ -479,12 +479,8 @@ type userManagementClient struct {
 	httpClient *internal.HTTPClient
 }
 
-func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*userManagementClient, error) {
-	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
-	if err != nil {
-		return nil, err
-	}
-
+func newUserManagementClient(client *http.Client, conf *internal.AuthConfig) *userManagementClient {
+	hc := internal.WithDefaultRetryConfig(client)
 	hc.CreateErrFn = handleHTTPError
 	hc.SuccessFn = internal.HasSuccessStatus
 	hc.Opts = []internal.HTTPOption{
@@ -495,7 +491,7 @@ func newUserManagementClient(ctx context.Context, conf *internal.AuthConfig) (*u
 		baseURL:    idToolkitV1Endpoint,
 		projectID:  conf.ProjectID,
 		httpClient: hc,
-	}, nil
+	}
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
