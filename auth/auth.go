@@ -43,6 +43,7 @@ var reservedClaims = []string{
 type Client struct {
 	*userManagementClient
 	*providerConfigClient
+	TenantManager   *TenantManager
 	idTokenVerifier *tokenVerifier
 	cookieVerifier  *tokenVerifier
 	signer          cryptoSigner
@@ -106,6 +107,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		cookieVerifier:       cookieVerifier,
 		signer:               signer,
 		clock:                internal.SystemClock,
+		TenantManager:        &TenantManager{},
 	}, nil
 }
 
