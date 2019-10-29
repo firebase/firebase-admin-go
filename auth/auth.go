@@ -101,15 +101,17 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	}
 
 	umc := newUserManagementClient(hc, conf)
+	pcc := newProviderConfigClient(hc, conf)
 	return &Client{
 		userManagementClient: umc,
-		providerConfigClient: newProviderConfigClient(hc, conf),
+		providerConfigClient: pcc,
 		idTokenVerifier:      idTokenVerifier,
 		cookieVerifier:       cookieVerifier,
 		signer:               signer,
 		clock:                internal.SystemClock,
 		TenantManager: &TenantManager{
 			userManagementClient: umc,
+			providerConfigClient: pcc,
 		},
 	}, nil
 }
