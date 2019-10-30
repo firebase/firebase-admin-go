@@ -203,7 +203,9 @@ func TestEmailSignInLink(t *testing.T) {
 }
 
 func TestEmailActionLinkNoEmail(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	_, err := client.EmailVerificationLink(context.Background(), "")
 	if err == nil {
 		t.Errorf("EmailVerificationLink('') = nil; want error")
@@ -221,7 +223,9 @@ func TestEmailActionLinkNoEmail(t *testing.T) {
 }
 
 func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.EmailVerificationLinkWithSettings(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -231,7 +235,9 @@ func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
 }
 
 func TestPasswordResetLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.PasswordResetLinkWithSettings(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -241,7 +247,9 @@ func TestPasswordResetLinkInvalidSettings(t *testing.T) {
 }
 
 func TestEmailSignInLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.EmailSignInLink(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -251,7 +259,9 @@ func TestEmailSignInLinkInvalidSettings(t *testing.T) {
 }
 
 func TestEmailSignInLinkNoSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	_, err := client.EmailSignInLink(context.Background(), testEmail, nil)
 	if err == nil {
 		t.Errorf("EmailSignInLink(nil) = %v; want = error", err)
