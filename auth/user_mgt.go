@@ -323,6 +323,7 @@ const (
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
+	tenantIDMismatch         = "tenant-id-mismatch"
 	uidAlreadyExists         = "uid-already-exists"
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
@@ -367,6 +368,11 @@ func IsProjectNotFound(err error) bool {
 // IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
 func IsSessionCookieRevoked(err error) bool {
 	return internal.HasErrorCode(err, sessionCookieRevoked)
+}
+
+// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
+func IsTenantIDMismatch(err error) bool {
+	return internal.HasErrorCode(err, tenantIDMismatch)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
