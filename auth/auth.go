@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -176,6 +177,17 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	return info.Token(ctx, c.signer)
 }
 
+// SessionCookie creates a new Firebase session cookie from the given ID token and expiry
+// duration. The returned JWT can be set as a server-side session cookie with a custom cookie
+// policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
+func (c *Client) SessionCookie(
+	ctx context.Context,
+	idToken string,
+	expiresIn time.Duration,
+) (string, error) {
+	return c.baseClient.userManagementClient.createSessionCookie(ctx, idToken, expiresIn)
+}
+
 // Token represents a decoded Firebase ID token.
 //
 // Token provides typed accessors to the common JWT fields such as Audience (aud) and Expiry (exp).
@@ -280,13 +292,8 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 //
 // This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
 // when a revocation check is needed.
-func (c *baseClient) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
-	decoded, err := c.cookieVerifier.VerifyToken(ctx, sessionCookie)
-	if err == nil && c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
-		return nil, internal.Errorf(tenantIDMismatch, "invalid tenant id: %q", decoded.Firebase.Tenant)
-	}
-
-	return decoded, err
+func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
+	return c.baseClient.cookieVerifier.VerifyToken(ctx, sessionCookie)
 }
 
 // VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
@@ -296,7 +303,7 @@ func (c *baseClient) VerifySessionCookie(ctx context.Context, sessionCookie stri
 // `VerifySessionCookie()` this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
-func (c *baseClient) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
+func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
 	decoded, err := c.VerifySessionCookie(ctx, sessionCookie)
 	if err != nil {
 		return nil, err

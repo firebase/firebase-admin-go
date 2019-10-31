@@ -743,7 +743,10 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
 // duration. The returned JWT can be set as a server-side session cookie with a custom cookie
 // policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
-func (c *userManagementClient) SessionCookie(
+//
+// This function is only exposed via [auth.Client] for now, since the tenant-scoped variant
+// of it is currently not supported.
+func (c *userManagementClient) createSessionCookie(
 	ctx context.Context,
 	idToken string,
 	expiresIn time.Duration,
