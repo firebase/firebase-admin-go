@@ -293,7 +293,7 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 // This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
-	return c.baseClient.cookieVerifier.VerifyToken(ctx, sessionCookie)
+	return c.cookieVerifier.VerifyToken(ctx, sessionCookie)
 }
 
 // VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
