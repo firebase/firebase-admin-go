@@ -476,6 +476,7 @@ func validatePhone(phone string) error {
 type userManagementClient struct {
 	baseURL    string
 	projectID  string
+	tenantID   string
 	httpClient *internal.HTTPClient
 }
 
@@ -492,6 +493,12 @@ func newUserManagementClient(client *http.Client, conf *internal.AuthConfig) *us
 		projectID:  conf.ProjectID,
 		httpClient: hc,
 	}
+}
+
+func (c *userManagementClient) withTenantID(tenantID string) *userManagementClient {
+	copy := *c
+	copy.tenantID = tenantID
+	return &copy
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -779,7 +786,13 @@ func (c *userManagementClient) makeUserMgtURL(path string) (string, error) {
 		return "", errors.New("project id not available")
 	}
 
-	url := fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+	var url string
+	if c.tenantID != "" {
+		url = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.baseURL, c.projectID, c.tenantID, path)
+	} else {
+		url = fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+	}
+
 	return url, nil
 }
 

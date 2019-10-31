@@ -83,6 +83,11 @@ func TestGetUser(t *testing.T) {
 	if got != want {
 		t.Errorf("GetUser() Req = %v; want = %v", got, want)
 	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUser() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
 }
 
 func TestGetUserByEmail(t *testing.T) {
@@ -102,6 +107,11 @@ func TestGetUserByEmail(t *testing.T) {
 	if got != want {
 		t.Errorf("GetUserByEmail() Req = %v; want = %v", got, want)
 	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUserByEmail() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
 }
 
 func TestGetUserByPhoneNumber(t *testing.T) {
@@ -120,6 +130,11 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 	got := string(s.Rbody)
 	if got != want {
 		t.Errorf("GetUserByPhoneNumber() Req = %v; want = %v", got, want)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUserByPhoneNumber() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -210,10 +225,16 @@ func TestListUsers(t *testing.T) {
 			t.Errorf("Users(%q) = %v, want = %v", token, err, iterator.Done)
 		}
 
+		hr := s.Req[len(s.Req)-1]
 		// Check the query string of the last HTTP request made.
-		gotReq := s.Req[len(s.Req)-1].URL.Query().Encode()
+		gotReq := hr.URL.Query().Encode()
 		if gotReq != req {
 			t.Errorf("Users(%q) = %q, want = %v", token, gotReq, req)
+		}
+
+		wantPath := "/projects/mock-project-id/accounts:batchGet"
+		if hr.URL.Path != wantPath {
+			t.Errorf("Users(%q) URL = %q; want = %q", token, hr.URL.Path, wantPath)
 		}
 	}
 	testIterator(
@@ -284,6 +305,64 @@ func TestInvalidCreateUser(t *testing.T) {
 	}
 }
 
+var createUserCases = []struct {
+	params *UserToCreate
+	req    map[string]interface{}
+}{
+	{
+		nil,
+		map[string]interface{}{},
+	},
+	{
+		&UserToCreate{},
+		map[string]interface{}{},
+	},
+	{
+		(&UserToCreate{}).Password("123456"),
+		map[string]interface{}{"password": "123456"},
+	},
+	{
+		(&UserToCreate{}).UID("1"),
+		map[string]interface{}{"localId": "1"},
+	},
+	{
+		(&UserToCreate{}).UID(strings.Repeat("a", 128)),
+		map[string]interface{}{"localId": strings.Repeat("a", 128)},
+	},
+	{
+		(&UserToCreate{}).PhoneNumber("+1"),
+		map[string]interface{}{"phoneNumber": "+1"},
+	},
+	{
+		(&UserToCreate{}).DisplayName("a"),
+		map[string]interface{}{"displayName": "a"},
+	},
+	{
+		(&UserToCreate{}).Email("a@a"),
+		map[string]interface{}{"email": "a@a"},
+	},
+	{
+		(&UserToCreate{}).Disabled(true),
+		map[string]interface{}{"disabled": true},
+	},
+	{
+		(&UserToCreate{}).Disabled(false),
+		map[string]interface{}{"disabled": false},
+	},
+	{
+		(&UserToCreate{}).EmailVerified(true),
+		map[string]interface{}{"emailVerified": true},
+	},
+	{
+		(&UserToCreate{}).EmailVerified(false),
+		map[string]interface{}{"emailVerified": false},
+	},
+	{
+		(&UserToCreate{}).PhotoURL("http://some.url"),
+		map[string]interface{}{"photoUrl": "http://some.url"},
+	},
+}
+
 func TestCreateUser(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SignupNewUserResponse",
@@ -292,74 +371,24 @@ func TestCreateUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	cases := []struct {
-		params *UserToCreate
-		req    map[string]interface{}
-	}{
-		{
-			nil,
-			map[string]interface{}{},
-		},
-		{
-			&UserToCreate{},
-			map[string]interface{}{},
-		},
-		{
-			(&UserToCreate{}).Password("123456"),
-			map[string]interface{}{"password": "123456"},
-		},
-		{
-			(&UserToCreate{}).UID("1"),
-			map[string]interface{}{"localId": "1"},
-		},
-		{
-			(&UserToCreate{}).UID(strings.Repeat("a", 128)),
-			map[string]interface{}{"localId": strings.Repeat("a", 128)},
-		},
-		{
-			(&UserToCreate{}).PhoneNumber("+1"),
-			map[string]interface{}{"phoneNumber": "+1"},
-		},
-		{
-			(&UserToCreate{}).DisplayName("a"),
-			map[string]interface{}{"displayName": "a"},
-		},
-		{
-			(&UserToCreate{}).Email("a@a"),
-			map[string]interface{}{"email": "a@a"},
-		},
-		{
-			(&UserToCreate{}).Disabled(true),
-			map[string]interface{}{"disabled": true},
-		},
-		{
-			(&UserToCreate{}).Disabled(false),
-			map[string]interface{}{"disabled": false},
-		},
-		{
-			(&UserToCreate{}).EmailVerified(true),
-			map[string]interface{}{"emailVerified": true},
-		},
-		{
-			(&UserToCreate{}).EmailVerified(false),
-			map[string]interface{}{"emailVerified": false},
-		},
-		{
-			(&UserToCreate{}).PhotoURL("http://some.url"),
-			map[string]interface{}{"photoUrl": "http://some.url"},
-		},
-	}
-	for _, tc := range cases {
+	wantPath := "/projects/mock-project-id/accounts"
+	for _, tc := range createUserCases {
 		uid, err := s.Client.createUser(context.Background(), tc.params)
 		if uid != "expectedUserID" || err != nil {
 			t.Errorf("createUser(%#v) = (%q, %v); want = (%q, nil)", tc.params, uid, err, "expectedUserID")
 		}
+
 		want, err := json.Marshal(tc.req)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if !reflect.DeepEqual(s.Rbody, want) {
 			t.Errorf("createUser(%#v) request = %v; want = %v", tc.params, string(s.Rbody), string(want))
+		}
+
+		if s.Req[0].RequestURI != wantPath {
+			t.Errorf("createUser(%#v) URL = %q; want = %q", tc.params, s.Req[0].RequestURI, wantPath)
 		}
 	}
 }
@@ -425,6 +454,79 @@ func TestUpdateUserEmptyUID(t *testing.T) {
 	}
 }
 
+var updateUserCases = []struct {
+	params *UserToUpdate
+	req    map[string]interface{}
+}{
+	{
+		(&UserToUpdate{}).Password("123456"),
+		map[string]interface{}{"password": "123456"},
+	},
+	{
+		(&UserToUpdate{}).PhoneNumber("+1"),
+		map[string]interface{}{"phoneNumber": "+1"},
+	},
+	{
+		(&UserToUpdate{}).DisplayName("a"),
+		map[string]interface{}{"displayName": "a"},
+	},
+	{
+		(&UserToUpdate{}).Email("a@a"),
+		map[string]interface{}{"email": "a@a"},
+	},
+	{
+		(&UserToUpdate{}).Disabled(true),
+		map[string]interface{}{"disableUser": true},
+	},
+	{
+		(&UserToUpdate{}).Disabled(false),
+		map[string]interface{}{"disableUser": false},
+	},
+	{
+		(&UserToUpdate{}).EmailVerified(true),
+		map[string]interface{}{"emailVerified": true},
+	},
+	{
+		(&UserToUpdate{}).EmailVerified(false),
+		map[string]interface{}{"emailVerified": false},
+	},
+	{
+		(&UserToUpdate{}).PhotoURL("http://some.url"),
+		map[string]interface{}{"photoUrl": "http://some.url"},
+	},
+	{
+		(&UserToUpdate{}).DisplayName(""),
+		map[string]interface{}{"deleteAttribute": []string{"DISPLAY_NAME"}},
+	},
+	{
+		(&UserToUpdate{}).PhoneNumber(""),
+		map[string]interface{}{"deleteProvider": []string{"phone"}},
+	},
+	{
+		(&UserToUpdate{}).PhotoURL(""),
+		map[string]interface{}{"deleteAttribute": []string{"PHOTO_URL"}},
+	},
+	{
+		(&UserToUpdate{}).PhotoURL("").PhoneNumber("").DisplayName(""),
+		map[string]interface{}{
+			"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
+			"deleteProvider":  []string{"phone"},
+		},
+	},
+	{
+		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
+		map[string]interface{}{"customAttributes": fmt.Sprintf(`{"a":%q}`, strings.Repeat("a", 992))},
+	},
+	{
+		(&UserToUpdate{}).CustomClaims(map[string]interface{}{}),
+		map[string]interface{}{"customAttributes": "{}"},
+	},
+	{
+		(&UserToUpdate{}).CustomClaims(nil),
+		map[string]interface{}{"customAttributes": "{}"},
+	},
+}
+
 func TestUpdateUser(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
@@ -433,90 +535,25 @@ func TestUpdateUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	cases := []struct {
-		params *UserToUpdate
-		req    map[string]interface{}
-	}{
-		{
-			(&UserToUpdate{}).Password("123456"),
-			map[string]interface{}{"password": "123456"},
-		},
-		{
-			(&UserToUpdate{}).PhoneNumber("+1"),
-			map[string]interface{}{"phoneNumber": "+1"},
-		},
-		{
-			(&UserToUpdate{}).DisplayName("a"),
-			map[string]interface{}{"displayName": "a"},
-		},
-		{
-			(&UserToUpdate{}).Email("a@a"),
-			map[string]interface{}{"email": "a@a"},
-		},
-		{
-			(&UserToUpdate{}).Disabled(true),
-			map[string]interface{}{"disableUser": true},
-		},
-		{
-			(&UserToUpdate{}).Disabled(false),
-			map[string]interface{}{"disableUser": false},
-		},
-		{
-			(&UserToUpdate{}).EmailVerified(true),
-			map[string]interface{}{"emailVerified": true},
-		},
-		{
-			(&UserToUpdate{}).EmailVerified(false),
-			map[string]interface{}{"emailVerified": false},
-		},
-		{
-			(&UserToUpdate{}).PhotoURL("http://some.url"),
-			map[string]interface{}{"photoUrl": "http://some.url"},
-		},
-		{
-			(&UserToUpdate{}).DisplayName(""),
-			map[string]interface{}{"deleteAttribute": []string{"DISPLAY_NAME"}},
-		},
-		{
-			(&UserToUpdate{}).PhoneNumber(""),
-			map[string]interface{}{"deleteProvider": []string{"phone"}},
-		},
-		{
-			(&UserToUpdate{}).PhotoURL(""),
-			map[string]interface{}{"deleteAttribute": []string{"PHOTO_URL"}},
-		},
-		{
-			(&UserToUpdate{}).PhotoURL("").PhoneNumber("").DisplayName(""),
-			map[string]interface{}{
-				"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
-				"deleteProvider":  []string{"phone"},
-			},
-		},
-		{
-			(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
-			map[string]interface{}{"customAttributes": fmt.Sprintf(`{"a":%q}`, strings.Repeat("a", 992))},
-		},
-		{
-			(&UserToUpdate{}).CustomClaims(map[string]interface{}{}),
-			map[string]interface{}{"customAttributes": "{}"},
-		},
-		{
-			(&UserToUpdate{}).CustomClaims(nil),
-			map[string]interface{}{"customAttributes": "{}"},
-		},
-	}
-	for _, tc := range cases {
+	wantPath := "/projects/mock-project-id/accounts:update"
+	for _, tc := range updateUserCases {
 		err := s.Client.updateUser(context.Background(), "uid", tc.params)
 		if err != nil {
 			t.Errorf("updateUser(%v) = %v; want = nil", tc.params, err)
 		}
+
 		tc.req["localId"] = "uid"
 		want, err := json.Marshal(tc.req)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if !reflect.DeepEqual(s.Rbody, want) {
 			t.Errorf("updateUser() request = %v; want = %v", string(s.Rbody), string(want))
+		}
+
+		if s.Req[0].RequestURI != wantPath {
+			t.Errorf("updateUser(%#v) URL = %q; want = %q", tc.params, s.Req[0].RequestURI, wantPath)
 		}
 	}
 }
@@ -548,6 +585,11 @@ func TestRevokeRefreshTokens(t *testing.T) {
 
 	if validSince > after || validSince < before {
 		t.Errorf("validSince = %d, expecting time between %d and %d", validSince, before, after)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:update"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("RevokeRefreshTokens() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -603,21 +645,23 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 	}
 }
 
-func TestSetCustomUserClaims(t *testing.T) {
-	cases := []map[string]interface{}{
-		nil,
-		{},
-		{"admin": true},
-		{"admin": true, "package": "gold"},
-	}
+var setCustomUserClaimsCases = []map[string]interface{}{
+	nil,
+	{},
+	{"admin": true},
+	{"admin": true, "package": "gold"},
+}
 
+func TestSetCustomUserClaims(t *testing.T) {
 	resp := `{
 		"kind": "identitytoolkit#SetAccountInfoResponse",
 		"localId": "uid"
 	}`
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
-	for _, tc := range cases {
+
+	wantPath := "/projects/mock-project-id/accounts:update"
+	for _, tc := range setCustomUserClaimsCases {
 		err := s.Client.SetCustomUserClaims(context.Background(), "uid", tc)
 		if err != nil {
 			t.Errorf("SetCustomUserClaims(%v) = %v; want nil", tc, err)
@@ -640,8 +684,14 @@ func TestSetCustomUserClaims(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if !reflect.DeepEqual(s.Rbody, want) {
 			t.Errorf("SetCustomUserClaims() = %v; want = %v", string(s.Rbody), string(want))
+		}
+
+		hr := s.Req[len(s.Req)-1]
+		if hr.RequestURI != wantPath {
+			t.Errorf("RevokeRefreshTokens() URL = %q; want = %q", hr.RequestURI, wantPath)
 		}
 	}
 }
@@ -865,6 +915,7 @@ func TestInvalidImportUsers(t *testing.T) {
 func TestImportUsers(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
+
 	users := []*UserToImport{
 		(&UserToImport{}).UID("user1"),
 		(&UserToImport{}).UID("user2"),
@@ -873,8 +924,14 @@ func TestImportUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if result.SuccessCount != 2 || result.FailureCount != 0 {
 		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:batchCreate"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("ImportUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -928,6 +985,7 @@ func (h mockHash) Config() (internal.HashConfig, error) {
 func TestImportUsersWithHash(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
+
 	users := []*UserToImport{
 		(&UserToImport{}).UID("user1").PasswordHash([]byte("password")),
 		(&UserToImport{}).UID("user2"),
@@ -941,13 +999,16 @@ func TestImportUsersWithHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if result.SuccessCount != 2 || result.FailureCount != 0 {
 		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
 	}
+
 	var got map[string]interface{}
 	if err := json.Unmarshal(s.Rbody, &got); err != nil {
 		t.Fatal(err)
 	}
+
 	want := map[string]interface{}{
 		"hashAlgorithm": "MOCKHASH",
 		"signerKey":     "key",
@@ -960,6 +1021,11 @@ func TestImportUsersWithHash(t *testing.T) {
 		if !ok || gv != v {
 			t.Errorf("ImportUsers() request(%q) = %v; want = %v", k, gv, v)
 		}
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:batchCreate"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("ImportUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -984,8 +1050,14 @@ func TestDeleteUser(t *testing.T) {
 	}`
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
+
 	if err := s.Client.DeleteUser(context.Background(), "uid"); err != nil {
 		t.Errorf("DeleteUser() = %v; want = nil", err)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:delete"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("DeleteUser() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -1062,6 +1134,20 @@ func TestExportedUserRecordShouldClearRedacted(t *testing.T) {
 	}
 }
 
+var createSessionCookieCases = []struct {
+	expiresIn time.Duration
+	want      float64
+}{
+	{
+		expiresIn: 10 * time.Minute,
+		want:      600.0,
+	},
+	{
+		expiresIn: 300500 * time.Millisecond,
+		want:      300.0,
+	},
+}
+
 func TestSessionCookie(t *testing.T) {
 	resp := `{
 		"sessionCookie": "expectedCookie"
@@ -1069,21 +1155,7 @@ func TestSessionCookie(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	cases := []struct {
-		expiresIn time.Duration
-		want      float64
-	}{
-		{
-			expiresIn: 10 * time.Minute,
-			want:      600.0,
-		},
-		{
-			expiresIn: 300500 * time.Millisecond,
-			want:      300.0,
-		},
-	}
-
-	for _, tc := range cases {
+	for _, tc := range createSessionCookieCases {
 		cookie, err := s.Client.SessionCookie(context.Background(), "idToken", tc.expiresIn)
 		if cookie != "expectedCookie" || err != nil {
 			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
