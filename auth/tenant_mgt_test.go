@@ -17,7 +17,9 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"net/http"
 	"reflect"
 	"strconv"
 	"testing"
@@ -508,4 +510,516 @@ func TestTenantSessionCookie(t *testing.T) {
 			t.Errorf("SessionCookie(%f) request =%#v; want = %#v", tc.want, got, want)
 		}
 	}
+}
+
+const wantEmailActionURL = "/projects/mock-project-id/tenants/tenantID/accounts:sendOobCode"
+
+func TestTenantEmailVerificationLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.EmailVerificationLink(context.Background(), testEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("EmailVerificationLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("EmailVerificationLink() %v", err)
+	}
+}
+
+func TestTenantPasswordResetLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.PasswordResetLink(context.Background(), testEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("PasswordResetLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "PASSWORD_RESET",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("PasswordResetLink() %v", err)
+	}
+}
+
+func TestTenantEmailSignInLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "EMAIL_SIGNIN",
+		"email":         testEmail,
+		"returnOobLink": true,
+	}
+	for k, v := range testActionCodeSettingsMap {
+		want[k] = v
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("EmailSignInLink() %v", err)
+	}
+}
+
+func TestTenantOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	oidc, err := client.OIDCProviderConfig(context.Background(), "oidc.provider")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("OIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodGet {
+		t.Errorf("OIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs/oidc.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("OIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestTenantCreateOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	options := (&OIDCProviderConfigToCreate{}).
+		ID(oidcProviderConfig.ID).
+		DisplayName(oidcProviderConfig.DisplayName).
+		Enabled(oidcProviderConfig.Enabled).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("CreateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": oidcProviderConfig.DisplayName,
+		"enabled":     oidcProviderConfig.Enabled,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
+	}
+	wantURL := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs"
+	if err := checkCreateOIDCConfigRequestWithURL(s, wantBody, wantURL); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTenantUpdateOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte(oidcConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	options := (&OIDCProviderConfigToUpdate{}).
+		DisplayName(oidcProviderConfig.DisplayName).
+		Enabled(oidcProviderConfig.Enabled).
+		ClientID(oidcProviderConfig.ClientID).
+		Issuer(oidcProviderConfig.Issuer)
+	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(oidc, oidcProviderConfig) {
+		t.Errorf("UpdateOIDCProviderConfig() = %#v; want = %#v", oidc, oidcProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": oidcProviderConfig.DisplayName,
+		"enabled":     oidcProviderConfig.Enabled,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
+	}
+	wantMask := []string{
+		"clientId",
+		"displayName",
+		"enabled",
+		"issuer",
+	}
+	wantURL := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs/oidc.provider"
+	if err := checkUpdateOIDCConfigRequestWithURL(s, wantBody, wantMask, wantURL); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTenantDeleteOIDCProviderConfig(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	if err := client.DeleteOIDCProviderConfig(context.Background(), "oidc.provider"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodDelete {
+		t.Errorf("DeleteOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodDelete)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs/oidc.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("DeleteOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestTenantOIDCProviderConfigs(t *testing.T) {
+	template := `{
+                "oauthIdpConfigs": [
+                    %s,
+                    %s,
+                    %s
+                ],
+                "nextPageToken": ""
+        }`
+	response := fmt.Sprintf(template, oidcConfigResponse, oidcConfigResponse, oidcConfigResponse)
+	s := echoServer([]byte(response), t)
+	defer s.Close()
+
+	want := []*OIDCProviderConfig{
+		oidcProviderConfig,
+		oidcProviderConfig,
+		oidcProviderConfig,
+	}
+	wantPath := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs"
+
+	testIterator := func(iter *OIDCProviderConfigIterator, token string, req string) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			config, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(config, want[i]) {
+				t.Errorf("OIDCProviderConfigs(%q) = %#v; want = %#v", token, config, want[i])
+			}
+			count++
+		}
+		if count != len(want) {
+			t.Errorf("OIDCProviderConfigs(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("OIDCProviderConfigs(%q) = %v; want = %v", token, err, iterator.Done)
+		}
+
+		url := s.Req[len(s.Req)-1].URL
+		if url.Path != wantPath {
+			t.Errorf("OIDCProviderConfigs(%q) = %q; want = %q", token, url.Path, wantPath)
+		}
+
+		// Check the query string of the last HTTP request made.
+		gotReq := url.Query().Encode()
+		if gotReq != req {
+			t.Errorf("OIDCProviderConfigs(%q) = %q; want = %v", token, gotReq, req)
+		}
+	}
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	testIterator(
+		client.OIDCProviderConfigs(context.Background(), ""),
+		"",
+		"pageSize=100")
+	testIterator(
+		client.OIDCProviderConfigs(context.Background(), "pageToken"),
+		"pageToken",
+		"pageSize=100&pageToken=pageToken")
+}
+
+func TestTenantSAMLProviderConfig(t *testing.T) {
+	s := echoServer([]byte(samlConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	saml, err := client.SAMLProviderConfig(context.Background(), "saml.provider")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(saml, samlProviderConfig) {
+		t.Errorf("SAMLProviderConfig() = %#v; want = %#v", saml, samlProviderConfig)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodGet {
+		t.Errorf("SAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID/inboundSamlConfigs/saml.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("SAMLProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestTenantCreateSAMLProviderConfig(t *testing.T) {
+	s := echoServer([]byte(samlConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	options := (&SAMLProviderConfigToCreate{}).
+		ID(samlProviderConfig.ID).
+		DisplayName(samlProviderConfig.DisplayName).
+		Enabled(samlProviderConfig.Enabled).
+		IDPEntityID(samlProviderConfig.IDPEntityID).
+		SSOURL(samlProviderConfig.SSOURL).
+		RequestSigningEnabled(samlProviderConfig.RequestSigningEnabled).
+		X509Certificates(samlProviderConfig.X509Certificates).
+		RPEntityID(samlProviderConfig.RPEntityID).
+		CallbackURL(samlProviderConfig.CallbackURL)
+	saml, err := client.CreateSAMLProviderConfig(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(saml, samlProviderConfig) {
+		t.Errorf("CreateSAMLProviderConfig() = %#v; want = %#v", saml, samlProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": samlProviderConfig.DisplayName,
+		"enabled":     samlProviderConfig.Enabled,
+		"idpConfig": map[string]interface{}{
+			"idpEntityId":     samlProviderConfig.IDPEntityID,
+			"ssoUrl":          samlProviderConfig.SSOURL,
+			"signRequest":     samlProviderConfig.RequestSigningEnabled,
+			"idpCertificates": idpCertsMap,
+		},
+		"spConfig": map[string]interface{}{
+			"spEntityId":  samlProviderConfig.RPEntityID,
+			"callbackUri": samlProviderConfig.CallbackURL,
+		},
+	}
+	wantURL := "/projects/mock-project-id/tenants/tenantID/inboundSamlConfigs"
+	if err := checkCreateSAMLConfigRequestWithURL(s, wantBody, wantURL); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTenantUpdateSAMLProviderConfig(t *testing.T) {
+	s := echoServer([]byte(samlConfigResponse), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	options := (&SAMLProviderConfigToUpdate{}).
+		DisplayName(samlProviderConfig.DisplayName).
+		Enabled(samlProviderConfig.Enabled).
+		IDPEntityID(samlProviderConfig.IDPEntityID).
+		SSOURL(samlProviderConfig.SSOURL).
+		RequestSigningEnabled(samlProviderConfig.RequestSigningEnabled).
+		X509Certificates(samlProviderConfig.X509Certificates).
+		RPEntityID(samlProviderConfig.RPEntityID).
+		CallbackURL(samlProviderConfig.CallbackURL)
+	saml, err := client.UpdateSAMLProviderConfig(context.Background(), "saml.provider", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(saml, samlProviderConfig) {
+		t.Errorf("UpdateSAMLProviderConfig() = %#v; want = %#v", saml, samlProviderConfig)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": samlProviderConfig.DisplayName,
+		"enabled":     samlProviderConfig.Enabled,
+		"idpConfig": map[string]interface{}{
+			"idpEntityId":     samlProviderConfig.IDPEntityID,
+			"ssoUrl":          samlProviderConfig.SSOURL,
+			"signRequest":     samlProviderConfig.RequestSigningEnabled,
+			"idpCertificates": idpCertsMap,
+		},
+		"spConfig": map[string]interface{}{
+			"spEntityId":  samlProviderConfig.RPEntityID,
+			"callbackUri": samlProviderConfig.CallbackURL,
+		},
+	}
+	wantMask := []string{
+		"displayName",
+		"enabled",
+		"idpConfig.idpCertificates",
+		"idpConfig.idpEntityId",
+		"idpConfig.signRequest",
+		"idpConfig.ssoUrl",
+		"spConfig.callbackUri",
+		"spConfig.spEntityId",
+	}
+	wantURL := "/projects/mock-project-id/tenants/tenantID/inboundSamlConfigs/saml.provider"
+	if err := checkUpdateSAMLConfigRequestWithURL(s, wantBody, wantMask, wantURL); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTenantDeleteSAMLProviderConfig(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	if err := client.DeleteSAMLProviderConfig(context.Background(), "saml.provider"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodDelete {
+		t.Errorf("DeleteSAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodDelete)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID/inboundSamlConfigs/saml.provider"
+	if req.URL.Path != wantURL {
+		t.Errorf("DeleteSAMLProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestTenantSAMLProviderConfigs(t *testing.T) {
+	template := `{
+                "inboundSamlConfigs": [
+                    %s,
+                    %s,
+                    %s
+                ],
+                "nextPageToken": ""
+        }`
+	response := fmt.Sprintf(template, samlConfigResponse, samlConfigResponse, samlConfigResponse)
+	s := echoServer([]byte(response), t)
+	defer s.Close()
+
+	want := []*SAMLProviderConfig{
+		samlProviderConfig,
+		samlProviderConfig,
+		samlProviderConfig,
+	}
+	wantPath := "/projects/mock-project-id/tenants/tenantID/inboundSamlConfigs"
+
+	testIterator := func(iter *SAMLProviderConfigIterator, token string, req string) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			config, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(config, want[i]) {
+				t.Errorf("SAMLProviderConfigs(%q) = %#v; want = %#v", token, config, want[i])
+			}
+			count++
+		}
+		if count != len(want) {
+			t.Errorf("SAMLProviderConfigs(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("SAMLProviderConfigs(%q) = %v; want = %v", token, err, iterator.Done)
+		}
+
+		url := s.Req[len(s.Req)-1].URL
+		if url.Path != wantPath {
+			t.Errorf("SAMLProviderConfigs(%q) = %q; want = %q", token, url.Path, wantPath)
+		}
+
+		// Check the query string of the last HTTP request made.
+		gotReq := url.Query().Encode()
+		if gotReq != req {
+			t.Errorf("SAMLProviderConfigs(%q) = %q; want = %v", token, gotReq, req)
+		}
+	}
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	testIterator(
+		client.SAMLProviderConfigs(context.Background(), ""),
+		"",
+		"pageSize=100")
+	testIterator(
+		client.SAMLProviderConfigs(context.Background(), "pageToken"),
+		"pageToken",
+		"pageSize=100&pageToken=pageToken")
 }

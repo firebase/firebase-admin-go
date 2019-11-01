@@ -598,6 +598,7 @@ func (it *SAMLProviderConfigIterator) fetch(pageSize int, pageToken string) (str
 type providerConfigClient struct {
 	endpoint   string
 	projectID  string
+	tenantID   string
 	httpClient *internal.HTTPClient
 }
 
@@ -614,6 +615,12 @@ func newProviderConfigClient(client *http.Client, conf *internal.AuthConfig) *pr
 		projectID:  conf.ProjectID,
 		httpClient: hc,
 	}
+}
+
+func (c *providerConfigClient) withTenantID(tenantID string) *providerConfigClient {
+	copy := *c
+	copy.tenantID = tenantID
+	return &copy
 }
 
 // OIDCProviderConfig returns the OIDCProviderConfig with the given ID.
@@ -845,7 +852,12 @@ func (c *providerConfigClient) makeRequest(ctx context.Context, req *internal.Re
 		return nil, errors.New("project id not available")
 	}
 
-	req.URL = fmt.Sprintf("%s/projects/%s%s", c.endpoint, c.projectID, req.URL)
+	if c.tenantID != "" {
+		req.URL = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.endpoint, c.projectID, c.tenantID, req.URL)
+	} else {
+		req.URL = fmt.Sprintf("%s/projects/%s%s", c.endpoint, c.projectID, req.URL)
+	}
+
 	return c.httpClient.DoAndUnmarshal(ctx, req, v)
 }
 

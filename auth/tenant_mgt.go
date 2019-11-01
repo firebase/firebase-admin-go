@@ -54,6 +54,7 @@ type Tenant struct {
 type TenantClient struct {
 	tenantID string
 	*userManagementClient
+	*providerConfigClient
 }
 
 // TenantID returns the ID of the tenant to which this TenantClient instance belongs.
@@ -67,6 +68,7 @@ func (tc *TenantClient) TenantID() string {
 // supports creating new TenantClient instances scoped to specific tenant IDs.
 type TenantManager struct {
 	userManagementClient *userManagementClient
+	providerConfigClient *providerConfigClient
 }
 
 // AuthForTenant creates a new TenantClient scoped to a given tenantID.
@@ -78,5 +80,6 @@ func (tm *TenantManager) AuthForTenant(tenantID string) (*TenantClient, error) {
 	return &TenantClient{
 		tenantID:             tenantID,
 		userManagementClient: tm.userManagementClient.withTenantID(tenantID),
+		providerConfigClient: tm.providerConfigClient.withTenantID(tenantID),
 	}, nil
 }
