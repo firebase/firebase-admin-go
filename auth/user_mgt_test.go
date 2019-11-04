@@ -1384,6 +1384,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	authClient.userManagementClient.baseURL = s.Srv.URL
 	authClient.providerConfigClient.endpoint = s.Srv.URL
+	authClient.TenantManager.endpoint = s.Srv.URL
 	s.Client = authClient
 	return &s
 }

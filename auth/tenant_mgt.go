@@ -14,7 +14,18 @@
 
 package auth
 
-import "errors"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+
+	"firebase.google.com/go/internal"
+)
+
+const (
+	tenantMgtEndpoint = "https://identitytoolkit.googleapis.com/v2beta1"
+)
 
 // Tenant represents a tenant in a multi-tenant application.
 //
@@ -33,10 +44,10 @@ import "errors"
 // All other settings of a tenant will also be inherited. These will need to be managed from the
 // Cloud Console UI.
 type Tenant struct {
-	ID                    string
-	DisplayName           string
-	AllowPasswordSignUp   bool
-	EnableEmailLinkSignIn bool
+	ID                    string `json:"name"`
+	DisplayName           string `json:"displayName"`
+	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
+	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -65,7 +76,26 @@ func (tc *TenantClient) TenantID() string {
 // This supports creating, updating, listing, deleting the tenants of a Firebase project. It also
 // supports creating new TenantClient instances scoped to specific tenant IDs.
 type TenantManager struct {
-	base *baseClient
+	base       *baseClient
+	endpoint   string
+	projectID  string
+	httpClient *internal.HTTPClient
+}
+
+func newTenantManager(client *http.Client, conf *internal.AuthConfig, base *baseClient) *TenantManager {
+	hc := internal.WithDefaultRetryConfig(client)
+	hc.CreateErrFn = handleHTTPError
+	hc.SuccessFn = internal.HasSuccessStatus
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
+	}
+
+	return &TenantManager{
+		base:       base,
+		endpoint:   tenantMgtEndpoint,
+		projectID:  conf.ProjectID,
+		httpClient: hc,
+	}
 }
 
 // AuthForTenant creates a new TenantClient scoped to a given tenantID.
@@ -77,4 +107,46 @@ func (tm *TenantManager) AuthForTenant(tenantID string) (*TenantClient, error) {
 	return &TenantClient{
 		baseClient: tm.base.withTenantID(tenantID),
 	}, nil
+}
+
+// Tenant returns the tenant with the given ID.
+func (tm *TenantManager) Tenant(ctx context.Context, tenantID string) (*Tenant, error) {
+	if tenantID == "" {
+		return nil, errors.New("tenantID must not be empty")
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    fmt.Sprintf("/tenants/%s", tenantID),
+	}
+	var tenant Tenant
+	if _, err := tm.makeRequest(ctx, req, &tenant); err != nil {
+		return nil, err
+	}
+
+	tenant.ID = extractResourceID(tenant.ID)
+	return &tenant, nil
+}
+
+// DeleteTenant deletes the tenant with the given ID.
+func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
+	if tenantID == "" {
+		return errors.New("tenantID must not be empty")
+	}
+
+	req := &internal.Request{
+		Method: http.MethodDelete,
+		URL:    fmt.Sprintf("/tenants/%s", tenantID),
+	}
+	_, err := tm.makeRequest(ctx, req, nil)
+	return err
+}
+
+func (tm *TenantManager) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+	if tm.projectID == "" {
+		return nil, errors.New("project id not available")
+	}
+
+	req.URL = fmt.Sprintf("%s/projects/%s%s", tm.endpoint, tm.projectID, req.URL)
+	return tm.httpClient.DoAndUnmarshal(ctx, req, v)
 }
