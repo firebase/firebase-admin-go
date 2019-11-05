@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"firebase.google.com/go/internal"
 )
@@ -128,6 +129,61 @@ func (tm *TenantManager) Tenant(ctx context.Context, tenantID string) (*Tenant, 
 	return &tenant, nil
 }
 
+// CreateTenant creates a new tenant with the given options.
+func (tm *TenantManager) CreateTenant(ctx context.Context, tenant *TenantToCreate) (*Tenant, error) {
+	if tenant == nil {
+		return nil, errors.New("tenant must not be nil")
+	}
+
+	req := &internal.Request{
+		Method: http.MethodPost,
+		URL:    "/tenants",
+		Body:   internal.NewJSONEntity(tenant.ensureParams()),
+	}
+	var result Tenant
+	if _, err := tm.makeRequest(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	result.ID = extractResourceID(result.ID)
+	return &result, nil
+}
+
+// UpdateTenant updates an existing tenant with the given options.
+func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tenant *TenantToUpdate) (*Tenant, error) {
+	if tenantID == "" {
+		return nil, errors.New("tenantID must not be empty")
+	}
+	if tenant == nil {
+		return nil, errors.New("tenant must not be nil")
+	}
+
+	mask, err := tenant.params.UpdateMask()
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct update mask: %v", err)
+	}
+
+	if len(mask) == 0 {
+		return nil, errors.New("no parameters specified in the update request")
+	}
+
+	req := &internal.Request{
+		Method: http.MethodPatch,
+		URL:    fmt.Sprintf("/tenants/%s", tenantID),
+		Body:   internal.NewJSONEntity(tenant.params),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
+		},
+	}
+	var result Tenant
+	if _, err := tm.makeRequest(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	result.ID = extractResourceID(result.ID)
+	return &result, nil
+}
+
 // DeleteTenant deletes the tenant with the given ID.
 func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
 	if tenantID == "" {
@@ -140,6 +196,78 @@ func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) erro
 	}
 	_, err := tm.makeRequest(ctx, req, nil)
 	return err
+}
+
+const (
+	tenantDisplayNameKey     = "displayName"
+	allowPasswordSignUpKey   = "allowPasswordSignup"
+	enableEmailLinkSignInKey = "enableEmailLinkSignin"
+)
+
+// TenantToCreate represents the options used to create a new tenant.
+type TenantToCreate struct {
+	params nestedMap
+}
+
+// DisplayName sets the display name of the new tenant.
+func (t *TenantToCreate) DisplayName(name string) *TenantToCreate {
+	return t.set(tenantDisplayNameKey, name)
+}
+
+// AllowPasswordSignUp enables or disables email sign-in provider.
+func (t *TenantToCreate) AllowPasswordSignUp(allow bool) *TenantToCreate {
+	return t.set(allowPasswordSignUpKey, allow)
+}
+
+// EnableEmailLinkSignIn enables or disables email link sign-in.
+//
+// Disabling this makes the password required for email sign-in.
+func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
+	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+func (t *TenantToCreate) set(key string, value interface{}) *TenantToCreate {
+	t.ensureParams().Set(key, value)
+	return t
+}
+
+func (t *TenantToCreate) ensureParams() nestedMap {
+	if t.params == nil {
+		t.params = make(nestedMap)
+	}
+
+	return t.params
+}
+
+// TenantToUpdate represents the options used to update an existing tenant.
+type TenantToUpdate struct {
+	params nestedMap
+}
+
+// DisplayName sets the display name of the new tenant.
+func (t *TenantToUpdate) DisplayName(name string) *TenantToUpdate {
+	return t.set(tenantDisplayNameKey, name)
+}
+
+// AllowPasswordSignUp enables or disables email sign-in provider.
+func (t *TenantToUpdate) AllowPasswordSignUp(allow bool) *TenantToUpdate {
+	return t.set(allowPasswordSignUpKey, allow)
+}
+
+// EnableEmailLinkSignIn enables or disables email link sign-in.
+//
+// Disabling this makes the password required for email sign-in.
+func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
+	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
+	if t.params == nil {
+		t.params = make(nestedMap)
+	}
+
+	t.params.Set(key, value)
+	return t
 }
 
 func (tm *TenantManager) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {

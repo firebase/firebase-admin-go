@@ -21,7 +21,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1148,6 +1150,232 @@ func TestTenantError(t *testing.T) {
 	}
 }
 
+func TestTenantNoProjectID(t *testing.T) {
+	tm := &TenantManager{}
+	want := "project id not available"
+	if _, err := tm.Tenant(context.Background(), "tenantID"); err == nil || err.Error() != want {
+		t.Errorf("Tenant() = %v; want = %q", err, want)
+	}
+}
+
+func TestCreateTenant(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	options := (&TenantToCreate{}).
+		DisplayName(testTenant.DisplayName).
+		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
+		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn)
+	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("CreateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName":           testTenant.DisplayName,
+		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
+		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
+	}
+	if err := checkCreateTenantRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateTenantMinimal(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	tenant, err := client.TenantManager.CreateTenant(context.Background(), &TenantToCreate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("CreateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{}
+	if err := checkCreateTenantRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateTenantZeroValues(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+	client := s.Client
+
+	options := (&TenantToCreate{}).
+		DisplayName("").
+		AllowPasswordSignUp(false).
+		EnableEmailLinkSignIn(false)
+	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("CreateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName":           "",
+		"allowPasswordSignup":   false,
+		"enableEmailLinkSignin": false,
+	}
+	if err := checkCreateTenantRequest(s, wantBody); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateTenantError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	s.Status = http.StatusInternalServerError
+	defer s.Close()
+
+	client := s.Client
+	client.TenantManager.httpClient.RetryConfig = nil
+	tenant, err := client.TenantManager.CreateTenant(context.Background(), &TenantToCreate{})
+	if tenant != nil || !IsUnknown(err) {
+		t.Errorf("CreateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "unknown-error")
+	}
+}
+
+func TestCreateTenantNilOptions(t *testing.T) {
+	tm := &TenantManager{}
+	want := "tenant must not be nil"
+	if _, err := tm.CreateTenant(context.Background(), nil); err == nil || err.Error() != want {
+		t.Errorf("CreateTenant(nil) = %v, want = %q", err, want)
+	}
+}
+
+func TestUpdateTenant(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	options := (&TenantToUpdate{}).
+		DisplayName(testTenant.DisplayName).
+		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
+		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn)
+	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName":           testTenant.DisplayName,
+		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
+		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
+	}
+	wantMask := []string{"allowPasswordSignup", "displayName", "enableEmailLinkSignin"}
+	if err := checkUpdateTenantRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateTenantMinimal(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	options := (&TenantToUpdate{}).DisplayName(testTenant.DisplayName)
+	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName": testTenant.DisplayName,
+	}
+	wantMask := []string{"displayName"}
+	if err := checkUpdateTenantRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateTenantZeroValues(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+	client := s.Client
+
+	options := (&TenantToUpdate{}).
+		DisplayName("").
+		AllowPasswordSignUp(false).
+		EnableEmailLinkSignIn(false)
+	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	wantBody := map[string]interface{}{
+		"displayName":           "",
+		"allowPasswordSignup":   false,
+		"enableEmailLinkSignin": false,
+	}
+	wantMask := []string{"allowPasswordSignup", "displayName", "enableEmailLinkSignin"}
+	if err := checkUpdateTenantRequest(s, wantBody, wantMask); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateTenantError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	s.Status = http.StatusInternalServerError
+	defer s.Close()
+
+	client := s.Client
+	client.TenantManager.httpClient.RetryConfig = nil
+	options := (&TenantToUpdate{}).DisplayName("")
+	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
+	if tenant != nil || !IsUnknown(err) {
+		t.Errorf("UpdateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "unknown-error")
+	}
+}
+
+func TestUpdateTenantEmptyID(t *testing.T) {
+	tm := &TenantManager{}
+	want := "tenantID must not be empty"
+	options := (&TenantToUpdate{}).DisplayName("")
+	if _, err := tm.UpdateTenant(context.Background(), "", options); err == nil || err.Error() != want {
+		t.Errorf("UpdateTenant(nil) = %v, want = %q", err, want)
+	}
+}
+
+func TestUpdateTenantNilOptions(t *testing.T) {
+	tm := &TenantManager{}
+	want := "tenant must not be nil"
+	if _, err := tm.UpdateTenant(context.Background(), "tenantID", nil); err == nil || err.Error() != want {
+		t.Errorf("UpdateTenant(nil) = %v, want = %q", err, want)
+	}
+}
+
+func TestUpdateTenantEmptyOptions(t *testing.T) {
+	tm := &TenantManager{}
+	want := "no parameters specified in the update request"
+	if _, err := tm.UpdateTenant(context.Background(), "tenantID", &TenantToUpdate{}); err == nil || err.Error() != want {
+		t.Errorf("UpdateTenant({}) = %v, want = %q", err, want)
+	}
+}
+
 func TestDeleteTenant(t *testing.T) {
 	s := echoServer([]byte("{}"), t)
 	defer s.Close()
@@ -1188,4 +1416,57 @@ func TestDeleteTenantError(t *testing.T) {
 	if err == nil || !IsTenantNotFound(err) {
 		t.Errorf("DeleteTenant() = %v; want = TenantNotFound", err)
 	}
+}
+
+func checkCreateTenantRequest(s *mockAuthServer, wantBody interface{}) error {
+	req := s.Req[0]
+	if req.Method != http.MethodPost {
+		return fmt.Errorf("CreateTenant() Method = %q; want = %q", req.Method, http.MethodPost)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants"
+	if req.URL.Path != wantURL {
+		return fmt.Errorf("CreateTenant() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &body); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(body, wantBody) {
+		return fmt.Errorf("CreateTenant() Body = %#v; want = %#v", body, wantBody)
+	}
+
+	return nil
+}
+
+func checkUpdateTenantRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
+	req := s.Req[0]
+	if req.Method != http.MethodPatch {
+		return fmt.Errorf("UpdateTenant() Method = %q; want = %q", req.Method, http.MethodPatch)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID"
+	if req.URL.Path != wantURL {
+		return fmt.Errorf("UpdateTenant() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
+	queryParam := req.URL.Query().Get("updateMask")
+	mask := strings.Split(queryParam, ",")
+	sort.Strings(mask)
+	if !reflect.DeepEqual(mask, wantMask) {
+		return fmt.Errorf("UpdateTenant() Query = %#v; want = %#v", mask, wantMask)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &body); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(body, wantBody) {
+		return fmt.Errorf("UpdateTenant() Body = %#v; want = %#v", body, wantBody)
+	}
+
+	return nil
 }
