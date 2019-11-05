@@ -246,13 +246,7 @@ func basicConfig(name string, rounds int) (internal.HashConfig, error) {
 	switch name {
 	case "MD5":
 		maxRounds = 8192
-	case "SHA1":
-		minRounds = 1
-		maxRounds = 8192
-	case "SHA256":
-		minRounds = 1
-		maxRounds = 8192
-	case "SHA512":
+	case "SHA1", "SHA256", "SHA512":
 		minRounds = 1
 		maxRounds = 8192
 	}
