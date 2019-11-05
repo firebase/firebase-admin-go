@@ -1,6 +1,6 @@
 module firebase.google.com/go
 
-go 1.13
+go 1.11
 
 require (
 	cloud.google.com/go v0.47.0 // indirect
