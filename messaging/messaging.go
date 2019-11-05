@@ -262,45 +262,18 @@ func (a *AndroidConfig) UnmarshalJSON(b []byte) error {
 
 // AndroidNotification is a notification to send to Android devices.
 type AndroidNotification struct {
-	Title                 string           `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
-	Body                  string           `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
-	Icon                  string           `json:"icon,omitempty"`
-	Color                 string           `json:"color,omitempty"` // notification color in #RRGGBB format
-	Sound                 string           `json:"sound,omitempty"`
-	Tag                   string           `json:"tag,omitempty"`
-	ClickAction           string           `json:"click_action,omitempty"`
-	BodyLocKey            string           `json:"body_loc_key,omitempty"`
-	BodyLocArgs           []string         `json:"body_loc_args,omitempty"`
-	TitleLocKey           string           `json:"title_loc_key,omitempty"`
-	TitleLocArgs          []string         `json:"title_loc_args,omitempty"`
-	ChannelID             string           `json:"channel_id,omitempty"`
-	Ticker                string           `json:"ticker,omitempty"`
-	Sticky                bool             `json:"sticky,omitempty"`
-	EventTime             *time.Time       `json:"event_time,omitempty"`
-	LocalOnly             bool             `json:"local_only,omitempty"`
-	Priority              string           `json:"priority,omitempty"`
-	DefaultSound          bool             `json:"default_sound,omitempty"`
-	DefaultVibrateTimings bool             `json:"default_vibrate_timings,omitempty"`
-	DefaultLightSettings  bool             `json:"default_light_settings,omitempty"`
-	VibrateTimings        []*time.Duration `json:"vibrate_timings,omitempty"`
-	Visibility            string           `json:"visibility,omitempty"`
-	NotificationCount     float64          `json:"notification_count,omitempty"`
-	LightSettings         *LightSettings   `json:"light_settings,omitempty"`
-}
-
-// LightSettings is Settings to control notification LED.
-type LightSettings struct {
-	Color            *Color         `json:"color,omitempty"`
-	LightOnDuration  *time.Duration `json:"light_on_duration,omitempty"`
-	LightOffDuration *time.Duration `json:"light_off_duration,omitempty"`
-}
-
-// Color represents a color in the RGBA color space.
-type Color struct {
-	Red   float64 `json:"red,omitempty"`
-	Green float64 `json:"green,omitempty"`
-	Blue  float64 `json:"blue,omitempty"`
-	Alpha float64 `json:"alpha,omitempty"`
+	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
+	Icon         string   `json:"icon,omitempty"`
+	Color        string   `json:"color,omitempty"` // notification color in #RRGGBB format
+	Sound        string   `json:"sound,omitempty"`
+	Tag          string   `json:"tag,omitempty"`
+	ClickAction  string   `json:"click_action,omitempty"`
+	BodyLocKey   string   `json:"body_loc_key,omitempty"`
+	BodyLocArgs  []string `json:"body_loc_args,omitempty"`
+	TitleLocKey  string   `json:"title_loc_key,omitempty"`
+	TitleLocArgs []string `json:"title_loc_args,omitempty"`
+	ChannelID    string   `json:"channel_id,omitempty"`
 }
 
 // AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.
