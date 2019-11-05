@@ -52,9 +52,7 @@ type Tenant struct {
 // TenantClient instances for a specific tenantID can be instantiated by calling
 // [TenantManager.AuthForTenant(tenantID)].
 type TenantClient struct {
-	tenantID string
-	*userManagementClient
-	*providerConfigClient
+	*baseClient
 }
 
 // TenantID returns the ID of the tenant to which this TenantClient instance belongs.
@@ -67,8 +65,7 @@ func (tc *TenantClient) TenantID() string {
 // This supports creating, updating, listing, deleting the tenants of a Firebase project. It also
 // supports creating new TenantClient instances scoped to specific tenant IDs.
 type TenantManager struct {
-	userManagementClient *userManagementClient
-	providerConfigClient *providerConfigClient
+	base *baseClient
 }
 
 // AuthForTenant creates a new TenantClient scoped to a given tenantID.
@@ -78,8 +75,6 @@ func (tm *TenantManager) AuthForTenant(tenantID string) (*TenantClient, error) {
 	}
 
 	return &TenantClient{
-		tenantID:             tenantID,
-		userManagementClient: tm.userManagementClient.withTenantID(tenantID),
-		providerConfigClient: tm.providerConfigClient.withTenantID(tenantID),
+		baseClient: tm.base.withTenantID(tenantID),
 	}, nil
 }

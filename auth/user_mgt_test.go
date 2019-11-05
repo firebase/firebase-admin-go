@@ -140,7 +140,9 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 
 func TestInvalidGetUser(t *testing.T) {
 	client := &Client{
-		userManagementClient: &userManagementClient{},
+		baseClient: &baseClient{
+			userManagementClient: &userManagementClient{},
+		},
 	}
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
@@ -293,7 +295,9 @@ func TestInvalidCreateUser(t *testing.T) {
 			`malformed email string: "a@a@a"`,
 		},
 	}
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for i, tc := range cases {
 		user, err := client.CreateUser(context.Background(), tc.params)
 		if user != nil || err == nil {
@@ -433,7 +437,9 @@ func TestInvalidUpdateUser(t *testing.T) {
 		cases = append(cases, s)
 	}
 
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for i, tc := range cases {
 		user, err := client.UpdateUser(context.Background(), "uid", tc.params)
 		if user != nil || err == nil {
@@ -447,7 +453,9 @@ func TestInvalidUpdateUser(t *testing.T) {
 
 func TestUpdateUserEmptyUID(t *testing.T) {
 	params := (&UserToUpdate{}).DisplayName("test")
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	user, err := client.UpdateUser(context.Background(), "", params)
 	if user != nil || err == nil {
 		t.Errorf("UpdateUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -633,7 +641,9 @@ func TestInvalidSetCustomClaims(t *testing.T) {
 		cases = append(cases, s)
 	}
 
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range cases {
 		err := client.SetCustomUserClaims(context.Background(), "uid", tc.cc)
 		if err == nil {
@@ -1062,7 +1072,9 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestInvalidDeleteUser(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	if err := client.DeleteUser(context.Background(), ""); err == nil {
 		t.Errorf("DeleteUser('') = nil; want error")
 	}
@@ -1203,7 +1215,9 @@ func TestSessionCookieError(t *testing.T) {
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
 	client := &Client{
-		userManagementClient: &userManagementClient{},
+		baseClient: &baseClient{
+			userManagementClient: &userManagementClient{},
+		},
 	}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
@@ -1213,7 +1227,9 @@ func TestSessionCookieWithoutProjectID(t *testing.T) {
 }
 
 func TestSessionCookieWithoutIDToken(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	_, err := client.SessionCookie(context.Background(), "", 10*time.Minute)
 	if err == nil {
 		t.Errorf("CreateSessionCookie('') = nil; want error")
@@ -1221,7 +1237,9 @@ func TestSessionCookieWithoutIDToken(t *testing.T) {
 }
 
 func TestSessionCookieShortExpiresIn(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	lessThanFiveMins := 5*time.Minute - time.Second
 	_, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins)
 	if err == nil {
@@ -1230,7 +1248,9 @@ func TestSessionCookieShortExpiresIn(t *testing.T) {
 }
 
 func TestSessionCookieLongExpiresIn(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	moreThanTwoWeeks := 14*24*time.Hour + time.Second
 	_, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
 	if err == nil {

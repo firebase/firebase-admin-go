@@ -319,7 +319,9 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 
 func TestVerifyIDToken(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 
 	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
@@ -348,7 +350,9 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -368,7 +372,9 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
@@ -462,7 +468,9 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -494,7 +502,9 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
@@ -518,9 +528,11 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
-		signer:          testSigner,
-		clock:           testClock,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
+		signer: testSigner,
+		clock:  testClock,
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
@@ -539,7 +551,9 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 	tv.keySource = &mockKeySource{nil, errors.New("mock error")}
 	client := &Client{
-		idTokenVerifier: tv,
+		baseClient: &baseClient{
+			idTokenVerifier: tv,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
@@ -627,7 +641,9 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 
 func TestVerifySessionCookie(t *testing.T) {
 	client := &Client{
-		cookieVerifier: testCookieVerifier,
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
 	}
 
 	ft, err := client.VerifySessionCookie(context.Background(), testSessionCookie)
@@ -716,7 +732,9 @@ func TestVerifySessionCookieError(t *testing.T) {
 	}
 
 	client := &Client{
-		cookieVerifier: testCookieVerifier,
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

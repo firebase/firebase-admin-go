@@ -47,9 +47,18 @@ func TestTenantID(t *testing.T) {
 		t.Fatalf("AuthForTenant() = %v", err)
 	}
 
+	const want = "tenantID"
 	tenantID := client.TenantID()
-	if tenantID != "tenantID" {
-		t.Errorf("TenantID() = %q; want = %q", tenantID, "tenantID")
+	if tenantID != want {
+		t.Errorf("TenantID() = %q; want = %q", tenantID, want)
+	}
+
+	if client.userManagementClient.tenantID != want {
+		t.Errorf("userManagementClient.tenantID = %q; want = %q", client.userManagementClient.tenantID, want)
+	}
+
+	if client.providerConfigClient.tenantID != want {
+		t.Errorf("providerConfigClient.tenantID = %q; want = %q", client.providerConfigClient.tenantID, want)
 	}
 }
 

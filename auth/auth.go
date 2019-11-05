@@ -41,13 +41,10 @@ var reservedClaims = []string{
 // Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
 // by Firebase backend services.
 type Client struct {
-	*userManagementClient
-	*providerConfigClient
-	TenantManager   *TenantManager
-	idTokenVerifier *tokenVerifier
-	cookieVerifier  *tokenVerifier
-	signer          cryptoSigner
-	clock           internal.Clock
+	*baseClient
+	TenantManager *TenantManager
+	signer        cryptoSigner
+	clock         internal.Clock
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -100,18 +97,18 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	umc := newUserManagementClient(hc, conf)
-	pcc := newProviderConfigClient(hc, conf)
-	return &Client{
-		userManagementClient: umc,
-		providerConfigClient: pcc,
+	base := &baseClient{
+		userManagementClient: newUserManagementClient(hc, conf),
+		providerConfigClient: newProviderConfigClient(hc, conf),
 		idTokenVerifier:      idTokenVerifier,
 		cookieVerifier:       cookieVerifier,
-		signer:               signer,
-		clock:                internal.SystemClock,
+	}
+	return &Client{
+		baseClient: base,
+		signer:     signer,
+		clock:      internal.SystemClock,
 		TenantManager: &TenantManager{
-			userManagementClient: umc,
-			providerConfigClient: pcc,
+			base: base,
 		},
 	}, nil
 }
@@ -194,6 +191,24 @@ type Token struct {
 	Claims   map[string]interface{} `json:"-"`
 }
 
+type baseClient struct {
+	*userManagementClient
+	*providerConfigClient
+	idTokenVerifier *tokenVerifier
+	cookieVerifier  *tokenVerifier
+	tenantID        string
+}
+
+func (c *baseClient) withTenantID(tenantID string) *baseClient {
+	return &baseClient{
+		userManagementClient: c.userManagementClient.withTenantID(tenantID),
+		providerConfigClient: c.providerConfigClient.withTenantID(tenantID),
+		idTokenVerifier:      c.idTokenVerifier,
+		cookieVerifier:       c.cookieVerifier,
+		tenantID:             tenantID,
+	}
+}
+
 // VerifyIDToken verifies the signature	and payload of the provided ID token.
 //
 // VerifyIDToken accepts a signed JWT token string, and verifies that it is current, issued for the
@@ -208,7 +223,7 @@ type Token struct {
 //
 // This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
 // when a revocation check is needed.
-func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
+func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	return c.idTokenVerifier.VerifyToken(ctx, idToken)
 }
 
@@ -219,7 +234,7 @@ func (c *Client) VerifyIDToken(ctx context.Context, idToken string) (*Token, err
 // `VerifyIDToken()` this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
-func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
+func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
 	p, err := c.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, err
@@ -248,7 +263,7 @@ func (c *Client) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken strin
 //
 // This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
 // when a revocation check is needed.
-func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
+func (c *baseClient) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
 	return c.cookieVerifier.VerifyToken(ctx, sessionCookie)
 }
 
@@ -259,7 +274,7 @@ func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) 
 // `VerifySessionCookie()` this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
-func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
+func (c *baseClient) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
 	p, err := c.VerifySessionCookie(ctx, sessionCookie)
 	if err != nil {
 		return nil, err
@@ -275,7 +290,7 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 	return p, nil
 }
 
-func (c *Client) checkRevoked(ctx context.Context, token *Token) (bool, error) {
+func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {
 	user, err := c.GetUser(ctx, token.UID)
 	if err != nil {
 		return false, err
