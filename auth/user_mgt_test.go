@@ -1142,8 +1142,7 @@ func TestSessionCookieWithoutProjectID(t *testing.T) {
 
 func TestSessionCookieWithoutIDToken(t *testing.T) {
 	client := &Client{}
-	_, err := client.SessionCookie(context.Background(), "", 10*time.Minute)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "", 10*time.Minute); err == nil {
 		t.Errorf("CreateSessionCookie('') = nil; want error")
 	}
 }
@@ -1151,8 +1150,7 @@ func TestSessionCookieWithoutIDToken(t *testing.T) {
 func TestSessionCookieShortExpiresIn(t *testing.T) {
 	client := &Client{}
 	lessThanFiveMins := 5*time.Minute - time.Second
-	_, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins); err == nil {
 		t.Errorf("SessionCookie(< 5 mins) = nil; want error")
 	}
 }
@@ -1160,8 +1158,7 @@ func TestSessionCookieShortExpiresIn(t *testing.T) {
 func TestSessionCookieLongExpiresIn(t *testing.T) {
 	client := &Client{}
 	moreThanTwoWeeks := 14*24*time.Hour + time.Second
-	_, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks); err == nil {
 		t.Errorf("SessionCookie(> 14 days) = nil; want error")
 	}
 }
