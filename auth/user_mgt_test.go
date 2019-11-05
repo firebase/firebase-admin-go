@@ -124,7 +124,9 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 }
 
 func TestInvalidGetUser(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		userManagementClient: &userManagementClient{},
+	}
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
@@ -995,7 +997,7 @@ func TestInvalidDeleteUser(t *testing.T) {
 }
 
 func TestMakeExportedUser(t *testing.T) {
-	rur := &userQueryResponse{
+	queryResponse := &userQueryResponse{
 		UID:                "testuser",
 		Email:              "testuser@example.com",
 		PhoneNumber:        "+1234567890",
@@ -1028,7 +1030,7 @@ func TestMakeExportedUser(t *testing.T) {
 		PasswordHash: "passwordhash",
 		PasswordSalt: "salt",
 	}
-	exported, err := rur.makeExportedUserRecord()
+	exported, err := queryResponse.makeExportedUserRecord()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1042,6 +1044,21 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if exported.PasswordSalt != want.PasswordSalt {
 		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
+	}
+}
+
+func TestExportedUserRecordShouldClearRedacted(t *testing.T) {
+	queryResponse := &userQueryResponse{
+		UID:          "uid1",
+		PasswordHash: base64.StdEncoding.EncodeToString([]byte("REDACTED")),
+	}
+
+	exported, err := queryResponse.makeExportedUserRecord()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exported.PasswordHash != "" {
+		t.Errorf("PasswordHash = %q; want = ''", exported.PasswordHash)
 	}
 }
 
@@ -1072,7 +1089,7 @@ func TestSessionCookie(t *testing.T) {
 			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
 		}
 
-		wantURL := "/mock-project-id:createSessionCookie"
+		wantURL := "/projects/mock-project-id:createSessionCookie"
 		if s.Req[0].URL.Path != wantURL {
 			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
 		}
@@ -1113,7 +1130,9 @@ func TestSessionCookieError(t *testing.T) {
 }
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		userManagementClient: &userManagementClient{},
+	}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
 	if err == nil || err.Error() != want {
@@ -1147,7 +1166,7 @@ func TestSessionCookieLongExpiresIn(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
-	s.Client.httpClient.RetryConfig = nil
+	s.Client.userManagementClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
@@ -1163,7 +1182,7 @@ func TestHTTPError(t *testing.T) {
 
 func TestHTTPErrorWithCode(t *testing.T) {
 	errorCodes := map[string]func(error) bool{
-		"CONFIGURATION_NOT_FOUND": IsProjectNotFound,
+		"CONFIGURATION_NOT_FOUND": IsConfigurationNotFound,
 		"DUPLICATE_EMAIL":         IsEmailAlreadyExists,
 		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
 		"EMAIL_EXISTS":            IsEmailAlreadyExists,
@@ -1173,7 +1192,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 	}
 	s := echoServer(nil, t)
 	defer s.Close()
-	s.Client.httpClient.RetryConfig = nil
+	s.Client.userManagementClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	for code, check := range errorCodes {
@@ -1267,7 +1286,9 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authClient.baseURL = s.Srv.URL
+
+	authClient.userManagementClient.baseURL = s.Srv.URL
+	authClient.providerConfigClient.endpoint = s.Srv.URL
 	s.Client = authClient
 	return &s
 }

@@ -130,6 +130,13 @@ following credentials from the project:
    your Go workspace as
    `src/firebase.google.com/go/testdata/integration_apikey.txt`.
 
+You'll also need to grant your service account the 'Firebase Authentication Admin' role. This is
+required to ensure that exported user records contain the password hashes of the user accounts:
+1. Go to [Google Cloud Platform Console / IAM & admin](https://console.cloud.google.com/iam-admin).
+2. Find your service account in the list, and click the 'pencil' icon to edit it's permissions.
+3. Click 'ADD ANOTHER ROLE' and choose 'Firebase Authentication Admin'.
+4. Click 'SAVE'.
+
 Now you can invoke the test suite as follows:
 
 ```bash
