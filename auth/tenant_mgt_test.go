@@ -1418,6 +1418,85 @@ func TestDeleteTenantError(t *testing.T) {
 	}
 }
 
+func TestTenants(t *testing.T) {
+	template := `{
+                "tenants": [
+                    %s,
+                    %s,
+                    %s
+                ],
+                "nextPageToken": ""
+        }`
+	response := fmt.Sprintf(template, tenantResponse, tenantResponse, tenantResponse)
+	s := echoServer([]byte(response), t)
+	defer s.Close()
+
+	want := []*Tenant{
+		testTenant,
+		testTenant,
+		testTenant,
+	}
+	wantPath := "/projects/mock-project-id/tenants"
+
+	testIterator := func(iter *TenantIterator, token string, req string) {
+		count := 0
+		for i := 0; i < len(want); i++ {
+			tenant, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tenant, want[i]) {
+				t.Errorf("Tenants(%q) = %#v; want = %#v", token, tenant, want[i])
+			}
+			count++
+		}
+		if count != len(want) {
+			t.Errorf("Tenants(%q) = %d; want = %d", token, count, len(want))
+		}
+		if _, err := iter.Next(); err != iterator.Done {
+			t.Errorf("Tenants(%q) = %v; want = %v", token, err, iterator.Done)
+		}
+
+		url := s.Req[len(s.Req)-1].URL
+		if url.Path != wantPath {
+			t.Errorf("Tenants(%q) = %q; want = %q", token, url.Path, wantPath)
+		}
+
+		// Check the query string of the last HTTP request made.
+		gotReq := url.Query().Encode()
+		if gotReq != req {
+			t.Errorf("Tenants(%q) = %q; want = %v", token, gotReq, req)
+		}
+	}
+
+	client := s.Client
+	testIterator(
+		client.TenantManager.Tenants(context.Background(), ""),
+		"",
+		"pageSize=100")
+	testIterator(
+		client.TenantManager.Tenants(context.Background(), "pageToken"),
+		"pageToken",
+		"pageSize=100&pageToken=pageToken")
+}
+
+func TestTenantsError(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	s.Status = http.StatusInternalServerError
+
+	client := s.Client
+	client.TenantManager.httpClient.RetryConfig = nil
+	it := client.TenantManager.Tenants(context.Background(), "")
+	config, err := it.Next()
+	if config != nil || err == nil || !IsUnknown(err) {
+		t.Errorf("Tenants() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
+	}
+}
+
 func checkCreateTenantRequest(s *mockAuthServer, wantBody interface{}) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPost {

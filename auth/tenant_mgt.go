@@ -19,9 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/iterator"
 )
 
 const (
@@ -198,6 +200,33 @@ func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) erro
 	return err
 }
 
+// Tenants returns an iterator over tenants in the project.
+//
+// If nextPageToken is empty, the iterator will start at the beginning. Otherwise,
+// iterator starts after the token.
+func (tm *TenantManager) Tenants(ctx context.Context, nextPageToken string) *TenantIterator {
+	it := &TenantIterator{
+		ctx: ctx,
+		tm:  tm,
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(
+		it.fetch,
+		func() int { return len(it.tenants) },
+		func() interface{} { b := it.tenants; it.tenants = nil; return b })
+	it.pageInfo.MaxSize = maxConfigs
+	it.pageInfo.Token = nextPageToken
+	return it
+}
+
+func (tm *TenantManager) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+	if tm.projectID == "" {
+		return nil, errors.New("project id not available")
+	}
+
+	req.URL = fmt.Sprintf("%s/projects/%s%s", tm.endpoint, tm.projectID, req.URL)
+	return tm.httpClient.DoAndUnmarshal(ctx, req, v)
+}
+
 const (
 	tenantDisplayNameKey     = "displayName"
 	allowPasswordSignUpKey   = "allowPasswordSignup"
@@ -270,11 +299,62 @@ func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
 	return t
 }
 
-func (tm *TenantManager) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
-	if tm.projectID == "" {
-		return nil, errors.New("project id not available")
+// TenantIterator is an iterator over tenants.
+type TenantIterator struct {
+	tm       *TenantManager
+	ctx      context.Context
+	nextFunc func() error
+	pageInfo *iterator.PageInfo
+	tenants  []*Tenant
+}
+
+// PageInfo supports pagination.
+func (it *TenantIterator) PageInfo() *iterator.PageInfo {
+	return it.pageInfo
+}
+
+// Next returns the next Tenant. The error value of [iterator.Done] is
+// returned if there are no more results. Once Next returns [iterator.Done], all
+// subsequent calls will return [iterator.Done].
+func (it *TenantIterator) Next() (*Tenant, error) {
+	if err := it.nextFunc(); err != nil {
+		return nil, err
 	}
 
-	req.URL = fmt.Sprintf("%s/projects/%s%s", tm.endpoint, tm.projectID, req.URL)
-	return tm.httpClient.DoAndUnmarshal(ctx, req, v)
+	tenant := it.tenants[0]
+	it.tenants = it.tenants[1:]
+	return tenant, nil
+}
+
+func (it *TenantIterator) fetch(pageSize int, pageToken string) (string, error) {
+	params := map[string]string{
+		"pageSize": strconv.Itoa(pageSize),
+	}
+	if pageToken != "" {
+		params["pageToken"] = pageToken
+	}
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    "/tenants",
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParams(params),
+		},
+	}
+
+	var result struct {
+		Tenants       []Tenant `json:"tenants"`
+		NextPageToken string   `json:"nextPageToken"`
+	}
+	if _, err := it.tm.makeRequest(it.ctx, req, &result); err != nil {
+		return "", err
+	}
+
+	for _, tenant := range result.Tenants {
+		tenant.ID = extractResourceID(tenant.ID)
+		it.tenants = append(it.tenants, &tenant)
+	}
+
+	it.pageInfo.Token = result.NextPageToken
+	return result.NextPageToken, nil
 }
