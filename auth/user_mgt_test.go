@@ -1187,6 +1187,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
 		"EMAIL_EXISTS":            IsEmailAlreadyExists,
 		"INSUFFICIENT_PERMISSION": IsInsufficientPermission,
+		"INVALID_EMAIL":           IsInvalidEmail,
 		"PHONE_NUMBER_EXISTS":     IsPhoneNumberAlreadyExists,
 		"PROJECT_NOT_FOUND":       IsProjectNotFound,
 	}

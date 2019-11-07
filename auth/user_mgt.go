@@ -320,6 +320,7 @@ const (
 	idTokenRevoked           = "id-token-revoked"
 	insufficientPermission   = "insufficient-permission"
 	invalidDynamicLinkDomain = "invalid-dynamic-link-domain"
+	invalidEmail             = "invalid-email"
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
@@ -352,6 +353,11 @@ func IsInsufficientPermission(err error) bool {
 // IsInvalidDynamicLinkDomain checks if the given error was due to an invalid dynamic link domain.
 func IsInvalidDynamicLinkDomain(err error) bool {
 	return internal.HasErrorCode(err, invalidDynamicLinkDomain)
+}
+
+// IsInvalidEmail checks if the given error was due to an invalid email.
+func IsInvalidEmail(err error) bool {
+	return internal.HasErrorCode(err, invalidEmail)
 }
 
 // IsPhoneNumberAlreadyExists checks if the given error was due to a duplicate phone number.
@@ -396,6 +402,7 @@ var serverError = map[string]string{
 	"EMAIL_EXISTS":                emailAlreadyExists,
 	"INSUFFICIENT_PERMISSION":     insufficientPermission,
 	"INVALID_DYNAMIC_LINK_DOMAIN": invalidDynamicLinkDomain,
+	"INVALID_EMAIL":               invalidEmail,
 	"PERMISSION_DENIED":           insufficientPermission,
 	"PHONE_NUMBER_EXISTS":         phoneNumberAlreadyExists,
 	"PROJECT_NOT_FOUND":           projectNotFound,
