@@ -68,6 +68,7 @@ type UserRecord struct {
 	ProviderUserInfo       []*UserInfo
 	TokensValidAfterMillis int64 // milliseconds since epoch.
 	UserMetadata           *UserMetadata
+	TenantID               string
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -597,6 +598,7 @@ type userQueryResponse struct {
 	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
 	PasswordHash       string      `json:"passwordHash,omitempty"`
 	PasswordSalt       string      `json:"salt,omitempty"`
+	TenantID           string      `json:"tenantId,omitempty"`
 	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
 }
 
@@ -643,6 +645,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			Disabled:               r.Disabled,
 			EmailVerified:          r.EmailVerified,
 			ProviderUserInfo:       r.ProviderUserInfo,
+			TenantID:               r.TenantID,
 			TokensValidAfterMillis: r.ValidSinceSeconds * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLogInTimestamp,
