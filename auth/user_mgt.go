@@ -323,6 +323,7 @@ const (
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
+	tenantIDMismatch         = "tenant-id-mismatch"
 	uidAlreadyExists         = "uid-already-exists"
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
@@ -367,6 +368,11 @@ func IsProjectNotFound(err error) bool {
 // IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
 func IsSessionCookieRevoked(err error) bool {
 	return internal.HasErrorCode(err, sessionCookieRevoked)
+}
+
+// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
+func IsTenantIDMismatch(err error) bool {
+	return internal.HasErrorCode(err, tenantIDMismatch)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
@@ -737,7 +743,10 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
 // duration. The returned JWT can be set as a server-side session cookie with a custom cookie
 // policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
-func (c *userManagementClient) SessionCookie(
+//
+// This function is only exposed via [auth.Client] for now, since the tenant-scoped variant
+// of it is currently not supported.
+func (c *userManagementClient) createSessionCookie(
 	ctx context.Context,
 	idToken string,
 	expiresIn time.Duration,

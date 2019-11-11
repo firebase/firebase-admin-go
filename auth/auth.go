@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"firebase.google.com/go/internal"
 	"google.golang.org/api/transport"
@@ -176,19 +177,42 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	return info.Token(ctx, c.signer)
 }
 
+// SessionCookie creates a new Firebase session cookie from the given ID token and expiry
+// duration. The returned JWT can be set as a server-side session cookie with a custom cookie
+// policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
+func (c *Client) SessionCookie(
+	ctx context.Context,
+	idToken string,
+	expiresIn time.Duration,
+) (string, error) {
+	return c.baseClient.userManagementClient.createSessionCookie(ctx, idToken, expiresIn)
+}
+
 // Token represents a decoded Firebase ID token.
 //
 // Token provides typed accessors to the common JWT fields such as Audience (aud) and Expiry (exp).
 // Additionally it provides a UID field, which indicates the user ID of the account to which this token
 // belongs. Any additional JWT claims can be accessed via the Claims map of Token.
 type Token struct {
+	AuthTime int64                  `json:"auth_time"`
 	Issuer   string                 `json:"iss"`
 	Audience string                 `json:"aud"`
 	Expires  int64                  `json:"exp"`
 	IssuedAt int64                  `json:"iat"`
 	Subject  string                 `json:"sub,omitempty"`
 	UID      string                 `json:"uid,omitempty"`
+	Firebase FirebaseInfo           `json:"firebase"`
 	Claims   map[string]interface{} `json:"-"`
+}
+
+// FirebaseInfo represents the information about the sign-in event, including which auth provider
+// was used and provider-specific identity details.
+//
+// This data is provided by the Firebase Auth service and is a reserved claim in the ID token.
+type FirebaseInfo struct {
+	SignInProvider string                 `json:"sign_in_provider"`
+	Tenant         string                 `json:"tenant"`
+	Identities     map[string]interface{} `json:"identities"`
 }
 
 type baseClient struct {
@@ -224,7 +248,12 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 // This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
-	return c.idTokenVerifier.VerifyToken(ctx, idToken)
+	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken)
+	if err == nil && c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
+		return nil, internal.Errorf(tenantIDMismatch, "invalid tenant id: %q", decoded.Firebase.Tenant)
+	}
+
+	return decoded, err
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
@@ -235,19 +264,19 @@ func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token,
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
 func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
-	p, err := c.VerifyIDToken(ctx, idToken)
+	decoded, err := c.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, err
 	}
 
-	revoked, err := c.checkRevoked(ctx, p)
+	revoked, err := c.checkRevoked(ctx, decoded)
 	if err != nil {
 		return nil, err
 	}
 	if revoked {
 		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
 	}
-	return p, nil
+	return decoded, nil
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -263,7 +292,7 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 //
 // This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
 // when a revocation check is needed.
-func (c *baseClient) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
+func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
 	return c.cookieVerifier.VerifyToken(ctx, sessionCookie)
 }
 
@@ -274,20 +303,20 @@ func (c *baseClient) VerifySessionCookie(ctx context.Context, sessionCookie stri
 // `VerifySessionCookie()` this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
-func (c *baseClient) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
-	p, err := c.VerifySessionCookie(ctx, sessionCookie)
+func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
+	decoded, err := c.VerifySessionCookie(ctx, sessionCookie)
 	if err != nil {
 		return nil, err
 	}
 
-	revoked, err := c.checkRevoked(ctx, p)
+	revoked, err := c.checkRevoked(ctx, decoded)
 	if err != nil {
 		return nil, err
 	}
 	if revoked {
 		return nil, internal.Error(sessionCookieRevoked, "session cookie has been revoked")
 	}
-	return p, nil
+	return decoded, nil
 }
 
 func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {

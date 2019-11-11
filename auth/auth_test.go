@@ -328,6 +328,53 @@ func TestVerifyIDToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenFromTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
+	}
+
+	idToken := getIDToken(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifyIDToken(context.Background(), idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
+	}
 	if ft.Claims["admin"] != true {
 		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
 	}
@@ -650,6 +697,53 @@ func TestVerifySessionCookie(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifySessionCookieFromTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
+	}
+
+	cookie := getSessionCookie(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifySessionCookie(context.Background(), cookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
+	}
 	if ft.Claims["admin"] != true {
 		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
 	}
@@ -908,11 +1002,16 @@ func getIDToken(p mockIDTokenPayload) string {
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	pCopy := mockIDTokenPayload{
-		"aud":   testProjectID,
-		"iss":   "https://securetoken.google.com/" + testProjectID,
-		"iat":   testClock.Now().Unix() - 100,
-		"exp":   testClock.Now().Unix() + 3600,
-		"sub":   "1234567890",
+		"aud":       testProjectID,
+		"iss":       "https://securetoken.google.com/" + testProjectID,
+		"iat":       testClock.Now().Unix() - 100,
+		"exp":       testClock.Now().Unix() + 3600,
+		"auth_time": testClock.Now().Unix() - 100,
+		"sub":       "1234567890",
+		"firebase": map[string]interface{}{
+			"identities":       map[string]interface{}{},
+			"sign_in_provider": "custom",
+		},
 		"admin": true,
 	}
 	for k, v := range p {

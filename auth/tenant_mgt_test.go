@@ -484,43 +484,6 @@ func TestTenantDeleteUser(t *testing.T) {
 	}
 }
 
-func TestTenantSessionCookie(t *testing.T) {
-	resp := `{
-		"sessionCookie": "expectedCookie"
-	}`
-	s := echoServer([]byte(resp), t)
-	defer s.Close()
-
-	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
-	if err != nil {
-		t.Fatalf("AuthForTenant() = %v", err)
-	}
-
-	for _, tc := range createSessionCookieCases {
-		cookie, err := client.SessionCookie(context.Background(), "idToken", tc.expiresIn)
-		if cookie != "expectedCookie" || err != nil {
-			t.Errorf("SessionCookie() = (%q, %v); want = (%q, nil)", cookie, err, "expectedCookie")
-		}
-
-		wantURL := "/projects/mock-project-id/tenants/tenantID:createSessionCookie"
-		if s.Req[0].URL.Path != wantURL {
-			t.Errorf("SesionCookie() URL = %q; want = %q", s.Req[0].URL.Path, wantURL)
-		}
-
-		var got map[string]interface{}
-		if err := json.Unmarshal(s.Rbody, &got); err != nil {
-			t.Fatal(err)
-		}
-		want := map[string]interface{}{
-			"idToken":       "idToken",
-			"validDuration": tc.want,
-		}
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("SessionCookie(%f) request =%#v; want = %#v", tc.want, got, want)
-		}
-	}
-}
-
 const wantEmailActionURL = "/projects/mock-project-id/tenants/tenantID/accounts:sendOobCode"
 
 func TestTenantEmailVerificationLink(t *testing.T) {
@@ -1031,4 +994,89 @@ func TestTenantSAMLProviderConfigs(t *testing.T) {
 		client.SAMLProviderConfigs(context.Background(), "pageToken"),
 		"pageToken",
 		"pageSize=100&pageToken=pageToken")
+}
+
+func TestTenantVerifyIDToken(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	s.Client.TenantManager.base.idTokenVerifier = testIDTokenVerifier
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	idToken := getIDToken(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifyIDToken(context.Background(), idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
+	}
+}
+
+func TestTenantVerifyIDTokenAndCheckRevoked(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	s.Client.TenantManager.base.idTokenVerifier = testIDTokenVerifier
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	idToken := getIDToken(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifyIDTokenAndCheckRevoked(context.Background(), idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
+	}
+
+	wantURI := "/projects/mock-project-id/tenants/tenantID/accounts:lookup"
+	if s.Req[0].RequestURI != wantURI {
+		t.Errorf("VerifySessionCookieAndCheckRevoked() URL = %q; want = %q", s.Req[0].RequestURI, wantURI)
+	}
+}
+
+func TestInvalidTenantVerifyIDToken(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+	s.Client.TenantManager.base.idTokenVerifier = testIDTokenVerifier
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	idToken := getIDToken(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "invalidTenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifyIDToken(context.Background(), idToken)
+	if ft != nil || err == nil || !IsTenantIDMismatch(err) {
+		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, %q)", ft, err, tenantIDMismatch)
+	}
 }
