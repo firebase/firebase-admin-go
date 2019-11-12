@@ -323,6 +323,44 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 	})
 
+	t.Run("ImportUsers()", func(t *testing.T) {
+		scrypt, passwordHash, err := newScryptHash()
+		if err != nil {
+			t.Fatalf("newScryptHash() = %v", err)
+		}
+
+		uid := randomUID()
+		email := randomEmail(uid)
+		user := (&auth.UserToImport{}).
+			UID(uid).
+			Email(email).
+			PasswordHash(passwordHash).
+			PasswordSalt([]byte("NaCl"))
+		result, err := tenantClient.ImportUsers(context.Background(), []*auth.UserToImport{user}, auth.WithHash(scrypt))
+		if err != nil {
+			t.Fatalf("ImportUsers() = %v", err)
+		}
+
+		defer func() {
+			tenantClient.DeleteUser(context.Background(), uid)
+		}()
+
+		if result.SuccessCount != 1 || result.FailureCount != 0 {
+			t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 0}", result)
+		}
+
+		savedUser, err := tenantClient.GetUser(context.Background(), uid)
+		if err != nil {
+			t.Fatalf("GetUser() = %v", err)
+		}
+		if savedUser.Email != email {
+			t.Errorf("ImportUser() Email = %q; want = %q", savedUser.Email, email)
+		}
+		if savedUser.TenantID != id {
+			t.Errorf("ImportUser() TenantID = %q; want = %q", savedUser.TenantID, id)
+		}
+	})
+
 	t.Run("DeleteUser()", func(t *testing.T) {
 		if err := tenantClient.DeleteUser(context.Background(), user.UID); err != nil {
 			t.Fatalf("DeleteUser() = %v", err)
