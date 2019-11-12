@@ -101,6 +101,24 @@ func TestTenantManager(t *testing.T) {
 		testTenantAwareUserManagement(t, id)
 	})
 
+	t.Run("OIDCProviderConfig", func(t *testing.T) {
+		tenantClient, err := client.TenantManager.AuthForTenant(id)
+		if err != nil {
+			t.Fatalf("AuthForTenant() = %v", err)
+		}
+
+		testOIDCProviderConfig(t, tenantClient)
+	})
+
+	t.Run("SAMLProviderConfig", func(t *testing.T) {
+		tenantClient, err := client.TenantManager.AuthForTenant(id)
+		if err != nil {
+			t.Fatalf("AuthForTenant() = %v", err)
+		}
+
+		testSAMLProviderConfig(t, tenantClient)
+	})
+
 	t.Run("UpdateTenant()", func(t *testing.T) {
 		want = &auth.Tenant{
 			ID:                    id,

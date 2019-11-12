@@ -31,6 +31,18 @@ var x509Certs = []string{
 }
 
 func TestOIDCProviderConfig(t *testing.T) {
+	testOIDCProviderConfig(t, client)
+}
+
+type oidcProviderClient interface {
+	OIDCProviderConfig(ctx context.Context, id string) (*auth.OIDCProviderConfig, error)
+	OIDCProviderConfigs(ctx context.Context, nextPageToken string) *auth.OIDCProviderConfigIterator
+	CreateOIDCProviderConfig(ctx context.Context, config *auth.OIDCProviderConfigToCreate) (*auth.OIDCProviderConfig, error)
+	UpdateOIDCProviderConfig(ctx context.Context, id string, config *auth.OIDCProviderConfigToUpdate) (*auth.OIDCProviderConfig, error)
+	DeleteOIDCProviderConfig(ctx context.Context, id string) error
+}
+
+func testOIDCProviderConfig(t *testing.T, client oidcProviderClient) {
 	id := randomOIDCProviderID()
 	want := &auth.OIDCProviderConfig{
 		ID:          id,
@@ -140,6 +152,18 @@ func TestOIDCProviderConfig(t *testing.T) {
 }
 
 func TestSAMLProviderConfig(t *testing.T) {
+	testSAMLProviderConfig(t, client)
+}
+
+type samlProviderClient interface {
+	SAMLProviderConfig(ctx context.Context, id string) (*auth.SAMLProviderConfig, error)
+	SAMLProviderConfigs(ctx context.Context, nextPageToken string) *auth.SAMLProviderConfigIterator
+	CreateSAMLProviderConfig(ctx context.Context, config *auth.SAMLProviderConfigToCreate) (*auth.SAMLProviderConfig, error)
+	UpdateSAMLProviderConfig(ctx context.Context, id string, config *auth.SAMLProviderConfigToUpdate) (*auth.SAMLProviderConfig, error)
+	DeleteSAMLProviderConfig(ctx context.Context, id string) error
+}
+
+func testSAMLProviderConfig(t *testing.T, client samlProviderClient) {
 	id := randomSAMLProviderID()
 	want := &auth.SAMLProviderConfig{
 		ID:          id,
