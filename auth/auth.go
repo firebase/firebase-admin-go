@@ -105,12 +105,10 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		cookieVerifier:       cookieVerifier,
 	}
 	return &Client{
-		baseClient: base,
-		signer:     signer,
-		clock:      internal.SystemClock,
-		TenantManager: &TenantManager{
-			base: base,
-		},
+		baseClient:    base,
+		signer:        signer,
+		clock:         internal.SystemClock,
+		TenantManager: newTenantManager(hc, conf, base),
 	}, nil
 }
 

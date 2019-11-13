@@ -1080,3 +1080,112 @@ func TestInvalidTenantVerifyIDToken(t *testing.T) {
 		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, %q)", ft, err, tenantIDMismatch)
 	}
 }
+
+const tenantResponse = `{
+    "name":"projects/mock-project-id/tenants/tenantID",
+    "displayName": "Test Tenant",
+    "allowPasswordSignup": true,
+    "enableEmailLinkSignin": true
+}`
+
+const tenantNotFoundResponse = `{
+	"error": {
+		"message": "TENANT_NOT_FOUND"
+	}
+}`
+
+var testTenant = &Tenant{
+	ID:                    "tenantID",
+	DisplayName:           "Test Tenant",
+	AllowPasswordSignUp:   true,
+	EnableEmailLinkSignIn: true,
+}
+
+func TestTenant(t *testing.T) {
+	s := echoServer([]byte(tenantResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	tenant, err := client.TenantManager.Tenant(context.Background(), "tenantID")
+	if err != nil {
+		t.Fatalf("Tenant() = %v", err)
+	}
+
+	if !reflect.DeepEqual(tenant, testTenant) {
+		t.Errorf("Tenant() = %#v; want = %#v", tenant, testTenant)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodGet {
+		t.Errorf("Tenant() Method = %q; want = %q", req.Method, http.MethodGet)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID"
+	if req.URL.Path != wantURL {
+		t.Errorf("Tenant() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestTenantEmptyID(t *testing.T) {
+	tm := &TenantManager{}
+	wantErr := "tenantID must not be empty"
+
+	tenant, err := tm.Tenant(context.Background(), "")
+	if tenant != nil || err == nil || err.Error() != wantErr {
+		t.Errorf("Tenant('') = (%v, %v); want = (nil, %q)", tenant, err, wantErr)
+	}
+}
+
+func TestTenantError(t *testing.T) {
+	s := echoServer([]byte(tenantNotFoundResponse), t)
+	defer s.Close()
+	s.Status = http.StatusNotFound
+
+	client := s.Client
+	tenant, err := client.TenantManager.Tenant(context.Background(), "tenantID")
+	if tenant != nil || err == nil || !IsTenantNotFound(err) {
+		t.Errorf("Tenant() = (%v, %v); want = (nil, TenantNotFound)", tenant, err)
+	}
+}
+
+func TestDeleteTenant(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	client := s.Client
+	if err := client.TenantManager.DeleteTenant(context.Background(), "tenantID"); err != nil {
+		t.Fatalf("DeleteTenant() = %v", err)
+	}
+
+	req := s.Req[0]
+	if req.Method != http.MethodDelete {
+		t.Errorf("DeleteTenant() Method = %q; want = %q", req.Method, http.MethodDelete)
+	}
+
+	wantURL := "/projects/mock-project-id/tenants/tenantID"
+	if req.URL.Path != wantURL {
+		t.Errorf("DeleteTenant() URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+}
+
+func TestDeleteTenantEmptyID(t *testing.T) {
+	tm := &TenantManager{}
+	wantErr := "tenantID must not be empty"
+
+	err := tm.DeleteTenant(context.Background(), "")
+	if err == nil || err.Error() != wantErr {
+		t.Errorf("DeleteTenant('') = %v; want = (nil, %q)", err, wantErr)
+	}
+}
+
+func TestDeleteTenantError(t *testing.T) {
+	s := echoServer([]byte(tenantNotFoundResponse), t)
+	defer s.Close()
+	s.Status = http.StatusNotFound
+
+	client := s.Client
+	err := client.TenantManager.DeleteTenant(context.Background(), "tenantID")
+	if err == nil || !IsTenantNotFound(err) {
+		t.Errorf("DeleteTenant() = %v; want = TenantNotFound", err)
+	}
+}

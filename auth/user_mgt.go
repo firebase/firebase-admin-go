@@ -324,6 +324,7 @@ const (
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
 	tenantIDMismatch         = "tenant-id-mismatch"
+	tenantNotFound           = "tenant-not-found"
 	uidAlreadyExists         = "uid-already-exists"
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
@@ -375,6 +376,11 @@ func IsTenantIDMismatch(err error) bool {
 	return internal.HasErrorCode(err, tenantIDMismatch)
 }
 
+// IsTenantNotFound checks if the given error was due to a non-existing tenant ID.
+func IsTenantNotFound(err error) bool {
+	return internal.HasErrorCode(err, tenantNotFound)
+}
+
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
 func IsUIDAlreadyExists(err error) bool {
 	return internal.HasErrorCode(err, uidAlreadyExists)
@@ -405,6 +411,7 @@ var serverError = map[string]string{
 	"PERMISSION_DENIED":           insufficientPermission,
 	"PHONE_NUMBER_EXISTS":         phoneNumberAlreadyExists,
 	"PROJECT_NOT_FOUND":           projectNotFound,
+	"TENANT_NOT_FOUND":            tenantNotFound,
 	"UNAUTHORIZED_DOMAIN":         unauthorizedContinueURI,
 	"USER_NOT_FOUND":              userNotFound,
 }
