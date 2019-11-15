@@ -31,7 +31,7 @@
             "createdAt": "1234567890000",
             "lastLoginAt": "1233211232000",
             "customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
-	    "tenantId": "testTenant"
+            "tenantId": "testTenant"
         },
         {
             "localId": "testuser",
@@ -63,7 +63,7 @@
             "createdAt": "1234567890000",
             "lastLoginAt": "1233211232000",
             "customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
-	    "tenantId": "testTenant"
+            "tenantId": "testTenant"
         },
         {
             "localId": "testuser",
@@ -95,7 +95,7 @@
             "createdAt": "1234567890000",
             "lastLoginAt": "1233211232000",
             "customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
-	    "tenantId": "testTenant"
+            "tenantId": "testTenant"
         }
     ],
     "nextPageToken": ""
