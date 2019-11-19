@@ -64,6 +64,7 @@ var testUser = &UserRecord{
 		LastLogInTimestamp: 1233211232000,
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+	TenantID:     "testTenant",
 }
 
 func TestGetUser(t *testing.T) {
@@ -1095,6 +1096,7 @@ func TestMakeExportedUser(t *testing.T) {
 		CreationTimestamp:  1234567890000,
 		LastLogInTimestamp: 1233211232000,
 		CustomAttributes:   `{"admin": true, "package": "gold"}`,
+		TenantID:           "testTenant",
 		ProviderUserInfo: []*UserInfo{
 			{
 				ProviderID:  "password",
