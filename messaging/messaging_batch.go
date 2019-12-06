@@ -31,7 +31,7 @@ import (
 	"firebase.google.com/go/internal"
 )
 
-const maxMessages = 100
+const maxMessages = 500
 const multipartBoundary = "__END_OF_PART__"
 
 // MulticastMessage represents a message that can be sent to multiple devices via Firebase Cloud

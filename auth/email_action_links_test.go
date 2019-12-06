@@ -206,18 +206,16 @@ func TestEmailActionLinkNoEmail(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{},
 	}
-	_, err := client.EmailVerificationLink(context.Background(), "")
-	if err == nil {
+
+	if _, err := client.EmailVerificationLink(context.Background(), ""); err == nil {
 		t.Errorf("EmailVerificationLink('') = nil; want error")
 	}
 
-	_, err = client.PasswordResetLink(context.Background(), "")
-	if err == nil {
+	if _, err := client.PasswordResetLink(context.Background(), ""); err == nil {
 		t.Errorf("PasswordResetLink('') = nil; want error")
 	}
 
-	_, err = client.EmailSignInLink(context.Background(), "", testActionCodeSettings)
-	if err == nil {
+	if _, err := client.EmailSignInLink(context.Background(), "", testActionCodeSettings); err == nil {
 		t.Errorf("EmailSignInLink('') = nil; want error")
 	}
 }

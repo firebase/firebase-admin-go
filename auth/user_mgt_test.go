@@ -1232,8 +1232,7 @@ func TestSessionCookieWithoutIDToken(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{},
 	}
-	_, err := client.SessionCookie(context.Background(), "", 10*time.Minute)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "", 10*time.Minute); err == nil {
 		t.Errorf("CreateSessionCookie('') = nil; want error")
 	}
 }
@@ -1243,8 +1242,7 @@ func TestSessionCookieShortExpiresIn(t *testing.T) {
 		baseClient: &baseClient{},
 	}
 	lessThanFiveMins := 5*time.Minute - time.Second
-	_, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "idToken", lessThanFiveMins); err == nil {
 		t.Errorf("SessionCookie(< 5 mins) = nil; want error")
 	}
 }
@@ -1254,8 +1252,7 @@ func TestSessionCookieLongExpiresIn(t *testing.T) {
 		baseClient: &baseClient{},
 	}
 	moreThanTwoWeeks := 14*24*time.Hour + time.Second
-	_, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks)
-	if err == nil {
+	if _, err := client.SessionCookie(context.Background(), "idToken", moreThanTwoWeeks); err == nil {
 		t.Errorf("SessionCookie(> 14 days) = nil; want error")
 	}
 }
@@ -1284,6 +1281,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
 		"EMAIL_EXISTS":            IsEmailAlreadyExists,
 		"INSUFFICIENT_PERMISSION": IsInsufficientPermission,
+		"INVALID_EMAIL":           IsInvalidEmail,
 		"PHONE_NUMBER_EXISTS":     IsPhoneNumberAlreadyExists,
 		"PROJECT_NOT_FOUND":       IsProjectNotFound,
 	}
