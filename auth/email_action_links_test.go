@@ -101,7 +101,7 @@ func TestEmailVerificationLink(t *testing.T) {
 		"returnOobLink": true,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatal(err)
+		t.Fatalf("EmailVerificationLink() %v", err)
 	}
 }
 
@@ -126,7 +126,7 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 		want[k] = v
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatal(err)
+		t.Fatalf("EmailVerificationLinkWithSettings() %v", err)
 	}
 }
 
@@ -148,7 +148,7 @@ func TestPasswordResetLink(t *testing.T) {
 		"returnOobLink": true,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatal(err)
+		t.Fatalf("PasswordResetLink() %v", err)
 	}
 }
 
@@ -173,7 +173,7 @@ func TestPasswordResetLinkWithSettings(t *testing.T) {
 		want[k] = v
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatal(err)
+		t.Fatalf("PasswordResetLinkWithSettings() %v", err)
 	}
 }
 
@@ -198,12 +198,14 @@ func TestEmailSignInLink(t *testing.T) {
 		want[k] = v
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatal(err)
+		t.Fatalf("EmailSignInLink() %v", err)
 	}
 }
 
 func TestEmailActionLinkNoEmail(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 
 	if _, err := client.EmailVerificationLink(context.Background(), ""); err == nil {
 		t.Errorf("EmailVerificationLink('') = nil; want error")
@@ -219,7 +221,9 @@ func TestEmailActionLinkNoEmail(t *testing.T) {
 }
 
 func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.EmailVerificationLinkWithSettings(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -229,7 +233,9 @@ func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
 }
 
 func TestPasswordResetLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.PasswordResetLinkWithSettings(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -239,7 +245,9 @@ func TestPasswordResetLinkInvalidSettings(t *testing.T) {
 }
 
 func TestEmailSignInLinkInvalidSettings(t *testing.T) {
-	client := &Client{}
+	client := &Client{
+		baseClient: &baseClient{},
+	}
 	for _, tc := range invalidActionCodeSettings {
 		_, err := client.EmailSignInLink(context.Background(), testEmail, tc.settings)
 		if err == nil || err.Error() != tc.want {
@@ -249,8 +257,11 @@ func TestEmailSignInLinkInvalidSettings(t *testing.T) {
 }
 
 func TestEmailSignInLinkNoSettings(t *testing.T) {
-	client := &Client{}
-	if _, err := client.EmailSignInLink(context.Background(), testEmail, nil); err == nil {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+	_, err := client.EmailSignInLink(context.Background(), testEmail, nil)
+	if err == nil {
 		t.Errorf("EmailSignInLink(nil) = %v; want = error", err)
 	}
 }
@@ -276,12 +287,26 @@ func TestEmailVerificationLinkError(t *testing.T) {
 }
 
 func checkActionLinkRequest(want map[string]interface{}, s *mockAuthServer) error {
+	wantURL := "/projects/mock-project-id/accounts:sendOobCode"
+	return checkActionLinkRequestWithURL(want, wantURL, s)
+}
+
+func checkActionLinkRequestWithURL(want map[string]interface{}, wantURL string, s *mockAuthServer) error {
+	req := s.Req[0]
+	if req.Method != http.MethodPost {
+		return fmt.Errorf("Method = %q; want = %q", req.Method, http.MethodPatch)
+	}
+
+	if req.URL.Path != wantURL {
+		return fmt.Errorf("URL = %q; want = %q", req.URL.Path, wantURL)
+	}
+
 	var got map[string]interface{}
 	if err := json.Unmarshal(s.Rbody, &got); err != nil {
 		return err
 	}
 	if !reflect.DeepEqual(got, want) {
-		return fmt.Errorf("EmailVerificationLink() request = %#v; want = %#v", got, want)
+		return fmt.Errorf("Body = %#v; want = %#v", got, want)
 	}
 	return nil
 }

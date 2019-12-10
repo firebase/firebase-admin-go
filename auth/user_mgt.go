@@ -68,6 +68,7 @@ type UserRecord struct {
 	ProviderUserInfo       []*UserInfo
 	TokensValidAfterMillis int64 // milliseconds since epoch.
 	UserMetadata           *UserMetadata
+	TenantID               string
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -324,6 +325,8 @@ const (
 	phoneNumberAlreadyExists = "phone-number-already-exists"
 	projectNotFound          = "project-not-found"
 	sessionCookieRevoked     = "session-cookie-revoked"
+	tenantIDMismatch         = "tenant-id-mismatch"
+	tenantNotFound           = "tenant-not-found"
 	uidAlreadyExists         = "uid-already-exists"
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
@@ -375,6 +378,16 @@ func IsSessionCookieRevoked(err error) bool {
 	return internal.HasErrorCode(err, sessionCookieRevoked)
 }
 
+// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
+func IsTenantIDMismatch(err error) bool {
+	return internal.HasErrorCode(err, tenantIDMismatch)
+}
+
+// IsTenantNotFound checks if the given error was due to a non-existing tenant ID.
+func IsTenantNotFound(err error) bool {
+	return internal.HasErrorCode(err, tenantNotFound)
+}
+
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
 func IsUIDAlreadyExists(err error) bool {
 	return internal.HasErrorCode(err, uidAlreadyExists)
@@ -406,6 +419,7 @@ var serverError = map[string]string{
 	"PERMISSION_DENIED":           insufficientPermission,
 	"PHONE_NUMBER_EXISTS":         phoneNumberAlreadyExists,
 	"PROJECT_NOT_FOUND":           projectNotFound,
+	"TENANT_NOT_FOUND":            tenantNotFound,
 	"UNAUTHORIZED_DOMAIN":         unauthorizedContinueURI,
 	"USER_NOT_FOUND":              userNotFound,
 }
@@ -483,6 +497,7 @@ func validatePhone(phone string) error {
 type userManagementClient struct {
 	baseURL    string
 	projectID  string
+	tenantID   string
 	httpClient *internal.HTTPClient
 }
 
@@ -499,6 +514,12 @@ func newUserManagementClient(client *http.Client, conf *internal.AuthConfig) *us
 		projectID:  conf.ProjectID,
 		httpClient: hc,
 	}
+}
+
+func (c *userManagementClient) withTenantID(tenantID string) *userManagementClient {
+	copy := *c
+	copy.tenantID = tenantID
+	return &copy
 }
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -584,6 +605,7 @@ type userQueryResponse struct {
 	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
 	PasswordHash       string      `json:"passwordHash,omitempty"`
 	PasswordSalt       string      `json:"salt,omitempty"`
+	TenantID           string      `json:"tenantId,omitempty"`
 	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
 }
 
@@ -630,6 +652,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			Disabled:               r.Disabled,
 			EmailVerified:          r.EmailVerified,
 			ProviderUserInfo:       r.ProviderUserInfo,
+			TenantID:               r.TenantID,
 			TokensValidAfterMillis: r.ValidSinceSeconds * 1000,
 			UserMetadata: &UserMetadata{
 				LastLogInTimestamp: r.LastLogInTimestamp,
@@ -737,7 +760,10 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
 // duration. The returned JWT can be set as a server-side session cookie with a custom cookie
 // policy. Expiry duration must be at least 5 minutes but may not exceed 14 days.
-func (c *userManagementClient) SessionCookie(
+//
+// This function is only exposed via [auth.Client] for now, since the tenant-scoped variant
+// of it is currently not supported.
+func (c *userManagementClient) createSessionCookie(
 	ctx context.Context,
 	idToken string,
 	expiresIn time.Duration,
@@ -786,7 +812,13 @@ func (c *userManagementClient) makeUserMgtURL(path string) (string, error) {
 		return "", errors.New("project id not available")
 	}
 
-	url := fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+	var url string
+	if c.tenantID != "" {
+		url = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.baseURL, c.projectID, c.tenantID, path)
+	} else {
+		url = fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+	}
+
 	return url, nil
 }
 

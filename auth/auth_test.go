@@ -319,12 +319,61 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 
 func TestVerifyIDToken(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 
 	ft, err := client.VerifyIDToken(context.Background(), testIDToken)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifyIDTokenFromTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
+	}
+
+	idToken := getIDToken(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifyIDToken(context.Background(), idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
 	}
 	if ft.Claims["admin"] != true {
 		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -348,7 +397,9 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -368,7 +419,9 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 
 func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
@@ -462,7 +515,9 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -494,7 +549,9 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 	}
 
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
 		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
@@ -518,9 +575,11 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
-		idTokenVerifier: testIDTokenVerifier,
-		signer:          testSigner,
-		clock:           testClock,
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
+		signer: testSigner,
+		clock:  testClock,
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
@@ -539,7 +598,9 @@ func TestCertificateRequestError(t *testing.T) {
 	}
 	tv.keySource = &mockKeySource{nil, errors.New("mock error")}
 	client := &Client{
-		idTokenVerifier: tv,
+		baseClient: &baseClient{
+			idTokenVerifier: tv,
+		},
 	}
 	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
 		t.Error("VeridyIDToken() = nil; want error")
@@ -627,12 +688,61 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 
 func TestVerifySessionCookie(t *testing.T) {
 	client := &Client{
-		cookieVerifier: testCookieVerifier,
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
 	}
 
 	ft, err := client.VerifySessionCookie(context.Background(), testSessionCookie)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestVerifySessionCookieFromTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
+	}
+
+	cookie := getSessionCookie(mockIDTokenPayload{
+		"firebase": map[string]interface{}{
+			"tenant":           "tenantID",
+			"sign_in_provider": "custom",
+		},
+	})
+	ft, err := client.VerifySessionCookie(context.Background(), cookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "tenantID" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "tenantID")
 	}
 	if ft.Claims["admin"] != true {
 		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -716,7 +826,9 @@ func TestVerifySessionCookieError(t *testing.T) {
 	}
 
 	client := &Client{
-		cookieVerifier: testCookieVerifier,
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -890,11 +1002,16 @@ func getIDToken(p mockIDTokenPayload) string {
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 	pCopy := mockIDTokenPayload{
-		"aud":   testProjectID,
-		"iss":   "https://securetoken.google.com/" + testProjectID,
-		"iat":   testClock.Now().Unix() - 100,
-		"exp":   testClock.Now().Unix() + 3600,
-		"sub":   "1234567890",
+		"aud":       testProjectID,
+		"iss":       "https://securetoken.google.com/" + testProjectID,
+		"iat":       testClock.Now().Unix() - 100,
+		"exp":       testClock.Now().Unix() + 3600,
+		"auth_time": testClock.Now().Unix() - 100,
+		"sub":       "1234567890",
+		"firebase": map[string]interface{}{
+			"identities":       map[string]interface{}{},
+			"sign_in_provider": "custom",
+		},
 		"admin": true,
 	}
 	for k, v := range p {

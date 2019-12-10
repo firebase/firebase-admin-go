@@ -198,7 +198,10 @@ func verifyCustomToken(t *testing.T, ct, uid string) *auth.Token {
 		t.Fatal(err)
 	}
 	if vt.UID != uid {
-		t.Fatalf("UID = %q; want UID = %q", vt.UID, uid)
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
+	}
+	if vt.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", vt.Firebase.Tenant, "")
 	}
 	return vt
 }
