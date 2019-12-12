@@ -987,3 +987,485 @@ func listOIDCProviderConfigs(ctx context.Context, client *auth.Client) {
 	}
 	// [END list_oidc_providers]
 }
+
+// ================================================================================
+// https://cloud.google.com/identity-platform/docs/multi-tenancy-managing-tenants
+// =================================================================================
+
+func getTenantClient(ctx context.Context, app *firebase.App, tenantID string) *auth.TenantClient {
+	// [START get_tenant_client]
+	client, err := app.Auth(ctx)
+	if err != nil {
+		log.Fatalf("error initializing auth client: %v\n", err)
+	}
+
+	tm := client.TenantManager
+	tenantClient, err := tm.AuthForTenant(tenantID)
+	if err != nil {
+		log.Fatalf("error initializing tenant-aware auth client: %v\n", err)
+	}
+
+	// [END get_tenant_client]
+	return tenantClient
+}
+
+func getTenant(ctx context.Context, client *auth.Client, tenantID string) {
+	// [START get_tenant]
+	tenant, err := client.TenantManager.Tenant(ctx, tenantID)
+	if err != nil {
+		log.Fatalf("error retrieving tenant: %v\n", err)
+	}
+
+	log.Printf("Retreieved tenant: %q\n", tenant.ID)
+	// [END get_tenant]
+}
+
+func createTenant(ctx context.Context, client *auth.Client) {
+	// [START create_tenant]
+	config := (&auth.TenantToCreate{}).
+		DisplayName("myTenant1").
+		EnableEmailLinkSignIn(true).
+		AllowPasswordSignUp(true)
+	tenant, err := client.TenantManager.CreateTenant(ctx, config)
+	if err != nil {
+		log.Fatalf("error creating tenant: %v\n", err)
+	}
+
+	log.Printf("Created tenant: %q\n", tenant.ID)
+	// [END create_tenant]
+}
+
+func updateTenant(ctx context.Context, client *auth.Client, tenantID string) {
+	// [START update_tenant]
+	config := (&auth.TenantToUpdate{}).
+		DisplayName("updatedName").
+		AllowPasswordSignUp(false) // Disable email provider
+	tenant, err := client.TenantManager.UpdateTenant(ctx, tenantID, config)
+	if err != nil {
+		log.Fatalf("error updating tenant: %v\n", err)
+	}
+
+	log.Printf("Updated tenant: %q\n", tenant.ID)
+	// [END update_tenant]
+}
+
+func deleteTenant(ctx context.Context, client *auth.Client, tenantID string) {
+	// [START delete_tenant]
+	if err := client.TenantManager.DeleteTenant(ctx, tenantID); err != nil {
+		log.Fatalf("error deleting tenant: %v\n", tenantID)
+	}
+	// [END delete_tenant]
+}
+
+func listTenants(ctx context.Context, client *auth.Client) {
+	// [START list_tenants]
+	iter := client.TenantManager.Tenants(ctx, "")
+	for {
+		tenant, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error listing tenants: %v\n", err)
+		}
+
+		log.Printf("Retrieved tenant: %q\n", tenant.ID)
+	}
+	// [END list_tenants]
+}
+
+func createProviderTenant(ctx context.Context, client *auth.Client) {
+	// [START get_tenant_client_short]
+	tenantClient, err := client.TenantManager.AuthForTenant("TENANT-ID")
+	if err != nil {
+		log.Fatalf("error initializing tenant client: %v\n", err)
+	}
+	// [END get_tenant_client_short]
+
+	// [START create_saml_provider_tenant]
+	newConfig := (&auth.SAMLProviderConfigToCreate{}).
+		DisplayName("SAML provider name").
+		Enabled(true).
+		ID("saml.myProvider").
+		IDPEntityID("IDP_ENTITY_ID").
+		SSOURL("https://example.com/saml/sso/1234/").
+		X509Certificates([]string{
+			"-----BEGIN CERTIFICATE-----\nCERT1...\n-----END CERTIFICATE-----",
+			"-----BEGIN CERTIFICATE-----\nCERT2...\n-----END CERTIFICATE-----",
+		}).
+		RPEntityID("RP_ENTITY_ID").
+		// Using the default callback URL.
+		CallbackURL("https://project-id.firebaseapp.com/__/auth/handler")
+	saml, err := tenantClient.CreateSAMLProviderConfig(ctx, newConfig)
+	if err != nil {
+		log.Fatalf("error creating SAML provider: %v\n", err)
+	}
+
+	log.Printf("Created new SAML provider: %s", saml.ID)
+	// [END create_saml_provider_tenant]
+}
+
+func updateProviderTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START update_saml_provider_tenant]
+	updatedConfig := (&auth.SAMLProviderConfigToUpdate{}).
+		X509Certificates([]string{
+			"-----BEGIN CERTIFICATE-----\nCERT2...\n-----END CERTIFICATE-----",
+			"-----BEGIN CERTIFICATE-----\nCERT3...\n-----END CERTIFICATE-----",
+		})
+	saml, err := tenantClient.UpdateSAMLProviderConfig(ctx, "saml.myProvider", updatedConfig)
+	if err != nil {
+		log.Fatalf("error updating SAML provider: %v\n", err)
+	}
+
+	log.Printf("Updated SAML provider: %s", saml.ID)
+	// [END update_saml_provider_tenant]
+}
+
+func getProviderTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START get_saml_provider_tenant]
+	saml, err := tenantClient.SAMLProviderConfig(ctx, "saml.myProvider")
+	if err != nil {
+		log.Fatalf("error retrieving SAML provider: %v\n", err)
+	}
+
+	// Get display name and whether it is enabled.
+	log.Printf("%s %t", saml.DisplayName, saml.Enabled)
+	// [END get_saml_provider_tenant]
+}
+
+func listProviderConfigsTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START list_saml_providers_tenant]
+	iter := tenantClient.SAMLProviderConfigs(ctx, "nextPageToken")
+	for {
+		saml, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error retrieving SAML providers: %v\n", err)
+		}
+
+		log.Printf("%s\n", saml.ID)
+	}
+	// [END list_saml_providers_tenant]
+}
+
+func deleteProviderConfigTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START delete_saml_provider_tenant]
+	if err := tenantClient.DeleteSAMLProviderConfig(ctx, "saml.myProvider"); err != nil {
+		log.Fatalf("error deleting SAML provider: %v\n", err)
+	}
+	// [END delete_saml_provider_tenant]
+}
+
+func getUserTenant(ctx context.Context, tenantClient *auth.TenantClient) *auth.UserRecord {
+	uid := "some_string_uid"
+
+	// [START get_user_tenant]
+	// Get an auth client from the firebase.App
+	u, err := tenantClient.GetUser(ctx, uid)
+	if err != nil {
+		log.Fatalf("error getting user %s: %v\n", uid, err)
+	}
+
+	log.Printf("Successfully fetched user data: %v\n", u)
+	// [END get_user_tenant]
+	return u
+}
+
+func getUserByEmailTenant(ctx context.Context, tenantClient *auth.TenantClient) *auth.UserRecord {
+	email := "some@email.com"
+	// [START get_user_by_email_tenant]
+	u, err := tenantClient.GetUserByEmail(ctx, email)
+	if err != nil {
+		log.Fatalf("error getting user by email %s: %v\n", email, err)
+	}
+	log.Printf("Successfully fetched user data: %v\n", u)
+	// [END get_user_by_email_tenant]
+	return u
+}
+
+func createUserTenant(ctx context.Context, tenantClient *auth.TenantClient) *auth.UserRecord {
+	// [START create_user_tenant]
+	params := (&auth.UserToCreate{}).
+		Email("user@example.com").
+		EmailVerified(false).
+		PhoneNumber("+15555550100").
+		Password("secretPassword").
+		DisplayName("John Doe").
+		PhotoURL("http://www.example.com/12345678/photo.png").
+		Disabled(false)
+	u, err := tenantClient.CreateUser(ctx, params)
+	if err != nil {
+		log.Fatalf("error creating user: %v\n", err)
+	}
+
+	log.Printf("Successfully created user: %v\n", u)
+	// [END create_user_tenant]
+	return u
+}
+
+func updateUserTenant(ctx context.Context, tenantClient *auth.TenantClient, uid string) {
+	// [START update_user_tenant]
+	params := (&auth.UserToUpdate{}).
+		Email("user@example.com").
+		EmailVerified(true).
+		PhoneNumber("+15555550100").
+		Password("newPassword").
+		DisplayName("John Doe").
+		PhotoURL("http://www.example.com/12345678/photo.png").
+		Disabled(true)
+	u, err := tenantClient.UpdateUser(ctx, uid, params)
+	if err != nil {
+		log.Fatalf("error updating user: %v\n", err)
+	}
+
+	log.Printf("Successfully updated user: %v\n", u)
+	// [END update_user_tenant]
+}
+
+func deleteUserTenant(ctx context.Context, tenantClient *auth.TenantClient, uid string) {
+	// [START delete_user_tenant]
+	if err := tenantClient.DeleteUser(ctx, uid); err != nil {
+		log.Fatalf("error deleting user: %v\n", err)
+	}
+
+	log.Printf("Successfully deleted user: %s\n", uid)
+	// [END delete_user_tenant]
+}
+
+func listUsersTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START list_all_users_tenant]
+	// Note, behind the scenes, the Users() iterator will retrive 1000 Users at a time through the API
+	iter := tenantClient.Users(ctx, "")
+	for {
+		user, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error listing users: %s\n", err)
+		}
+		log.Printf("read user user: %v\n", user)
+	}
+
+	// Iterating by pages 100 users at a time.
+	// Note that using both the Next() function on an iterator and the NextPage()
+	// on a Pager wrapping that same iterator will result in an error.
+	pager := iterator.NewPager(tenantClient.Users(ctx, ""), 100, "")
+	for {
+		var users []*auth.ExportedUserRecord
+		nextPageToken, err := pager.NextPage(&users)
+		if err != nil {
+			log.Fatalf("paging error %v\n", err)
+		}
+		for _, u := range users {
+			log.Printf("read user user: %v\n", u)
+		}
+		if nextPageToken == "" {
+			break
+		}
+	}
+	// [END list_all_users_tenant]
+}
+
+func importWithHMACTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START import_with_hmac_tenant]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("uid1").
+			Email("user1@example.com").
+			PasswordHash([]byte("password-hash-1")).
+			PasswordSalt([]byte("salt1")),
+		(&auth.UserToImport{}).
+			UID("uid2").
+			Email("user2@example.com").
+			PasswordHash([]byte("password-hash-2")).
+			PasswordSalt([]byte("salt2")),
+	}
+	h := hash.HMACSHA256{
+		Key: []byte("secret"),
+	}
+	result, err := tenantClient.ImportUsers(ctx, users, auth.WithHash(h))
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_with_hmac_tenant]
+}
+
+func importWithoutPasswordTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	// [START import_without_password_tenant]
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			DisplayName("John Doe").
+			Email("johndoe@acme.com").
+			PhotoURL("https://www.example.com/12345678/photo.png").
+			EmailVerified(true).
+			PhoneNumber("+11234567890").
+			// Set this user as admin.
+			CustomClaims(map[string]interface{}{"admin": true}).
+			// User with SAML provider.
+			ProviderData([]*auth.UserProvider{
+				{
+					UID:         "saml-uid",
+					Email:       "johndoe@acme.com",
+					DisplayName: "John Doe",
+					PhotoURL:    "https://www.example.com/12345678/photo.png",
+					ProviderID:  "saml.acme",
+				},
+			}),
+	}
+	result, err := tenantClient.ImportUsers(ctx, users)
+	if err != nil {
+		log.Fatalln("Error importing users", err)
+	}
+	for _, e := range result.Errors {
+		log.Println("Failed to import user", e.Reason)
+	}
+	// [END import_without_password_tenant]
+}
+
+func verifyIDTokenTenant(ctx context.Context, tenantClient *auth.TenantClient, idToken string) {
+	// [START verify_id_token_tenant]
+	// idToken comes from the client app
+	token, err := tenantClient.VerifyIDToken(ctx, idToken)
+	if err != nil {
+		log.Fatalf("error verifying ID token: %v\n", err)
+	}
+
+	// This should be set to TENANT-ID. Otherwise auth/mismatching-tenant-id error thrown.
+	log.Printf("Verified ID token from tenant: %q\n", token.Firebase.Tenant)
+	// [END verify_id_token_tenant]
+}
+
+func verifyIDTokenAccessControlTenant(ctx context.Context, tenantClient *auth.TenantClient, idToken string) {
+	// [START id_token_access_control_tenant]
+	token, err := tenantClient.VerifyIDToken(ctx, idToken)
+	if err != nil {
+		log.Fatalf("error verifying ID token: %v\n", err)
+	}
+
+	if token.Firebase.Tenant == "TENANT-ID1" {
+		// Allow appropriate level of access for TENANT-ID1.
+	} else if token.Firebase.Tenant == "TENANT-ID2" {
+		// Allow appropriate level of access for TENANT-ID2.
+	} else {
+		// Access not allowed -- Handle error
+	}
+	// [END id_token_access_control_tenant]
+}
+
+func revokeRefreshTokensTenant(ctx context.Context, tenantClient *auth.TenantClient, uid string) {
+	// [START revoke_tokens_tenant]
+	// Revoke all refresh tokens for a specified user in a specified tenant for whatever reason.
+	// Retrieve the timestamp of the revocation, in seconds since the epoch.
+	if err := tenantClient.RevokeRefreshTokens(ctx, uid); err != nil {
+		log.Fatalf("error revoking tokens for user: %v, %v\n", uid, err)
+	}
+
+	// accessing the user's TokenValidAfter
+	u, err := tenantClient.GetUser(ctx, uid)
+	if err != nil {
+		log.Fatalf("error getting user %s: %v\n", uid, err)
+	}
+
+	timestamp := u.TokensValidAfterMillis / 1000
+	log.Printf("the refresh tokens were revoked at: %d (UTC seconds) ", timestamp)
+	// [END revoke_tokens_tenant]
+}
+
+func verifyIDTokenAndCheckRevokedTenant(ctx context.Context, tenantClient *auth.TenantClient, idToken string) {
+	// [START verify_id_token_and_check_revoked_tenant]
+	// Verify the ID token for a specific tenant while checking if the token is revoked.
+	token, err := tenantClient.VerifyIDTokenAndCheckRevoked(ctx, idToken)
+	if err != nil {
+		if auth.IsIDTokenRevoked(err) {
+			// Token is revoked. Inform the user to reauthenticate or signOut() the user.
+		} else {
+			// Token is invalid
+		}
+	}
+	log.Printf("Verified ID token: %v\n", token)
+	// [END verify_id_token_and_check_revoked_tenant]
+}
+
+func customClaimsSetTenant(ctx context.Context, tenantClient *auth.TenantClient, uid string) {
+	// [START set_custom_user_claims_tenant]
+	// Set admin privilege on the user corresponding to uid.
+	claims := map[string]interface{}{"admin": true}
+	if err := tenantClient.SetCustomUserClaims(ctx, uid, claims); err != nil {
+		log.Fatalf("error setting custom claims %v\n", err)
+	}
+	// The new custom claims will propagate to the user's ID token the
+	// next time a new one is issued.
+	// [END set_custom_user_claims_tenant]
+}
+
+func customClaimsVerifyTenant(ctx context.Context, tenantClient *auth.TenantClient, idToken string) {
+	// [START verify_custom_claims_tenant]
+	// Verify the ID token first.
+	token, err := tenantClient.VerifyIDToken(ctx, idToken)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	claims := token.Claims
+	if admin, ok := claims["admin"]; ok {
+		if admin.(bool) {
+			//Allow access to requested admin resource.
+		}
+	}
+	// [END verify_custom_claims_tenant]
+}
+
+func customClaimsReadTenant(ctx context.Context, tenantClient *auth.TenantClient, uid string) {
+	// [START read_custom_user_claims_tenant]
+	// Lookup the user associated with the specified uid.
+	user, err := tenantClient.GetUser(ctx, uid)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// The claims can be accessed on the user record.
+	if admin, ok := user.CustomClaims["admin"]; ok {
+		if admin.(bool) {
+			log.Println(admin)
+		}
+	}
+	// [END read_custom_user_claims_tenant]
+}
+
+func generateEmailVerificationLinkTenant(ctx context.Context, tenantClient *auth.TenantClient) {
+	displayName := "Example User"
+	email := "user@example.com"
+
+	// [START email_verification_link_tenant]
+	actionCodeSettings := &auth.ActionCodeSettings{
+		// URL you want to redirect back to. The domain (www.example.com) for
+		// this URL must be whitelisted in the GCP Console.
+		URL: "https://www.example.com/checkout?cartId=1234",
+		// This must be true for email link sign-in.
+		HandleCodeInApp:       true,
+		IOSBundleID:           "com.example.ios",
+		AndroidPackageName:    "com.example.android",
+		AndroidInstallApp:     true,
+		AndroidMinimumVersion: "12",
+		// FDL custom domain.
+		DynamicLinkDomain: "coolapp.page.link",
+	}
+
+	link, err := tenantClient.EmailVerificationLinkWithSettings(ctx, email, actionCodeSettings)
+	if err != nil {
+		log.Fatalf("error generating email link: %v\n", err)
+	}
+
+	// Construct email verification template, embed the link and send
+	// using custom SMTP server.
+	sendCustomEmail(email, displayName, link)
+	// [END email_verification_link_tenant]
+}
