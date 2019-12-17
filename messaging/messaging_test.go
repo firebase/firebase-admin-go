@@ -1095,7 +1095,7 @@ var httpErrors = []struct {
 	},
 	{
 		resp: "{\"error\": {\"status\": \"SENDER_ID_MISMATCH\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: sender id does not match regisration token; code: mismatched-credential; " +
+		want: "http error status: 500; reason: sender id does not match registration token; code: mismatched-credential; " +
 			"details: test error",
 		check: IsMismatchedCredential,
 	},

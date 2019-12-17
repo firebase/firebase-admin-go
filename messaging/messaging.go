@@ -61,7 +61,7 @@ var (
 		},
 		"PERMISSION_DENIED": {
 			mismatchedCredential,
-			"sender id does not match regisration token; code: " + mismatchedCredential,
+			"sender id does not match registration token; code: " + mismatchedCredential,
 		},
 		"RESOURCE_EXHAUSTED": {
 			messageRateExceeded,
@@ -87,7 +87,7 @@ var (
 		},
 		"SENDER_ID_MISMATCH": {
 			mismatchedCredential,
-			"sender id does not match regisration token; code: " + mismatchedCredential,
+			"sender id does not match registration token; code: " + mismatchedCredential,
 		},
 		"QUOTA_EXCEEDED": {
 			messageRateExceeded,
