@@ -20,6 +20,7 @@ package hash // import "firebase.google.com/go/auth/hash"
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 
 	"firebase.google.com/go/internal"
 )
@@ -147,7 +148,7 @@ func (h HMACSHA512) Config() (internal.HashConfig, error) {
 
 // MD5 represents the MD5 hash algorithm.
 //
-// Rounds must be between 0 and 120000.
+// Rounds must be between 0 and 8192.
 // Refer to https://firebase.google.com/docs/auth/admin/import-users#import_users_with_md5_sha_and_pbkdf_hashed_passwords
 // for more details.
 type MD5 struct {
@@ -189,7 +190,7 @@ func (h PBKDFSHA1) Config() (internal.HashConfig, error) {
 
 // SHA1 represents the SHA1 hash algorithm.
 //
-// Rounds must be between 0 and 120000.
+// Rounds must be between 1 and 8192.
 // Refer to https://firebase.google.com/docs/auth/admin/import-users#import_users_with_md5_sha_and_pbkdf_hashed_passwords
 // for more details.
 type SHA1 struct {
@@ -203,7 +204,7 @@ func (h SHA1) Config() (internal.HashConfig, error) {
 
 // SHA256 represents the SHA256 hash algorithm.
 //
-// Rounds must be between 0 and 120000.
+// Rounds must be between 1 and 8192.
 // Refer to https://firebase.google.com/docs/auth/admin/import-users#import_users_with_md5_sha_and_pbkdf_hashed_passwords
 // for more details.
 type SHA256 struct {
@@ -217,7 +218,7 @@ func (h SHA256) Config() (internal.HashConfig, error) {
 
 // SHA512 represents the SHA512 hash algorithm.
 //
-// Rounds must be between 0 and 120000.
+// Rounds must be between 1 and 8192.
 // Refer to https://firebase.google.com/docs/auth/admin/import-users#import_users_with_md5_sha_and_pbkdf_hashed_passwords
 // for more details.
 type SHA512 struct {
@@ -240,8 +241,17 @@ func hmacConfig(name string, key []byte) (internal.HashConfig, error) {
 }
 
 func basicConfig(name string, rounds int) (internal.HashConfig, error) {
-	if rounds < 0 || rounds > 120000 {
-		return nil, errors.New("rounds must be between 0 and 120000")
+	minRounds := 0
+	maxRounds := 120000
+	switch name {
+	case "MD5":
+		maxRounds = 8192
+	case "SHA1", "SHA256", "SHA512":
+		minRounds = 1
+		maxRounds = 8192
+	}
+	if rounds < minRounds || maxRounds < rounds {
+		return nil, fmt.Errorf("rounds must be between %d and %d", minRounds, maxRounds)
 	}
 	return internal.HashConfig{
 		"hashAlgorithm": name,

@@ -1225,12 +1225,16 @@ func TestSAMLProviderConfigNoProjectID(t *testing.T) {
 }
 
 func checkCreateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}) error {
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs"
+	return checkCreateOIDCConfigRequestWithURL(s, wantBody, wantURL)
+}
+
+func checkCreateOIDCConfigRequestWithURL(s *mockAuthServer, wantBody interface{}, wantURL string) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPost {
 		return fmt.Errorf("CreateOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodPost)
 	}
 
-	wantURL := "/projects/mock-project-id/oauthIdpConfigs"
 	if req.URL.Path != wantURL {
 		return fmt.Errorf("CreateOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
 	}
@@ -1253,12 +1257,16 @@ func checkCreateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}) error
 }
 
 func checkCreateSAMLConfigRequest(s *mockAuthServer, wantBody interface{}) error {
+	wantURL := "/projects/mock-project-id/inboundSamlConfigs"
+	return checkCreateSAMLConfigRequestWithURL(s, wantBody, wantURL)
+}
+
+func checkCreateSAMLConfigRequestWithURL(s *mockAuthServer, wantBody interface{}, wantURL string) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPost {
 		return fmt.Errorf("CreateSAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodPost)
 	}
 
-	wantURL := "/projects/mock-project-id/inboundSamlConfigs"
 	if req.URL.Path != wantURL {
 		return fmt.Errorf("CreateSAMLProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
 	}
@@ -1281,12 +1289,16 @@ func checkCreateSAMLConfigRequest(s *mockAuthServer, wantBody interface{}) error
 }
 
 func checkUpdateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
+	wantURL := "/projects/mock-project-id/oauthIdpConfigs/oidc.provider"
+	return checkUpdateOIDCConfigRequestWithURL(s, wantBody, wantMask, wantURL)
+}
+
+func checkUpdateOIDCConfigRequestWithURL(s *mockAuthServer, wantBody interface{}, wantMask []string, wantURL string) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPatch {
 		return fmt.Errorf("UpdateOIDCProviderConfig() Method = %q; want = %q", req.Method, http.MethodPatch)
 	}
 
-	wantURL := "/projects/mock-project-id/oauthIdpConfigs/oidc.provider"
 	if req.URL.Path != wantURL {
 		return fmt.Errorf("UpdateOIDCProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
 	}
@@ -1311,12 +1323,16 @@ func checkUpdateOIDCConfigRequest(s *mockAuthServer, wantBody interface{}, wantM
 }
 
 func checkUpdateSAMLConfigRequest(s *mockAuthServer, wantBody interface{}, wantMask []string) error {
+	wantURL := "/projects/mock-project-id/inboundSamlConfigs/saml.provider"
+	return checkUpdateSAMLConfigRequestWithURL(s, wantBody, wantMask, wantURL)
+}
+
+func checkUpdateSAMLConfigRequestWithURL(s *mockAuthServer, wantBody interface{}, wantMask []string, wantURL string) error {
 	req := s.Req[0]
 	if req.Method != http.MethodPatch {
 		return fmt.Errorf("UpdateSAMLProviderConfig() Method = %q; want = %q", req.Method, http.MethodPatch)
 	}
 
-	wantURL := "/projects/mock-project-id/inboundSamlConfigs/saml.provider"
 	if req.URL.Path != wantURL {
 		return fmt.Errorf("UpdateSAMLProviderConfig() URL = %q; want = %q", req.URL.Path, wantURL)
 	}

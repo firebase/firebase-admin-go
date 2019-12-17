@@ -95,45 +95,87 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: MD5{42},
+		alg: MD5{0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "MD5",
-			"rounds":        42,
+			"rounds":        0,
 		},
 	},
 	{
-		alg: SHA1{42},
+		alg: MD5{8192},
+		want: internal.HashConfig{
+			"hashAlgorithm": "MD5",
+			"rounds":        8192,
+		},
+	},
+	{
+		alg: SHA1{1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA1",
-			"rounds":        42,
+			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA256{42},
+		alg: SHA1{8192},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA1",
+			"rounds":        8192,
+		},
+	},
+	{
+		alg: SHA256{1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA256",
-			"rounds":        42,
+			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA512{42},
+		alg: SHA256{8192},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA256",
+			"rounds":        8192,
+		},
+	},
+	{
+		alg: SHA512{1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA512",
-			"rounds":        42,
+			"rounds":        1,
 		},
 	},
 	{
-		alg: PBKDFSHA1{42},
+		alg: SHA512{8192},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA512",
+			"rounds":        8192,
+		},
+	},
+	{
+		alg: PBKDFSHA1{0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF_SHA1",
-			"rounds":        42,
+			"rounds":        0,
 		},
 	},
 	{
-		alg: PBKDF2SHA256{42},
+		alg: PBKDFSHA1{120000},
+		want: internal.HashConfig{
+			"hashAlgorithm": "PBKDF_SHA1",
+			"rounds":        120000,
+		},
+	},
+	{
+		alg: PBKDF2SHA256{0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF2_SHA256",
-			"rounds":        42,
+			"rounds":        0,
+		},
+	},
+	{
+		alg: PBKDF2SHA256{120000},
+		want: internal.HashConfig{
+			"hashAlgorithm": "PBKDF2_SHA256",
+			"rounds":        120000,
 		},
 	},
 }
@@ -206,15 +248,15 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "SHA1: rounds too low",
-		alg:  SHA1{-1},
+		alg:  SHA1{0},
 	},
 	{
 		name: "SHA256: rounds too low",
-		alg:  SHA256{-1},
+		alg:  SHA256{0},
 	},
 	{
 		name: "SHA512: rounds too low",
-		alg:  SHA512{-1},
+		alg:  SHA512{0},
 	},
 	{
 		name: "PBKDFSHA1: rounds too low",
@@ -226,19 +268,19 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "MD5: rounds too high",
-		alg:  MD5{120001},
+		alg:  MD5{8193},
 	},
 	{
 		name: "SHA1: rounds too high",
-		alg:  SHA1{120001},
+		alg:  SHA1{8193},
 	},
 	{
 		name: "SHA256: rounds too high",
-		alg:  SHA256{120001},
+		alg:  SHA256{8193},
 	},
 	{
 		name: "SHA512: rounds too high",
-		alg:  SHA512{120001},
+		alg:  SHA512{8193},
 	},
 	{
 		name: "PBKDFSHA1: rounds too high",

@@ -164,9 +164,10 @@ func TestSendAll(t *testing.T) {
 	}
 }
 
-func TestSendHundred(t *testing.T) {
+func TestSendFiveHundred(t *testing.T) {
 	var messages []*messaging.Message
-	for i := 0; i < 100; i++ {
+	const limit = 500
+	for i := 0; i < limit; i++ {
 		m := &messaging.Message{
 			Topic: fmt.Sprintf("foo-bar-%d", i%10),
 		}
@@ -178,17 +179,17 @@ func TestSendHundred(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(br.Responses) != 100 {
-		t.Errorf("len(Responses) = %d; want = 100", len(br.Responses))
+	if len(br.Responses) != limit {
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), limit)
 	}
-	if br.SuccessCount != 100 {
-		t.Errorf("SuccessCount = %d; want = 100", br.SuccessCount)
+	if br.SuccessCount != limit {
+		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, limit)
 	}
 	if br.FailureCount != 0 {
 		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < limit; i++ {
 		sr := br.Responses[i]
 		if err := checkSuccessfulSendResponse(sr); err != nil {
 			t.Errorf("Responses[%d]: %v", i, err)

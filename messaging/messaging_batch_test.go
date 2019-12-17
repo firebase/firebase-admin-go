@@ -189,11 +189,11 @@ func TestSendAllTooManyMessages(t *testing.T) {
 	}
 
 	var messages []*Message
-	for i := 0; i < 101; i++ {
+	for i := 0; i < 501; i++ {
 		messages = append(messages, &Message{Topic: "test-topic"})
 	}
 
-	want := "messages must not contain more than 100 elements"
+	want := "messages must not contain more than 500 elements"
 	br, err := client.SendAll(ctx, messages)
 	if err == nil || err.Error() != want {
 		t.Errorf("SendAll() = (%v, %v); want = (nil, %q)", br, err, want)
@@ -359,9 +359,7 @@ func TestSendAllNonMultipartResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
@@ -379,9 +377,7 @@ func TestSendAllMalformedContentType(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
@@ -405,9 +401,7 @@ func TestSendAllMalformedMultipartResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
-
-	_, err = client.SendAll(ctx, testMessages)
-	if err == nil {
+	if _, err = client.SendAll(ctx, testMessages); err == nil {
 		t.Fatal("SendAll() = nil; want = error")
 	}
 }
@@ -463,11 +457,11 @@ func TestSendMulticastTooManyTokens(t *testing.T) {
 	}
 
 	var tokens []string
-	for i := 0; i < 101; i++ {
+	for i := 0; i < 501; i++ {
 		tokens = append(tokens, fmt.Sprintf("token%d", i))
 	}
 
-	want := "tokens must not contain more than 100 elements"
+	want := "tokens must not contain more than 500 elements"
 	mm := &MulticastMessage{Tokens: tokens}
 	br, err := client.SendMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
