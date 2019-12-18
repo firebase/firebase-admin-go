@@ -15,6 +15,7 @@
 package messaging
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -111,6 +112,28 @@ func validateAndroidNotification(notification *AndroidNotification) error {
 		if _, err := url.ParseRequestURI(image); err != nil {
 			return fmt.Errorf("invalid image URL: %q", image)
 		}
+	}
+	for _, timing := range notification.VibrateTimingMillis {
+		if timing < 0 {
+			return fmt.Errorf("vibrateTimingMillis must not be negative")
+		}
+	}
+
+	return validateLightSettings(notification.LightSettings)
+}
+
+func validateLightSettings(light *LightSettings) error {
+	if light == nil {
+		return nil
+	}
+	if !colorPattern.MatchString(light.Color) {
+		return errors.New("color must be in the #RRGGBB form")
+	}
+	if light.LightOnDurationMillis < 0 {
+		return errors.New("lightOnDuration must not be negative")
+	}
+	if light.LightOffDurationMillis < 0 {
+		return errors.New("lightOffDuration must not be negative")
 	}
 	return nil
 }
