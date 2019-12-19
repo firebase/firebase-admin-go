@@ -595,34 +595,6 @@ func (it *SAMLProviderConfigIterator) fetch(pageSize int, pageToken string) (str
 	return result.NextPageToken, nil
 }
 
-type providerConfigClient struct {
-	endpoint   string
-	projectID  string
-	tenantID   string
-	httpClient *internal.HTTPClient
-}
-
-func newProviderConfigClient(client *http.Client, conf *internal.AuthConfig) *providerConfigClient {
-	hc := internal.WithDefaultRetryConfig(client)
-	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus
-	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-	}
-
-	return &providerConfigClient{
-		endpoint:   providerConfigEndpoint,
-		projectID:  conf.ProjectID,
-		httpClient: hc,
-	}
-}
-
-func (c *providerConfigClient) withTenantID(tenantID string) *providerConfigClient {
-	copy := *c
-	copy.tenantID = tenantID
-	return &copy
-}
-
 // OIDCProviderConfig returns the OIDCProviderConfig with the given ID.
 func (c *baseClient) OIDCProviderConfig(ctx context.Context, id string) (*OIDCProviderConfig, error) {
 	if err := validateOIDCConfigID(id); err != nil {
