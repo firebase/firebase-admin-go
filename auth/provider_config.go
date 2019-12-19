@@ -247,7 +247,7 @@ func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 
 // OIDCProviderConfigIterator is an iterator over OIDC provider configurations.
 type OIDCProviderConfigIterator struct {
-	client   *providerConfigClient
+	client   *baseClient
 	ctx      context.Context
 	nextFunc func() error
 	pageInfo *iterator.PageInfo
@@ -538,7 +538,7 @@ func (config *SAMLProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 
 // SAMLProviderConfigIterator is an iterator over SAML provider configurations.
 type SAMLProviderConfigIterator struct {
-	client   *providerConfigClient
+	client   *baseClient
 	ctx      context.Context
 	nextFunc func() error
 	pageInfo *iterator.PageInfo
@@ -624,7 +624,7 @@ func (c *providerConfigClient) withTenantID(tenantID string) *providerConfigClie
 }
 
 // OIDCProviderConfig returns the OIDCProviderConfig with the given ID.
-func (c *providerConfigClient) OIDCProviderConfig(ctx context.Context, id string) (*OIDCProviderConfig, error) {
+func (c *baseClient) OIDCProviderConfig(ctx context.Context, id string) (*OIDCProviderConfig, error) {
 	if err := validateOIDCConfigID(id); err != nil {
 		return nil, err
 	}
@@ -642,7 +642,7 @@ func (c *providerConfigClient) OIDCProviderConfig(ctx context.Context, id string
 }
 
 // CreateOIDCProviderConfig creates a new OIDC provider config from the given parameters.
-func (c *providerConfigClient) CreateOIDCProviderConfig(ctx context.Context, config *OIDCProviderConfigToCreate) (*OIDCProviderConfig, error) {
+func (c *baseClient) CreateOIDCProviderConfig(ctx context.Context, config *OIDCProviderConfigToCreate) (*OIDCProviderConfig, error) {
 	if config == nil {
 		return nil, errors.New("config must not be nil")
 	}
@@ -669,7 +669,7 @@ func (c *providerConfigClient) CreateOIDCProviderConfig(ctx context.Context, con
 }
 
 // UpdateOIDCProviderConfig updates an existing OIDC provider config with the given parameters.
-func (c *providerConfigClient) UpdateOIDCProviderConfig(ctx context.Context, id string, config *OIDCProviderConfigToUpdate) (*OIDCProviderConfig, error) {
+func (c *baseClient) UpdateOIDCProviderConfig(ctx context.Context, id string, config *OIDCProviderConfigToUpdate) (*OIDCProviderConfig, error) {
 	if err := validateOIDCConfigID(id); err != nil {
 		return nil, err
 	}
@@ -704,7 +704,7 @@ func (c *providerConfigClient) UpdateOIDCProviderConfig(ctx context.Context, id 
 }
 
 // DeleteOIDCProviderConfig deletes the OIDCProviderConfig with the given ID.
-func (c *providerConfigClient) DeleteOIDCProviderConfig(ctx context.Context, id string) error {
+func (c *baseClient) DeleteOIDCProviderConfig(ctx context.Context, id string) error {
 	if err := validateOIDCConfigID(id); err != nil {
 		return err
 	}
@@ -721,7 +721,7 @@ func (c *providerConfigClient) DeleteOIDCProviderConfig(ctx context.Context, id 
 //
 // If nextPageToken is empty, the iterator will start at the beginning. Otherwise,
 // iterator starts after the token.
-func (c *providerConfigClient) OIDCProviderConfigs(ctx context.Context, nextPageToken string) *OIDCProviderConfigIterator {
+func (c *baseClient) OIDCProviderConfigs(ctx context.Context, nextPageToken string) *OIDCProviderConfigIterator {
 	it := &OIDCProviderConfigIterator{
 		ctx:    ctx,
 		client: c,
@@ -736,7 +736,7 @@ func (c *providerConfigClient) OIDCProviderConfigs(ctx context.Context, nextPage
 }
 
 // SAMLProviderConfig returns the SAMLProviderConfig with the given ID.
-func (c *providerConfigClient) SAMLProviderConfig(ctx context.Context, id string) (*SAMLProviderConfig, error) {
+func (c *baseClient) SAMLProviderConfig(ctx context.Context, id string) (*SAMLProviderConfig, error) {
 	if err := validateSAMLConfigID(id); err != nil {
 		return nil, err
 	}
@@ -754,7 +754,7 @@ func (c *providerConfigClient) SAMLProviderConfig(ctx context.Context, id string
 }
 
 // CreateSAMLProviderConfig creates a new SAML provider config from the given parameters.
-func (c *providerConfigClient) CreateSAMLProviderConfig(ctx context.Context, config *SAMLProviderConfigToCreate) (*SAMLProviderConfig, error) {
+func (c *baseClient) CreateSAMLProviderConfig(ctx context.Context, config *SAMLProviderConfigToCreate) (*SAMLProviderConfig, error) {
 	if config == nil {
 		return nil, errors.New("config must not be nil")
 	}
@@ -781,7 +781,7 @@ func (c *providerConfigClient) CreateSAMLProviderConfig(ctx context.Context, con
 }
 
 // UpdateSAMLProviderConfig updates an existing SAML provider config with the given parameters.
-func (c *providerConfigClient) UpdateSAMLProviderConfig(ctx context.Context, id string, config *SAMLProviderConfigToUpdate) (*SAMLProviderConfig, error) {
+func (c *baseClient) UpdateSAMLProviderConfig(ctx context.Context, id string, config *SAMLProviderConfigToUpdate) (*SAMLProviderConfig, error) {
 	if err := validateSAMLConfigID(id); err != nil {
 		return nil, err
 	}
@@ -816,7 +816,7 @@ func (c *providerConfigClient) UpdateSAMLProviderConfig(ctx context.Context, id 
 }
 
 // DeleteSAMLProviderConfig deletes the SAMLProviderConfig with the given ID.
-func (c *providerConfigClient) DeleteSAMLProviderConfig(ctx context.Context, id string) error {
+func (c *baseClient) DeleteSAMLProviderConfig(ctx context.Context, id string) error {
 	if err := validateSAMLConfigID(id); err != nil {
 		return err
 	}
@@ -833,7 +833,7 @@ func (c *providerConfigClient) DeleteSAMLProviderConfig(ctx context.Context, id 
 //
 // If nextPageToken is empty, the iterator will start at the beginning. Otherwise,
 // iterator starts after the token.
-func (c *providerConfigClient) SAMLProviderConfigs(ctx context.Context, nextPageToken string) *SAMLProviderConfigIterator {
+func (c *baseClient) SAMLProviderConfigs(ctx context.Context, nextPageToken string) *SAMLProviderConfigIterator {
 	it := &SAMLProviderConfigIterator{
 		ctx:    ctx,
 		client: c,
@@ -847,15 +847,17 @@ func (c *providerConfigClient) SAMLProviderConfigs(ctx context.Context, nextPage
 	return it
 }
 
-func (c *providerConfigClient) makeRequest(ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+func (c *baseClient) makeRequest(
+	ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+
 	if c.projectID == "" {
 		return nil, errors.New("project id not available")
 	}
 
 	if c.tenantID != "" {
-		req.URL = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.endpoint, c.projectID, c.tenantID, req.URL)
+		req.URL = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.providerConfigEndpoint, c.projectID, c.tenantID, req.URL)
 	} else {
-		req.URL = fmt.Sprintf("%s/projects/%s%s", c.endpoint, c.projectID, req.URL)
+		req.URL = fmt.Sprintf("%s/projects/%s%s", c.providerConfigEndpoint, c.projectID, req.URL)
 	}
 
 	return c.httpClient.DoAndUnmarshal(ctx, req, v)

@@ -493,37 +493,8 @@ func validatePhone(phone string) error {
 
 // End of validators
 
-// userManagementClient is a helper for interacting with the Identity Toolkit REST API.
-type userManagementClient struct {
-	baseURL    string
-	projectID  string
-	tenantID   string
-	httpClient *internal.HTTPClient
-}
-
-func newUserManagementClient(client *http.Client, conf *internal.AuthConfig) *userManagementClient {
-	hc := internal.WithDefaultRetryConfig(client)
-	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus
-	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-	}
-
-	return &userManagementClient{
-		baseURL:    idToolkitV1Endpoint,
-		projectID:  conf.ProjectID,
-		httpClient: hc,
-	}
-}
-
-func (c *userManagementClient) withTenantID(tenantID string) *userManagementClient {
-	copy := *c
-	copy.tenantID = tenantID
-	return &copy
-}
-
 // GetUser gets the user data corresponding to the specified user ID.
-func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+func (c *baseClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
 	return c.getUser(ctx, &userQuery{
 		field: "localId",
 		value: uid,
@@ -532,7 +503,7 @@ func (c *userManagementClient) GetUser(ctx context.Context, uid string) (*UserRe
 }
 
 // GetUserByEmail gets the user data corresponding to the specified email.
-func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+func (c *baseClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
 	if err := validateEmail(email); err != nil {
 		return nil, err
 	}
@@ -543,7 +514,7 @@ func (c *userManagementClient) GetUserByEmail(ctx context.Context, email string)
 }
 
 // GetUserByPhoneNumber gets the user data corresponding to the specified user phone number.
-func (c *userManagementClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
+func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*UserRecord, error) {
 	if err := validatePhone(phone); err != nil {
 		return nil, err
 	}
@@ -574,7 +545,7 @@ func (q *userQuery) build() map[string]interface{} {
 	}
 }
 
-func (c *userManagementClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
+func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
 	var parsed struct {
 		Users []*userQueryResponse `json:"users"`
 	}
@@ -665,7 +636,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 }
 
 // CreateUser creates a new user with the specified properties.
-func (c *userManagementClient) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
+func (c *baseClient) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
 	uid, err := c.createUser(ctx, user)
 	if err != nil {
 		return nil, err
@@ -673,7 +644,7 @@ func (c *userManagementClient) CreateUser(ctx context.Context, user *UserToCreat
 	return c.GetUser(ctx, uid)
 }
 
-func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreate) (string, error) {
+func (c *baseClient) createUser(ctx context.Context, user *UserToCreate) (string, error) {
 	if user == nil {
 		user = &UserToCreate{}
 	}
@@ -691,7 +662,7 @@ func (c *userManagementClient) createUser(ctx context.Context, user *UserToCreat
 }
 
 // UpdateUser updates an existing user account with the specified properties.
-func (c *userManagementClient) UpdateUser(
+func (c *baseClient) UpdateUser(
 	ctx context.Context, uid string, user *UserToUpdate) (ur *UserRecord, err error) {
 	if err := c.updateUser(ctx, uid, user); err != nil {
 		return nil, err
@@ -707,7 +678,7 @@ func (c *userManagementClient) UpdateUser(
 // While this revokes all sessions for a specified user and disables any new ID tokens for existing sessions
 // from getting minted, existing ID tokens may remain active until their natural expiration (one hour).
 // To verify that ID tokens are revoked, use `verifyIdTokenAndCheckRevoked(ctx, idToken)`.
-func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
+func (c *baseClient) RevokeRefreshTokens(ctx context.Context, uid string) error {
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).revokeRefreshTokens())
 }
 
@@ -719,14 +690,14 @@ func (c *userManagementClient) RevokeRefreshTokens(ctx context.Context, uid stri
 // can be accessed via the user's ID token JWT. If a reserved OIDC claim is specified (sub, iat,
 // iss, etc), an error is thrown. Claims payload must also not be larger then 1000 characters
 // when serialized into a JSON string.
-func (c *userManagementClient) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
+func (c *baseClient) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
 	if customClaims == nil || len(customClaims) == 0 {
 		customClaims = map[string]interface{}{}
 	}
 	return c.updateUser(ctx, uid, (&UserToUpdate{}).CustomClaims(customClaims))
 }
 
-func (c *userManagementClient) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
+func (c *baseClient) updateUser(ctx context.Context, uid string, user *UserToUpdate) error {
 	if err := validateUID(uid); err != nil {
 		return err
 	}
@@ -745,7 +716,7 @@ func (c *userManagementClient) updateUser(ctx context.Context, uid string, user 
 }
 
 // DeleteUser deletes the user by the given UID.
-func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error {
+func (c *baseClient) DeleteUser(ctx context.Context, uid string) error {
 	if err := validateUID(uid); err != nil {
 		return err
 	}
@@ -763,7 +734,7 @@ func (c *userManagementClient) DeleteUser(ctx context.Context, uid string) error
 //
 // This function is only exposed via [auth.Client] for now, since the tenant-scoped variant
 // of it is currently not supported.
-func (c *userManagementClient) createSessionCookie(
+func (c *baseClient) createSessionCookie(
 	ctx context.Context,
 	idToken string,
 	expiresIn time.Duration,
@@ -788,7 +759,7 @@ func (c *userManagementClient) createSessionCookie(
 	return result.SessionCookie, err
 }
 
-func (c *userManagementClient) post(
+func (c *baseClient) post(
 	ctx context.Context,
 	path string,
 	payload, resp interface{},
@@ -807,16 +778,16 @@ func (c *userManagementClient) post(
 	return c.httpClient.DoAndUnmarshal(ctx, req, resp)
 }
 
-func (c *userManagementClient) makeUserMgtURL(path string) (string, error) {
+func (c *baseClient) makeUserMgtURL(path string) (string, error) {
 	if c.projectID == "" {
 		return "", errors.New("project id not available")
 	}
 
 	var url string
 	if c.tenantID != "" {
-		url = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.baseURL, c.projectID, c.tenantID, path)
+		url = fmt.Sprintf("%s/projects/%s/tenants/%s%s", c.userManagementEndpoint, c.projectID, c.tenantID, path)
 	} else {
-		url = fmt.Sprintf("%s/projects/%s%s", c.baseURL, c.projectID, path)
+		url = fmt.Sprintf("%s/projects/%s%s", c.userManagementEndpoint, c.projectID, path)
 	}
 
 	return url, nil

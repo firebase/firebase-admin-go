@@ -100,8 +100,8 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	if err := checkCookieVerifier(client.cookieVerifier, creds.ProjectID); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkUserManagementClient(client, creds.ProjectID); err != nil {
-		t.Errorf("NewClient().userManagementClient: %v", err)
+	if err := checkBaseClient(client, creds.ProjectID); err != nil {
+		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -127,8 +127,8 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkUserManagementClient(client, ""); err != nil {
-		t.Errorf("NewClient().userManagementClient: %v", err)
+	if err := checkBaseClient(client, ""); err != nil {
+		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -155,8 +155,8 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkUserManagementClient(client, ""); err != nil {
-		t.Errorf("NewClient().userManagementClient: %v", err)
+	if err := checkBaseClient(client, ""); err != nil {
+		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -194,8 +194,8 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkUserManagementClient(client, ""); err != nil {
-		t.Errorf("NewClient().userManagementClient: %v", err)
+	if err := checkBaseClient(client, ""); err != nil {
+		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
 		t.Errorf("NewClient().clock = %v; want = SystemClock", client.clock)
@@ -1057,10 +1057,13 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 	return nil
 }
 
-func checkUserManagementClient(client *Client, wantProjectID string) error {
-	umc := client.userManagementClient
-	if umc.baseURL != idToolkitV1Endpoint {
-		return fmt.Errorf("baseURL = %q; want = %q", umc.baseURL, idToolkitV1Endpoint)
+func checkBaseClient(client *Client, wantProjectID string) error {
+	umc := client.baseClient
+	if umc.userManagementEndpoint != idToolkitV1Endpoint {
+		return fmt.Errorf("userManagementEndpoint = %q; want = %q", umc.userManagementEndpoint, idToolkitV1Endpoint)
+	}
+	if umc.providerConfigEndpoint != providerConfigEndpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", umc.providerConfigEndpoint, providerConfigEndpoint)
 	}
 	if umc.projectID != wantProjectID {
 		return fmt.Errorf("projectID = %q; want = %q", umc.projectID, wantProjectID)

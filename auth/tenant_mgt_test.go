@@ -55,12 +55,8 @@ func TestTenantID(t *testing.T) {
 		t.Errorf("TenantID() = %q; want = %q", tenantID, want)
 	}
 
-	if client.userManagementClient.tenantID != want {
-		t.Errorf("userManagementClient.tenantID = %q; want = %q", client.userManagementClient.tenantID, want)
-	}
-
-	if client.providerConfigClient.tenantID != want {
-		t.Errorf("providerConfigClient.tenantID = %q; want = %q", client.providerConfigClient.tenantID, want)
+	if client.baseClient.tenantID != want {
+		t.Errorf("baseClient.tenantID = %q; want = %q", client.baseClient.tenantID, want)
 	}
 }
 
