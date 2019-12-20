@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/storage v1.1.2
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
+	github.com/stretchr/testify v1.4.0
 	go.opencensus.io v0.22.1 // indirect
 	golang.org/x/exp v0.0.0-20191030013958-a1ab85dbe136 // indirect
 	golang.org/x/net v0.0.0-20191101175033-0deb6923b6d9 // indirect

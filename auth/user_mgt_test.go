@@ -30,6 +30,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
 )
 
@@ -772,11 +774,9 @@ func TestUserToImport(t *testing.T) {
 
 	for idx, tc := range cases {
 		got, err := tc.user.validatedUserInfo()
-		if err != nil {
-			t.Errorf("[%d] invalid user: %v", idx, err)
-		}
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("[%d] UserToImport = %#v; want = %#v", idx, got, tc.want)
+		if assert.NoError(t, err, "[%d] invalid user: %v.", idx, err) {
+			assert.True(t, reflect.DeepEqual(got, tc.want),
+				"[%d] UserToImport = %#v; want = %#v", idx, got, tc.want)
 		}
 	}
 }
@@ -832,8 +832,9 @@ func TestUserToImportError(t *testing.T) {
 	defer s.Close()
 	for idx, tc := range cases {
 		_, err := s.Client.ImportUsers(context.Background(), []*UserToImport{tc.user})
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("[%d] UserToImport = %v; want = %q", idx, err, tc.want)
+		if assert.Error(t, err) {
+			assert.Equal(t, err.Error(), tc.want,
+				"[%d] UserToImport = %q; want = %q", idx, err.Error(), tc.want)
 		}
 	}
 }
@@ -843,23 +844,20 @@ func TestInvalidImportUsers(t *testing.T) {
 	defer s.Close()
 
 	result, err := s.Client.ImportUsers(context.Background(), nil)
-	if result != nil || err == nil {
-		t.Errorf("ImportUsers(nil) = (%v, %v); want = (nil, error)", result, err)
-	}
+	assert.Error(t, err)
+	assert.Nil(t, result)
 
 	result, err = s.Client.ImportUsers(context.Background(), []*UserToImport{})
-	if result != nil || err == nil {
-		t.Errorf("ImportUsers([]) = (%v, %v); want = (nil, error)", result, err)
-	}
+	assert.Error(t, err)
+	assert.Nil(t, result)
 
 	var users []*UserToImport
 	for i := 0; i < 1001; i++ {
 		users = append(users, (&UserToImport{}).UID(fmt.Sprintf("user%d", i)))
 	}
 	result, err = s.Client.ImportUsers(context.Background(), users)
-	if result != nil || err == nil {
-		t.Errorf("ImportUsers(len > 1000) = (%v, %v); want = (nil, error)", result, err)
-	}
+	assert.Error(t, err)
+	assert.Nil(t, result)
 }
 
 func TestImportUsers(t *testing.T) {
@@ -870,11 +868,10 @@ func TestImportUsers(t *testing.T) {
 		(&UserToImport{}).UID("user2"),
 	}
 	result, err := s.Client.ImportUsers(context.Background(), users)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.SuccessCount != 2 || result.FailureCount != 0 {
-		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
+	assert.NoError(t, err)
+	if assert.NotNil(t, result) {
+		assert.Equal(t, result.SuccessCount, 2)
+		assert.Equal(t, result.FailureCount, 0)
 	}
 }
 
@@ -893,20 +890,18 @@ func TestImportUsersError(t *testing.T) {
 		(&UserToImport{}).UID("user3"),
 	}
 	result, err := s.Client.ImportUsers(context.Background(), users)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.SuccessCount != 1 || result.FailureCount != 2 || len(result.Errors) != 2 {
-		t.Fatalf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 2}", result)
-	}
+	require.NoError(t, err)
+	require.Equal(t, result.SuccessCount, 1)
+	require.Equal(t, result.FailureCount, 2)
+	require.Len(t, result.Errors, 2)
+
 	want := []ErrorInfo{
 		{Index: 0, Reason: "Some error occurred in user1"},
 		{Index: 2, Reason: "Another error occurred in user3"},
 	}
 	for idx, we := range want {
-		if *result.Errors[idx] != we {
-			t.Errorf("[%d] Error = %#v; want = %#v", idx, result.Errors[idx], we)
-		}
+		assert.Equal(t, *result.Errors[idx], we,
+			"[%d] Error = %#v; want = %#v", idx, result.Errors[idx], we)
 	}
 }
 
@@ -938,16 +933,14 @@ func TestImportUsersWithHash(t *testing.T) {
 		rounds:     8,
 		memoryCost: 14,
 	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.SuccessCount != 2 || result.FailureCount != 0 {
-		t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 2, FailureCount: 0}", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, result.SuccessCount, 2)
+	assert.Equal(t, result.FailureCount, 0)
+
 	var got map[string]interface{}
-	if err := json.Unmarshal(s.Rbody, &got); err != nil {
-		t.Fatal(err)
-	}
+	err = json.Unmarshal(s.Rbody, &got)
+	require.NoError(t, err)
+
 	want := map[string]interface{}{
 		"hashAlgorithm": "MOCKHASH",
 		"signerKey":     "key",
@@ -957,9 +950,8 @@ func TestImportUsersWithHash(t *testing.T) {
 	}
 	for k, v := range want {
 		gv, ok := got[k]
-		if !ok || gv != v {
-			t.Errorf("ImportUsers() request(%q) = %v; want = %v", k, gv, v)
-		}
+		assert.True(t, ok)
+		assert.Equal(t, gv, v)
 	}
 }
 
@@ -971,9 +963,8 @@ func TestImportUsersMissingRequiredHash(t *testing.T) {
 		(&UserToImport{}).UID("user2"),
 	}
 	result, err := s.Client.ImportUsers(context.Background(), users)
-	if result != nil || err == nil {
-		t.Fatalf("ImportUsers() = (%v, %v); want = (nil, error)", result, err)
-	}
+	assert.Error(t, err)
+	assert.Nil(t, result)
 }
 
 func TestDeleteUser(t *testing.T) {
