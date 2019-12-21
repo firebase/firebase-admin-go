@@ -85,19 +85,12 @@ type TenantManager struct {
 	httpClient *internal.HTTPClient
 }
 
-func newTenantManager(client *http.Client, conf *internal.AuthConfig, base *baseClient) *TenantManager {
-	hc := internal.WithDefaultRetryConfig(client)
-	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus
-	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-	}
-
+func newTenantManager(client *internal.HTTPClient, conf *internal.AuthConfig, base *baseClient) *TenantManager {
 	return &TenantManager{
 		base:       base,
 		endpoint:   tenantMgtEndpoint,
 		projectID:  conf.ProjectID,
-		httpClient: hc,
+		httpClient: client,
 	}
 }
 

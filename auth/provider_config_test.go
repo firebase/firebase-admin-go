@@ -123,7 +123,7 @@ func TestOIDCProviderConfig(t *testing.T) {
 }
 
 func TestOIDCProviderConfigInvalidID(t *testing.T) {
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	wantErr := "invalid OIDC provider id: "
 
 	for _, id := range invalidOIDCConfigIDs {
@@ -241,7 +241,7 @@ func TestCreateOIDCProviderConfigError(t *testing.T) {
 	defer s.Close()
 
 	client := s.Client
-	client.providerConfigClient.httpClient.RetryConfig = nil
+	client.baseClient.httpClient.RetryConfig = nil
 	options := (&OIDCProviderConfigToCreate{}).
 		ID(oidcProviderConfig.ID).
 		ClientID(oidcProviderConfig.ClientID).
@@ -304,7 +304,7 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 		},
 	}
 
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	for _, tc := range cases {
 		_, err := client.CreateOIDCProviderConfig(context.Background(), tc.conf)
 		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
@@ -408,7 +408,7 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 
 func TestUpdateOIDCProviderConfigInvalidID(t *testing.T) {
 	cases := []string{"", "saml.config"}
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("")
 	want := "invalid OIDC provider id: "
@@ -456,7 +456,7 @@ func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
 		},
 	}
 
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	for _, tc := range cases {
 		_, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", tc.conf)
 		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
@@ -486,7 +486,7 @@ func TestDeleteOIDCProviderConfig(t *testing.T) {
 }
 
 func TestDeleteOIDCProviderConfigInvalidID(t *testing.T) {
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	wantErr := "invalid OIDC provider id: "
 
 	for _, id := range invalidOIDCConfigIDs {
@@ -580,7 +580,7 @@ func TestOIDCProviderConfigsError(t *testing.T) {
 	s.Status = http.StatusInternalServerError
 
 	client := s.Client
-	client.providerConfigClient.httpClient.RetryConfig = nil
+	client.baseClient.httpClient.RetryConfig = nil
 	it := client.OIDCProviderConfigs(context.Background(), "")
 	config, err := it.Next()
 	if config != nil || err == nil || !IsUnknown(err) {
@@ -614,7 +614,7 @@ func TestSAMLProviderConfig(t *testing.T) {
 }
 
 func TestSAMLProviderConfigInvalidID(t *testing.T) {
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	wantErr := "invalid SAML provider id: "
 
 	for _, id := range invalidSAMLConfigIDs {
@@ -766,7 +766,7 @@ func TestCreateSAMLProviderConfigError(t *testing.T) {
 	defer s.Close()
 
 	client := s.Client
-	client.providerConfigClient.httpClient.RetryConfig = nil
+	client.baseClient.httpClient.RetryConfig = nil
 	options := (&SAMLProviderConfigToCreate{}).
 		ID(samlProviderConfig.ID).
 		IDPEntityID(samlProviderConfig.IDPEntityID).
@@ -879,7 +879,7 @@ func TestCreateSAMLProviderConfigInvalidInput(t *testing.T) {
 		},
 	}
 
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	for _, tc := range cases {
 		_, err := client.CreateSAMLProviderConfig(context.Background(), tc.conf)
 		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
@@ -1004,7 +1004,7 @@ func TestUpdateSAMLProviderConfigZeroValues(t *testing.T) {
 
 func TestUpdateSAMLProviderConfigInvalidID(t *testing.T) {
 	cases := []string{"", "oidc.config"}
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	options := (&SAMLProviderConfigToUpdate{}).
 		DisplayName("").
 		Enabled(false).
@@ -1084,7 +1084,7 @@ func TestUpdateSAMLProviderConfigInvalidInput(t *testing.T) {
 		},
 	}
 
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	for _, tc := range cases {
 		_, err := client.UpdateSAMLProviderConfig(context.Background(), "saml.provider", tc.conf)
 		if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
@@ -1114,7 +1114,7 @@ func TestDeleteSAMLProviderConfig(t *testing.T) {
 }
 
 func TestDeleteSAMLProviderConfigInvalidID(t *testing.T) {
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	wantErr := "invalid SAML provider id: "
 
 	for _, id := range invalidSAMLConfigIDs {
@@ -1208,7 +1208,7 @@ func TestSAMLProviderConfigsError(t *testing.T) {
 	s.Status = http.StatusInternalServerError
 
 	client := s.Client
-	client.providerConfigClient.httpClient.RetryConfig = nil
+	client.baseClient.httpClient.RetryConfig = nil
 	it := client.SAMLProviderConfigs(context.Background(), "")
 	config, err := it.Next()
 	if config != nil || err == nil || !IsUnknown(err) {
@@ -1217,7 +1217,7 @@ func TestSAMLProviderConfigsError(t *testing.T) {
 }
 
 func TestSAMLProviderConfigNoProjectID(t *testing.T) {
-	client := &providerConfigClient{}
+	client := &baseClient{}
 	want := "project id not available"
 	if _, err := client.SAMLProviderConfig(context.Background(), "saml.provider"); err == nil || err.Error() != want {
 		t.Errorf("SAMLProviderConfig() = %v; want = %q", err, want)

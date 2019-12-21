@@ -141,9 +141,7 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 
 func TestInvalidGetUser(t *testing.T) {
 	client := &Client{
-		baseClient: &baseClient{
-			userManagementClient: &userManagementClient{},
-		},
+		baseClient: &baseClient{},
 	}
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
@@ -1217,9 +1215,7 @@ func TestSessionCookieError(t *testing.T) {
 
 func TestSessionCookieWithoutProjectID(t *testing.T) {
 	client := &Client{
-		baseClient: &baseClient{
-			userManagementClient: &userManagementClient{},
-		},
+		baseClient: &baseClient{},
 	}
 	_, err := client.SessionCookie(context.Background(), "idToken", 10*time.Minute)
 	want := "project id not available"
@@ -1260,7 +1256,7 @@ func TestSessionCookieLongExpiresIn(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	s := echoServer([]byte(`{"error":"test"}`), t)
 	defer s.Close()
-	s.Client.userManagementClient.httpClient.RetryConfig = nil
+	s.Client.baseClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	u, err := s.Client.GetUser(context.Background(), "some uid")
@@ -1287,7 +1283,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 	}
 	s := echoServer(nil, t)
 	defer s.Close()
-	s.Client.userManagementClient.httpClient.RetryConfig = nil
+	s.Client.baseClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	for code, check := range errorCodes {
@@ -1382,8 +1378,8 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		t.Fatal(err)
 	}
 
-	authClient.userManagementClient.baseURL = s.Srv.URL
-	authClient.providerConfigClient.endpoint = s.Srv.URL
+	authClient.baseClient.userManagementEndpoint = s.Srv.URL
+	authClient.baseClient.providerConfigEndpoint = s.Srv.URL
 	authClient.TenantManager.endpoint = s.Srv.URL
 	s.Client = authClient
 	return &s
