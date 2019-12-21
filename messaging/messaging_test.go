@@ -168,7 +168,7 @@ var validMessages = []struct {
 					DefaultVibrateTimings: true,
 					DefaultSound:          true,
 					LightSettings: &LightSettings{
-						Color:                  "#336699",
+						Color:                  "#33669966",
 						LightOnDurationMillis:  100,
 						LightOffDurationMillis: 50,
 					},
@@ -209,7 +209,7 @@ var validMessages = []struct {
 							"red":   float64(0.2),
 							"green": float64(0.4),
 							"blue":  float64(0.6),
-							"alpha": float64(1.0),
+							"alpha": float64(0.4),
 						},
 						"light_on_duration":  "0.100000000s",
 						"light_off_duration": "0.050000000s",
@@ -220,6 +220,38 @@ var validMessages = []struct {
 				"ttl": "1.500000000s",
 				"fcm_options": map[string]interface{}{
 					"analytics_label": "Analytics",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationLightSettings",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color:                  "#336699",
+						LightOnDurationMillis:  100,
+						LightOffDurationMillis: 50,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"light_settings": map[string]interface{}{
+						"color": map[string]interface{}{
+							"red":   float64(0.2),
+							"green": float64(0.4),
+							"blue":  float64(0.6),
+							"alpha": float64(1.0),
+						},
+						"light_on_duration":  "0.100000000s",
+						"light_off_duration": "0.050000000s",
+					},
 				},
 			},
 			"topic": "test-topic",
@@ -667,7 +699,7 @@ var invalidMessages = []struct {
 			},
 			Topic: "topic",
 		},
-		want: "color must be in the #RRGGBB form",
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
 	},
 	{
 		name: "InvalidLightSettingsColor2",
@@ -681,7 +713,21 @@ var invalidMessages = []struct {
 			},
 			Topic: "topic",
 		},
-		want: "color must be in the #RRGGBB form",
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
+	},
+	{
+		name: "InvalidLightSettingsColor3",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color: "#112234X",
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
 	},
 	{
 		name: "InvalidLightSettingsOnDuration",

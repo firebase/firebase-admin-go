@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	bareTopicNamePattern = regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$")
-	colorPattern         = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+	bareTopicNamePattern  = regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$")
+	colorPattern          = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+	colorWithAlphaPattern = regexp.MustCompile("^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$")
 )
 
 func validateMessage(message *Message) error {
@@ -126,8 +127,8 @@ func validateLightSettings(light *LightSettings) error {
 	if light == nil {
 		return nil
 	}
-	if !colorPattern.MatchString(light.Color) {
-		return errors.New("color must be in the #RRGGBB form")
+	if !colorWithAlphaPattern.MatchString(light.Color) {
+		return errors.New("color must be in #RRGGBB or #RRGGBBAA form")
 	}
 	if light.LightOnDurationMillis < 0 {
 		return errors.New("lightOnDuration must not be negative")

@@ -367,7 +367,7 @@ type AndroidNotificationPriority int
 const (
 	priorityUnspecified AndroidNotificationPriority = iota
 
-	// PriorityMin is the owest notification priority. Notifications with this priority might not
+	// PriorityMin is the lowest notification priority. Notifications with this priority might not
 	// be shown to the user except under special circumstances, such as detailed notification logs.
 	PriorityMin
 
@@ -514,11 +514,19 @@ func newColor(clr string) (*color, error) {
 		return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
 	}
 
+	alpha := int64(255)
+	if len(clr) == 9 {
+		alpha, err = strconv.ParseInt(clr[7:9], 16, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
+		}
+	}
+
 	return &color{
 		Red:   float64(red) / 255.0,
 		Green: float64(green) / 255.0,
 		Blue:  float64(blue) / 255.0,
-		Alpha: 1.0,
+		Alpha: float64(alpha) / 255.0,
 	}, nil
 }
 
@@ -526,7 +534,11 @@ func (c *color) toString() string {
 	red := int(c.Red * 255.0)
 	green := int(c.Green * 255.0)
 	blue := int(c.Blue * 255.0)
-	return fmt.Sprintf("#%X%X%X", red, green, blue)
+	alpha := int(c.Alpha * 255.0)
+	if alpha == 255 {
+		return fmt.Sprintf("#%X%X%X", red, green, blue)
+	}
+	return fmt.Sprintf("#%X%X%X%X", red, green, blue, alpha)
 }
 
 // AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.
