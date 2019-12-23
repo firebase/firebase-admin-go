@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -155,6 +156,267 @@ func TestInvalidGetUser(t *testing.T) {
 	if user != nil || err == nil {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
 	}
+}
+
+// Checks to see if the users list contain the given uids. Order is ignored.
+//
+// Behaviour is undefined if there are duplicate entries in either of the
+// slices.
+//
+// This function is identical to the one in integration/auth/user_mgt_test.go
+func sameUsers(users [](*UserRecord), uids []string) bool {
+	if len(users) != len(uids) {
+		return false
+	}
+
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].UID < users[j].UID
+	})
+	sort.Slice(uids, func(i, j int) bool {
+		return uids[i] < uids[j]
+	})
+
+	for i := range users {
+		if users[i].UID != uids[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestGetUsers(t *testing.T) {
+	t.Run("should be rejected when given more than 100 identifiers", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		var identifiers [101]UserIdentifier
+		for i := 0; i < 101; i++ {
+			identifiers[i] = &UidIdentifier{UID: fmt.Sprintf("id%d", i)}
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), identifiers[:])
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers(too-many-identifiers) should fail")
+		}
+		if !internal.HasErrorCode(err, "maximum-user-count-exceeded") {
+			t.Errorf(
+				"GetUsers(too-many-identifiers) returned an error of '%s'; "+
+					"expected 'maximum-user-count-exceeded'",
+				err.(*internal.FirebaseError).Code)
+		}
+	})
+
+	t.Run("should return no results when given no identifiers", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), [](UserIdentifier){})
+		if getUsersResult == nil || err != nil {
+			t.Errorf("GetUsers([]) failed with: %s", err.Error())
+		} else {
+			if len(getUsersResult.Users) != 0 {
+				t.Errorf("len(GetUsers([]).Users) = %d; want 0", len(getUsersResult.Users))
+			}
+			if len(getUsersResult.NotFound) != 0 {
+				t.Errorf("len(GetUsers([]).NotFound) = %d; want 0", len(getUsersResult.NotFound))
+			}
+		}
+	})
+
+	t.Run("should return no users when given identifiers that do not exist", func(t *testing.T) {
+		resp := `{
+			"kind" : "identitytoolkit#GetAccountInfoResponse",
+			"users" : []
+		}`
+		s := echoServer([]byte(resp), t)
+		defer s.Close()
+
+		notFoundIds := []UserIdentifier{&UidIdentifier{"id that doesnt exist"}}
+		getUsersResult, err := s.Client.GetUsers(context.Background(), notFoundIds)
+		if err != nil {
+			t.Errorf("GetUsers(['id that doesnt exist']) failed with %v", err)
+		} else {
+			if len(getUsersResult.Users) != 0 {
+				t.Errorf(
+					"len(GetUsers(['id that doesnt exist']).Users) = %d; want 0",
+					len(getUsersResult.Users))
+			}
+			if len(getUsersResult.NotFound) != len(notFoundIds) {
+				t.Errorf("len(GetUsers['id that doesnt exist']).NotFound) = %d; want %d",
+					len(getUsersResult.NotFound), len(notFoundIds))
+			} else {
+				for i := range notFoundIds {
+					if getUsersResult.NotFound[i] != notFoundIds[i] {
+						t.Errorf("GetUsers['id that doesnt exist']).NotFound[%d] = %v; want %v",
+							i, getUsersResult.NotFound[i], notFoundIds[i])
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("should be rejected when given an invalid uid", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		getUsersResult, err := client.GetUsers(
+			context.Background(),
+			[]UserIdentifier{&UidIdentifier{"too long " + strings.Repeat(".", 128)}})
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers([too-long]) should fail")
+		}
+		if err.Error() != "uid string must not be longer than 128 characters" {
+			t.Errorf(
+				"GetUsers([too-long]) returned an error of '%s'; "+
+					"expected 'uid string must not be longer than 128 characters'",
+				err.Error())
+		}
+	})
+
+	t.Run("should be rejected when given an invalid email", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		getUsersResult, err := client.GetUsers(
+			context.Background(),
+			[]UserIdentifier{EmailIdentifier{"invalid email addr"}})
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers([invalid email addr]) should fail")
+		}
+		if err.Error() != `malformed email string: "invalid email addr"` {
+			t.Errorf(
+				"GetUsers([invalid email addr]) returned an error of '%s'; "+
+					`"expected 'malformed email string: "invalid email addr"'"`,
+				err.Error())
+		}
+	})
+
+	t.Run("should be rejected when given an invalid phone number", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), []UserIdentifier{
+			PhoneIdentifier{"invalid phone number"},
+		})
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers([invalid phone number]) should fail")
+		}
+		if err.Error() != "phone number must be a valid, E.164 compliant identifier" {
+			t.Errorf(
+				"GetUsers([invalid phone number]) returned an error of '%s'; "+
+					"expected 'phone number must be a valid, E.164 compliant identifier'",
+				err.Error())
+		}
+	})
+
+	t.Run("should be rejected when given an invalid provider", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), []UserIdentifier{
+			ProviderIdentifier{ProviderID: "", ProviderUID: ""},
+		})
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers([invalid provider]) should fail")
+		}
+		if err.Error() != "providerID must be a non-empty string" {
+			t.Errorf(
+				"GetUsers([invalid provider]) returned an error of '%s'; "+
+					"expected 'providerID must be a non-empty string'",
+				err.Error())
+		}
+	})
+
+	t.Run("should be rejected when given a single bad identifier", func(t *testing.T) {
+		client := &Client{
+			baseClient: &baseClient{},
+		}
+
+		identifiers := []UserIdentifier{
+			UidIdentifier{"valid_id1"},
+			UidIdentifier{"valid_id2"},
+			UidIdentifier{"invalid id; too long. " + strings.Repeat(".", 128)},
+			UidIdentifier{"valid_id3"},
+			UidIdentifier{"valid_id4"},
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
+		if getUsersResult != nil || err == nil {
+			t.Errorf("GetUsers([list_with_bad_identifier]) should fail")
+		}
+		if err.Error() != "uid string must not be longer than 128 characters" {
+			t.Errorf(
+				"GetUsers([too-long]) returned an error of '%s'; "+
+					"expected 'uid string must not be longer than 128 characters'",
+				err.Error())
+		}
+	})
+
+	t.Run("returns users by various identifier types in a single call", func(t *testing.T) {
+		mockUsers := []byte(`
+			{
+				"users": [{
+					"localId": "uid1",
+					"email": "user1@example.com",
+					"phoneNumber": "+15555550001"
+				}, {
+					"localId": "uid2",
+					"email": "user2@example.com",
+					"phoneNumber": "+15555550002"
+				}, {
+					"localId": "uid3",
+					"email": "user3@example.com",
+					"phoneNumber": "+15555550003"
+				}, {
+					"localId": "uid4",
+					"email": "user4@example.com",
+					"phoneNumber": "+15555550004",
+					"providerUserInfo": [{
+						"providerId": "google.com",
+						"rawId": "google_uid4"
+					}]
+				}]
+			}`)
+		s := echoServer(mockUsers, t)
+		defer s.Close()
+
+		identifiers := []UserIdentifier{
+			&UidIdentifier{"uid1"},
+			&EmailIdentifier{"user2@example.com"},
+			&PhoneIdentifier{"+15555550003"},
+			&ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
+			&UidIdentifier{"this-user-doesnt-exist"},
+		}
+
+		getUsersResult, err := s.Client.GetUsers(context.Background(), identifiers)
+		if err != nil {
+			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
+		} else {
+			if !sameUsers(getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"}) {
+				t.Errorf("GetUsers([valid identifiers]) = %v; want = (uids from) %v (in any order)",
+					getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"})
+			}
+			if len(getUsersResult.NotFound) != 1 {
+				t.Errorf("GetUsers([valid identifiers with one not found]) = %d; want = 1",
+					len(getUsersResult.NotFound))
+			} else {
+				if id, ok := getUsersResult.NotFound[0].(*UidIdentifier); !ok {
+					t.Errorf("GetUsers([...]).NotFound[0] not a UidIdentifier")
+				} else {
+					if id.UID != "this-user-doesnt-exist" {
+						t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want = 'this-user-doesnt-exist'", id.UID)
+					}
+				}
+			}
+		}
+	})
 }
 
 func TestGetNonExistingUser(t *testing.T) {

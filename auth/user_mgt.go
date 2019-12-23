@@ -34,6 +34,9 @@ const (
 	maxLenPayloadCC     = 1000
 	defaultProviderID   = "firebase"
 	idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
+
+	// Maximum allowed number of users to batch get at one time.
+	maxGetAccountsBatchSize = 100
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -331,6 +334,7 @@ const (
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
+	maximumUserCountExceeded = "maximum-user-count-exceeded"
 )
 
 // IsConfigurationNotFound checks if the given error was due to a non-existing IdP configuration.
@@ -491,6 +495,15 @@ func validatePhone(phone string) error {
 	return nil
 }
 
+func validateProvider(providerID string, providerUID string) error {
+	if providerID == "" {
+		return fmt.Errorf("providerID must be a non-empty string")
+	} else if providerUID == "" {
+		return fmt.Errorf("providerUID must be a non-empty string")
+	}
+	return nil
+}
+
 // End of validators
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -545,10 +558,12 @@ func (q *userQuery) build() map[string]interface{} {
 	}
 }
 
+type getAccountInfoResponse struct {
+	Users []*userQueryResponse `json:"users"`
+}
+
 func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
-	var parsed struct {
-		Users []*userQueryResponse `json:"users"`
-	}
+	var parsed getAccountInfoResponse
 	_, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
 	if err != nil {
 		return nil, err
@@ -559,6 +574,261 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 	}
 
 	return parsed.Users[0].makeUserRecord()
+}
+
+// Identifies a user to be looked up.
+type UserIdentifier interface {
+	String() string
+
+	validate() error
+	matchesUserRecord(ur *UserRecord) (bool, error)
+	populateRequest(req *getAccountInfoRequest) error
+}
+
+// Used for looking up an account by uid.
+//
+// See GetUsers function.
+type UidIdentifier struct {
+	UID string
+}
+
+func (id UidIdentifier) String() string {
+	return fmt.Sprintf("UidIdentifier{%s}", id.UID)
+}
+
+func (id UidIdentifier) validate() error {
+	return validateUID(id.UID)
+}
+
+func (id UidIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
+	err := id.validate()
+	if err != nil {
+		return false, err
+	}
+	if id.UID == ur.UID {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (id UidIdentifier) populateRequest(req *getAccountInfoRequest) error {
+	err := id.validate()
+	if err != nil {
+		return err
+	}
+	req.localId = append(req.localId, id.UID)
+	return nil
+}
+
+// Used for looking up an account by email.
+//
+// See GetUsers function.
+type EmailIdentifier struct {
+	Email string
+}
+
+func (id EmailIdentifier) String() string {
+	return fmt.Sprintf("EmailIdentifier{%s}", id.Email)
+}
+
+func (id EmailIdentifier) validate() error {
+	return validateEmail(id.Email)
+}
+
+func (id EmailIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
+	err := id.validate()
+	if err != nil {
+		return false, err
+	}
+	if id.Email == ur.Email {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) error {
+	err := id.validate()
+	if err != nil {
+		return err
+	}
+	req.email = append(req.email, id.Email)
+	return nil
+}
+
+// Used for looking up an account by phone number.
+//
+// See GetUsers function.
+type PhoneIdentifier struct {
+	PhoneNumber string
+}
+
+func (id PhoneIdentifier) String() string {
+	return fmt.Sprintf("PhoneIdentifier{%s}", id.PhoneNumber)
+}
+
+func (id PhoneIdentifier) validate() error {
+	return validatePhone(id.PhoneNumber)
+}
+
+func (id PhoneIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
+	err := id.validate()
+	if err != nil {
+		return false, err
+	}
+	if id.PhoneNumber == ur.PhoneNumber {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) error {
+	err := id.validate()
+	if err != nil {
+		return err
+	}
+	req.phoneNumber = append(req.phoneNumber, id.PhoneNumber)
+	return nil
+}
+
+// Used for looking up an account by federated provider.
+//
+// See GetUsers function.
+type ProviderIdentifier struct {
+	ProviderID  string
+	ProviderUID string
+}
+
+func (id ProviderIdentifier) String() string {
+	return fmt.Sprintf("ProviderIdentifier{%s, %s}", id.ProviderID, id.ProviderUID)
+}
+
+func (id ProviderIdentifier) validate() error {
+	return validateProvider(id.ProviderID, id.ProviderUID)
+}
+
+func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
+	err := id.validate()
+	if err != nil {
+		return false, err
+	}
+	for _, userInfo := range ur.ProviderUserInfo {
+		if id.ProviderID == userInfo.ProviderID && id.ProviderUID == userInfo.UID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) error {
+	err := id.validate()
+	if err != nil {
+		return err
+	}
+	req.federatedUserId = append(
+		req.federatedUserId,
+		federatedUserIdentifier{providerId: id.ProviderID, rawId: id.ProviderUID})
+	return nil
+}
+
+// Represents the result of the GetUsers() API.
+type GetUsersResult struct {
+	// Set of UserRecords, corresponding to the set of users that were requested.
+	// Only users that were found are listed here. The result set is unordered.
+	Users []*UserRecord
+
+	// Set of UserIdentifiers that were requested, but not found.
+	NotFound []UserIdentifier
+}
+
+type federatedUserIdentifier struct {
+	providerId string
+	rawId      string
+}
+
+type getAccountInfoRequest struct {
+	localId         []string
+	email           []string
+	phoneNumber     []string
+	federatedUserId []federatedUserIdentifier
+}
+
+func (req *getAccountInfoRequest) build() map[string]interface{} {
+	var builtFederatedUserId []map[string]interface{}
+	for i := range req.federatedUserId {
+		builtFederatedUserId = append(builtFederatedUserId, map[string]interface{}{
+			"providerId": req.federatedUserId[i].providerId,
+			"rawId":      req.federatedUserId[i].rawId,
+		})
+	}
+	return map[string]interface{}{
+		"localId":         req.localId,
+		"email":           req.email,
+		"phoneNumber":     req.phoneNumber,
+		"federatedUserId": builtFederatedUserId,
+	}
+}
+
+func isUserFound(id UserIdentifier, urs [](*UserRecord)) (bool, error) {
+	for i := range urs {
+		match, err := id.matchesUserRecord(urs[i])
+		if err != nil {
+			return false, err
+		} else if match {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *baseClient) GetUsers(
+	ctx context.Context, identifiers []UserIdentifier,
+) (*GetUsersResult, error) {
+	if len(identifiers) == 0 {
+		return &GetUsersResult{[](*UserRecord){}, [](UserIdentifier){}}, nil
+	} else if len(identifiers) > maxGetAccountsBatchSize {
+		return nil, internal.Errorf(
+			maximumUserCountExceeded,
+			"`identifiers` parameter must have <= %d entries.", maxGetAccountsBatchSize)
+	}
+
+	var request getAccountInfoRequest
+	for i := range identifiers {
+		err := identifiers[i].populateRequest(&request)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var parsed getAccountInfoResponse
+	_, err := c.post(ctx, "/accounts:lookup", request.build(), &parsed)
+	if err != nil {
+		return nil, err
+	}
+
+	var userRecords [](*UserRecord)
+	for _, user := range parsed.Users {
+		userRecord, err := user.makeUserRecord()
+		if err != nil {
+			return nil, err
+		}
+		userRecords = append(userRecords, userRecord)
+	}
+	if len(identifiers) < len(userRecords) {
+		return nil, errors.New("GetUsers() returned more results than requested")
+	}
+
+	var notFound []UserIdentifier
+	for i := range identifiers {
+		userFound, err := isUserFound(identifiers[i], userRecords)
+		if err != nil {
+			return nil, err
+		}
+		if !userFound {
+			notFound = append(notFound, identifiers[i])
+		}
+	}
+
+	return &GetUsersResult{userRecords, notFound}, nil
 }
 
 type userQueryResponse struct {
