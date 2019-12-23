@@ -93,16 +93,25 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	transport, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
+	hc := internal.WithDefaultRetryConfig(transport)
+	hc.CreateErrFn = handleHTTPError
+	hc.SuccessFn = internal.HasSuccessStatus
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
+	}
+
 	base := &baseClient{
-		userManagementClient: newUserManagementClient(hc, conf),
-		providerConfigClient: newProviderConfigClient(hc, conf),
-		idTokenVerifier:      idTokenVerifier,
-		cookieVerifier:       cookieVerifier,
+		userManagementEndpoint: idToolkitV1Endpoint,
+		providerConfigEndpoint: providerConfigEndpoint,
+		projectID:              conf.ProjectID,
+		httpClient:             hc,
+		idTokenVerifier:        idTokenVerifier,
+		cookieVerifier:         cookieVerifier,
 	}
 	return &Client{
 		baseClient:    base,
@@ -183,7 +192,7 @@ func (c *Client) SessionCookie(
 	idToken string,
 	expiresIn time.Duration,
 ) (string, error) {
-	return c.baseClient.userManagementClient.createSessionCookie(ctx, idToken, expiresIn)
+	return c.baseClient.createSessionCookie(ctx, idToken, expiresIn)
 }
 
 // Token represents a decoded Firebase ID token.
@@ -213,22 +222,21 @@ type FirebaseInfo struct {
 	Identities     map[string]interface{} `json:"identities"`
 }
 
+// baseClient exposes the APIs common to both auth.Client and auth.TenantClient.
 type baseClient struct {
-	*userManagementClient
-	*providerConfigClient
-	idTokenVerifier *tokenVerifier
-	cookieVerifier  *tokenVerifier
-	tenantID        string
+	userManagementEndpoint string
+	providerConfigEndpoint string
+	projectID              string
+	tenantID               string
+	httpClient             *internal.HTTPClient
+	idTokenVerifier        *tokenVerifier
+	cookieVerifier         *tokenVerifier
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {
-	return &baseClient{
-		userManagementClient: c.userManagementClient.withTenantID(tenantID),
-		providerConfigClient: c.providerConfigClient.withTenantID(tenantID),
-		idTokenVerifier:      c.idTokenVerifier,
-		cookieVerifier:       c.cookieVerifier,
-		tenantID:             tenantID,
-	}
+	copy := *c
+	copy.tenantID = tenantID
+	return &copy
 }
 
 // VerifyIDToken verifies the signature	and payload of the provided ID token.

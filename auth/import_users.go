@@ -50,7 +50,7 @@ type ErrorInfo struct {
 //
 // No more than 1000 users can be imported in a single call. If at least one user specifies a
 // password, a UserImportHash must be specified as an option.
-func (c *userManagementClient) ImportUsers(
+func (c *baseClient) ImportUsers(
 	ctx context.Context, users []*UserToImport, opts ...UserImportOption) (*UserImportResult, error) {
 
 	if len(users) == 0 {

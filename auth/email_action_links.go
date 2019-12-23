@@ -71,38 +71,38 @@ const (
 
 // EmailVerificationLink generates the out-of-band email action link for email verification flows for the specified
 // email address.
-func (c *userManagementClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
+func (c *baseClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
 	return c.EmailVerificationLinkWithSettings(ctx, email, nil)
 }
 
 // EmailVerificationLinkWithSettings generates the out-of-band email action link for email verification flows for the
 // specified email address, using the action code settings provided.
-func (c *userManagementClient) EmailVerificationLinkWithSettings(
+func (c *baseClient) EmailVerificationLinkWithSettings(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
 	return c.generateEmailActionLink(ctx, emailVerification, email, settings)
 }
 
 // PasswordResetLink generates the out-of-band email action link for password reset flows for the specified email
 // address.
-func (c *userManagementClient) PasswordResetLink(ctx context.Context, email string) (string, error) {
+func (c *baseClient) PasswordResetLink(ctx context.Context, email string) (string, error) {
 	return c.PasswordResetLinkWithSettings(ctx, email, nil)
 }
 
 // PasswordResetLinkWithSettings generates the out-of-band email action link for password reset flows for the
 // specified email address, using the action code settings provided.
-func (c *userManagementClient) PasswordResetLinkWithSettings(
+func (c *baseClient) PasswordResetLinkWithSettings(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
 	return c.generateEmailActionLink(ctx, passwordReset, email, settings)
 }
 
 // EmailSignInLink generates the out-of-band email action link for email link sign-in flows, using the action
 // code settings provided.
-func (c *userManagementClient) EmailSignInLink(
+func (c *baseClient) EmailSignInLink(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
 	return c.generateEmailActionLink(ctx, emailLinkSignIn, email, settings)
 }
 
-func (c *userManagementClient) generateEmailActionLink(
+func (c *baseClient) generateEmailActionLink(
 	ctx context.Context, linkType linkType, email string, settings *ActionCodeSettings) (string, error) {
 
 	if email == "" {

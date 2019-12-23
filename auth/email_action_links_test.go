@@ -273,7 +273,7 @@ func TestEmailVerificationLinkError(t *testing.T) {
 	}
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
-	s.Client.userManagementClient.httpClient.RetryConfig = nil
+	s.Client.baseClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
 	for code, check := range cases {

@@ -31,7 +31,7 @@ const maxReturnedResults = 1000
 //
 // If nextPageToken is empty, the iterator will start at the beginning.
 // If the nextPageToken is not empty, the iterator starts after the token.
-func (c *userManagementClient) Users(ctx context.Context, nextPageToken string) *UserIterator {
+func (c *baseClient) Users(ctx context.Context, nextPageToken string) *UserIterator {
 	it := &UserIterator{
 		ctx:    ctx,
 		client: c,
@@ -49,7 +49,7 @@ func (c *userManagementClient) Users(ctx context.Context, nextPageToken string) 
 //
 // Also see: https://github.com/GoogleCloudPlatform/google-cloud-go/wiki/Iterator-Guidelines
 type UserIterator struct {
-	client   *userManagementClient
+	client   *baseClient
 	ctx      context.Context
 	nextFunc func() error
 	pageInfo *iterator.PageInfo
