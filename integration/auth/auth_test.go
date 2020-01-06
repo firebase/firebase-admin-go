@@ -230,8 +230,9 @@ func signInWithCustomToken(token string) (string, error) {
 
 func signInWithPassword(email, password string) (string, error) {
 	req, err := json.Marshal(map[string]interface{}{
-		"email":    email,
-		"password": password,
+		"email":             email,
+		"password":          password,
+		"returnSecureToken": true,
 	})
 	if err != nil {
 		return "", err

@@ -60,6 +60,9 @@ type UserInfo struct {
 type UserMetadata struct {
 	CreationTimestamp  int64
 	LastLogInTimestamp int64
+	// The time at which the user was last active (ID token refreshed), or 0 if
+	// the user was never active.
+	LastRefreshTimestamp int64
 }
 
 // UserRecord contains metadata associated with a Firebase user account.
@@ -839,6 +842,7 @@ type userQueryResponse struct {
 	PhotoURL           string      `json:"photoUrl,omitempty"`
 	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
 	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
+	LastRefreshAt      string      `json:"lastRefreshAt,omitempty"`
 	ProviderID         string      `json:"providerId,omitempty"`
 	CustomAttributes   string      `json:"customAttributes,omitempty"`
 	Disabled           bool        `json:"disabled,omitempty"`
@@ -879,6 +883,15 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		hash = ""
 	}
 
+	var lastRefreshTimestamp int64 = 0
+	if r.LastRefreshAt != "" {
+		t, err := time.Parse(time.RFC3339, r.LastRefreshAt)
+		if err != nil {
+			return nil, err
+		}
+		lastRefreshTimestamp = t.Unix()
+	}
+
 	return &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -896,8 +909,9 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			TenantID:               r.TenantID,
 			TokensValidAfterMillis: r.ValidSinceSeconds * 1000,
 			UserMetadata: &UserMetadata{
-				LastLogInTimestamp: r.LastLogInTimestamp,
-				CreationTimestamp:  r.CreationTimestamp,
+				LastLogInTimestamp:   r.LastLogInTimestamp,
+				CreationTimestamp:    r.CreationTimestamp,
+				LastRefreshTimestamp: lastRefreshTimestamp,
 			},
 		},
 		PasswordHash: hash,

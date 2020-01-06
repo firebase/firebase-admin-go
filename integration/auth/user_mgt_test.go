@@ -130,6 +130,10 @@ func TestGetUsers(t *testing.T) {
 			}
 			var userRecord *auth.UserRecord
 			userRecord, err = client.CreateUser(context.Background(), userToCreate)
+			if err != nil {
+				err = fmt.Errorf("Unable to create user %v: %w", *userToCreate, err)
+				return nil
+			}
 			return userRecord
 		}
 
@@ -144,11 +148,12 @@ func TestGetUsers(t *testing.T) {
 			userImportResult, err = client.ImportUsers(
 				context.Background(), [](*auth.UserToImport){userToImport})
 			if err != nil {
+				err = fmt.Errorf("Unable to import user %v (uid %v): %w", *userToImport, uid, err)
 				return nil
 			}
 
 			if userImportResult.FailureCount > 0 {
-				err = fmt.Errorf(userImportResult.Errors[0].Reason)
+				err = fmt.Errorf("Unable to import user %v (uid %v): %v", *userToImport, uid, userImportResult.Errors[0].Reason)
 				return nil
 			}
 			if userImportResult.SuccessCount != 1 {
@@ -213,10 +218,10 @@ func TestGetUsers(t *testing.T) {
 	// over from a prior run).
 	deleteTestUsers()
 
+	defer deleteTestUsers()
 	if err := createTestUsers(); err != nil {
 		t.Fatalf("Unable to create the test users: %v", err)
 	}
-	defer deleteTestUsers()
 
 	t.Run("returns users by various identifier types in a single call", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
@@ -298,6 +303,43 @@ func TestGetUsers(t *testing.T) {
 			if len(getUsersResult.NotFound) != 0 {
 				t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 0", len(getUsersResult.NotFound))
 			}
+		}
+	})
+
+	t.Run("returns users with a LastRefreshTimestamp", func(t *testing.T) {
+		// Delete user that we're about to create (in case it was left over from a
+		// prior run).
+		client.DeleteUser(context.Background(), "lastRefreshTimeUser")
+		defer client.DeleteUser(context.Background(), "lastRefreshTimeUser")
+		newUserRecord, err := client.CreateUser(context.Background(), (&auth.UserToCreate{}).
+			UID("lastRefreshTimeUser").
+			Email("lastRefreshTimeUser@example.com").
+			Password("p4ssword"))
+		if err != nil {
+			t.Fatalf("Unable to create lastRefreshTimeUser: %v", err)
+		}
+
+		// New users should not have a LastRefreshTimestamp set.
+		if newUserRecord.UserMetadata.LastRefreshTimestamp != 0 {
+			t.Errorf(
+				"CreateUser(...).UserMetadata.LastRefreshTimestamp = %d; want = 0",
+				newUserRecord.UserMetadata.LastRefreshTimestamp)
+		}
+
+		// Login to cause the LastRefreshTimestamp to be set
+		_, err = signInWithPassword("lastRefreshTimeUser@example.com", "p4ssword")
+		if err != nil {
+			t.Errorf("signInWithPassword failed: %v", err)
+		}
+
+		getUsersResult, err := client.GetUser(context.Background(), "lastRefreshTimeUser")
+		if err != nil {
+			t.Errorf("GetUser(...) failed with error: %v", err)
+		}
+		if getUsersResult.UserMetadata.LastRefreshTimestamp <= 0 {
+			t.Errorf(
+				"GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want > 0",
+				getUsersResult.UserMetadata.LastRefreshTimestamp)
 		}
 	})
 }
