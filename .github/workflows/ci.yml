@@ -31,11 +31,10 @@ jobs:
 
     - name: Run Linter
       working-directory: ./go/src/firebase.google.com/go
-      run: golint -set_exit_status $(go list ./...)
+      run: ls $GOPATH/bin
 
     - name: Run Unit Tests
-      working-directory: ./go/src/firebase.google.com/go
-      run: go test -v -race -test.short ./...
+      run: go test -v -race -test.short firebase.google.com/go/...
 
     - name: Run Formatter
       working-directory: ./go/src/firebase.google.com/go
