@@ -15,6 +15,7 @@
 package messaging
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -22,8 +23,9 @@ import (
 )
 
 var (
-	bareTopicNamePattern = regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$")
-	colorPattern         = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+	bareTopicNamePattern  = regexp.MustCompile("^[a-zA-Z0-9-_.~%]+$")
+	colorPattern          = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+	colorWithAlphaPattern = regexp.MustCompile("^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$")
 )
 
 func validateMessage(message *Message) error {
@@ -111,6 +113,28 @@ func validateAndroidNotification(notification *AndroidNotification) error {
 		if _, err := url.ParseRequestURI(image); err != nil {
 			return fmt.Errorf("invalid image URL: %q", image)
 		}
+	}
+	for _, timing := range notification.VibrateTimingMillis {
+		if timing < 0 {
+			return fmt.Errorf("vibrateTimingMillis must not be negative")
+		}
+	}
+
+	return validateLightSettings(notification.LightSettings)
+}
+
+func validateLightSettings(light *LightSettings) error {
+	if light == nil {
+		return nil
+	}
+	if !colorWithAlphaPattern.MatchString(light.Color) {
+		return errors.New("color must be in #RRGGBB or #RRGGBBAA form")
+	}
+	if light.LightOnDurationMillis < 0 {
+		return errors.New("lightOnDuration must not be negative")
+	}
+	if light.LightOffDurationMillis < 0 {
+		return errors.New("lightOffDuration must not be negative")
 	}
 	return nil
 }

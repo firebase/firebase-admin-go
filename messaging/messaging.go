@@ -48,6 +48,8 @@ const (
 	serverUnavailable              = "server-unavailable"
 	tooManyTopics                  = "too-many-topics"
 	unknownError                   = "unknown-error"
+
+	rfc3339Zulu = "2006-01-02T15:04:05.000000000Z"
 )
 
 var (
@@ -176,13 +178,7 @@ type AndroidConfig struct {
 func (a *AndroidConfig) MarshalJSON() ([]byte, error) {
 	var ttl string
 	if a.TTL != nil {
-		seconds := int64(*a.TTL / time.Second)
-		nanos := int64((*a.TTL - time.Duration(seconds)*time.Second) / time.Nanosecond)
-		if nanos > 0 {
-			ttl = fmt.Sprintf("%d.%09ds", seconds, nanos)
-		} else {
-			ttl = fmt.Sprintf("%ds", seconds)
-		}
+		ttl = durationToString(*a.TTL)
 	}
 
 	type androidInternal AndroidConfig
@@ -209,21 +205,9 @@ func (a *AndroidConfig) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	if temp.TTL != "" {
-		segments := strings.Split(strings.TrimSuffix(temp.TTL, "s"), ".")
-		if len(segments) != 1 && len(segments) != 2 {
-			return fmt.Errorf("incorrect number of segments in ttl: %q", temp.TTL)
-		}
-		seconds, err := strconv.ParseInt(segments[0], 10, 64)
+		ttl, err := stringToDuration(temp.TTL)
 		if err != nil {
 			return err
-		}
-		ttl := time.Duration(seconds) * time.Second
-		if len(segments) == 2 {
-			nanos, err := strconv.ParseInt(strings.TrimLeft(segments[1], "0"), 10, 64)
-			if err != nil {
-				return err
-			}
-			ttl += time.Duration(nanos) * time.Nanosecond
 		}
 		a.TTL = &ttl
 	}
@@ -232,19 +216,329 @@ func (a *AndroidConfig) UnmarshalJSON(b []byte) error {
 
 // AndroidNotification is a notification to send to Android devices.
 type AndroidNotification struct {
-	Title        string   `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
-	Body         string   `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
-	Icon         string   `json:"icon,omitempty"`
-	Color        string   `json:"color,omitempty"` // notification color in #RRGGBB format
-	Sound        string   `json:"sound,omitempty"`
-	Tag          string   `json:"tag,omitempty"`
-	ClickAction  string   `json:"click_action,omitempty"`
-	BodyLocKey   string   `json:"body_loc_key,omitempty"`
-	BodyLocArgs  []string `json:"body_loc_args,omitempty"`
-	TitleLocKey  string   `json:"title_loc_key,omitempty"`
-	TitleLocArgs []string `json:"title_loc_args,omitempty"`
-	ChannelID    string   `json:"channel_id,omitempty"`
-	ImageURL     string   `json:"image,omitempty"`
+	Title                 string                        `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
+	Body                  string                        `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
+	Icon                  string                        `json:"icon,omitempty"`
+	Color                 string                        `json:"color,omitempty"` // notification color in #RRGGBB format
+	Sound                 string                        `json:"sound,omitempty"`
+	Tag                   string                        `json:"tag,omitempty"`
+	ClickAction           string                        `json:"click_action,omitempty"`
+	BodyLocKey            string                        `json:"body_loc_key,omitempty"`
+	BodyLocArgs           []string                      `json:"body_loc_args,omitempty"`
+	TitleLocKey           string                        `json:"title_loc_key,omitempty"`
+	TitleLocArgs          []string                      `json:"title_loc_args,omitempty"`
+	ChannelID             string                        `json:"channel_id,omitempty"`
+	ImageURL              string                        `json:"image,omitempty"`
+	Ticker                string                        `json:"ticker,omitempty"`
+	Sticky                bool                          `json:"sticky,omitempty"`
+	EventTimestamp        *time.Time                    `json:"-"`
+	LocalOnly             bool                          `json:"local_only,omitempty"`
+	Priority              AndroidNotificationPriority   `json:"-"`
+	VibrateTimingMillis   []int64                       `json:"-"`
+	DefaultVibrateTimings bool                          `json:"default_vibrate_timings,omitempty"`
+	DefaultSound          bool                          `json:"default_sound,omitempty"`
+	LightSettings         *LightSettings                `json:"light_settings,omitempty"`
+	DefaultLightSettings  bool                          `json:"default_light_settings,omitempty"`
+	Visibility            AndroidNotificationVisibility `json:"-"`
+	NotificationCount     *int                          `json:"notification_count,omitempty"`
+}
+
+// MarshalJSON marshals an AndroidNotification into JSON (for internal use only).
+func (a *AndroidNotification) MarshalJSON() ([]byte, error) {
+	var priority string
+	if a.Priority != priorityUnspecified {
+		priorities := map[AndroidNotificationPriority]string{
+			PriorityMin:     "PRIORITY_MIN",
+			PriorityLow:     "PRIORITY_LOW",
+			PriorityDefault: "PRIORITY_DEFAULT",
+			PriorityHigh:    "PRIORITY_HIGH",
+			PriorityMax:     "PRIORITY_MAX",
+		}
+		priority, _ = priorities[a.Priority]
+	}
+
+	var visibility string
+	if a.Visibility != visibilityUnspecified {
+		visibilities := map[AndroidNotificationVisibility]string{
+			VisibilityPrivate: "PRIVATE",
+			VisibilityPublic:  "PUBLIC",
+			VisibilitySecret:  "SECRET",
+		}
+		visibility, _ = visibilities[a.Visibility]
+	}
+
+	var timestamp string
+	if a.EventTimestamp != nil {
+		timestamp = a.EventTimestamp.UTC().Format(rfc3339Zulu)
+	}
+
+	var vibTimings []string
+	for _, t := range a.VibrateTimingMillis {
+		vibTimings = append(vibTimings, durationToString(time.Duration(t)*time.Millisecond))
+	}
+
+	type androidInternal AndroidNotification
+	temp := &struct {
+		EventTimestamp string   `json:"event_time,omitempty"`
+		Priority       string   `json:"notification_priority,omitempty"`
+		Visibility     string   `json:"visibility,omitempty"`
+		VibrateTimings []string `json:"vibrate_timings,omitempty"`
+		*androidInternal
+	}{
+		EventTimestamp:  timestamp,
+		Priority:        priority,
+		Visibility:      visibility,
+		VibrateTimings:  vibTimings,
+		androidInternal: (*androidInternal)(a),
+	}
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into an AndroidNotification (for internal use only).
+func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
+	type androidInternal AndroidNotification
+	temp := struct {
+		EventTimestamp string   `json:"event_time,omitempty"`
+		Priority       string   `json:"notification_priority,omitempty"`
+		Visibility     string   `json:"visibility,omitempty"`
+		VibrateTimings []string `json:"vibrate_timings,omitempty"`
+		*androidInternal
+	}{
+		androidInternal: (*androidInternal)(a),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+
+	if temp.Priority != "" {
+		priorities := map[string]AndroidNotificationPriority{
+			"PRIORITY_MIN":     PriorityMin,
+			"PRIORITY_LOW":     PriorityLow,
+			"PRIORITY_DEFUALT": PriorityDefault,
+			"PRIORITY_HIGH":    PriorityHigh,
+			"PRIORITY_MAX":     PriorityMax,
+		}
+		if prio, ok := priorities[temp.Priority]; ok {
+			a.Priority = prio
+		} else {
+			return fmt.Errorf("unknown priority value: %q", temp.Priority)
+		}
+	}
+
+	if temp.Visibility != "" {
+		visibilities := map[string]AndroidNotificationVisibility{
+			"PRIVATE": VisibilityPrivate,
+			"PUBLIC":  VisibilityPublic,
+			"SECRET":  VisibilitySecret,
+		}
+		if vis, ok := visibilities[temp.Visibility]; ok {
+			a.Visibility = vis
+		} else {
+			return fmt.Errorf("unknown visibility value: %q", temp.Visibility)
+		}
+	}
+
+	if temp.EventTimestamp != "" {
+		ts, err := time.Parse(rfc3339Zulu, temp.EventTimestamp)
+		if err != nil {
+			return err
+		}
+
+		a.EventTimestamp = &ts
+	}
+
+	var vibTimings []int64
+	for _, t := range temp.VibrateTimings {
+		vibTime, err := stringToDuration(t)
+		if err != nil {
+			return err
+		}
+
+		millis := int64(vibTime / time.Millisecond)
+		vibTimings = append(vibTimings, millis)
+	}
+	a.VibrateTimingMillis = vibTimings
+	return nil
+}
+
+// AndroidNotificationPriority represents the priority levels of a notification.
+type AndroidNotificationPriority int
+
+const (
+	priorityUnspecified AndroidNotificationPriority = iota
+
+	// PriorityMin is the lowest notification priority. Notifications with this priority might not
+	// be shown to the user except under special circumstances, such as detailed notification logs.
+	PriorityMin
+
+	// PriorityLow is a lower notification priority. The UI may choose to show the notifications
+	// smaller, or at a different position in the list, compared with notifications with PriorityDefault.
+	PriorityLow
+
+	// PriorityDefault is the default notification priority. If the application does not prioritize
+	// its own notifications, use this value for all notifications.
+	PriorityDefault
+
+	// PriorityHigh is a higher notification priority. Use this for more important
+	// notifications or alerts. The UI may choose to show these notifications larger, or at a
+	// different position in the notification lists, compared with notifications with PriorityDefault.
+	PriorityHigh
+
+	// PriorityMax is the highest notification priority. Use this for the application's most
+	// important items that require the user's prompt attention or input.
+	PriorityMax
+)
+
+// AndroidNotificationVisibility represents the different visibility levels of a notification.
+type AndroidNotificationVisibility int
+
+const (
+	visibilityUnspecified AndroidNotificationVisibility = iota
+
+	// VisibilityPrivate shows this notification on all lockscreens, but conceal sensitive or
+	// private information on secure lockscreens.
+	VisibilityPrivate
+
+	// VisibilityPublic shows this notification in its entirety on all lockscreens.
+	VisibilityPublic
+
+	// VisibilitySecret does not reveal any part of this notification on a secure lockscreen.
+	VisibilitySecret
+)
+
+// LightSettings to control notification LED.
+type LightSettings struct {
+	Color                  string
+	LightOnDurationMillis  int64
+	LightOffDurationMillis int64
+}
+
+// MarshalJSON marshals an LightSettings into JSON (for internal use only).
+func (l *LightSettings) MarshalJSON() ([]byte, error) {
+	clr, err := newColor(l.Color)
+	if err != nil {
+		return nil, err
+	}
+
+	temp := struct {
+		Color            *color `json:"color"`
+		LightOnDuration  string `json:"light_on_duration"`
+		LightOffDuration string `json:"light_off_duration"`
+	}{
+		Color:            clr,
+		LightOnDuration:  durationToString(time.Duration(l.LightOnDurationMillis) * time.Millisecond),
+		LightOffDuration: durationToString(time.Duration(l.LightOffDurationMillis) * time.Millisecond),
+	}
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into an LightSettings (for internal use only).
+func (l *LightSettings) UnmarshalJSON(b []byte) error {
+	temp := struct {
+		Color            *color `json:"color"`
+		LightOnDuration  string `json:"light_on_duration"`
+		LightOffDuration string `json:"light_off_duration"`
+	}{}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+
+	on, err := stringToDuration(temp.LightOnDuration)
+	if err != nil {
+		return err
+	}
+
+	off, err := stringToDuration(temp.LightOffDuration)
+	if err != nil {
+		return err
+	}
+
+	l.Color = temp.Color.toString()
+	l.LightOnDurationMillis = int64(on / time.Millisecond)
+	l.LightOffDurationMillis = int64(off / time.Millisecond)
+	return nil
+}
+
+func durationToString(ms time.Duration) string {
+	seconds := int64(ms / time.Second)
+	nanos := int64((ms - time.Duration(seconds)*time.Second) / time.Nanosecond)
+	if nanos > 0 {
+		return fmt.Sprintf("%d.%09ds", seconds, nanos)
+	}
+	return fmt.Sprintf("%ds", seconds)
+}
+
+func stringToDuration(s string) (time.Duration, error) {
+	segments := strings.Split(strings.TrimSuffix(s, "s"), ".")
+	if len(segments) != 1 && len(segments) != 2 {
+		return 0, fmt.Errorf("incorrect number of segments in ttl: %q", s)
+	}
+
+	seconds, err := strconv.ParseInt(segments[0], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s: %v", s, err)
+	}
+
+	ttl := time.Duration(seconds) * time.Second
+	if len(segments) == 2 {
+		nanos, err := strconv.ParseInt(strings.TrimLeft(segments[1], "0"), 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse %s: %v", s, err)
+		}
+		ttl += time.Duration(nanos) * time.Nanosecond
+	}
+
+	return ttl, nil
+}
+
+type color struct {
+	Red   float64 `json:"red"`
+	Green float64 `json:"green"`
+	Blue  float64 `json:"blue"`
+	Alpha float64 `json:"alpha"`
+}
+
+func newColor(clr string) (*color, error) {
+	red, err := strconv.ParseInt(clr[1:3], 16, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
+	}
+
+	green, err := strconv.ParseInt(clr[3:5], 16, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
+	}
+
+	blue, err := strconv.ParseInt(clr[5:7], 16, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
+	}
+
+	alpha := int64(255)
+	if len(clr) == 9 {
+		alpha, err = strconv.ParseInt(clr[7:9], 16, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %v", clr, err)
+		}
+	}
+
+	return &color{
+		Red:   float64(red) / 255.0,
+		Green: float64(green) / 255.0,
+		Blue:  float64(blue) / 255.0,
+		Alpha: float64(alpha) / 255.0,
+	}, nil
+}
+
+func (c *color) toString() string {
+	red := int(c.Red * 255.0)
+	green := int(c.Green * 255.0)
+	blue := int(c.Blue * 255.0)
+	alpha := int(c.Alpha * 255.0)
+	if alpha == 255 {
+		return fmt.Sprintf("#%X%X%X", red, green, blue)
+	}
+	return fmt.Sprintf("#%X%X%X%X", red, green, blue, alpha)
 }
 
 // AndroidFCMOptions contains additional options for features provided by the FCM Android SDK.

@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -47,6 +46,7 @@ var (
 	badge           = 42
 	badgeZero       = 0
 	timestampMillis = int64(12345)
+	timestamp       = time.Unix(0, 1546304523123*1000000).UTC()
 )
 
 var validMessages = []struct {
@@ -149,16 +149,31 @@ var validMessages = []struct {
 			Android: &AndroidConfig{
 				RestrictedPackageName: "rpn",
 				Notification: &AndroidNotification{
-					Title:        "t",
-					Body:         "b",
-					Color:        "#112233",
-					Sound:        "s",
-					TitleLocKey:  "tlk",
-					TitleLocArgs: []string{"t1", "t2"},
-					BodyLocKey:   "blk",
-					BodyLocArgs:  []string{"b1", "b2"},
-					ChannelID:    "channel",
-					ImageURL:     "http://image.jpg",
+					Title:                 "t",
+					Body:                  "b",
+					Color:                 "#112233",
+					Sound:                 "s",
+					TitleLocKey:           "tlk",
+					TitleLocArgs:          []string{"t1", "t2"},
+					BodyLocKey:            "blk",
+					BodyLocArgs:           []string{"b1", "b2"},
+					ChannelID:             "channel",
+					ImageURL:              "http://image.jpg",
+					Ticker:                "tkr",
+					Sticky:                true,
+					EventTimestamp:        &timestamp,
+					LocalOnly:             true,
+					Priority:              PriorityMax,
+					VibrateTimingMillis:   []int64{100, 50, 100},
+					DefaultVibrateTimings: true,
+					DefaultSound:          true,
+					LightSettings: &LightSettings{
+						Color:                  "#33669966",
+						LightOnDurationMillis:  100,
+						LightOffDurationMillis: 50,
+					},
+					Visibility:           VisibilityPrivate,
+					DefaultLightSettings: true,
 				},
 				TTL: &ttlWithNanos,
 				FCMOptions: &AndroidFCMOptions{
@@ -171,20 +186,72 @@ var validMessages = []struct {
 			"android": map[string]interface{}{
 				"restricted_package_name": "rpn",
 				"notification": map[string]interface{}{
-					"title":          "t",
-					"body":           "b",
-					"color":          "#112233",
-					"sound":          "s",
-					"title_loc_key":  "tlk",
-					"title_loc_args": []interface{}{"t1", "t2"},
-					"body_loc_key":   "blk",
-					"body_loc_args":  []interface{}{"b1", "b2"},
-					"channel_id":     "channel",
-					"image":          "http://image.jpg",
+					"title":                   "t",
+					"body":                    "b",
+					"color":                   "#112233",
+					"sound":                   "s",
+					"title_loc_key":           "tlk",
+					"title_loc_args":          []interface{}{"t1", "t2"},
+					"body_loc_key":            "blk",
+					"body_loc_args":           []interface{}{"b1", "b2"},
+					"channel_id":              "channel",
+					"image":                   "http://image.jpg",
+					"ticker":                  "tkr",
+					"sticky":                  true,
+					"event_time":              "2019-01-01T01:02:03.123000000Z",
+					"local_only":              true,
+					"notification_priority":   "PRIORITY_MAX",
+					"vibrate_timings":         []interface{}{"0.100000000s", "0.050000000s", "0.100000000s"},
+					"default_vibrate_timings": true,
+					"default_sound":           true,
+					"light_settings": map[string]interface{}{
+						"color": map[string]interface{}{
+							"red":   float64(0.2),
+							"green": float64(0.4),
+							"blue":  float64(0.6),
+							"alpha": float64(0.4),
+						},
+						"light_on_duration":  "0.100000000s",
+						"light_off_duration": "0.050000000s",
+					},
+					"visibility":             "PRIVATE",
+					"default_light_settings": true,
 				},
 				"ttl": "1.500000000s",
 				"fcm_options": map[string]interface{}{
 					"analytics_label": "Analytics",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationLightSettings",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color:                  "#336699",
+						LightOnDurationMillis:  100,
+						LightOffDurationMillis: 50,
+					},
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"light_settings": map[string]interface{}{
+						"color": map[string]interface{}{
+							"red":   float64(0.2),
+							"green": float64(0.4),
+							"blue":  float64(0.6),
+							"alpha": float64(1.0),
+						},
+						"light_on_duration":  "0.100000000s",
+						"light_off_duration": "0.050000000s",
+					},
 				},
 			},
 			"topic": "test-topic",
@@ -621,6 +688,90 @@ var invalidMessages = []struct {
 		want: `invalid image URL: "image.jpg"`,
 	},
 	{
+		name: "InvalidLightSettingsColor1",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color: "112233",
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
+	},
+	{
+		name: "InvalidLightSettingsColor2",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color: "#11223X",
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
+	},
+	{
+		name: "InvalidLightSettingsColor3",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color: "#112234X",
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "color must be in #RRGGBB or #RRGGBBAA form",
+	},
+	{
+		name: "InvalidLightSettingsOnDuration",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color:                 "#112233",
+						LightOnDurationMillis: -1,
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "lightOnDuration must not be negative",
+	},
+	{
+		name: "InvalidLightSettingsOffDuration",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					LightSettings: &LightSettings{
+						Color:                  "#112233",
+						LightOffDurationMillis: -1,
+					},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "lightOffDuration must not be negative",
+	},
+	{
+		name: "InvalidVibrateTimings",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					VibrateTimingMillis: []int64{100, -1, 100},
+				},
+			},
+			Topic: "topic",
+		},
+		want: "vibrateTimingMillis must not be negative",
+	},
+	{
 		name: "APNSMultipleAps",
 		req: &Message{
 			APNS: &APNSConfig{
@@ -852,8 +1003,6 @@ func TestJSONUnmarshal(t *testing.T) {
 			t.Errorf("Unmarshal(%s) = %v; want = nil", tc.name, err)
 		}
 		if !reflect.DeepEqual(tc.req, &target) {
-			log.Printf("%#v\n", *tc.req.APNS.Payload.Aps)
-			log.Printf("%#v\n", *target.APNS.Payload.Aps)
 			t.Errorf("Unmarshal(%s) result = %#v; want = %#v", tc.name, tc.req, target)
 		}
 	}
@@ -899,6 +1048,42 @@ func TestInvalidJSONUnmarshal(t *testing.T) {
 				"sound": 10,
 			},
 			target: &Aps{},
+		},
+		{
+			name: "InvalidPriority",
+			req: map[string]interface{}{
+				"notification_priority": "invalid",
+			},
+			target: &AndroidNotification{},
+		},
+		{
+			name: "InvalidVisibility",
+			req: map[string]interface{}{
+				"visibility": "invalid",
+			},
+			target: &AndroidNotification{},
+		},
+		{
+			name: "InvalidEventTimestamp",
+			req: map[string]interface{}{
+				"event_time": "invalid",
+			},
+			target: &AndroidNotification{},
+		},
+		{
+			name: "IncorrectLightOnDuration",
+			req: map[string]interface{}{
+				"light_on_duration": "10.abcs",
+			},
+			target: &LightSettings{},
+		},
+		{
+			name: "IncorrectLightOffDuration",
+			req: map[string]interface{}{
+				"light_on_duration":  "1s",
+				"light_off_duration": "10.abcs",
+			},
+			target: &LightSettings{},
 		},
 	}
 	for _, tc := range cases {
