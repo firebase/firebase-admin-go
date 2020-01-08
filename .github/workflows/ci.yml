@@ -6,7 +6,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     env:
-      GOPATH: ${{ env.GITHUB_WORKSPACE }}
+        GOPATH: /home/runner/work/firebase-admin-go/go
     strategy:
       matrix:
         go: [1.11, 1.12, 1.13]
@@ -21,24 +21,23 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
       with:
-        path: ./src/firebase.google.com/go
+        path: go/src/firebase.google.com/go
     
     - name: Get dependencies
-      working-directory: ./src/firebase.google.com/go
       run: |
-        go get golang.org/x/lint/golint
         go get -t -v $(go list ./... | grep -v integration)
+        go get golang.org/x/lint/golint
 
     - name: Run Linter
-      working-directory: ./src/firebase.google.com/go
+      working-directory: ./go/src/firebase.google.com/go
       run: golint -set_exit_status $(go list ./...)
 
     - name: Run Unit Tests
-      working-directory: ./src/firebase.google.com/go
+      working-directory: ./go/src/firebase.google.com/go
       run: go test -v -race -test.short ./...
 
     - name: Run Formatter
-      working-directory: ./src/firebase.google.com/go
+      working-directory: ./go/src/firebase.google.com/go
       if: matrix.go != '1.11'
       run: |
         if [[ ! -z "$(gofmt -l -s .)" ]]; then
@@ -47,5 +46,5 @@ jobs:
         fi 
 
     - name: Run Static Analyzer
-      working-directory: ./src/firebase.google.com/go
+      working-directory: ./go/src/firebase.google.com/go
       run: go vet -v ./...
