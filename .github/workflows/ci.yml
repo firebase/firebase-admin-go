@@ -6,7 +6,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     env:
-        GOPATH: /home/runner/work/firebase-admin-go/go
+        GOPATH: /home/runner/work/firebase-admin-go/firebase-admin-go/go
     strategy:
       matrix:
         go: [1.11, 1.12, 1.13]
@@ -25,6 +25,7 @@ jobs:
     
     - name: Get dependencies
       run: |
+        echo "GOPATH = ${GOPATH}"
         go get -t -v $(go list ./... | grep -v integration)
         go get golang.org/x/lint/golint
 
