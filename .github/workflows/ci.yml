@@ -32,7 +32,7 @@ jobs:
         $GOPATH/bin/golint -set_exit_status firebase.google.com/go/...
 
     - name: Run Unit Tests
-      if: always()
+      if: success() || failure()
       run: go test -v -race -test.short firebase.google.com/go/...
 
     - name: Run Formatter
