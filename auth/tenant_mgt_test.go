@@ -1086,6 +1086,13 @@ const tenantResponse = `{
     "enableEmailLinkSignin": true
 }`
 
+const tenantResponse2 = `{
+    "name":"projects/mock-project-id/tenants/tenantID2",
+    "displayName": "Test Tenant 2",
+    "allowPasswordSignup": true,
+    "enableEmailLinkSignin": true
+}`
+
 const tenantNotFoundResponse = `{
 	"error": {
 		"message": "TENANT_NOT_FOUND"
@@ -1095,6 +1102,13 @@ const tenantNotFoundResponse = `{
 var testTenant = &Tenant{
 	ID:                    "tenantID",
 	DisplayName:           "Test Tenant",
+	AllowPasswordSignUp:   true,
+	EnableEmailLinkSignIn: true,
+}
+
+var testTenant2 = &Tenant{
+	ID:                    "tenantID2",
+	DisplayName:           "Test Tenant 2",
 	AllowPasswordSignUp:   true,
 	EnableEmailLinkSignIn: true,
 }
@@ -1423,13 +1437,13 @@ func TestTenants(t *testing.T) {
                 ],
                 "nextPageToken": ""
         }`
-	response := fmt.Sprintf(template, tenantResponse, tenantResponse, tenantResponse)
+	response := fmt.Sprintf(template, tenantResponse, tenantResponse2, tenantResponse)
 	s := echoServer([]byte(response), t)
 	defer s.Close()
 
 	want := []*Tenant{
 		testTenant,
-		testTenant,
+		testTenant2,
 		testTenant,
 	}
 	wantPath := "/projects/mock-project-id/tenants"

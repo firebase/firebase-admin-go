@@ -343,9 +343,9 @@ func (it *TenantIterator) fetch(pageSize int, pageToken string) (string, error) 
 		return "", err
 	}
 
-	for _, tenant := range result.Tenants {
-		tenant.ID = extractResourceID(tenant.ID)
-		it.tenants = append(it.tenants, &tenant)
+	for i := range result.Tenants {
+		result.Tenants[i].ID = extractResourceID(result.Tenants[i].ID)
+		it.tenants = append(it.tenants, &result.Tenants[i])
 	}
 
 	it.pageInfo.Token = result.NextPageToken
