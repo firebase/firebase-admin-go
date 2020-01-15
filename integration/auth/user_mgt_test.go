@@ -225,9 +225,9 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns users by various identifier types in a single call", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{"uid1"},
-			auth.EmailIdentifier{"user2@example.com"},
-			auth.PhoneIdentifier{"+15555550003"},
+			auth.UIDIdentifier{UID: "uid1"},
+			auth.EmailIdentifier{Email: "user2@example.com"},
+			auth.PhoneIdentifier{PhoneNumber: "+15555550003"},
 			auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
 		})
 		if err != nil {
@@ -242,9 +242,9 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns found users and ignores non-existing users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{"uid1"},
-			auth.UIDIdentifier{"uid_that_doesnt_exist"},
-			auth.UIDIdentifier{"uid3"},
+			auth.UIDIdentifier{UID: "uid1"},
+			auth.UIDIdentifier{UID: "uid_that_doesnt_exist"},
+			auth.UIDIdentifier{UID: "uid3"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([...]) returned an error: %v", err)
@@ -266,7 +266,7 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns nothing when queried for only non-existing users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{"non-existing user"},
+			auth.UIDIdentifier{UID: "non-existing user"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
@@ -287,8 +287,8 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("de-dups duplicate users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{"uid1"},
-			auth.UIDIdentifier{"uid1"},
+			auth.UIDIdentifier{UID: "uid1"},
+			auth.UIDIdentifier{UID: "uid1"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
@@ -602,7 +602,7 @@ func TestDeleteUsers(t *testing.T) {
 	ensureUsersNotFound := func(t *testing.T, uids []string) {
 		identifiers := []auth.UserIdentifier{}
 		for i := range uids {
-			identifiers = append(identifiers, auth.UIDIdentifier{uids[i]})
+			identifiers = append(identifiers, auth.UIDIdentifier{UID: uids[i]})
 		}
 
 		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
