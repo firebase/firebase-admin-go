@@ -225,7 +225,7 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns users by various identifier types in a single call", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UidIdentifier{"uid1"},
+			auth.UIDIdentifier{"uid1"},
 			auth.EmailIdentifier{"user2@example.com"},
 			auth.PhoneIdentifier{"+15555550003"},
 			auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
@@ -242,9 +242,9 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns found users and ignores non-existing users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UidIdentifier{"uid1"},
-			auth.UidIdentifier{"uid_that_doesnt_exist"},
-			auth.UidIdentifier{"uid3"},
+			auth.UIDIdentifier{"uid1"},
+			auth.UIDIdentifier{"uid_that_doesnt_exist"},
+			auth.UIDIdentifier{"uid3"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([...]) returned an error: %v", err)
@@ -256,9 +256,9 @@ func TestGetUsers(t *testing.T) {
 			if len(getUsersResult.NotFound) != 1 {
 				t.Errorf("len(GetUsers([...]).NotFound) = %d; want 1", len(getUsersResult.NotFound))
 			} else {
-				if getUsersResult.NotFound[0].(auth.UidIdentifier).UID != "uid_that_doesnt_exist" {
+				if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "uid_that_doesnt_exist" {
 					t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'uid_that_doesnt_exist'",
-						getUsersResult.NotFound[0].(auth.UidIdentifier).UID)
+						getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
 				}
 			}
 		}
@@ -266,7 +266,7 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("returns nothing when queried for only non-existing users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UidIdentifier{"non-existing user"},
+			auth.UIDIdentifier{"non-existing user"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
@@ -277,9 +277,9 @@ func TestGetUsers(t *testing.T) {
 			if len(getUsersResult.NotFound) != 1 {
 				t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 1", len(getUsersResult.NotFound))
 			} else {
-				if getUsersResult.NotFound[0].(auth.UidIdentifier).UID != "non-existing user" {
+				if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "non-existing user" {
 					t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'non-existing user'",
-						getUsersResult.NotFound[0].(auth.UidIdentifier).UID)
+						getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
 				}
 			}
 		}
@@ -287,8 +287,8 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("de-dups duplicate users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UidIdentifier{"uid1"},
-			auth.UidIdentifier{"uid1"},
+			auth.UIDIdentifier{"uid1"},
+			auth.UIDIdentifier{"uid1"},
 		})
 		if err != nil {
 			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
@@ -602,7 +602,7 @@ func TestDeleteUsers(t *testing.T) {
 	ensureUsersNotFound := func(t *testing.T, uids []string) {
 		identifiers := []auth.UserIdentifier{}
 		for i := range uids {
-			identifiers = append(identifiers, auth.UidIdentifier{uids[i]})
+			identifiers = append(identifiers, auth.UIDIdentifier{uids[i]})
 		}
 
 		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
@@ -625,7 +625,7 @@ func TestDeleteUsers(t *testing.T) {
 			sort.Strings(uids)
 			notFoundUids := []string{}
 			for i := range getUsersResult.NotFound {
-				notFoundUids = append(notFoundUids, getUsersResult.NotFound[i].(auth.UidIdentifier).UID)
+				notFoundUids = append(notFoundUids, getUsersResult.NotFound[i].(auth.UIDIdentifier).UID)
 			}
 			sort.Strings(notFoundUids)
 			for i := range uids {

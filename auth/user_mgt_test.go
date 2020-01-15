@@ -193,7 +193,7 @@ func TestGetUsers(t *testing.T) {
 
 		var identifiers [101]UserIdentifier
 		for i := 0; i < 101; i++ {
-			identifiers[i] = &UidIdentifier{UID: fmt.Sprintf("id%d", i)}
+			identifiers[i] = &UIDIdentifier{UID: fmt.Sprintf("id%d", i)}
 		}
 
 		getUsersResult, err := client.GetUsers(context.Background(), identifiers[:])
@@ -234,7 +234,7 @@ func TestGetUsers(t *testing.T) {
 		s := echoServer([]byte(resp), t)
 		defer s.Close()
 
-		notFoundIds := []UserIdentifier{&UidIdentifier{"id that doesnt exist"}}
+		notFoundIds := []UserIdentifier{&UIDIdentifier{"id that doesnt exist"}}
 		getUsersResult, err := s.Client.GetUsers(context.Background(), notFoundIds)
 		if err != nil {
 			t.Errorf("GetUsers(['id that doesnt exist']) failed with %v", err)
@@ -265,7 +265,7 @@ func TestGetUsers(t *testing.T) {
 
 		getUsersResult, err := client.GetUsers(
 			context.Background(),
-			[]UserIdentifier{&UidIdentifier{"too long " + strings.Repeat(".", 128)}})
+			[]UserIdentifier{&UIDIdentifier{"too long " + strings.Repeat(".", 128)}})
 		if getUsersResult != nil || err == nil {
 			t.Errorf("GetUsers([too-long]) should fail")
 		}
@@ -340,11 +340,11 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		identifiers := []UserIdentifier{
-			UidIdentifier{"valid_id1"},
-			UidIdentifier{"valid_id2"},
-			UidIdentifier{"invalid id; too long. " + strings.Repeat(".", 128)},
-			UidIdentifier{"valid_id3"},
-			UidIdentifier{"valid_id4"},
+			UIDIdentifier{"valid_id1"},
+			UIDIdentifier{"valid_id2"},
+			UIDIdentifier{"invalid id; too long. " + strings.Repeat(".", 128)},
+			UIDIdentifier{"valid_id3"},
+			UIDIdentifier{"valid_id4"},
 		}
 
 		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
@@ -388,11 +388,11 @@ func TestGetUsers(t *testing.T) {
 		defer s.Close()
 
 		identifiers := []UserIdentifier{
-			&UidIdentifier{"uid1"},
+			&UIDIdentifier{"uid1"},
 			&EmailIdentifier{"user2@example.com"},
 			&PhoneIdentifier{"+15555550003"},
 			&ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
-			&UidIdentifier{"this-user-doesnt-exist"},
+			&UIDIdentifier{"this-user-doesnt-exist"},
 		}
 
 		getUsersResult, err := s.Client.GetUsers(context.Background(), identifiers)
@@ -407,8 +407,8 @@ func TestGetUsers(t *testing.T) {
 				t.Errorf("GetUsers([valid identifiers with one not found]) = %d; want = 1",
 					len(getUsersResult.NotFound))
 			} else {
-				if id, ok := getUsersResult.NotFound[0].(*UidIdentifier); !ok {
-					t.Errorf("GetUsers([...]).NotFound[0] not a UidIdentifier")
+				if id, ok := getUsersResult.NotFound[0].(*UIDIdentifier); !ok {
+					t.Errorf("GetUsers([...]).NotFound[0] not a UIDIdentifier")
 				} else {
 					if id.UID != "this-user-doesnt-exist" {
 						t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want = 'this-user-doesnt-exist'", id.UID)
@@ -1382,8 +1382,8 @@ func TestDeleteUsers(t *testing.T) {
 	})
 
 	t.Run("should immediately fail given an invalid id", func(t *testing.T) {
-		tooLongUid := "too long " + strings.Repeat(".", 128)
-		_, err := client.DeleteUsers(context.Background(), []string{tooLongUid})
+		tooLongUID := "too long " + strings.Repeat(".", 128)
+		_, err := client.DeleteUsers(context.Background(), []string{tooLongUID})
 
 		if err == nil {
 			t.Errorf("DeleteUsers([too_long_uid]) error nil; want not nil")

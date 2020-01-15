@@ -582,7 +582,7 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 	return parsed.Users[0].makeUserRecord()
 }
 
-// Identifies a user to be looked up.
+// A UserIdentifier identifies a user to be looked up.
 type UserIdentifier interface {
 	String() string
 
@@ -591,22 +591,22 @@ type UserIdentifier interface {
 	populateRequest(req *getAccountInfoRequest) error
 }
 
-// Used for looking up an account by uid.
+// A UIDIdentifier is used for looking up an account by uid.
 //
 // See GetUsers function.
-type UidIdentifier struct {
+type UIDIdentifier struct {
 	UID string
 }
 
-func (id UidIdentifier) String() string {
-	return fmt.Sprintf("UidIdentifier{%s}", id.UID)
+func (id UIDIdentifier) String() string {
+	return fmt.Sprintf("UIDIdentifier{%s}", id.UID)
 }
 
-func (id UidIdentifier) validate() error {
+func (id UIDIdentifier) validate() error {
 	return validateUID(id.UID)
 }
 
-func (id UidIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
+func (id UIDIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
 	err := id.validate()
 	if err != nil {
 		return false, err
@@ -617,16 +617,16 @@ func (id UidIdentifier) matchesUserRecord(ur *UserRecord) (bool, error) {
 	return false, nil
 }
 
-func (id UidIdentifier) populateRequest(req *getAccountInfoRequest) error {
+func (id UIDIdentifier) populateRequest(req *getAccountInfoRequest) error {
 	err := id.validate()
 	if err != nil {
 		return err
 	}
-	req.localId = append(req.localId, id.UID)
+	req.localID = append(req.localID, id.UID)
 	return nil
 }
 
-// Used for looking up an account by email.
+// An EmailIdentifier is used for looking up an account by email.
 //
 // See GetUsers function.
 type EmailIdentifier struct {
@@ -661,7 +661,7 @@ func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) error {
 	return nil
 }
 
-// Used for looking up an account by phone number.
+// A PhoneIdentifier is used for looking up an account by phone number.
 //
 // See GetUsers function.
 type PhoneIdentifier struct {
@@ -696,7 +696,7 @@ func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) error {
 	return nil
 }
 
-// Used for looking up an account by federated provider.
+// A ProviderIdentifier is used for looking up an account by federated provider.
 //
 // See GetUsers function.
 type ProviderIdentifier struct {
@@ -730,13 +730,13 @@ func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) error {
 	if err != nil {
 		return err
 	}
-	req.federatedUserId = append(
-		req.federatedUserId,
-		federatedUserIdentifier{providerId: id.ProviderID, rawId: id.ProviderUID})
+	req.federatedUserID = append(
+		req.federatedUserID,
+		federatedUserIdentifier{providerID: id.ProviderID, rawID: id.ProviderUID})
 	return nil
 }
 
-// Represents the result of the GetUsers() API.
+// A GetUsersResult represents the result of the GetUsers() API.
 type GetUsersResult struct {
 	// Set of UserRecords, corresponding to the set of users that were requested.
 	// Only users that were found are listed here. The result set is unordered.
@@ -747,30 +747,30 @@ type GetUsersResult struct {
 }
 
 type federatedUserIdentifier struct {
-	providerId string
-	rawId      string
+	providerID string
+	rawID      string
 }
 
 type getAccountInfoRequest struct {
-	localId         []string
+	localID         []string
 	email           []string
 	phoneNumber     []string
-	federatedUserId []federatedUserIdentifier
+	federatedUserID []federatedUserIdentifier
 }
 
 func (req *getAccountInfoRequest) build() map[string]interface{} {
-	var builtFederatedUserId []map[string]interface{}
-	for i := range req.federatedUserId {
-		builtFederatedUserId = append(builtFederatedUserId, map[string]interface{}{
-			"providerId": req.federatedUserId[i].providerId,
-			"rawId":      req.federatedUserId[i].rawId,
+	var builtFederatedUserID []map[string]interface{}
+	for i := range req.federatedUserID {
+		builtFederatedUserID = append(builtFederatedUserID, map[string]interface{}{
+			"providerId": req.federatedUserID[i].providerID,
+			"rawId":      req.federatedUserID[i].rawID,
 		})
 	}
 	return map[string]interface{}{
-		"localId":         req.localId,
+		"localId":         req.localID,
 		"email":           req.email,
 		"phoneNumber":     req.phoneNumber,
-		"federatedUserId": builtFederatedUserId,
+		"federatedUserId": builtFederatedUserID,
 	}
 }
 
@@ -886,7 +886,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		hash = ""
 	}
 
-	var lastRefreshTimestamp int64 = 0
+	var lastRefreshTimestamp int64
 	if r.LastRefreshAt != "" {
 		t, err := time.Parse(time.RFC3339, r.LastRefreshAt)
 		if err != nil {
@@ -1015,7 +1015,7 @@ func (c *baseClient) DeleteUser(ctx context.Context, uid string) error {
 	return err
 }
 
-// Represents the result of the DeleteUsers() call.
+// A DeleteUsersResult represents the result of the DeleteUsers() call.
 type DeleteUsersResult struct {
 	// The number of users that were deleted successfully (possibly zero). Users
 	// that did not exist prior to calling DeleteUsers() will be considered to be
@@ -1031,7 +1031,8 @@ type DeleteUsersResult struct {
 	Errors []*DeleteUsersErrorInfo
 }
 
-// ErrorInfo represents an error encountered while deleting a user account.
+// DeleteUsersErrorInfo represents an error encountered while deleting a user
+// account.
 //
 // The Index field corresponds to the index of the failed user in the uids
 // array that was passed to DeleteUsers().
@@ -1084,7 +1085,7 @@ func (c *baseClient) DeleteUsers(ctx context.Context, uids []string) (*DeleteUse
 
 	type batchDeleteErrorInfo struct {
 		Index   int    `json:"index"`
-		LocalId string `json:"localId"`
+		LocalID string `json:"localId"`
 		Message string `json:"message"`
 	}
 	type batchDeleteAccountsResponse struct {
