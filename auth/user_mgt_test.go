@@ -1341,6 +1341,106 @@ func TestInvalidDeleteUser(t *testing.T) {
 	}
 }
 
+func TestDeleteUsers(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	t.Run("should succeed given an empty list", func(t *testing.T) {
+		result, err := client.DeleteUsers(context.Background(), []string{})
+
+		if err != nil {
+			t.Errorf("DeleteUsers([]) error %v; want = nil", err)
+		} else {
+			if result.SuccessCount != 0 {
+				t.Errorf("DeleteUsers([]).SuccessCount = %d; want = 0", result.SuccessCount)
+			}
+			if result.FailureCount != 0 {
+				t.Errorf("DeleteUsers([]).FailureCount = %d; want = 0", result.FailureCount)
+			}
+			if len(result.Errors) != 0 {
+				t.Errorf("len(DeleteUsers([]).Errors) = %d; want = 0", len(result.Errors))
+			}
+		}
+	})
+
+	t.Run("should be rejected when given more than 1000 identifiers", func(t *testing.T) {
+		uids := []string{}
+		for i := 0; i < 1001; i++ {
+			uids = append(uids, fmt.Sprintf("id%d", i))
+		}
+
+		_, err := client.DeleteUsers(context.Background(), uids)
+		if err == nil {
+			t.Errorf("DeleteUsers([too_many_uids]) error nil; want not nil")
+		} else if !internal.HasErrorCode(err, "maximum-user-count-exceeded") {
+			t.Errorf(
+				"DeleteUsers([too_many_uids]) returned an error of '%s'; "+
+					"expected 'maximum-user-count-exceeded'",
+				err.(*internal.FirebaseError).Code)
+		}
+	})
+
+	t.Run("should immediately fail given an invalid id", func(t *testing.T) {
+		tooLongUid := "too long " + strings.Repeat(".", 128)
+		_, err := client.DeleteUsers(context.Background(), []string{tooLongUid})
+
+		if err == nil {
+			t.Errorf("DeleteUsers([too_long_uid]) error nil; want not nil")
+		} else if err.Error() != "uid string must not be longer than 128 characters" {
+			t.Errorf(
+				"DeleteUsers([too_long_uid]) returned an error of '%s'; "+
+					"expected 'uid string must not be longer than 128 characters'",
+				err.Error())
+		}
+	})
+
+	t.Run("should index errors correctly in result", func(t *testing.T) {
+		resp := `{
+      "errors": [{
+        "index": 0,
+        "localId": "uid1",
+        "message": "Error Message 1"
+      }, {
+        "index": 2,
+        "localId": "uid3",
+        "message": "Error Message 2"
+      }]
+    }`
+		s := echoServer([]byte(resp), t)
+		defer s.Close()
+
+		result, err := s.Client.DeleteUsers(context.Background(), []string{"uid1", "uid2", "uid3", "uid4"})
+
+		if err != nil {
+			t.Errorf("DeleteUsers([...]) error %v; want = nil", err)
+		} else {
+			if result.SuccessCount != 2 {
+				t.Errorf("DeleteUsers([...]).SuccessCount = %d; want 2", result.SuccessCount)
+			}
+			if result.FailureCount != 2 {
+				t.Errorf("DeleteUsers([...]).FailureCount = %d; want 2", result.FailureCount)
+			}
+			if len(result.Errors) != 2 {
+				t.Errorf("len(DeleteUsers([...]).Errors) = %d; want 2", len(result.Errors))
+			} else {
+				if result.Errors[0].Index != 0 {
+					t.Errorf("DeleteUsers([...]).Errors[0].Index = %d; want 0", result.Errors[0].Index)
+				}
+				if result.Errors[0].Reason != "Error Message 1" {
+					t.Errorf("DeleteUsers([...]).Errors[0].Reason = %s; want Error Message 1", result.Errors[0].Reason)
+				}
+				if result.Errors[1].Index != 2 {
+					t.Errorf("DeleteUsers([...]).Errors[1].Index = %d; want 2", result.Errors[1].Index)
+				}
+				if result.Errors[1].Reason != "Error Message 2" {
+					t.Errorf("DeleteUsers([...]).Errors[1].Reason = %s; want Error Message 2", result.Errors[1].Reason)
+				}
+			}
+		}
+	})
+}
+
 func TestMakeExportedUser(t *testing.T) {
 	queryResponse := &userQueryResponse{
 		UID:                "testuser",

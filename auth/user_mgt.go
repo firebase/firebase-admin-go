@@ -37,6 +37,9 @@ const (
 
 	// Maximum allowed number of users to batch get at one time.
 	maxGetAccountsBatchSize = 100
+
+	// Maximum allowed numberof users to batch delete at one time.
+	maxDeleteAccountsBatchSize = 1000
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -1010,6 +1013,100 @@ func (c *baseClient) DeleteUser(ctx context.Context, uid string) error {
 	}
 	_, err := c.post(ctx, "/accounts:delete", payload, nil)
 	return err
+}
+
+// Represents the result of the DeleteUsers() call.
+type DeleteUsersResult struct {
+	// The number of users that were deleted successfully (possibly zero). Users
+	// that did not exist prior to calling DeleteUsers() will be considered to be
+	// successfully deleted.
+	SuccessCount int
+
+	// The number of users that failed to be deleted (possibly zero).
+	FailureCount int
+
+	// A list of describing the errors that were encountered
+	// during the deletion. Length of this list is equal to the value of
+	// FailureCount.
+	Errors []*DeleteUsersErrorInfo
+}
+
+// ErrorInfo represents an error encountered while deleting a user account.
+//
+// The Index field corresponds to the index of the failed user in the uids
+// array that was passed to DeleteUsers().
+type DeleteUsersErrorInfo struct {
+	Index  int
+	Reason string
+}
+
+// Deletes the users specified by the given identifiers.
+//
+// Deleting a non-existing user won't generate an error. (i.e. this method is idempotent.)
+// Non-existing users will be considered to be successfully deleted, and will therefore be
+// counted in the DeleteUsersResult.SuccessCount value.
+//
+// Only a maximum of 1000 identifiers may be supplied. If more than 1000 identifiers are
+// supplied, this method will immediately return an error.
+//
+// This API is currently rate limited at the server to 1 QPS. If you exceed this, you may get
+// a quota exceeded error. Therefore, if you want to delete more than 1000 users, you may
+// need to add a delay to ensure you don't go over this limit.
+//
+// Parameters:
+//   uids: The uids of the users to be deleted. Must have <= 1000 entries.
+//
+// Returns: The total number of successful/failed deletions, as well as the array of errors
+//   that correspond to the failed deletions. An error is returned if any of the identifiers
+//   are invalid or if more than 1000 identifiers are specified.
+func (c *baseClient) DeleteUsers(ctx context.Context, uids []string) (*DeleteUsersResult, error) {
+	if len(uids) == 0 {
+		return &DeleteUsersResult{}, nil
+	} else if len(uids) > maxDeleteAccountsBatchSize {
+		return nil, internal.Errorf(
+			maximumUserCountExceeded,
+			"`uids` parameter must have <= %d entries.", maxDeleteAccountsBatchSize)
+	}
+
+	var payload struct {
+		LocalIds []string `json:"localIds"`
+		Force    bool     `json:"force"`
+	}
+	payload.Force = true
+
+	for i := range uids {
+		if err := validateUID(uids[i]); err != nil {
+			return nil, err
+		}
+
+		payload.LocalIds = append(payload.LocalIds, uids[i])
+	}
+
+	type batchDeleteErrorInfo struct {
+		Index   int    `json:"index"`
+		LocalId string `json:"localId"`
+		Message string `json:"message"`
+	}
+	type batchDeleteAccountsResponse struct {
+		Errors []batchDeleteErrorInfo `json:"errors"`
+	}
+
+	resp := batchDeleteAccountsResponse{}
+	_, err := c.post(ctx, "/accounts:batchDelete", payload, &resp)
+
+	result := DeleteUsersResult{
+		FailureCount: len(resp.Errors),
+		SuccessCount: len(uids) - len(resp.Errors),
+	}
+
+	for i := range resp.Errors {
+		result.Errors = append(result.Errors, &DeleteUsersErrorInfo{
+			Index:  resp.Errors[i].Index,
+			Reason: resp.Errors[i].Message,
+		})
+	}
+
+	return &result, err
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry

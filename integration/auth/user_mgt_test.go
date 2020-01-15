@@ -587,6 +587,131 @@ func TestDeleteUser(t *testing.T) {
 	}
 }
 
+func TestDeleteUsers(t *testing.T) {
+	// Creates a user and returns its uid. Upon failure, triggers t.Fatalf().
+	createTestUserOrDie := func(t *testing.T) string {
+		userRecord, err := client.CreateUser(context.Background(), &auth.UserToCreate{})
+		if err != nil {
+			t.Fatalf("CreateUser({}) error %v; want nil", err)
+		}
+		return userRecord.UID
+	}
+
+	// Ensures the specified users don't exist. Expected to be called after
+	// deleting the users to ensure the delete method worked.
+	ensureUsersNotFound := func(t *testing.T, uids []string) {
+		identifiers := []auth.UserIdentifier{}
+		for i := range uids {
+			identifiers = append(identifiers, auth.UidIdentifier{uids[i]})
+		}
+
+		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
+		if err != nil {
+			t.Errorf("GetUsers(notfound_ids) error %v; want nil", err)
+		} else {
+			ok := true
+			if len(getUsersResult.Users) != 0 {
+				t.Errorf("len(GetUsers(notfound_ids).Users) = %d; want 0", len(getUsersResult.Users))
+				ok = false
+			}
+			if len(getUsersResult.NotFound) != len(uids) {
+				t.Errorf("len(GetUsers(notfound_ids).NotFound) = %d; want %d", len(getUsersResult.NotFound), len(uids))
+				ok = false
+			}
+			if !ok {
+				t.FailNow()
+			}
+
+			sort.Strings(uids)
+			notFoundUids := []string{}
+			for i := range getUsersResult.NotFound {
+				notFoundUids = append(notFoundUids, getUsersResult.NotFound[i].(auth.UidIdentifier).UID)
+			}
+			sort.Strings(notFoundUids)
+			for i := range uids {
+				if notFoundUids[i] != uids[i] {
+					t.Errorf("GetUsers(deleted_ids).NotFound[%d] = %s; want %s", i, notFoundUids[i], uids[i])
+				}
+			}
+		}
+	}
+
+	t.Run("deletes users", func(t *testing.T) {
+		uids := []string{
+			createTestUserOrDie(t), createTestUserOrDie(t), createTestUserOrDie(t),
+		}
+
+		result, err := client.DeleteUsers(context.Background(), uids)
+		if err != nil {
+			t.Fatalf("DeleteUsers([valid_ids]) error %v; want nil", err)
+		} else {
+			ok := true
+			if result.SuccessCount != 3 {
+				t.Errorf("DeleteUsers([valid_ids]).SuccessCount = %d; want 3", result.SuccessCount)
+				ok = false
+			}
+			if result.FailureCount != 0 {
+				t.Errorf("DeleteUsers([valid_ids]).FailureCount = %d; want 0", result.FailureCount)
+				ok = false
+			}
+			if len(result.Errors) != 0 {
+				t.Errorf("len(DeleteUsers([valid_ids]).Errors) = %d; want 0", len(result.Errors))
+				ok = false
+			}
+			if !ok {
+				t.FailNow()
+			}
+		}
+
+		ensureUsersNotFound(t, uids)
+	})
+
+	t.Run("deletes users that exist even when non-existing users also specified", func(t *testing.T) {
+		uids := []string{createTestUserOrDie(t), "uid-that-doesnt-exist"}
+		result, err := client.DeleteUsers(context.Background(), uids)
+		if err != nil {
+			t.Errorf("DeleteUsers(uids) error %v; want nil", err)
+		} else {
+			if result.SuccessCount != 2 {
+				t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 2", result.SuccessCount)
+			}
+			if result.FailureCount != 0 {
+				t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
+			}
+			if len(result.Errors) != 0 {
+				t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
+			}
+
+			ensureUsersNotFound(t, uids)
+		}
+	})
+
+	t.Run("is idempotent", func(t *testing.T) {
+		deleteUserAndEnsureSuccess := func(t *testing.T, uids []string) {
+			result, err := client.DeleteUsers(context.Background(), uids)
+			if err != nil {
+				t.Errorf("DeleteUsers(uids) error %v; want nil", err)
+			} else {
+				if result.SuccessCount != 1 {
+					t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 1", result.SuccessCount)
+				}
+				if result.FailureCount != 0 {
+					t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
+				}
+				if len(result.Errors) != 0 {
+					t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
+				}
+			}
+		}
+
+		uids := []string{createTestUserOrDie(t)}
+		deleteUserAndEnsureSuccess(t, uids)
+
+		// Delete the user again, ensuring that everything still counts as a success.
+		deleteUserAndEnsureSuccess(t, uids)
+	})
+}
+
 func TestImportUsers(t *testing.T) {
 	uid := randomUID()
 	email := randomEmail(uid)
