@@ -131,7 +131,7 @@ func TestGetUsers(t *testing.T) {
 			var userRecord *auth.UserRecord
 			userRecord, err = client.CreateUser(context.Background(), userToCreate)
 			if err != nil {
-				err = fmt.Errorf("Unable to create user %v: %w", *userToCreate, err)
+				err = fmt.Errorf("Unable to create user %v: %v", *userToCreate, err)
 				return nil
 			}
 			return userRecord
@@ -148,7 +148,7 @@ func TestGetUsers(t *testing.T) {
 			userImportResult, err = client.ImportUsers(
 				context.Background(), [](*auth.UserToImport){userToImport})
 			if err != nil {
-				err = fmt.Errorf("Unable to import user %v (uid %v): %w", *userToImport, uid, err)
+				err = fmt.Errorf("Unable to import user %v (uid %v): %v", *userToImport, uid, err)
 				return nil
 			}
 
