@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/firebase/firebase-admin-go.svg?branch=master)](https://travis-ci.org/firebase/firebase-admin-go)
+[![Build Status](https://github.com/firebase/firebase-admin-go/workflows/Continuous%20Integration/badge.svg)](https://github.com/firebase/firebase-admin-go/actions)
 [![GoDoc](https://godoc.org/firebase.google.com/go?status.svg)](https://godoc.org/firebase.google.com/go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/firebase/firebase-admin-go)](https://goreportcard.com/report/github.com/firebase/firebase-admin-go)
 
@@ -42,7 +42,7 @@ requests, code review feedback, and also pull requests.
 ## Supported Go Versions
 
 We support Go v1.11 and higher.
-[Continuous integration](https://travis-ci.org/firebase/firebase-admin-go) system
+[Continuous integration](https://github.com/firebase/firebase-admin-go/actions) system
 tests the code on Go v1.11 through v1.13.
 
 ## Documentation
