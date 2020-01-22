@@ -231,12 +231,12 @@ func TestGetUsers(t *testing.T) {
 			auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
 		})
 		if err != nil {
-			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
-		} else {
-			if !sameUsers(getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"}) {
-				t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
-					getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"})
-			}
+			t.Fatalf("GetUsers([valid identifiers]) returned an error: %v", err)
+		}
+
+		if !sameUsers(getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"}) {
+			t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
+				getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"})
 		}
 	})
 
@@ -247,19 +247,19 @@ func TestGetUsers(t *testing.T) {
 			auth.UIDIdentifier{UID: "uid3"},
 		})
 		if err != nil {
-			t.Errorf("GetUsers([...]) returned an error: %v", err)
+			t.Fatalf("GetUsers([...]) returned an error: %v", err)
+		}
+
+		if !sameUsers(getUsersResult.Users, []string{"uid1", "uid3"}) {
+			t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
+				getUsersResult.Users, []string{"uid1", "uid3"})
+		}
+		if len(getUsersResult.NotFound) != 1 {
+			t.Errorf("len(GetUsers([...]).NotFound) = %d; want 1", len(getUsersResult.NotFound))
 		} else {
-			if !sameUsers(getUsersResult.Users, []string{"uid1", "uid3"}) {
-				t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
-					getUsersResult.Users, []string{"uid1", "uid3"})
-			}
-			if len(getUsersResult.NotFound) != 1 {
-				t.Errorf("len(GetUsers([...]).NotFound) = %d; want 1", len(getUsersResult.NotFound))
-			} else {
-				if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "uid_that_doesnt_exist" {
-					t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'uid_that_doesnt_exist'",
-						getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
-				}
+			if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "uid_that_doesnt_exist" {
+				t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'uid_that_doesnt_exist'",
+					getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
 			}
 		}
 	})
@@ -269,18 +269,18 @@ func TestGetUsers(t *testing.T) {
 			auth.UIDIdentifier{UID: "non-existing user"},
 		})
 		if err != nil {
-			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
+			t.Fatalf("GetUsers([valid identifiers]) returned an error: %v", err)
+		}
+
+		if len(getUsersResult.Users) != 0 {
+			t.Errorf("len(GetUsers([...]).Users) = %d; want = 0", len(getUsersResult.Users))
+		}
+		if len(getUsersResult.NotFound) != 1 {
+			t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 1", len(getUsersResult.NotFound))
 		} else {
-			if len(getUsersResult.Users) != 0 {
-				t.Errorf("len(GetUsers([...]).Users) = %d; want = 0", len(getUsersResult.Users))
-			}
-			if len(getUsersResult.NotFound) != 1 {
-				t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 1", len(getUsersResult.NotFound))
-			} else {
-				if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "non-existing user" {
-					t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'non-existing user'",
-						getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
-				}
+			if getUsersResult.NotFound[0].(auth.UIDIdentifier).UID != "non-existing user" {
+				t.Errorf("GetUsers([...]).NotFound[0].UID = %s; want 'non-existing user'",
+					getUsersResult.NotFound[0].(auth.UIDIdentifier).UID)
 			}
 		}
 	})
@@ -291,18 +291,18 @@ func TestGetUsers(t *testing.T) {
 			auth.UIDIdentifier{UID: "uid1"},
 		})
 		if err != nil {
-			t.Errorf("GetUsers([valid identifiers]) returned an error: %v", err)
+			t.Fatalf("GetUsers([valid identifiers]) returned an error: %v", err)
+		}
+
+		if len(getUsersResult.Users) != 1 {
+			t.Errorf("len(GetUsers([...]).Users) = %d; want = 1", len(getUsersResult.Users))
 		} else {
-			if len(getUsersResult.Users) != 1 {
-				t.Errorf("len(GetUsers([...]).Users) = %d; want = 1", len(getUsersResult.Users))
-			} else {
-				if getUsersResult.Users[0].UID != "uid1" {
-					t.Errorf("GetUsers([...]).Users[0].UID = %s; want = 'uid1'", getUsersResult.Users[0].UID)
-				}
+			if getUsersResult.Users[0].UID != "uid1" {
+				t.Errorf("GetUsers([...]).Users[0].UID = %s; want = 'uid1'", getUsersResult.Users[0].UID)
 			}
-			if len(getUsersResult.NotFound) != 0 {
-				t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 0", len(getUsersResult.NotFound))
-			}
+		}
+		if len(getUsersResult.NotFound) != 0 {
+			t.Errorf("len(GetUsers([...]).NotFound) = %d; want = 0", len(getUsersResult.NotFound))
 		}
 	})
 
@@ -334,7 +334,7 @@ func TestGetUsers(t *testing.T) {
 
 		getUsersResult, err := client.GetUser(context.Background(), "lastRefreshTimeUser")
 		if err != nil {
-			t.Errorf("GetUser(...) failed with error: %v", err)
+			t.Fatalf("GetUser(...) failed with error: %v", err)
 		}
 		if getUsersResult.UserMetadata.LastRefreshTimestamp <= 0 {
 			t.Errorf(
@@ -644,23 +644,16 @@ func TestDeleteUsers(t *testing.T) {
 		result, err := client.DeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers([valid_ids]) error %v; want nil", err)
-		} else {
-			ok := true
-			if result.SuccessCount != 3 {
-				t.Errorf("DeleteUsers([valid_ids]).SuccessCount = %d; want 3", result.SuccessCount)
-				ok = false
-			}
-			if result.FailureCount != 0 {
-				t.Errorf("DeleteUsers([valid_ids]).FailureCount = %d; want 0", result.FailureCount)
-				ok = false
-			}
-			if len(result.Errors) != 0 {
-				t.Errorf("len(DeleteUsers([valid_ids]).Errors) = %d; want 0", len(result.Errors))
-				ok = false
-			}
-			if !ok {
-				t.FailNow()
-			}
+		}
+
+		if result.SuccessCount != 3 {
+			t.Errorf("DeleteUsers([valid_ids]).SuccessCount = %d; want 3", result.SuccessCount)
+		}
+		if result.FailureCount != 0 {
+			t.Errorf("DeleteUsers([valid_ids]).FailureCount = %d; want 0", result.FailureCount)
+		}
+		if len(result.Errors) != 0 {
+			t.Errorf("len(DeleteUsers([valid_ids]).Errors) = %d; want 0", len(result.Errors))
 		}
 
 		ensureUsersNotFound(t, uids)
@@ -670,37 +663,37 @@ func TestDeleteUsers(t *testing.T) {
 		uids := []string{createTestUserOrDie(t), "uid-that-doesnt-exist"}
 		result, err := client.DeleteUsers(context.Background(), uids)
 		if err != nil {
-			t.Errorf("DeleteUsers(uids) error %v; want nil", err)
-		} else {
-			if result.SuccessCount != 2 {
-				t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 2", result.SuccessCount)
-			}
-			if result.FailureCount != 0 {
-				t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
-			}
-			if len(result.Errors) != 0 {
-				t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
-			}
-
-			ensureUsersNotFound(t, uids)
+			t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
 		}
+
+		if result.SuccessCount != 2 {
+			t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 2", result.SuccessCount)
+		}
+		if result.FailureCount != 0 {
+			t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
+		}
+		if len(result.Errors) != 0 {
+			t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
+		}
+
+		ensureUsersNotFound(t, uids)
 	})
 
 	t.Run("is idempotent", func(t *testing.T) {
 		deleteUserAndEnsureSuccess := func(t *testing.T, uids []string) {
 			result, err := client.DeleteUsers(context.Background(), uids)
 			if err != nil {
-				t.Errorf("DeleteUsers(uids) error %v; want nil", err)
-			} else {
-				if result.SuccessCount != 1 {
-					t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 1", result.SuccessCount)
-				}
-				if result.FailureCount != 0 {
-					t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
-				}
-				if len(result.Errors) != 0 {
-					t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
-				}
+				t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
+			}
+
+			if result.SuccessCount != 1 {
+				t.Errorf("DeleteUsers(uids).SuccessCount = %d; want 1", result.SuccessCount)
+			}
+			if result.FailureCount != 0 {
+				t.Errorf("DeleteUsers(uids).FailureCount = %d; want 0", result.FailureCount)
+			}
+			if len(result.Errors) != 0 {
+				t.Errorf("len(DeleteUsers(uids).Errors) = %d; want 0", len(result.Errors))
 			}
 		}
 
