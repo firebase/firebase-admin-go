@@ -585,7 +585,6 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 type UserIdentifier interface {
 	toString() string
 
-	matchesUserRecord(ur *UserRecord) bool
 	populateRequest(req *getAccountInfoRequest) error
 }
 
@@ -598,10 +597,6 @@ type UIDIdentifier struct {
 
 func (id UIDIdentifier) toString() string {
 	return fmt.Sprintf("UIDIdentifier{%s}", id.UID)
-}
-
-func (id UIDIdentifier) matchesUserRecord(ur *UserRecord) bool {
-	return id.UID == ur.UID
 }
 
 func (id UIDIdentifier) populateRequest(req *getAccountInfoRequest) error {
@@ -620,10 +615,6 @@ func (id EmailIdentifier) toString() string {
 	return fmt.Sprintf("EmailIdentifier{%s}", id.Email)
 }
 
-func (id EmailIdentifier) matchesUserRecord(ur *UserRecord) bool {
-	return id.Email == ur.Email
-}
-
 func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) error {
 	req.Email = append(req.Email, id.Email)
 	return nil
@@ -638,10 +629,6 @@ type PhoneIdentifier struct {
 
 func (id PhoneIdentifier) toString() string {
 	return fmt.Sprintf("PhoneIdentifier{%s}", id.PhoneNumber)
-}
-
-func (id PhoneIdentifier) matchesUserRecord(ur *UserRecord) bool {
-	return id.PhoneNumber == ur.PhoneNumber
 }
 
 func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) error {
@@ -659,15 +646,6 @@ type ProviderIdentifier struct {
 
 func (id ProviderIdentifier) toString() string {
 	return fmt.Sprintf("ProviderIdentifier{%s, %s}", id.ProviderID, id.ProviderUID)
-}
-
-func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) bool {
-	for _, userInfo := range ur.ProviderUserInfo {
-		if id.ProviderID == userInfo.ProviderID && id.ProviderUID == userInfo.UID {
-			return true
-		}
-	}
-	return false
 }
 
 func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) error {
@@ -730,9 +708,49 @@ func (req *getAccountInfoRequest) validate() error {
 
 func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
 	for i := range urs {
-		match := id.matchesUserRecord(urs[i])
-		if match {
-			return true
+		if uidIdentifier, ok := id.(*UIDIdentifier); ok {
+			if uidIdentifier.UID == urs[i].UID {
+				return true
+			}
+		}
+		if uidIdentifier, ok := id.(UIDIdentifier); ok {
+			if uidIdentifier.UID == urs[i].UID {
+				return true
+			}
+		}
+		if emailIdentifier, ok := id.(*EmailIdentifier); ok {
+			if emailIdentifier.Email == urs[i].Email {
+				return true
+			}
+		}
+		if emailIdentifier, ok := id.(EmailIdentifier); ok {
+			if emailIdentifier.Email == urs[i].Email {
+				return true
+			}
+		}
+		if phoneIdentifier, ok := id.(*PhoneIdentifier); ok {
+			if phoneIdentifier.PhoneNumber == urs[i].PhoneNumber {
+				return true
+			}
+		}
+		if phoneIdentifier, ok := id.(PhoneIdentifier); ok {
+			if phoneIdentifier.PhoneNumber == urs[i].PhoneNumber {
+				return true
+			}
+		}
+		if providerIdentifier, ok := id.(*ProviderIdentifier); ok {
+			for _, userInfo := range urs[i].ProviderUserInfo {
+				if providerIdentifier.ProviderID == userInfo.ProviderID && providerIdentifier.ProviderUID == userInfo.UID {
+					return true
+				}
+			}
+		}
+		if providerIdentifier, ok := id.(ProviderIdentifier); ok {
+			for _, userInfo := range urs[i].ProviderUserInfo {
+				if providerIdentifier.ProviderID == userInfo.ProviderID && providerIdentifier.ProviderUID == userInfo.UID {
+					return true
+				}
+			}
 		}
 	}
 	return false
