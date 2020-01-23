@@ -388,7 +388,7 @@ func TestGetUsers(t *testing.T) {
 		defer s.Close()
 
 		identifiers := []UserIdentifier{
-			UIDIdentifier{"uid1"},
+			&UIDIdentifier{"uid1"},
 			&EmailIdentifier{"user2@example.com"},
 			&PhoneIdentifier{"+15555550003"},
 			&ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
