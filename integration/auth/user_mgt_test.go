@@ -93,98 +93,27 @@ func TestGetNonExistingUser(t *testing.T) {
 }
 
 func TestGetUsers(t *testing.T) {
-	testUser1 := (&auth.UserToCreate{}).
-		UID("uid1").
-		Email("user1@example.com").
-		PhoneNumber("+15555550001")
-	testUser2 := (&auth.UserToCreate{}).
-		UID("uid2").
-		Email("user2@example.com").
-		PhoneNumber("+15555550002")
-	testUser3 := (&auth.UserToCreate{}).
-		UID("uid3").
-		Email("user3@example.com").
-		PhoneNumber("+15555550003")
+	var testUser1 *auth.UserRecord
+	var testUser2 *auth.UserRecord
+	var testUser3 *auth.UserRecord
 
+	importUser1UID := randomUID()
 	importUser1 := (&auth.UserToImport{}).
-		UID("uid4").
-		Email("user4@example.com").
-		PhoneNumber("+15555550004").
+		UID(importUser1UID).
+		Email(randomEmail(importUser1UID)).
+		PhoneNumber(randomPhoneNumber()).
 		ProviderData([](*auth.UserProvider){
 			&auth.UserProvider{
 				ProviderID: "google.com",
-				UID:        "google_uid4",
+				UID:        "google_" + importUser1UID,
 			},
 		})
 
-	// Creates/imports all test users. If a failure occurs, the remaining test
-	// users will not be created/imported.
-	createTestUsers := func() error {
-		var err error
-
-		// Helper to create a user and return its UserRecord. Upon error, sets the
-		// err variable.
-		createUser := func(userToCreate *auth.UserToCreate) *auth.UserRecord {
-			if err != nil {
-				return nil
-			}
-			var userRecord *auth.UserRecord
-			userRecord, err = client.CreateUser(context.Background(), userToCreate)
-			if err != nil {
-				err = fmt.Errorf("Unable to create user %v: %v", *userToCreate, err)
-				return nil
-			}
-			return userRecord
-		}
-
-		// Helper to import a user and return its UserRecord. Upon error, sets the
-		// err variable. `uid` must match the UID set on the `userToImport`
-		// parameter.
-		importUser := func(uid string, userToImport *auth.UserToImport) *auth.UserRecord {
-			if err != nil {
-				return nil
-			}
-			var userImportResult *auth.UserImportResult
-			userImportResult, err = client.ImportUsers(
-				context.Background(), [](*auth.UserToImport){userToImport})
-			if err != nil {
-				err = fmt.Errorf("Unable to import user %v (uid %v): %v", *userToImport, uid, err)
-				return nil
-			}
-
-			if userImportResult.FailureCount > 0 {
-				err = fmt.Errorf("Unable to import user %v (uid %v): %v", *userToImport, uid, userImportResult.Errors[0].Reason)
-				return nil
-			}
-			if userImportResult.SuccessCount != 1 {
-				err = fmt.Errorf("Import didn't fail, but it didn't succeed either?")
-				return nil
-			}
-
-			var userRecord *auth.UserRecord
-			userRecord, err = client.GetUser(context.Background(), uid)
-			if err != nil {
-				return nil
-			}
-			return userRecord
-		}
-
-		createUser(testUser1)
-		createUser(testUser2)
-		createUser(testUser3)
-
-		importUser("uid4", importUser1)
-
-		return err
-	}
-
-	// Delete all test users. This function will attempt to delete all test users
-	// even if a failure occurs.
-	deleteTestUsers := func() {
-		createdUsersUids := []string{"uid1", "uid2", "uid3", "uid4"}
-		for i := range createdUsersUids {
-			client.DeleteUser(context.Background(), createdUsersUids[i])
-		}
+	createTestUsers := func(t *testing.T) {
+		testUser1 = newUserWithParams(t)
+		testUser2 = newUserWithParams(t)
+		testUser3 = newUserWithParams(t)
+		importUser(t, importUser1UID, importUser1)
 	}
 
 	// Checks to see if the users list contain the given uids. Order is ignored.
@@ -192,7 +121,7 @@ func TestGetUsers(t *testing.T) {
 	// Behaviour is undefined if there are duplicate entries in either of the
 	// slices.
 	//
-	// This function is identical to the one in integration/auth/user_mgt_test.go
+	// This function is identical to the one in auth/user_mgt_test.go
 	sameUsers := func(users [](*auth.UserRecord), uids []string) bool {
 		if len(users) != len(uids) {
 			return false
@@ -214,45 +143,50 @@ func TestGetUsers(t *testing.T) {
 		return true
 	}
 
-	// Delete all the users that we're about to create (in case they were left
-	// over from a prior run).
-	deleteTestUsers()
+	createTestUsers(t)
+	defer deleteUser(testUser1.UID)
+	defer deleteUser(testUser2.UID)
+	defer deleteUser(testUser3.UID)
+	defer deleteUser(importUser1UID)
 
-	defer deleteTestUsers()
-	if err := createTestUsers(); err != nil {
-		t.Fatalf("Unable to create the test users: %v", err)
+	userRecordsToUIDs := func(users [](*auth.UserRecord)) []string {
+		results := []string{}
+		for i := range users {
+			results = append(results, users[i].UID)
+		}
+		return results
 	}
 
 	t.Run("returns users by various identifier types in a single call", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{UID: "uid1"},
-			auth.EmailIdentifier{Email: "user2@example.com"},
-			auth.PhoneIdentifier{PhoneNumber: "+15555550003"},
-			auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
+			auth.UIDIdentifier{UID: testUser1.UID},
+			auth.EmailIdentifier{Email: testUser2.Email},
+			auth.PhoneIdentifier{PhoneNumber: testUser3.PhoneNumber},
+			auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_" + importUser1UID},
 		})
 		if err != nil {
 			t.Fatalf("GetUsers([valid identifiers]) returned an error: %v", err)
 		}
 
-		if !sameUsers(getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"}) {
+		if !sameUsers(getUsersResult.Users, []string{testUser1.UID, testUser2.UID, testUser3.UID, importUser1UID}) {
 			t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
-				getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"})
+				userRecordsToUIDs(getUsersResult.Users), []string{testUser1.UID, testUser2.UID, testUser3.UID, importUser1UID})
 		}
 	})
 
 	t.Run("returns found users and ignores non-existing users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{UID: "uid1"},
+			auth.UIDIdentifier{UID: testUser1.UID},
 			auth.UIDIdentifier{UID: "uid_that_doesnt_exist"},
-			auth.UIDIdentifier{UID: "uid3"},
+			auth.UIDIdentifier{UID: testUser3.UID},
 		})
 		if err != nil {
 			t.Fatalf("GetUsers([...]) returned an error: %v", err)
 		}
 
-		if !sameUsers(getUsersResult.Users, []string{"uid1", "uid3"}) {
+		if !sameUsers(getUsersResult.Users, []string{testUser1.UID, testUser3.UID}) {
 			t.Errorf("GetUsers([valid identifiers]) = %v; want = %v (in any order)",
-				getUsersResult.Users, []string{"uid1", "uid3"})
+				getUsersResult.Users, []string{testUser1.UID, testUser3.UID})
 		}
 		if len(getUsersResult.NotFound) != 1 {
 			t.Errorf("len(GetUsers([...]).NotFound) = %d; want 1", len(getUsersResult.NotFound))
@@ -287,8 +221,8 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("de-dups duplicate users", func(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), []auth.UserIdentifier{
-			auth.UIDIdentifier{UID: "uid1"},
-			auth.UIDIdentifier{UID: "uid1"},
+			auth.UIDIdentifier{UID: testUser1.UID},
+			auth.UIDIdentifier{UID: testUser1.UID},
 		})
 		if err != nil {
 			t.Fatalf("GetUsers([valid identifiers]) returned an error: %v", err)
@@ -297,8 +231,8 @@ func TestGetUsers(t *testing.T) {
 		if len(getUsersResult.Users) != 1 {
 			t.Errorf("len(GetUsers([...]).Users) = %d; want = 1", len(getUsersResult.Users))
 		} else {
-			if getUsersResult.Users[0].UID != "uid1" {
-				t.Errorf("GetUsers([...]).Users[0].UID = %s; want = 'uid1'", getUsersResult.Users[0].UID)
+			if getUsersResult.Users[0].UID != testUser1.UID {
+				t.Errorf("GetUsers([...]).Users[0].UID = %s; want = '%s'", getUsersResult.Users[0].UID, testUser1.UID)
 			}
 		}
 		if len(getUsersResult.NotFound) != 0 {
@@ -342,6 +276,33 @@ func TestGetUsers(t *testing.T) {
 				getUsersResult.UserMetadata.LastRefreshTimestamp)
 		}
 	})
+}
+
+func TestLastRefreshTime(t *testing.T) {
+	userRecord := newUserWithParams(t)
+	defer deleteUser(userRecord.UID)
+
+	// New users should not have a LastRefreshTimestamp set.
+	if userRecord.UserMetadata.LastRefreshTimestamp != 0 {
+		t.Errorf(
+			"CreateUser(...).UserMetadata.LastRefreshTimestamp = %d; want = 0",
+			userRecord.UserMetadata.LastRefreshTimestamp)
+	}
+
+	// Login to cause the LastRefreshTimestamp to be set
+	if _, err := signInWithPassword(userRecord.Email, "password"); err != nil {
+		t.Errorf("signInWithPassword failed: %v", err)
+	}
+
+	getUsersResult, err := client.GetUser(context.Background(), userRecord.UID)
+	if err != nil {
+		t.Fatalf("GetUser(...) failed with error: %v", err)
+	}
+	if getUsersResult.UserMetadata.LastRefreshTimestamp <= 0 {
+		t.Errorf(
+			"GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want > 0",
+			getUsersResult.UserMetadata.LastRefreshTimestamp)
+	}
 }
 
 func TestUpdateNonExistingUser(t *testing.T) {
@@ -588,15 +549,6 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestDeleteUsers(t *testing.T) {
-	// Creates a user and returns its uid. Upon failure, triggers t.Fatalf().
-	createTestUserOrDie := func(t *testing.T) string {
-		userRecord, err := client.CreateUser(context.Background(), &auth.UserToCreate{})
-		if err != nil {
-			t.Fatalf("CreateUser({}) error %v; want nil", err)
-		}
-		return userRecord.UID
-	}
-
 	// Ensures the specified users don't exist. Expected to be called after
 	// deleting the users to ensure the delete method worked.
 	ensureUsersNotFound := func(t *testing.T, uids []string) {
@@ -608,37 +560,30 @@ func TestDeleteUsers(t *testing.T) {
 		getUsersResult, err := client.GetUsers(context.Background(), identifiers)
 		if err != nil {
 			t.Errorf("GetUsers(notfound_ids) error %v; want nil", err)
-		} else {
-			ok := true
-			if len(getUsersResult.Users) != 0 {
-				t.Errorf("len(GetUsers(notfound_ids).Users) = %d; want 0", len(getUsersResult.Users))
-				ok = false
-			}
-			if len(getUsersResult.NotFound) != len(uids) {
-				t.Errorf("len(GetUsers(notfound_ids).NotFound) = %d; want %d", len(getUsersResult.NotFound), len(uids))
-				ok = false
-			}
-			if !ok {
-				t.FailNow()
-			}
+			return
+		}
 
-			sort.Strings(uids)
-			notFoundUids := []string{}
-			for i := range getUsersResult.NotFound {
-				notFoundUids = append(notFoundUids, getUsersResult.NotFound[i].(auth.UIDIdentifier).UID)
-			}
-			sort.Strings(notFoundUids)
-			for i := range uids {
-				if notFoundUids[i] != uids[i] {
-					t.Errorf("GetUsers(deleted_ids).NotFound[%d] = %s; want %s", i, notFoundUids[i], uids[i])
-				}
+		if len(getUsersResult.NotFound) != len(uids) {
+			t.Errorf("len(GetUsers(notfound_ids).NotFound) = %d; want %d", len(getUsersResult.NotFound), len(uids))
+			return
+		}
+
+		sort.Strings(uids)
+		notFoundUids := []string{}
+		for i := range getUsersResult.NotFound {
+			notFoundUids = append(notFoundUids, getUsersResult.NotFound[i].(auth.UIDIdentifier).UID)
+		}
+		sort.Strings(notFoundUids)
+		for i := range uids {
+			if notFoundUids[i] != uids[i] {
+				t.Errorf("GetUsers(deleted_ids).NotFound[%d] = %s; want %s", i, notFoundUids[i], uids[i])
 			}
 		}
 	}
 
 	t.Run("deletes users", func(t *testing.T) {
 		uids := []string{
-			createTestUserOrDie(t), createTestUserOrDie(t), createTestUserOrDie(t),
+			newUserWithParams(t).UID, newUserWithParams(t).UID, newUserWithParams(t).UID,
 		}
 
 		result, err := client.DeleteUsers(context.Background(), uids)
@@ -660,7 +605,7 @@ func TestDeleteUsers(t *testing.T) {
 	})
 
 	t.Run("deletes users that exist even when non-existing users also specified", func(t *testing.T) {
-		uids := []string{createTestUserOrDie(t), "uid-that-doesnt-exist"}
+		uids := []string{newUserWithParams(t).UID, "uid-that-doesnt-exist"}
 		result, err := client.DeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
@@ -697,7 +642,7 @@ func TestDeleteUsers(t *testing.T) {
 			}
 		}
 
-		uids := []string{createTestUserOrDie(t)}
+		uids := []string{newUserWithParams(t).UID}
 		deleteUserAndEnsureSuccess(t, uids)
 
 		// Delete the user again, ensuring that everything still counts as a success.
@@ -1030,4 +975,27 @@ func newUserWithParams(t *testing.T) *auth.UserRecord {
 		t.Fatal(err)
 	}
 	return user
+}
+
+// Helper to import a user and return its UserRecord. Upon error, exits via
+// t.Fatalf.  `uid` must match the UID set on the `userToImport` parameter.
+func importUser(t *testing.T, uid string, userToImport *auth.UserToImport) *auth.UserRecord {
+	userImportResult, err := client.ImportUsers(
+		context.Background(), [](*auth.UserToImport){userToImport})
+	if err != nil {
+		t.Fatalf("Unable to import user %v (uid %v): %v", *userToImport, uid, err)
+	}
+
+	if userImportResult.FailureCount > 0 {
+		t.Fatalf("Unable to import user %v (uid %v): %v", *userToImport, uid, userImportResult.Errors[0].Reason)
+	}
+	if userImportResult.SuccessCount != 1 {
+		t.Fatalf("Import didn't fail, but it didn't succeed either?")
+	}
+
+	userRecord, err := client.GetUser(context.Background(), uid)
+	if err != nil {
+		t.Fatalf("GetUser(%s) for imported user failed: %v", uid, err)
+	}
+	return userRecord
 }

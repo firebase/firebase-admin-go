@@ -583,10 +583,8 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 
 // A UserIdentifier identifies a user to be looked up.
 type UserIdentifier interface {
-	toString() string
-
 	matchesUserRecord(ur *UserRecord) bool
-	populateRequest(req *getAccountInfoRequest) error
+	populateRequest(req *getAccountInfoRequest)
 }
 
 // A UIDIdentifier is used for looking up an account by uid.
@@ -596,17 +594,12 @@ type UIDIdentifier struct {
 	UID string
 }
 
-func (id UIDIdentifier) toString() string {
-	return fmt.Sprintf("UIDIdentifier{%s}", id.UID)
-}
-
 func (id UIDIdentifier) matchesUserRecord(ur *UserRecord) bool {
 	return id.UID == ur.UID
 }
 
-func (id UIDIdentifier) populateRequest(req *getAccountInfoRequest) error {
+func (id UIDIdentifier) populateRequest(req *getAccountInfoRequest) {
 	req.LocalID = append(req.LocalID, id.UID)
-	return nil
 }
 
 // An EmailIdentifier is used for looking up an account by email.
@@ -616,17 +609,12 @@ type EmailIdentifier struct {
 	Email string
 }
 
-func (id EmailIdentifier) toString() string {
-	return fmt.Sprintf("EmailIdentifier{%s}", id.Email)
-}
-
 func (id EmailIdentifier) matchesUserRecord(ur *UserRecord) bool {
 	return id.Email == ur.Email
 }
 
-func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) error {
+func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) {
 	req.Email = append(req.Email, id.Email)
-	return nil
 }
 
 // A PhoneIdentifier is used for looking up an account by phone number.
@@ -636,17 +624,12 @@ type PhoneIdentifier struct {
 	PhoneNumber string
 }
 
-func (id PhoneIdentifier) toString() string {
-	return fmt.Sprintf("PhoneIdentifier{%s}", id.PhoneNumber)
-}
-
 func (id PhoneIdentifier) matchesUserRecord(ur *UserRecord) bool {
 	return id.PhoneNumber == ur.PhoneNumber
 }
 
-func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) error {
+func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) {
 	req.PhoneNumber = append(req.PhoneNumber, id.PhoneNumber)
-	return nil
 }
 
 // A ProviderIdentifier is used for looking up an account by federated provider.
@@ -655,10 +638,6 @@ func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) error {
 type ProviderIdentifier struct {
 	ProviderID  string
 	ProviderUID string
-}
-
-func (id ProviderIdentifier) toString() string {
-	return fmt.Sprintf("ProviderIdentifier{%s, %s}", id.ProviderID, id.ProviderUID)
 }
 
 func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) bool {
@@ -670,11 +649,10 @@ func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) bool {
 	return false
 }
 
-func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) error {
+func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) {
 	req.FederatedUserID = append(
 		req.FederatedUserID,
 		federatedUserIdentifier{ProviderID: id.ProviderID, RawID: id.ProviderUID})
-	return nil
 }
 
 // A GetUsersResult represents the result of the GetUsers() API.
@@ -693,8 +671,8 @@ type federatedUserIdentifier struct {
 }
 
 type getAccountInfoRequest struct {
-	LocalID         []string                  `json:"localId"`
-	Email           []string                  `json:"email"`
+	LocalID         []string                  `json:"localId,omitempty"`
+	Email           []string                  `json:"email,omitempty"`
 	PhoneNumber     []string                  `json:"phoneNumber,omitempty"`
 	FederatedUserID []federatedUserIdentifier `json:"federatedUserId,omitempty"`
 }
@@ -750,9 +728,7 @@ func (c *baseClient) GetUsers(
 
 	var request getAccountInfoRequest
 	for i := range identifiers {
-		if err := identifiers[i].populateRequest(&request); err != nil {
-			return nil, err
-		}
+		identifiers[i].populateRequest(&request)
 	}
 
 	if err := request.validate(); err != nil {
