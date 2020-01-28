@@ -583,8 +583,8 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 
 // A UserIdentifier identifies a user to be looked up.
 type UserIdentifier interface {
-	matchesUserRecord(ur *UserRecord) bool
-	populateRequest(req *getAccountInfoRequest)
+	matches(ur *UserRecord) bool
+	populate(req *getAccountInfoRequest)
 }
 
 // A UIDIdentifier is used for looking up an account by uid.
@@ -594,11 +594,11 @@ type UIDIdentifier struct {
 	UID string
 }
 
-func (id UIDIdentifier) matchesUserRecord(ur *UserRecord) bool {
+func (id UIDIdentifier) matches(ur *UserRecord) bool {
 	return id.UID == ur.UID
 }
 
-func (id UIDIdentifier) populateRequest(req *getAccountInfoRequest) {
+func (id UIDIdentifier) populate(req *getAccountInfoRequest) {
 	req.LocalID = append(req.LocalID, id.UID)
 }
 
@@ -609,11 +609,11 @@ type EmailIdentifier struct {
 	Email string
 }
 
-func (id EmailIdentifier) matchesUserRecord(ur *UserRecord) bool {
+func (id EmailIdentifier) matches(ur *UserRecord) bool {
 	return id.Email == ur.Email
 }
 
-func (id EmailIdentifier) populateRequest(req *getAccountInfoRequest) {
+func (id EmailIdentifier) populate(req *getAccountInfoRequest) {
 	req.Email = append(req.Email, id.Email)
 }
 
@@ -624,11 +624,11 @@ type PhoneIdentifier struct {
 	PhoneNumber string
 }
 
-func (id PhoneIdentifier) matchesUserRecord(ur *UserRecord) bool {
+func (id PhoneIdentifier) matches(ur *UserRecord) bool {
 	return id.PhoneNumber == ur.PhoneNumber
 }
 
-func (id PhoneIdentifier) populateRequest(req *getAccountInfoRequest) {
+func (id PhoneIdentifier) populate(req *getAccountInfoRequest) {
 	req.PhoneNumber = append(req.PhoneNumber, id.PhoneNumber)
 }
 
@@ -640,7 +640,7 @@ type ProviderIdentifier struct {
 	ProviderUID string
 }
 
-func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) bool {
+func (id ProviderIdentifier) matches(ur *UserRecord) bool {
 	for _, userInfo := range ur.ProviderUserInfo {
 		if id.ProviderID == userInfo.ProviderID && id.ProviderUID == userInfo.UID {
 			return true
@@ -649,7 +649,7 @@ func (id ProviderIdentifier) matchesUserRecord(ur *UserRecord) bool {
 	return false
 }
 
-func (id ProviderIdentifier) populateRequest(req *getAccountInfoRequest) {
+func (id ProviderIdentifier) populate(req *getAccountInfoRequest) {
 	req.FederatedUserID = append(
 		req.FederatedUserID,
 		federatedUserIdentifier{ProviderID: id.ProviderID, RawID: id.ProviderUID})
@@ -708,14 +708,29 @@ func (req *getAccountInfoRequest) validate() error {
 
 func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
 	for i := range urs {
-		match := id.matchesUserRecord(urs[i])
-		if match {
+		if id.matches(urs[i]) {
 			return true
 		}
 	}
 	return false
 }
 
+// Gets the user data corresponding to the specified identifiers.
+//
+// There are no ordering guarantees; in particular, the nth entry in the users
+// result list is not guaranteed to correspond to the nth entry in the input
+// parameters list.
+//
+// Only a maximum of 100 identifiers may be supplied. If more than 100
+// identifiers are supplied, this method will immediately return an error.
+//
+// Parameters:
+//   identifiers: The identifiers used to indicate which user records should be
+//     returned. Must have <= 100 entries.
+//
+// Returns: The corresponding user records. An error is returned instead if any
+//   of the identifiers are invalid or if more than 100 identifiers are
+//   specified.
 func (c *baseClient) GetUsers(
 	ctx context.Context, identifiers []UserIdentifier,
 ) (*GetUsersResult, error) {
@@ -728,7 +743,7 @@ func (c *baseClient) GetUsers(
 
 	var request getAccountInfoRequest
 	for i := range identifiers {
-		identifiers[i].populateRequest(&request)
+		identifiers[i].populate(&request)
 	}
 
 	if err := request.validate(); err != nil {
@@ -747,9 +762,6 @@ func (c *baseClient) GetUsers(
 			return nil, err
 		}
 		userRecords = append(userRecords, userRecord)
-	}
-	if len(identifiers) < len(userRecords) {
-		return nil, errors.New("GetUsers() returned more results than requested")
 	}
 
 	var notFound []UserIdentifier
