@@ -715,7 +715,7 @@ func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
 	return false
 }
 
-// Gets the user data corresponding to the specified identifiers.
+// GetUsers returns the user data corresponding to the specified identifiers.
 //
 // There are no ordering guarantees; in particular, the nth entry in the users
 // result list is not guaranteed to correspond to the nth entry in the input
@@ -724,13 +724,9 @@ func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
 // Only a maximum of 100 identifiers may be supplied. If more than 100
 // identifiers are supplied, this method will immediately return an error.
 //
-// Parameters:
-//   identifiers: The identifiers used to indicate which user records should be
-//     returned. Must have <= 100 entries.
-//
-// Returns: The corresponding user records. An error is returned instead if any
-//   of the identifiers are invalid or if more than 100 identifiers are
-//   specified.
+// Returns the corresponding user records. An error is returned instead if any
+// of the identifiers are invalid or if more than 100 identifiers are
+// specified.
 func (c *baseClient) GetUsers(
 	ctx context.Context, identifiers []UserIdentifier,
 ) (*GetUsersResult, error) {
@@ -977,25 +973,25 @@ type DeleteUsersErrorInfo struct {
 	Reason string `json:"message,omitEmpty"`
 }
 
-// Deletes the users specified by the given identifiers.
+// DeleteUsers deletes the users specified by the given identifiers.
 //
-// Deleting a non-existing user won't generate an error. (i.e. this method is idempotent.)
-// Non-existing users will be considered to be successfully deleted, and will therefore be
-// counted in the DeleteUsersResult.SuccessCount value.
+// Deleting a non-existing user won't generate an error. (i.e. this method is
+// idempotent.) Non-existing users will be considered to be successfully
+// deleted, and will therefore be counted in the DeleteUsersResult.SuccessCount
+// value.
 //
-// Only a maximum of 1000 identifiers may be supplied. If more than 1000 identifiers are
-// supplied, this method will immediately return an error.
+// Only a maximum of 1000 identifiers may be supplied. If more than 1000
+// identifiers are supplied, this method will immediately return an error.
 //
-// This API is currently rate limited at the server to 1 QPS. If you exceed this, you may get
-// a quota exceeded error. Therefore, if you want to delete more than 1000 users, you may
-// need to add a delay to ensure you don't go over this limit.
+// This API is currently rate limited at the server to 1 QPS. If you exceed
+// this, you may get a quota exceeded error. Therefore, if you want to delete
+// more than 1000 users, you may need to add a delay to ensure you don't go
+// over this limit.
 //
-// Parameters:
-//   uids: The uids of the users to be deleted. Must have <= 1000 entries.
-//
-// Returns: The total number of successful/failed deletions, as well as the array of errors
-//   that correspond to the failed deletions. An error is returned if any of the identifiers
-//   are invalid or if more than 1000 identifiers are specified.
+// Returns the total number of successful/failed deletions, as well as the
+// array of errors that correspond to the failed deletions. An error is
+// returned if any of the identifiers are invalid or if more than 1000
+// identifiers are specified.
 func (c *baseClient) DeleteUsers(ctx context.Context, uids []string) (*DeleteUsersResult, error) {
 	if len(uids) == 0 {
 		return &DeleteUsersResult{}, nil
