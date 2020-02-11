@@ -59,6 +59,7 @@ jobs:
         $GOPATH/bin/golint -set_exit_status firebase.google.com/go/...
 
     - name: Run Tests
+      working-directory: ./go/src/firebase.google.com/go
       run: ./.github/scripts/run_all_tests.sh
       env:
         FIREBASE_SERVICE_ACCT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCT_KEY }}
