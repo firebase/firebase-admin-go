@@ -33,6 +33,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    env:
+      GOPATH: ${{ github.workspace }}/go
+
     # When manually triggering the build, the requester can specify a target branch or a tag
     # via the 'ref' client parameter.
     steps:
