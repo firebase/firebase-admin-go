@@ -18,8 +18,8 @@ set -e
 set -u
 
 gpg --quiet --batch --yes --decrypt --passphrase="${FIREBASE_SERVICE_ACCT_KEY}" \
-  --output integration_cert.json .github/resources/integ-service-account.json.gpg
+  --output testdata/integration_cert.json .github/resources/integ-service-account.json.gpg
 
-echo "${FIREBASE_API_KEY}" > integration_apikey.txt
+echo "${FIREBASE_API_KEY}" > testdata/integration_apikey.txt
 
 go test -v -race firebase.google.com/go/...
