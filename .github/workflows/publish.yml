@@ -22,23 +22,17 @@ on:
 
 jobs:
   publish_release:
-    # Check whether the release should be published. We publish only when the trigger PR is
-    #   1. merged to the master branch
-    #   2. with the label 'release:publish', and
-    #   3. the title prefix '[chore] Release '.
-    if: github.event.pull_request.merged &&
-      contains(github.event.pull_request.labels.*.name, 'release:publish') &&
-      startsWith(github.event.pull_request.title, '[chore] Release ')
+    if: github.event.pull_request.merged
 
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout source for publish
+    - name: Checkout source
       uses: actions/checkout@v2
 
-    - name: Publish preflight check
-      id: preflight
-      run: ./.github/scripts/publish_preflight_check.sh
+    - name: Publish post check
+      id: postcheck
+      run: ./.github/scripts/publish_post_check.sh
 
     # We pull this action from a custom fork of a contributor until
     # https://github.com/actions/create-release/pull/32 is merged. Also note that v1 of
@@ -48,9 +42,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.preflight.outputs.version }}
-        release_name: Firebase Admin Go SDK ${{ steps.preflight.outputs.version }}
-        body: ${{ steps.preflight.outputs.changelog }}
+        tag_name: ${{ steps.postcheck.outputs.version }}
+        release_name: Firebase Admin Go SDK ${{ steps.postcheck.outputs.version }}
+        body: ${{ steps.postcheck.outputs.changelog }}
         draft: false
         prerelease: false
 
@@ -58,11 +52,11 @@ jobs:
     - name: Post to Twitter
       if: success() &&
         contains(github.event.pull_request.labels.*.name, 'release:tweet')
-      uses: ethomson/send-tweet-action@v1
+      uses: firebase/firebase-admin-node/.github/actions/send-tweet@master
       with:
         status: >
-          ${{ steps.preflight.outputs.version }} of @Firebase Admin Go SDK is avaialble.
-          https://github.com/firebase/firebase-admin-python/releases/tag/${{ steps.preflight.outputs.version }}
+          ${{ steps.postcheck.outputs.version }} of @Firebase Admin Go SDK is avaialble.
+          https://github.com/firebase/firebase-admin-go/releases/tag/${{ steps.postcheck.outputs.version }}
         consumer-key: ${{ secrets.FIREBASE_TWITTER_CONSUMER_KEY }}
         consumer-secret: ${{ secrets.FIREBASE_TWITTER_CONSUMER_SECRET }}
         access-token: ${{ secrets.FIREBASE_TWITTER_ACCESS_TOKEN }}

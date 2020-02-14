@@ -27,9 +27,11 @@ on:
 jobs:
   stage_release:
     # To stage a release without publishing it, send a 'firebase_build' event or apply
-    # the 'release:stage' label to a PR.
+    # the 'release:stage' label to a PR. PRs targetting the master branch are always
+    # staged.
     if: github.event.action == 'firebase_build' ||
-      contains(github.event.pull_request.labels.*.name, 'release:stage')
+      contains(github.event.pull_request.labels.*.name, 'release:stage') ||
+      github.event.pull_request.base.ref == 'master'
 
     runs-on: ubuntu-latest
 
@@ -55,6 +57,7 @@ jobs:
 
     - name: Run Linter
       run: |
+        echo
         go get golang.org/x/lint/golint
         $GOPATH/bin/golint -set_exit_status firebase.google.com/go/...
 
@@ -64,3 +67,8 @@ jobs:
       env:
         FIREBASE_SERVICE_ACCT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCT_KEY }}
         FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+
+    # If triggered by a PR against the master branch, run additional checks.
+    - name: Publish preflight check
+      if: github.event.pull_request.base.ref == 'master'
+      run: ./.github/scripts/publish_preflight_check.sh
