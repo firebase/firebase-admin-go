@@ -211,6 +211,9 @@ func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
 	if e.Reason != "unknown-error" {
 		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "unknown-error")
 	}
+	if e.Code != "unknown-error" {
+		t.Errorf("ErrorInfo.Code = %s; want = %s", e.Code, "unknown-error")
+	}
 }
 
 var invalidTopicMgtArgs = []struct {

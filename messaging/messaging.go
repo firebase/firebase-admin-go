@@ -896,6 +896,7 @@ type FCMOptions struct {
 type ErrorInfo struct {
 	Index  int
 	Reason string
+	Code   string
 }
 
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.

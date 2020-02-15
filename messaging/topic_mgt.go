@@ -70,14 +70,18 @@ func newTopicManagementResponse(resp *iidResponse) *TopicManagementResponse {
 			code := res["error"].(string)
 			info, ok := iidErrorCodes[code]
 			var reason string
+			var iidErrorCode string
 			if ok {
 				reason = info.Msg
+				iidErrorCode = info.Code
 			} else {
 				reason = unknownError
+				iidErrorCode = unknownError
 			}
 			tmr.Errors = append(tmr.Errors, &ErrorInfo{
 				Index:  idx,
 				Reason: reason,
+				Code:   iidErrorCode,
 			})
 		}
 	}
