@@ -957,9 +957,9 @@ type DeleteUsersResult struct {
 	// The number of users that failed to be deleted (possibly zero).
 	FailureCount int
 
-  // A list of DeleteUsersErrorInfo instances describing the errors that were
-  // encountered during the deletion. Length of this list is equal to the value
-  // of FailureCount.
+	// A list of DeleteUsersErrorInfo instances describing the errors that were
+	// encountered during the deletion. Length of this list is equal to the value
+	// of FailureCount.
 	Errors []*DeleteUsersErrorInfo
 }
 
