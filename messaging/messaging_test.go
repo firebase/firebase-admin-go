@@ -311,7 +311,7 @@ var validMessages = []struct {
 					Vibrate:            []int{100, 200, 100},
 					CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
 				},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "https://link.com",
 				},
 			},
@@ -959,7 +959,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			Webpush: &WebpushConfig{
 				Notification: &WebpushNotification{},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "link",
 				},
 			},
@@ -972,7 +972,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			Webpush: &WebpushConfig{
 				Notification: &WebpushNotification{},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "http://link.com",
 				},
 			},

@@ -554,7 +554,7 @@ type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
-	FcmOptions   *WebpushFcmOptions   `json:"fcm_options,omitempty"`
+	FCMOptions   *WebpushFCMOptions   `json:"fcm_options,omitempty"`
 }
 
 // WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
@@ -660,8 +660,8 @@ func (n *WebpushNotification) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// WebpushFcmOptions contains additional options for features provided by the FCM web SDK.
-type WebpushFcmOptions struct {
+// WebpushFCMOptions contains additional options for features provided by the FCM web SDK.
+type WebpushFCMOptions struct {
 	Link string `json:"link,omitempty"`
 }
 
