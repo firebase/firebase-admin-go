@@ -657,7 +657,7 @@ func (id ProviderIdentifier) populate(req *getAccountInfoRequest) {
 
 // A GetUsersResult represents the result of the GetUsers() API.
 type GetUsersResult struct {
-	// Set of UserRecords, corresponding to the set of users that were requested.
+	// Set of UserRecords corresponding to the set of users that were requested.
 	// Only users that were found are listed here. The result set is unordered.
 	Users []*UserRecord
 
@@ -721,8 +721,8 @@ func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
 // result list is not guaranteed to correspond to the nth entry in the input
 // parameters list.
 //
-// Only a maximum of 100 identifiers may be supplied. If more than 100
-// identifiers are supplied, this method will immediately return an error.
+// A maximum of 100 identifiers may be supplied. If more than 100
+// identifiers are supplied, this method returns an error.
 //
 // Returns the corresponding user records. An error is returned instead if any
 // of the identifiers are invalid or if more than 100 identifiers are
@@ -950,16 +950,16 @@ func (c *baseClient) DeleteUser(ctx context.Context, uid string) error {
 // A DeleteUsersResult represents the result of the DeleteUsers() call.
 type DeleteUsersResult struct {
 	// The number of users that were deleted successfully (possibly zero). Users
-	// that did not exist prior to calling DeleteUsers() will be considered to be
+	// that did not exist prior to calling DeleteUsers() are considered to be
 	// successfully deleted.
 	SuccessCount int
 
 	// The number of users that failed to be deleted (possibly zero).
 	FailureCount int
 
-	// A list of describing the errors that were encountered
-	// during the deletion. Length of this list is equal to the value of
-	// FailureCount.
+  // A list of DeleteUsersErrorInfo instances describing the errors that were
+  // encountered during the deletion. Length of this list is equal to the value
+  // of FailureCount.
 	Errors []*DeleteUsersErrorInfo
 }
 
@@ -976,12 +976,12 @@ type DeleteUsersErrorInfo struct {
 // DeleteUsers deletes the users specified by the given identifiers.
 //
 // Deleting a non-existing user won't generate an error. (i.e. this method is
-// idempotent.) Non-existing users will be considered to be successfully
-// deleted, and will therefore be counted in the DeleteUsersResult.SuccessCount
+// idempotent.) Non-existing users are considered to be successfully
+// deleted, and are therefore counted in the DeleteUsersResult.SuccessCount
 // value.
 //
-// Only a maximum of 1000 identifiers may be supplied. If more than 1000
-// identifiers are supplied, this method will immediately return an error.
+// A maximum of 1000 identifiers may be supplied. If more than 1000
+// identifiers are supplied, this method returns an error.
 //
 // This API is currently rate limited at the server to 1 QPS. If you exceed
 // this, you may get a quota exceeded error. Therefore, if you want to delete
