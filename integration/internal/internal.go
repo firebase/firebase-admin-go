@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/internal"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )

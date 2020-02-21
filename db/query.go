@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package db // import "firebase.google.com/go/db"
+package db // import "firebase.google.com/go/v4/db"
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 )
 
 // QueryNode represents a data node retrieved from an ordered query.
