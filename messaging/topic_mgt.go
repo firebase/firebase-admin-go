@@ -26,8 +26,8 @@ import (
 
 const (
 	iidEndpoint    = "https://iid.googleapis.com/iid/v1"
-	iidSubscribe   = ":batchAdd"
-	iidUnsubscribe = ":batchRemove"
+	iidSubscribe   = "batchAdd"
+	iidUnsubscribe = "batchRemove"
 )
 
 var iidErrorCodes = map[string]struct{ Code, Msg string }{
@@ -164,7 +164,7 @@ func (c *iidClient) makeTopicManagementRequest(ctx context.Context, req *iidRequ
 
 	request := &internal.Request{
 		Method: http.MethodPost,
-		URL:    fmt.Sprintf("%s/%s", c.iidEndpoint, req.op),
+		URL:    fmt.Sprintf("%s:%s", c.iidEndpoint, req.op),
 		Body:   internal.NewJSONEntity(req),
 	}
 	var result iidResponse
