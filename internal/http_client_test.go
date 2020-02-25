@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -238,15 +237,15 @@ func TestSuccessFn(t *testing.T) {
 		Method: http.MethodGet,
 		URL:    server.URL,
 	}
-	want := "unexpected http response with status: 200; body: {}"
+	want := "unexpected http response with status: 200\n{}"
 
 	resp, err := client.Do(context.Background(), get)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	if !HasPlatformErrorCode(err, Unknown) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, Unknown)
 	}
 }
 
@@ -268,15 +267,15 @@ func TestSuccessFnOnRequest(t *testing.T) {
 			return false
 		},
 	}
-	want := "unexpected http response with status: 200; body: {}"
+	want := "unexpected http response with status: 200\n{}"
 
 	resp, err := client.Do(context.Background(), get)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	if !HasPlatformErrorCode(err, Unknown) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, Unknown)
 	}
 }
 
@@ -310,8 +309,8 @@ func TestPlatformError(t *testing.T) {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "NOT_FOUND") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "NOT_FOUND")
+	if !HasPlatformErrorCode(err, NotFound) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, NotFound)
 	}
 }
 
@@ -331,15 +330,15 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		Method: http.MethodGet,
 		URL:    server.URL,
 	}
-	want := "unexpected http response with status: 404; body: {}"
+	want := "unexpected http response with status: 404\n{}"
 
 	resp, err := client.Do(context.Background(), get)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	if !HasPlatformErrorCode(err, NotFound) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, NotFound)
 	}
 }
 
@@ -909,12 +908,11 @@ func TestNewHttpClientRetryOnResponseReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.RetryConfig.ExpBackoffFactor = 0
-	wantPrefix := "error while making http call: "
 
 	req := &Request{Method: http.MethodGet, URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
-	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("Do() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+	if resp != nil || err == nil {
+		t.Errorf("Do() = (%v, %v); want = (nil, error)", resp, err)
 	}
 
 	wantRequests := 1 + defaultMaxRetries
