@@ -244,8 +244,19 @@ func TestSuccessFn(t *testing.T) {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasPlatformErrorCode(err, Unknown) {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, Unknown)
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != Unknown {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unknown)
+	}
+	if fe.Response == nil {
+		t.Fatalf("Do() err.Response = nil; want = non-nil")
+	}
+	if fe.Response.StatusCode != http.StatusOK {
+		t.Errorf("Do() err.Response.StatusCode = %d; want = %d", fe.Response.StatusCode, http.StatusOK)
 	}
 }
 
@@ -309,8 +320,19 @@ func TestPlatformError(t *testing.T) {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasPlatformErrorCode(err, NotFound) {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, NotFound)
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != NotFound {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, NotFound)
+	}
+	if fe.Response == nil {
+		t.Fatalf("Do() err.Response = nil; want = non-nil")
+	}
+	if fe.Response.StatusCode != http.StatusNotFound {
+		t.Errorf("Do() err.Response.StatusCode = %d; want = %d", fe.Response.StatusCode, http.StatusNotFound)
 	}
 }
 
@@ -337,8 +359,19 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasPlatformErrorCode(err, NotFound) {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, NotFound)
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != NotFound {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, NotFound)
+	}
+	if fe.Response == nil {
+		t.Fatalf("Do() err.Response = nil; want = non-nil")
+	}
+	if fe.Response.StatusCode != http.StatusNotFound {
+		t.Errorf("Do() err.Response.StatusCode = %d; want = %d", fe.Response.StatusCode, http.StatusNotFound)
 	}
 }
 

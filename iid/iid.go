@@ -146,7 +146,7 @@ func (c *Client) DeleteInstanceID(ctx context.Context, iid string) error {
 }
 
 func createError(resp *internal.Response) error {
-	err := internal.NewFirebaseErrorFromHTTPResponse(resp)
+	err := internal.NewFirebaseError(resp)
 	if msg, ok := errorMessages[resp.Status]; ok {
 		requestPath := resp.LowLevelResponse().Request.URL.Path
 		idx := strings.LastIndex(requestPath, "/")

@@ -227,7 +227,7 @@ func (c *HTTPClient) success(req *Request, resp *Response) bool {
 
 func (c *HTTPClient) newError(req *Request, resp *Response) error {
 	createErr := func(r *Response) error {
-		return NewFirebaseErrorFromPlatformResponse(r)
+		return NewFirebaseErrorOnePlatform(r)
 	}
 
 	if req.CreateErrFn != nil {

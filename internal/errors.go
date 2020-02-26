@@ -89,8 +89,8 @@ var httpStatusToErrorCodes = map[int]ErrorCode{
 	http.StatusServiceUnavailable:  Unavailable,
 }
 
-// NewFirebaseErrorFromHTTPResponse creates a new error from the given HTTP response.
-func NewFirebaseErrorFromHTTPResponse(resp *Response) *FirebaseError {
+// NewFirebaseError creates a new error from the given HTTP response.
+func NewFirebaseError(resp *Response) *FirebaseError {
 	code, ok := httpStatusToErrorCodes[resp.Status]
 	if !ok {
 		code = Unknown
@@ -103,13 +103,13 @@ func NewFirebaseErrorFromHTTPResponse(resp *Response) *FirebaseError {
 	}
 }
 
-// NewFirebaseErrorFromPlatformResponse parses the response payload as a GCP error response
+// NewFirebaseErrorOnePlatform parses the response payload as a GCP error response
 // and create an error from the details extracted.
 //
 // If the response failes to parse, or otherwise doesn't provide any useful details
 // CreatePlatformError creates an error with some sensible defaults.
-func NewFirebaseErrorFromPlatformResponse(resp *Response) *FirebaseError {
-	base := NewFirebaseErrorFromHTTPResponse(resp)
+func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
+	base := NewFirebaseError(resp)
 
 	var gcpError struct {
 		Error struct {
