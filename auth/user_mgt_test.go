@@ -140,21 +140,117 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 	}
 }
 
+func TestGetUserByProviderIDNotFound(t *testing.T) {
+	mockUsers := []byte(`{ "users": [] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	userRecord, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
+	want := "cannot find user from providerID: { google.com, google_uid1 }"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+}
+
+func TestGetUserByProviderID(t *testing.T) {
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	_, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
+	if err != nil {
+		t.Fatalf("GetUserByProviderID() = %q", err)
+	}
+
+	want := `{"federatedUserId":[{"providerId":"google.com","rawId":"google_uid1"}]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestGetPhoneUserByProviderID(t *testing.T) {
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	_, err := s.Client.GetUserByProviderID(context.Background(), "phone", "+15555550001")
+	if err != nil {
+		t.Fatalf("GetUserByProviderID() = %q", err)
+	}
+
+	want := `{"phoneNumber":["+15555550001"]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestGetEmailUserByProviderID(t *testing.T) {
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	_, err := s.Client.GetUserByProviderID(context.Background(), "email", "user@example.com")
+	if err != nil {
+		t.Fatalf("GetUserByProviderID() = %q", err)
+	}
+
+	want := `{"email":["user@example.com"]}`
+	got := string(s.Rbody)
+	if got != want {
+		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:lookup"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
 func TestInvalidGetUser(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{},
 	}
+
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByEmail(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserByEmail('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByPhoneNumber(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	userRecord, err := client.GetUserByProviderID(context.Background(), "", "google_uid1")
+	want := "providerID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+
+	userRecord, err = client.GetUserByProviderID(context.Background(), "google.com", "")
+	want = "providerUID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
 

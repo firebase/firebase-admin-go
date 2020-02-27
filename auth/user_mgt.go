@@ -544,6 +544,41 @@ func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*U
 	})
 }
 
+// GetUserByProviderUid gets the user data for the user corresponding to a given provider id.
+//
+// See
+// [Retrieve user data](https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data)
+// for code samples and detailed documentation.
+//
+// `providerID` indicates the provider, e.g. 'google.com' for the Google provider.
+// `providerUID` is the user identifier for the given provider.
+func (c *baseClient) GetUserByProviderID(ctx context.Context, providerID string, providerUID string) (*UserRecord, error) {
+	// Although we don't really advertise it, we want to also handle non-federated
+	// idps with this call. So if we detect one of them, we'll reroute this
+	// request appropriately.
+	if providerID == "phone" {
+		return c.GetUserByPhoneNumber(ctx, providerUID)
+	} else if providerID == "email" {
+		return c.GetUserByEmail(ctx, providerUID)
+	}
+
+	if err := validateProvider(providerID, providerUID); err != nil {
+		return nil, err
+	}
+
+	getUsersResult, err := c.GetUsers(ctx, []UserIdentifier{&ProviderIdentifier{providerID, providerUID}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(getUsersResult.Users) == 0 {
+		return nil, internal.Errorf(
+			userNotFound, "cannot find user from providerID: { %s, %s }", providerID, providerUID)
+	}
+
+	return getUsersResult.Users[0], nil
+}
+
 type userQuery struct {
 	field string
 	value string

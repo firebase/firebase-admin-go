@@ -80,6 +80,34 @@ func TestGetUser(t *testing.T) {
 	}
 }
 
+func TestGetUserByProviderID(t *testing.T) {
+	// TODO(rsgowman): Once we can link a provider id with a user, just do that
+	// here instead of importing a new user.
+	importUserUID := randomUID()
+	providerUID := "google_" + importUserUID
+	userToImport := (&auth.UserToImport{}).
+		UID(importUserUID).
+		Email(randomEmail(importUserUID)).
+		PhoneNumber(randomPhoneNumber()).
+		ProviderData([](*auth.UserProvider){
+			&auth.UserProvider{
+				ProviderID: "google.com",
+				UID:        providerUID,
+			},
+		})
+	importUser(t, importUserUID, userToImport)
+	defer deleteUser(importUserUID)
+
+	userRecord, err := client.GetUserByProviderID(context.Background(), "google.com", providerUID)
+	if err != nil {
+		t.Fatalf("GetUserByProviderID() = %q", err)
+	}
+
+	if userRecord.UID != importUserUID {
+		t.Errorf("GetUserByProviderID().UID = %v; want = %v", userRecord.UID, importUserUID)
+	}
+}
+
 func TestGetNonExistingUser(t *testing.T) {
 	user, err := client.GetUser(context.Background(), "non.existing")
 	if user != nil || !auth.IsUserNotFound(err) {
@@ -89,6 +117,16 @@ func TestGetNonExistingUser(t *testing.T) {
 	user, err = client.GetUserByEmail(context.Background(), "non.existing@definitely.non.existing")
 	if user != nil || !auth.IsUserNotFound(err) {
 		t.Errorf("GetUserByEmail(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	user, err = client.GetUserByPhoneNumber(context.Background(), "+14044040404")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	user, err = client.GetUserByProviderID(context.Background(), "google.com", "a-uid-that-doesnt-exist")
+	if user != nil || !auth.IsUserNotFound(err) {
+		t.Errorf("GetUser(non.existing) = (%v, %v); want = (nil, error)", user, err)
 	}
 }
 
