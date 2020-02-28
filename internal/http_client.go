@@ -115,6 +115,10 @@ type Response struct {
 // returned response with no impact on the underlying HTTP connection. Closing the Body on the
 // returned response is a No-op.
 func (r *Response) LowLevelResponse() *http.Response {
+	if r.resp == nil {
+		return nil
+	}
+
 	resp := *r.resp
 	resp.Body = ioutil.NopCloser(bytes.NewBuffer(r.Body))
 	return &resp
