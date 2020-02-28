@@ -24,6 +24,17 @@ func IsInvalidArgument(err error) bool {
 	return internal.HasPlatformErrorCode(err, internal.InvalidArgument)
 }
 
+// IsFailedPrecondition checks if the given error was because a request could not be executed
+// in the current system state, such as deleting a non-empty directory.
+func IsFailedPrecondition(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.FailedPrecondition)
+}
+
+// IsOutOfRange checks if the given error due to an invalid range specified by the client.
+func IsOutOfRange(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.OutOfRange)
+}
+
 // IsUnauthenticated checks if the given error was caused by an unauthenticated request.
 //
 // Unauthenticated requests are due to missing, invalid, or expired OAuth token.
@@ -49,14 +60,48 @@ func IsNotFound(err error) bool {
 
 // IsConflict checks if the given error was due to a concurrency conflict, such as a
 // read-modify-write conflict.
+//
+// This represents an HTTP 409 Conflict status code, without additional information to distinguish
+// between ABORTED or ALREADY_EXISTS error conditions.
 func IsConflict(err error) bool {
 	return internal.HasPlatformErrorCode(err, internal.Conflict)
+}
+
+// IsAborted checks if the given error was due to a concurrency conflict, such as a
+// read-modify-write conflict.
+func IsAborted(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.Aborted)
+}
+
+// IsAlreadyExists checks if the given error was because a resource that a client tried to create
+// already exists..
+func IsAlreadyExists(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.AlreadyExists)
 }
 
 // IsResourceExhausted checks if the given error was caused by either running out of a quota or
 // reaching a rate limit.
 func IsResourceExhausted(err error) bool {
 	return internal.HasPlatformErrorCode(err, internal.ResourceExhausted)
+}
+
+// IsCancelled checks if the given error was due to the client cancelling a request.
+func IsCancelled(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.Cancelled)
+}
+
+// IsDataLoss checks if the given error was due to an unrecoverable data loss or corruption.
+//
+// The client should report such errors to the end user.
+func IsDataLoss(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.DataLoss)
+}
+
+// IsUnknown checks if the given error was cuased by an unknown server error.
+//
+// This typically indicates a server bug.
+func IsUnknown(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.Unknown)
 }
 
 // IsInternal checks if the given error was due to an internal server error.
@@ -73,11 +118,13 @@ func IsUnavailable(err error) bool {
 	return internal.HasPlatformErrorCode(err, internal.Unavailable)
 }
 
-// IsUnknown checks if the given error was cuased by an unknown server error.
+// IsDeadlineExceeded checks if the given error was due a request exceeding a deadline.
 //
-// This typically indicates a server bug.
-func IsUnknown(err error) bool {
-	return internal.HasPlatformErrorCode(err, internal.Unknown)
+// his will happen only if the caller sets a deadline that is shorter than the method's default
+// deadline (i.e. requested deadline is not enough for the server to process the request) and the
+// request did not finish within the deadline.
+func IsDeadlineExceeded(err error) bool {
+	return internal.HasPlatformErrorCode(err, internal.DeadlineExceeded)
 }
 
 // HTTPResponse returns the http.Response instance that caused the given error.

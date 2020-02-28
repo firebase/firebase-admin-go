@@ -25,21 +25,58 @@ import (
 type ErrorCode string
 
 const (
-	InvalidArgument    ErrorCode = "INVALID_ARGUMENT"
+	// InvalidArgument is a OnePlatform error code.
+	InvalidArgument ErrorCode = "INVALID_ARGUMENT"
+
+	// FailedPrecondition is a OnePlatform error code.
 	FailedPrecondition ErrorCode = "FAILED_PRECONDITION"
-	OutOfRange         ErrorCode = "OUT_OF_RANGE"
-	Unauthenticated    ErrorCode = "UNAUTHENTICATED"
-	PermissionDenied   ErrorCode = "PERMISSION_DENIED"
-	NotFound           ErrorCode = "NOT_FOUND"
-	Conflict           ErrorCode = "CONFLICT"
-	Aborted            ErrorCode = "ABORTED"
-	ResourceExhausted  ErrorCode = "RESOURCE_EXHAUSTED"
-	Cancelled          ErrorCode = "CANCELLED"
-	DataLoss           ErrorCode = "DATA_LOSS"
-	Unknown            ErrorCode = "UNKNOWN"
-	Internal           ErrorCode = "INTERNAL"
-	Unavailable        ErrorCode = "UNAVAILABLE"
-	DeadlineExceeded   ErrorCode = "DEADLINE_EXCEEDED"
+
+	// OutOfRange is a OnePlatform error code.
+	OutOfRange ErrorCode = "OUT_OF_RANGE"
+
+	// Unauthenticated is a OnePlatform error code.
+	Unauthenticated ErrorCode = "UNAUTHENTICATED"
+
+	// PermissionDenied is a OnePlatform error code.
+	PermissionDenied ErrorCode = "PERMISSION_DENIED"
+
+	// NotFound is a OnePlatform error code.
+	NotFound ErrorCode = "NOT_FOUND"
+
+	// Conflict is a custom error code that represents HTTP 409 responses.
+	//
+	// OnePlatform APIs typically respond with ABORTED or ALREADY_EXISTS explicitly. But a few
+	// old APIs send HTTP 409 Conflict without any additional details to distinguish between the two
+	// cases. For these we currently use this error code. As more APIs adopt OnePlatform conventions
+	// this will become less important.
+	Conflict ErrorCode = "CONFLICT"
+
+	// Aborted is a OnePlatform error code.
+	Aborted ErrorCode = "ABORTED"
+
+	// AlreadyExists is a OnePlatform error code.
+	AlreadyExists ErrorCode = "ALREADY_EXISTS"
+
+	// ResourceExhausted is a OnePlatform error code.
+	ResourceExhausted ErrorCode = "RESOURCE_EXHAUSTED"
+
+	// Cancelled is a OnePlatform error code.
+	Cancelled ErrorCode = "CANCELLED"
+
+	// DataLoss is a OnePlatform error code.
+	DataLoss ErrorCode = "DATA_LOSS"
+
+	// Unknown is a OnePlatform error code.
+	Unknown ErrorCode = "UNKNOWN"
+
+	// Internal is a OnePlatform error code.
+	Internal ErrorCode = "INTERNAL"
+
+	// Unavailable is a OnePlatform error code.
+	Unavailable ErrorCode = "UNAVAILABLE"
+
+	// DeadlineExceeded is a OnePlatform error code.
+	DeadlineExceeded ErrorCode = "DEADLINE_EXCEEDED"
 )
 
 // FirebaseError is an error type containing an error code string.
@@ -54,6 +91,7 @@ func (fe *FirebaseError) Error() string {
 	return fe.String
 }
 
+// HasPlatformErrorCode checks if the given error contains a specific error code.
 func HasPlatformErrorCode(err error, code ErrorCode) bool {
 	fe, ok := err.(*FirebaseError)
 	return ok && fe.ErrorCode == code
