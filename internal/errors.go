@@ -98,12 +98,16 @@ func HasPlatformErrorCode(err error, code ErrorCode) bool {
 }
 
 // HasErrorCode checks if the given error contain a specific error code.
+//
+// Deprecated.
 func HasErrorCode(err error, code string) bool {
 	fe, ok := err.(*FirebaseError)
 	return ok && fe.Code == code
 }
 
 // Error creates a new FirebaseError from the specified error code and message.
+//
+// Deprecated.
 func Error(code string, msg string) *FirebaseError {
 	return &FirebaseError{
 		Code:   code,
@@ -112,6 +116,8 @@ func Error(code string, msg string) *FirebaseError {
 }
 
 // Errorf creates a new FirebaseError from the specified error code and message.
+//
+// Deprecated.
 func Errorf(code string, msg string, args ...interface{}) *FirebaseError {
 	return Error(code, fmt.Sprintf(msg, args...))
 }
