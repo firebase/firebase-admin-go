@@ -653,6 +653,48 @@ func TestInvalidUpdateUser(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).Password("short"),
 			"password must be a string at least 6 characters long",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com"}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com", UID: ""}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "", UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProvidersToDelete([]string{""}),
+			"All providersToDelete must be non-empty strings",
+		}, {
+			(&UserToUpdate{}).
+				Email("user@example.com").
+				ProviderToLink(&UserProvider{
+					ProviderID: "email",
+					UID:        "user@example.com",
+				}),
+			"Both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+				"were set. To link to the email/password provider, only specify the " +
+				"UserToUpdate.Email field.",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("+15555550001").
+				ProviderToLink(&UserProvider{
+					ProviderID: "phone",
+					UID:        "+15555550001",
+				}),
+			"Both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+				"were set. To link to the phone provider, only specify the " +
+				"UserToUpdate.PhoneNumber field.",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("").
+				ProvidersToDelete([]string{"phone"}),
+			"Both UserToUpdate.PhoneNumber='' and " +
+				"UserToUpdate.ProvidersToDelete=['phone'] were set. To unlink from a " +
+				"phone provider, only specify the UserToUpdate.PhoneNumber='''field.",
 		},
 	}
 
@@ -750,6 +792,37 @@ var updateUserCases = []struct {
 			"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
 			"deleteProvider":  []string{"phone"},
 		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "google.com",
+			UID:        "google_uid",
+		}),
+		map[string]interface{}{
+			"linkProviderUserInfo": &UserProvider{
+				ProviderID: "google.com",
+				UID:        "google_uid",
+			}},
+	},
+	{
+		(&UserToUpdate{}).PhoneNumber("").ProvidersToDelete([]string{"google.com"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"phone", "google.com"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "email",
+			UID:        "user@example.com",
+		}),
+		map[string]interface{}{"email": "user@example.com"},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "phone",
+			UID:        "+15555550001",
+		}),
+		map[string]interface{}{"phoneNumber": "+15555550001"},
 	},
 	{
 		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
@@ -1114,7 +1187,7 @@ func TestUserToImportError(t *testing.T) {
 					ProviderID: "google.com",
 				},
 			}),
-			"user provdier must specify a uid",
+			"user provider must specify a uid",
 		},
 	}
 
