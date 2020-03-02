@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package internal contains functionality that is only accessible from within the Admin SDK.
-package internal // import "firebase.google.com/go/internal"
+package internal
 
 import (
 	"fmt"

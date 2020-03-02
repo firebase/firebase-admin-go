@@ -82,7 +82,7 @@ func (c *TenantClient) CustomTokenWithClaims(ctx context.Context, uid string, de
 		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: &customToken{
 			Iss:    iss,
-			Sub:    iss,
+			Sub:    c.TenantID(),
 			Aud:    firebaseAudience,
 			UID:    uid,
 			Iat:    now,

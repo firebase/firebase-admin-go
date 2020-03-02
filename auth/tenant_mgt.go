@@ -53,27 +53,6 @@ type Tenant struct {
 	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
 }
 
-// TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
-// links for specific tenants.
-//
-// Before multi-tenancy can be used in a Google Cloud Identity Platform project, tenants must be
-// enabled in that project via the Cloud Console UI.
-//
-// Each tenant contains its own identity providers, settings and users. TenantClient enables
-// managing users and SAML/OIDC configurations of specific tenants. It also supports verifying ID
-// tokens issued to users who are signed into specific tenants.
-//
-// TenantClient instances for a specific tenantID can be instantiated by calling
-// [TenantManager.AuthForTenant(tenantID)].
-type TenantClient struct {
-	*baseClient
-}
-
-// TenantID returns the ID of the tenant to which this TenantClient instance belongs.
-func (tc *TenantClient) TenantID() string {
-	return tc.tenantID
-}
-
 // TenantManager is the interface used to manage tenants in a multi-tenant application.
 //
 // This supports creating, updating, listing, deleting the tenants of a Firebase project. It also
