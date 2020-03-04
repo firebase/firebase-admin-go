@@ -151,7 +151,7 @@ func NewFirebaseError(resp *Response) *FirebaseError {
 // and create an error from the details extracted.
 //
 // If the response failes to parse, or otherwise doesn't provide any useful details
-// CreatePlatformError creates an error with some sensible defaults.
+// NewFirebaseErrorOnePlatform creates an error with some sensible defaults.
 func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 	base := NewFirebaseError(resp)
 
