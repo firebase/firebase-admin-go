@@ -74,7 +74,7 @@ func IsAborted(err error) bool {
 }
 
 // IsAlreadyExists checks if the given error was because a resource that a client tried to create
-// already exists..
+// already exists.
 func IsAlreadyExists(err error) bool {
 	return internal.HasPlatformErrorCode(err, internal.AlreadyExists)
 }
@@ -120,7 +120,7 @@ func IsUnavailable(err error) bool {
 
 // IsDeadlineExceeded checks if the given error was due a request exceeding a deadline.
 //
-// his will happen only if the caller sets a deadline that is shorter than the method's default
+// This will happen only if the caller sets a deadline that is shorter than the method's default
 // deadline (i.e. requested deadline is not enough for the server to process the request) and the
 // request did not finish within the deadline.
 func IsDeadlineExceeded(err error) bool {
