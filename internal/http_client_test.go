@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -238,15 +237,26 @@ func TestSuccessFn(t *testing.T) {
 		Method: http.MethodGet,
 		URL:    server.URL,
 	}
-	want := "unexpected http response with status: 200; body: {}"
+	want := "unexpected http response with status: 200\n{}"
 
 	resp, err := client.Do(context.Background(), get)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != Unknown {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unknown)
+	}
+	if fe.Response == nil {
+		t.Fatalf("Do() err.Response = nil; want = non-nil")
+	}
+	if fe.Response.StatusCode != http.StatusOK {
+		t.Errorf("Do() err.Response.StatusCode = %d; want = %d", fe.Response.StatusCode, http.StatusOK)
 	}
 }
 
@@ -268,78 +278,15 @@ func TestSuccessFnOnRequest(t *testing.T) {
 			return false
 		},
 	}
-	want := "unexpected http response with status: 200; body: {}"
+	want := "unexpected http response with status: 200\n{}"
 
 	resp, err := client.Do(context.Background(), get)
 	if resp != nil || err == nil || err.Error() != want {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
-	}
-}
-
-func TestPlatformError(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := `{
-			"error": {
-				"status": "NOT_FOUND",
-				"message": "Requested entity not found"
-			}
-		}`
-
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(resp))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
-	}
-	get := &Request{
-		Method: http.MethodGet,
-		URL:    server.URL,
-	}
-	want := "Requested entity not found"
-
-	resp, err := client.Do(context.Background(), get)
-	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
-	}
-
-	if !HasErrorCode(err, "NOT_FOUND") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "NOT_FOUND")
-	}
-}
-
-func TestPlatformErrorWithoutDetails(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("{}"))
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
-	}
-	get := &Request{
-		Method: http.MethodGet,
-		URL:    server.URL,
-	}
-	want := "unexpected http response with status: 404; body: {}"
-
-	resp, err := client.Do(context.Background(), get)
-	if resp != nil || err == nil || err.Error() != want {
-		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
-	}
-
-	if !HasErrorCode(err, "UNKNOWN") {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).Code, "UNKNOWN")
+	if !HasPlatformErrorCode(err, Unknown) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, Unknown)
 	}
 }
 
@@ -909,12 +856,11 @@ func TestNewHttpClientRetryOnResponseReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.RetryConfig.ExpBackoffFactor = 0
-	wantPrefix := "error while making http call: "
 
 	req := &Request{Method: http.MethodGet, URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
-	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("Do() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+	if resp != nil || err == nil {
+		t.Errorf("Do() = (%v, %v); want = (nil, error)", resp, err)
 	}
 
 	wantRequests := 1 + defaultMaxRetries

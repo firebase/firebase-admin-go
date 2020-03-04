@@ -105,6 +105,19 @@ type Response struct {
 	Header    http.Header
 	Body      []byte
 	errParser ErrorParser
+	resp      *http.Response
+}
+
+// LowLevelResponse returns an http.Response that represents the underlying low-level HTTP
+// response.
+//
+// This always returns a buffered copy of the original HTTP response. Body can be read from the
+// returned response with no impact on the underlying HTTP connection. Closing the Body on the
+// returned response is a No-op.
+func (r *Response) LowLevelResponse() *http.Response {
+	resp := *r.resp
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(r.Body))
+	return &resp
 }
 
 // Do executes the given Request, and returns a Response.
@@ -117,20 +130,23 @@ type Response struct {
 // used as the default error function.
 func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 	var result *attemptResult
-	var err error
 
 	for retries := 0; ; retries++ {
-		result, err = c.attempt(ctx, req, retries)
+		hr, err := req.buildHTTPRequest(c.Opts)
 		if err != nil {
 			return nil, err
 		}
+
+		result = c.attempt(ctx, hr, retries)
 		if !result.Retry {
 			break
 		}
+
 		if err = result.waitForRetry(ctx); err != nil {
 			return nil, err
 		}
 	}
+
 	return c.handleResult(req, result)
 }
 
@@ -155,12 +171,7 @@ func (c *HTTPClient) DoAndUnmarshal(ctx context.Context, req *Request, v interfa
 	return resp, nil
 }
 
-func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*attemptResult, error) {
-	hr, err := req.buildHTTPRequest(c.Opts)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *HTTPClient) attempt(ctx context.Context, hr *http.Request, retries int) *attemptResult {
 	resp, err := c.Client.Do(hr.WithContext(ctx))
 	result := &attemptResult{}
 	if err != nil {
@@ -181,12 +192,14 @@ func (c *HTTPClient) attempt(ctx context.Context, req *Request, retries int) (*a
 		result.RetryAfter = delay
 		result.Retry = retry
 	}
-	return result, nil
+
+	return result
 }
 
 func (c *HTTPClient) handleResult(req *Request, result *attemptResult) (*Response, error) {
 	if result.Err != nil {
-		return nil, fmt.Errorf("error while making http call: %v", result.Err)
+		// TODO: Handle transport and I/O errors.
+		return nil, result.Err
 	}
 
 	if !c.success(req, result.Resp) {
@@ -213,7 +226,10 @@ func (c *HTTPClient) success(req *Request, resp *Response) bool {
 }
 
 func (c *HTTPClient) newError(req *Request, resp *Response) error {
-	createErr := CreatePlatformError
+	createErr := func(r *Response) error {
+		return NewFirebaseErrorOnePlatform(r)
+	}
+
 	if req.CreateErrFn != nil {
 		createErr = req.CreateErrFn
 	} else if c.CreateErrFn != nil {
@@ -292,11 +308,13 @@ func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	return &Response{
 		Status:    resp.StatusCode,
 		Body:      b,
 		Header:    resp.Header,
 		errParser: errParser,
+		resp:      resp,
 	}, nil
 }
 
@@ -374,33 +392,6 @@ func WithQueryParams(qp map[string]string) HTTPOption {
 // HasSuccessStatus returns true if the response status code is in the 2xx range.
 func HasSuccessStatus(r *Response) bool {
 	return r.Status >= http.StatusOK && r.Status < http.StatusNotModified
-}
-
-// CreatePlatformError parses the response payload as a GCP error response
-// and create an error from the details extracted.
-//
-// If the response failes to parse, or otherwise doesn't provide any useful details
-// CreatePlatformError creates an error with some sensible defaults.
-func CreatePlatformError(resp *Response) error {
-	var gcpError struct {
-		Error struct {
-			Status  string `json:"status"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	json.Unmarshal(resp.Body, &gcpError) // ignore any json parse errors at this level
-	code := gcpError.Error.Status
-	if code == "" {
-		code = "UNKNOWN"
-	}
-
-	message := gcpError.Error.Message
-	if message == "" {
-		message = fmt.Sprintf(
-			"unexpected http response with status: %d; body: %s", resp.Status, string(resp.Body))
-	}
-
-	return Error(code, message)
 }
 
 // RetryConfig specifies how the HTTPClient should retry failing HTTP requests.
