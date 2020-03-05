@@ -544,7 +544,7 @@ func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*U
 	})
 }
 
-// GetUserByProviderUid gets the user data for the user corresponding to a given provider id.
+// GetUserByProviderID gets the user data for the user corresponding to a given provider id.
 //
 // See
 // [Retrieve user data](https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data)

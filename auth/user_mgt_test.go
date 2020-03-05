@@ -152,72 +152,49 @@ func TestGetUserByProviderIDNotFound(t *testing.T) {
 	}
 }
 
-func TestGetUserByProviderID(t *testing.T) {
-	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
-	mockUsers := []byte(`{ "users": [{}] }`)
-	s := echoServer(mockUsers, t)
-	defer s.Close()
-
-	_, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
-	if err != nil {
-		t.Fatalf("GetUserByProviderID() = %q", err)
+func TestGetUserByProviderId(t *testing.T) {
+	cases := []struct {
+		providerID  string
+		providerUID string
+		want        string
+	}{
+		{
+			"google.com",
+			"google_uid1",
+			`{"federatedUserId":[{"providerId":"google.com","rawId":"google_uid1"}]}`,
+		}, {
+			"phone",
+			"+15555550001",
+			`{"phoneNumber":["+15555550001"]}`,
+		}, {
+			"email",
+			"user@example.com",
+			`{"email":["user@example.com"]}`,
+		},
 	}
 
-	want := `{"federatedUserId":[{"providerId":"google.com","rawId":"google_uid1"}]}`
-	got := string(s.Rbody)
-	if got != want {
-		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
-	}
+	for _, tc := range cases {
+		t.Run(tc.providerID+":"+tc.providerUID, func(t *testing.T) {
+			// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+			mockUsers := []byte(`{ "users": [{}] }`)
+			s := echoServer(mockUsers, t)
+			defer s.Close()
 
-	wantPath := "/projects/mock-project-id/accounts:lookup"
-	if s.Req[0].RequestURI != wantPath {
-		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
-	}
-}
+			_, err := s.Client.GetUserByProviderID(context.Background(), tc.providerID, tc.providerUID)
+			if err != nil {
+				t.Fatalf("GetUserByProviderID() = %q", err)
+			}
 
-func TestGetPhoneUserByProviderID(t *testing.T) {
-	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
-	mockUsers := []byte(`{ "users": [{}] }`)
-	s := echoServer(mockUsers, t)
-	defer s.Close()
+			got := string(s.Rbody)
+			if got != tc.want {
+				t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, tc.want)
+			}
 
-	_, err := s.Client.GetUserByProviderID(context.Background(), "phone", "+15555550001")
-	if err != nil {
-		t.Fatalf("GetUserByProviderID() = %q", err)
-	}
-
-	want := `{"phoneNumber":["+15555550001"]}`
-	got := string(s.Rbody)
-	if got != want {
-		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
-	}
-
-	wantPath := "/projects/mock-project-id/accounts:lookup"
-	if s.Req[0].RequestURI != wantPath {
-		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
-	}
-}
-
-func TestGetEmailUserByProviderID(t *testing.T) {
-	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
-	mockUsers := []byte(`{ "users": [{}] }`)
-	s := echoServer(mockUsers, t)
-	defer s.Close()
-
-	_, err := s.Client.GetUserByProviderID(context.Background(), "email", "user@example.com")
-	if err != nil {
-		t.Fatalf("GetUserByProviderID() = %q", err)
-	}
-
-	want := `{"email":["user@example.com"]}`
-	got := string(s.Rbody)
-	if got != want {
-		t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, want)
-	}
-
-	wantPath := "/projects/mock-project-id/accounts:lookup"
-	if s.Req[0].RequestURI != wantPath {
-		t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+			wantPath := "/projects/mock-project-id/accounts:lookup"
+			if s.Req[0].RequestURI != wantPath {
+				t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+			}
+		})
 	}
 }
 
