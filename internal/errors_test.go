@@ -82,6 +82,9 @@ func TestPlatformError(t *testing.T) {
 		if fe.Response.StatusCode != http.StatusNotFound {
 			t.Errorf("[%s]: Do() err.Response.StatusCode = %d; want = %d", code, fe.Response.StatusCode, http.StatusNotFound)
 		}
+		if fe.Ext == nil || len(fe.Ext) > 0 {
+			t.Errorf("[%s]: Do() err.Ext = %v; want = empty-map", code, fe.Ext)
+		}
 	}
 }
 
@@ -137,6 +140,9 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		}
 		if fe.Response.StatusCode != httpStatus {
 			t.Errorf("[%d]: Do() err.Response.StatusCode = %d; want = %d", httpStatus, fe.Response.StatusCode, httpStatus)
+		}
+		if fe.Ext == nil || len(fe.Ext) > 0 {
+			t.Errorf("[%d]: Do() err.Ext = %v; want = empty-map", httpStatus, fe.Ext)
 		}
 	}
 }
