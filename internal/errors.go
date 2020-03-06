@@ -85,6 +85,7 @@ type FirebaseError struct {
 	Code      string
 	String    string
 	Response  *http.Response
+	Ext       map[string]interface{}
 }
 
 func (fe *FirebaseError) Error() string {
@@ -144,6 +145,7 @@ func NewFirebaseError(resp *Response) *FirebaseError {
 		ErrorCode: code,
 		String:    fmt.Sprintf("unexpected http response with status: %d\n%s", resp.Status, string(resp.Body)),
 		Response:  resp.LowLevelResponse(),
+		Ext:       make(map[string]interface{}),
 	}
 }
 

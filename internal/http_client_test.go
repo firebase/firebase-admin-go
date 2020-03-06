@@ -869,6 +869,16 @@ func TestNewHttpClientRetryOnResponseReadError(t *testing.T) {
 	}
 }
 
+func TestNilLowLevelResponse(t *testing.T) {
+	r := &Response{
+		resp: nil,
+	}
+
+	if ll := r.LowLevelResponse(); ll != nil {
+		t.Errorf("LowLevelResponse() = %v; want = nil", ll)
+	}
+}
+
 type faultyEntity struct {
 	RequestAttempts int
 }
