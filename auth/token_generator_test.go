@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 )
 
@@ -161,9 +162,9 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: test reason"
+	want := "test reason"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsInsufficientPermission(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
@@ -188,9 +189,9 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: client encountered an unknown error; response: not json"
+	want := "unexpected http response with status: 403\nnot json"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsUnknown(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }

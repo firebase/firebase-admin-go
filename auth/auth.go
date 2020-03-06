@@ -30,6 +30,11 @@ import (
 const (
 	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 	oneHourInSeconds = 3600
+
+	// SDK-generated error codes
+	idTokenRevoked       = "ID_TOKEN_REVOKED"
+	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
+	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
 
 var reservedClaims = []string{
@@ -256,10 +261,21 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken)
 	if err == nil && c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
-		return nil, internal.Errorf(tenantIDMismatch, "invalid tenant id: %q", decoded.Firebase.Tenant)
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
+			Ext: map[string]interface{}{
+				authErrorCode: tenantIDMismatch,
+			},
+		}
 	}
 
 	return decoded, err
+}
+
+// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
+func IsTenantIDMismatch(err error) bool {
+	return hasAuthErrorCode(err, tenantIDMismatch)
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
@@ -279,10 +295,23 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 	if err != nil {
 		return nil, err
 	}
+
 	if revoked {
-		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "ID token has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: idTokenRevoked,
+			},
+		}
 	}
+
 	return decoded, nil
+}
+
+// IsIDTokenRevoked checks if the given error was due to a revoked ID token.
+func IsIDTokenRevoked(err error) bool {
+	return hasAuthErrorCode(err, idTokenRevoked)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -319,10 +348,23 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 	if err != nil {
 		return nil, err
 	}
+
 	if revoked {
-		return nil, internal.Error(sessionCookieRevoked, "session cookie has been revoked")
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "session cookie has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: sessionCookieRevoked,
+			},
+		}
 	}
+
 	return decoded, nil
+}
+
+// IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
+func IsSessionCookieRevoked(err error) bool {
+	return hasAuthErrorCode(err, sessionCookieRevoked)
 }
 
 func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {
