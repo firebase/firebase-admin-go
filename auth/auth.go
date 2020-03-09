@@ -28,6 +28,7 @@ import (
 )
 
 const (
+	authErrorCode    = "authErrorCode"
 	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 	oneHourInSeconds = 3600
 
@@ -374,4 +375,14 @@ func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, erro
 	}
 
 	return token.IssuedAt*1000 < user.TokensValidAfterMillis, nil
+}
+
+func hasAuthErrorCode(err error, code string) bool {
+	fe, ok := err.(*internal.FirebaseError)
+	if !ok {
+		return false
+	}
+
+	got, ok := fe.Ext[authErrorCode]
+	return ok && got == code
 }

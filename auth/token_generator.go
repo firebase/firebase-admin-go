@@ -26,6 +26,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -186,7 +187,7 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 		"bytesToSign": base64.StdEncoding.EncodeToString(b),
 	}
 	req := &internal.Request{
-		Method: "POST",
+		Method: http.MethodPost,
 		URL:    url,
 		Body:   internal.NewJSONEntity(body),
 	}
@@ -204,6 +205,7 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 	if s.serviceAcct != "" {
 		return s.serviceAcct, nil
 	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	result, err := s.callMetadataService(ctx)
@@ -214,13 +216,15 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 			"for more details on creating custom tokens"
 		return "", fmt.Errorf(msg, err)
 	}
+
+	s.serviceAcct = result
 	return result, nil
 }
 
 func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
 	url := fmt.Sprintf("%s/computeMetadata/v1/instance/service-accounts/default/email", s.metadataHost)
 	req := &internal.Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 		Opts: []internal.HTTPOption{
 			internal.WithHeader("Metadata-Flavor", "Google"),
@@ -236,6 +240,5 @@ func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
 		return "", errors.New("unexpected response from metadata service")
 	}
 
-	s.serviceAcct = result
 	return result, nil
 }

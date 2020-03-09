@@ -315,8 +315,6 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 // Error handlers.
 
 const (
-	authErrorCode = "authErrorCode"
-
 	// Backend-generated error codes
 	configurationNotFound    = "CONFIGURATION_NOT_FOUND"
 	emailAlreadyExists       = "EMAIL_ALREADY_EXISTS"
@@ -394,16 +392,6 @@ func IsUnknown(err error) bool {
 // IsUserNotFound checks if the given error was due to non-existing user.
 func IsUserNotFound(err error) bool {
 	return hasAuthErrorCode(err, userNotFound)
-}
-
-func hasAuthErrorCode(err error, code string) bool {
-	fe, ok := err.(*internal.FirebaseError)
-	if !ok {
-		return false
-	}
-
-	got, ok := fe.Ext[authErrorCode]
-	return ok && got == code
 }
 
 // Validators.
