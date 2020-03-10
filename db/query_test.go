@@ -16,8 +16,11 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
 var sortableKeysResp = map[string]interface{}{
@@ -768,10 +771,15 @@ func TestQueryHttpError(t *testing.T) {
 
 	want := "http error status: 500; reason: test error"
 	result, err := testref.OrderByChild("child").GetOrdered(context.Background())
-	if err == nil || err.Error() != want {
-		t.Errorf("GetOrdered() = %v; want = %v", err, want)
+	if result != nil || err == nil || err.Error() != want {
+		t.Fatalf("GetOrdered() = (%v, %v); want = (nil, %v)", result, err, want)
 	}
-	if result != nil {
-		t.Errorf("GetOrdered() = %v; want = nil", result)
+	if !errorutils.IsInternal(err) {
+		t.Errorf("IsInternal(err) = false; want = true")
+	}
+
+	resp := errorutils.HTTPResponse(err)
+	if resp == nil || resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HTTPResponse(err) = %v; want = {StatusCode: %d}", resp, http.StatusInternalServerError)
 	}
 }
