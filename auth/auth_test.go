@@ -426,8 +426,9 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
 
-	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
-		t.Errorf("VerifyIDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
+	ft, err := client.VerifyIDToken(context.Background(), token)
+	if ft != nil || !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDToken('invalid-signature') = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 }
 
@@ -521,8 +522,13 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			check := IsIDTokenInvalid
+			if tc.name == "ExpiredToken" {
+				check = IsIDTokenExpired
+			}
+
 			_, err := client.VerifyIDToken(context.Background(), tc.token)
-			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			if !check(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifyIDToken(%q) = %v; want = %q", tc.name, err, tc.want)
 			}
 		})
@@ -553,8 +559,9 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 			idTokenVerifier: testIDTokenVerifier,
 		},
 	}
-	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
-		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
+	_, err = client.VerifyIDToken(context.Background(), token)
+	if !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want = IDTokenInvalid")
 	}
 }
 
@@ -586,8 +593,8 @@ func TestCustomTokenVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
+	if _, err := client.VerifyIDToken(context.Background(), token); !IsIDTokenInvalid(err) {
+		t.Error("VeridyIDToken() = nil; want = IDTokenInvalid")
 	}
 }
 
@@ -602,8 +609,8 @@ func TestCertificateRequestError(t *testing.T) {
 			idTokenVerifier: tv,
 		},
 	}
-	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
+	if _, err := client.VerifyIDToken(context.Background(), testIDToken); !IsCertificateFetchFailed(err) {
+		t.Error("VeridyIDToken() = nil; want = CertificateFetchFailed")
 	}
 }
 
@@ -648,8 +655,8 @@ func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || err == nil {
-		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
+	if ft != nil || !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -664,7 +671,7 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
-	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
+	if p != nil || !IsIDTokenRevoked(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -681,8 +688,8 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
-	if p != nil || err == nil || !IsUserNotFound(err) {
-		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
+	if p != nil || !IsUserNotFound(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
 	}
 }
 
@@ -832,8 +839,13 @@ func TestVerifySessionCookieError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			check := IsSessionCookieInvalid
+			if tc.name == "ExpiredToken" {
+				check = IsSessionCookieExpired
+			}
+
 			_, err := client.VerifySessionCookie(context.Background(), tc.token)
-			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			if !check(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifySessionCookie(%q) = %v; want = %q", tc.name, err, tc.want)
 			}
 		})
@@ -881,8 +893,8 @@ func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 	s.Client.cookieVerifier = testCookieVerifier
 
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
-	if ft != nil || err == nil {
-		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
+	if ft != nil || !IsSessionCookieInvalid(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, SessionCookieInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -897,7 +909,7 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
-	if p != nil || err == nil || err.Error() != we || !IsSessionCookieRevoked(err) {
+	if p != nil || !IsSessionCookieRevoked(err) || err.Error() != we {
 		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -914,8 +926,8 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	s.Client.cookieVerifier = testCookieVerifier
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
-	if p != nil || err == nil || !IsUserNotFound(err) {
-		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
+	if p != nil || !IsUserNotFound(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
 	}
 }
 
@@ -1041,6 +1053,12 @@ func checkIDTokenVerifier(tv *tokenVerifier, projectID string) error {
 	if tv.shortName != "ID token" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "ID token")
 	}
+	if tv.invalidTokenCode != idTokenInvalid {
+		return fmt.Errorf("invalidTokenCode = %q; want = %q", tv.invalidTokenCode, idTokenInvalid)
+	}
+	if tv.expiredTokenCode != idTokenExpired {
+		return fmt.Errorf("expiredTokenCode = %q; want = %q", tv.expiredTokenCode, idTokenExpired)
+	}
 	return nil
 }
 
@@ -1053,6 +1071,12 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 	}
 	if tv.shortName != "session cookie" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "session cookie")
+	}
+	if tv.invalidTokenCode != sessionCookieInvalid {
+		return fmt.Errorf("invalidTokenCode = %q; want = %q", tv.invalidTokenCode, sessionCookieInvalid)
+	}
+	if tv.expiredTokenCode != sessionCookieExpired {
+		return fmt.Errorf("expiredTokenCode = %q; want = %q", tv.expiredTokenCode, sessionCookieExpired)
 	}
 	return nil
 }
