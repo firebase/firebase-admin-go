@@ -522,14 +522,12 @@ func TestVerifyIDTokenError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			check := IsIDTokenInvalid
-			if tc.name == "ExpiredToken" {
-				check = IsIDTokenExpired
-			}
-
 			_, err := client.VerifyIDToken(context.Background(), tc.token)
-			if !check(err) || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsIDTokenInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifyIDToken(%q) = %v; want = %q", tc.name, err, tc.want)
+			}
+			if tc.name == "ExpiredToken" && !IsIDTokenExpired(err) {
+				t.Errorf("VerifyIDToken(%q) = %v; want = IDTokenExpired", tc.name, err)
 			}
 		})
 	}
@@ -655,7 +653,7 @@ func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || !IsIDTokenInvalid(err) {
+	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
@@ -671,7 +669,7 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
-	if p != nil || !IsIDTokenRevoked(err) || err.Error() != we {
+	if p != nil || !IsIDTokenRevoked(err) || !IsIDTokenInvalid(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -839,14 +837,12 @@ func TestVerifySessionCookieError(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			check := IsSessionCookieInvalid
-			if tc.name == "ExpiredToken" {
-				check = IsSessionCookieExpired
-			}
-
 			_, err := client.VerifySessionCookie(context.Background(), tc.token)
-			if !check(err) || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsSessionCookieInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifySessionCookie(%q) = %v; want = %q", tc.name, err, tc.want)
+			}
+			if tc.name == "ExpiredToken" && !IsSessionCookieExpired(err) {
+				t.Errorf("VerifySessionCookie(%q) = %v; want = SessionCookieExpired", tc.name, err)
 			}
 		})
 	}
@@ -909,7 +905,7 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
-	if p != nil || !IsSessionCookieRevoked(err) || err.Error() != we {
+	if p != nil || !IsSessionCookieRevoked(err) || !IsSessionCookieInvalid(err) || err.Error() != we {
 		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}

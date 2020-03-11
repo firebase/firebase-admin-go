@@ -58,23 +58,34 @@ func IsCertificateFetchFailed(err error) bool {
 }
 
 // IsIDTokenExpired checks if the given error was due to an expired ID token.
+//
+// When IsIDTokenExpired returns true, IsIDTokenInvalid is guranteed to return true.
 func IsIDTokenExpired(err error) bool {
 	return hasAuthErrorCode(err, idTokenExpired)
 }
 
 // IsIDTokenInvalid checks if the given error was due to an invalid ID token.
+//
+// An ID token is considered invalid when it is malformed (i.e. contains incorrect data), expired
+// or revoked.
 func IsIDTokenInvalid(err error) bool {
-	return hasAuthErrorCode(err, idTokenInvalid)
+	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err)
 }
 
 // IsSessionCookieExpired checks if the given error was due to an expired session cookie.
+//
+// When IsSessionCookieExpired returns true, IsSessionCookieInvalid is guranteed to return true.
 func IsSessionCookieExpired(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieExpired)
 }
 
 // IsSessionCookieInvalid checks if the given error was due to an invalid session cookie.
+//
+// A session cookie is considered invalid when it is malformed (i.e. contains incorrect data),
+// expired or revoked.
 func IsSessionCookieInvalid(err error) bool {
-	return hasAuthErrorCode(err, sessionCookieInvalid)
+	return hasAuthErrorCode(err, sessionCookieInvalid) || IsSessionCookieExpired(err) ||
+		IsSessionCookieRevoked(err)
 }
 
 // tokenVerifier verifies different types of Firebase token strings, including ID tokens and
