@@ -261,8 +261,7 @@ func TestSuccessFnOnRequest(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
+		Client: http.DefaultClient,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -296,7 +295,6 @@ func TestCreateErrFn(t *testing.T) {
 		CreateErrFn: func(r *Response) error {
 			return fmt.Errorf("custom error with status: %d", r.Status)
 		},
-		SuccessFn: HasSuccessStatus,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -323,7 +321,6 @@ func TestCreateErrFnOnRequest(t *testing.T) {
 		CreateErrFn: func(r *Response) error {
 			return fmt.Errorf("custom error with status: %d", r.Status)
 		},
-		SuccessFn: HasSuccessStatus,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -418,6 +415,7 @@ func TestRetryDisabled(t *testing.T) {
 	client := &HTTPClient{
 		Client:      http.DefaultClient,
 		RetryConfig: nil,
+		SuccessFn:   acceptAll,
 	}
 	req := &Request{Method: http.MethodGet, URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
@@ -732,7 +730,9 @@ func TestNewHTTPClientRetryOnHTTPErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	client.RetryConfig.ExpBackoffFactor = 0
+	client.SuccessFn = acceptAll
 	for _, status = range []int{http.StatusInternalServerError, http.StatusServiceUnavailable} {
 		requests = 0
 		req := &Request{Method: http.MethodGet, URL: server.URL}
@@ -765,11 +765,14 @@ func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	client.SuccessFn = acceptAll
 	req := &Request{Method: http.MethodGet, URL: server.URL}
 	resp, err := client.Do(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if resp.Status != http.StatusNotFound {
 		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusNotFound)
 	}
@@ -836,4 +839,8 @@ type faultyTransport struct {
 func (e *faultyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	e.RequestAttempts++
 	return nil, errors.New("test error")
+}
+
+func acceptAll(resp *Response) bool {
+	return true
 }

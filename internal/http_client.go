@@ -219,14 +219,11 @@ func (c *HTTPClient) success(req *Request, resp *Response) bool {
 		successFn = req.SuccessFn
 	} else if c.SuccessFn != nil {
 		successFn = c.SuccessFn
+	} else {
+		successFn = HasSuccessStatus
 	}
 
-	if successFn != nil {
-		return successFn(resp)
-	}
-
-	// TODO: Default to HasSuccessStatusCode
-	return true
+	return successFn(resp)
 }
 
 func (c *HTTPClient) newError(req *Request, resp *Response) error {

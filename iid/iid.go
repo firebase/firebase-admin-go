@@ -121,7 +121,6 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 	}
 
 	hc.CreateErrFn = createError
-	hc.SuccessFn = internal.HasSuccessStatus
 	return &Client{
 		endpoint: iidEndpoint,
 		client:   hc,

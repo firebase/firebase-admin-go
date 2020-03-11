@@ -43,8 +43,7 @@ func TestPlatformError(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
+		Client: http.DefaultClient,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -98,8 +97,7 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
+		Client: http.DefaultClient,
 	}
 	get := &Request{
 		Method: http.MethodGet,
