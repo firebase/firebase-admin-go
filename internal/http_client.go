@@ -41,7 +41,6 @@ import (
 type HTTPClient struct {
 	Client      *http.Client
 	RetryConfig *RetryConfig
-	ErrParser   ErrorParser // Deprecated. Use CreateErrFn instead.
 	CreateErrFn CreateErrFn
 	SuccessFn   SuccessFn
 	Opts        []HTTPOption
@@ -101,11 +100,10 @@ type Request struct {
 
 // Response contains information extracted from an HTTP response.
 type Response struct {
-	Status    int
-	Header    http.Header
-	Body      []byte
-	errParser ErrorParser
-	resp      *http.Response
+	Status int
+	Header http.Header
+	Body   []byte
+	resp   *http.Response
 }
 
 // LowLevelResponse returns an http.Response that represents the underlying low-level HTTP
@@ -185,7 +183,7 @@ func (c *HTTPClient) attempt(ctx context.Context, hr *http.Request, retries int)
 	} else {
 		// Read the response body here forcing any I/O errors to occur so that retry logic will
 		// cover them as well.
-		ir, err := newResponse(resp, c.ErrParser)
+		ir, err := newResponse(resp)
 		result.Resp = ir
 		result.Err = err
 	}
@@ -308,7 +306,7 @@ func (e *jsonEntity) Mime() string {
 	return "application/json"
 }
 
-func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) {
+func newResponse(resp *http.Response) (*Response, error) {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -316,53 +314,12 @@ func newResponse(resp *http.Response, errParser ErrorParser) (*Response, error) 
 	}
 
 	return &Response{
-		Status:    resp.StatusCode,
-		Body:      b,
-		Header:    resp.Header,
-		errParser: errParser,
-		resp:      resp,
+		Status: resp.StatusCode,
+		Body:   b,
+		Header: resp.Header,
+		resp:   resp,
 	}, nil
 }
-
-// CheckStatus checks whether the Response status code has the given HTTP status code.
-//
-// Returns an error if the status code does not match. If an ErrorParser is specified, uses that to
-// construct the returned error message. Otherwise includes the full response body in the error.
-//
-// Deprecated. Directly verify the Status field on the Response instead.
-func (r *Response) CheckStatus(want int) error {
-	if r.Status == want {
-		return nil
-	}
-
-	var msg string
-	if r.errParser != nil {
-		msg = r.errParser(r.Body)
-	}
-	if msg == "" {
-		msg = string(r.Body)
-	}
-	return fmt.Errorf("http error status: %d; reason: %s", r.Status, msg)
-}
-
-// Unmarshal checks if the Response has the given HTTP status code, and if so unmarshals the
-// response body into the variable pointed by v.
-//
-// Unmarshal uses https://golang.org/pkg/encoding/json/#Unmarshal internally, and hence v has the
-// same requirements as the json package.
-//
-// Deprecated. Use DoAndUnmarshal function instead.
-func (r *Response) Unmarshal(want int, v interface{}) error {
-	if err := r.CheckStatus(want); err != nil {
-		return err
-	}
-	return json.Unmarshal(r.Body, v)
-}
-
-// ErrorParser is a function that is used to construct custom error messages.
-//
-// Deprecated. Use SuccessFn and CreateErrFn instead.
-type ErrorParser func([]byte) string
 
 // HTTPOption is an additional parameter that can be specified to customize an outgoing request.
 type HTTPOption func(*http.Request)

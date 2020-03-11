@@ -166,20 +166,13 @@ func TestHTTPClient(t *testing.T) {
 	client := &HTTPClient{Client: http.DefaultClient}
 	for _, tc := range testRequests {
 		tc.req.URL = server.URL
-		resp, err := client.Do(context.Background(), tc.req)
+		var got map[string]interface{}
+		resp, err := client.DoAndUnmarshal(context.Background(), tc.req, &got)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := resp.CheckStatus(http.StatusOK); err != nil {
-			t.Errorf("CheckStatus() = %v; want nil", err)
-		}
-		if err := resp.CheckStatus(http.StatusCreated); err == nil {
-			t.Errorf("CheckStatus() = nil; want error")
-		}
-
-		var got map[string]interface{}
-		if err := resp.Unmarshal(http.StatusOK, &got); err != nil {
-			t.Errorf("Unmarshal() = %v; want nil", err)
+		if resp.Status != http.StatusOK {
+			t.Errorf("Status = %d; want = %d", resp.Status, http.StatusOK)
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Body = %v; want = %v", got, want)
@@ -364,9 +357,6 @@ func TestContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		t.Fatal(err)
-	}
 
 	cancel()
 	resp, err = client.Do(ctx, &Request{
@@ -375,55 +365,6 @@ func TestContext(t *testing.T) {
 	})
 	if resp != nil || err == nil {
 		t.Errorf("Do() = (%v; %v); want = (nil, error)", resp, err)
-	}
-}
-
-func TestErrorParser(t *testing.T) {
-	data := map[string]interface{}{
-		"error": "test error",
-	}
-	b, err := json.Marshal(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
-	})
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	ep := func(b []byte) string {
-		var p struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(b, &p); err != nil {
-			return ""
-		}
-		return p.Error
-	}
-	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		ErrParser: ep,
-	}
-	req := &Request{Method: http.MethodGet, URL: server.URL}
-	resp, err := client.Do(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := "http error status: 500; reason: test error"
-	if err := resp.CheckStatus(http.StatusOK); err.Error() != want {
-		t.Errorf("CheckStatus() = %q; want = %q", err.Error(), want)
-	}
-	var got map[string]interface{}
-	if err := resp.Unmarshal(http.StatusOK, &got); err.Error() != want {
-		t.Errorf("CheckStatus() = %q; want = %q", err.Error(), want)
-	}
-	if got != nil {
-		t.Errorf("Body = %v; want = nil", got)
 	}
 }
 
@@ -456,14 +397,10 @@ func TestUnmarshalError(t *testing.T) {
 
 	req := &Request{Method: http.MethodGet, URL: server.URL}
 	client := &HTTPClient{Client: http.DefaultClient}
-	resp, err := client.Do(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var got func()
-	if err := resp.Unmarshal(http.StatusOK, &got); err == nil {
-		t.Errorf("Unmarshal() = nil; want error")
+	_, err = client.DoAndUnmarshal(context.Background(), req, &got)
+	if err == nil {
+		t.Errorf("DoAndUnmarshal() = nil; want error")
 	}
 }
 
@@ -487,8 +424,8 @@ func TestRetryDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := resp.CheckStatus(http.StatusServiceUnavailable); err != nil {
-		t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+	if resp.Status != http.StatusServiceUnavailable {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusServiceUnavailable)
 	}
 	if requests != 1 {
 		t.Errorf("Total requests = %d; want = 1", requests)
@@ -803,8 +740,8 @@ func TestNewHTTPClientRetryOnHTTPErrors(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := resp.CheckStatus(status); err != nil {
-			t.Errorf("CheckStatus(%d) = %q; want = nil", status, err.Error())
+		if resp.Status != status {
+			t.Errorf("Status = %d; want = %d", resp.Status, status)
 		}
 		wantRequests := 1 + defaultMaxRetries
 		if requests != wantRequests {
@@ -833,8 +770,8 @@ func TestNewHttpClientNoRetryOnNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := resp.CheckStatus(http.StatusNotFound); err != nil {
-		t.Errorf("CheckStatus() = %q; want = nil", err.Error())
+	if resp.Status != http.StatusNotFound {
+		t.Errorf("Status = %d; want = %d", resp.Status, http.StatusNotFound)
 	}
 	if requests != 1 {
 		t.Errorf("Total requests = %d; want = 1", requests)
