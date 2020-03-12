@@ -17,7 +17,11 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"syscall"
 )
 
 // ErrorCode represents the platform-wide error codes that can be raised by
@@ -147,4 +151,42 @@ func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 	}
 
 	return base
+}
+
+func newFirebaseErrorTransport(err error) *FirebaseError {
+	var code ErrorCode
+	var msg string
+	if os.IsTimeout(err) {
+		code = DeadlineExceeded
+		msg = fmt.Sprintf("timed out while making an http call: %v", err)
+	} else if isConnectionRefused(err) {
+		code = Unavailable
+		msg = fmt.Sprintf("failed to establish a connection: %v", err)
+	} else {
+		code = Unknown
+		msg = fmt.Sprintf("unknown error while making an http call: %v", err)
+	}
+
+	return &FirebaseError{
+		ErrorCode: code,
+		String:    msg,
+		Ext:       make(map[string]interface{}),
+	}
+}
+
+func isConnectionRefused(err error) bool {
+	switch t := err.(type) {
+	case *url.Error:
+		return isConnectionRefused(t.Unwrap())
+	case *net.OpError:
+		if t.Op == "dial" || t.Op == "read" {
+			return true
+		}
+	case syscall.Errno:
+		if t == syscall.ECONNREFUSED {
+			return true
+		}
+	}
+
+	return false
 }

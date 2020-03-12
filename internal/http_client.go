@@ -202,8 +202,7 @@ func (c *HTTPClient) attempt(ctx context.Context, hr *http.Request, retries int)
 
 func (c *HTTPClient) handleResult(req *Request, result *attemptResult) (*Response, error) {
 	if result.Err != nil {
-		// TODO: Handle transport and I/O errors.
-		return nil, result.Err
+		return nil, newFirebaseErrorTransport(result.Err)
 	}
 
 	if !c.success(req, result.Resp) {
