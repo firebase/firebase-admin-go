@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/errorutils"
 	"google.golang.org/api/iterator"
 )
 
@@ -1252,8 +1253,8 @@ func TestCreateTenantError(t *testing.T) {
 	client := s.Client
 	client.TenantManager.httpClient.RetryConfig = nil
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), &TenantToCreate{})
-	if tenant != nil || !IsUnknown(err) {
-		t.Errorf("CreateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "unknown-error")
+	if tenant != nil || !errorutils.IsInternal(err) {
+		t.Errorf("CreateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "internal-error")
 	}
 }
 
@@ -1356,8 +1357,8 @@ func TestUpdateTenantError(t *testing.T) {
 	client.TenantManager.httpClient.RetryConfig = nil
 	options := (&TenantToUpdate{}).DisplayName("")
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
-	if tenant != nil || !IsUnknown(err) {
-		t.Errorf("UpdateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "unknown-error")
+	if tenant != nil || !errorutils.IsInternal(err) {
+		t.Errorf("UpdateTenant() = (%v, %v); want = (nil, %q)", tenant, err, "internal-error")
 	}
 }
 
@@ -1502,8 +1503,8 @@ func TestTenantsError(t *testing.T) {
 	client.TenantManager.httpClient.RetryConfig = nil
 	it := client.TenantManager.Tenants(context.Background(), "")
 	config, err := it.Next()
-	if config != nil || err == nil || !IsUnknown(err) {
-		t.Errorf("Tenants() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
+	if config != nil || !errorutils.IsInternal(err) {
+		t.Errorf("Tenants() = (%v, %v); want = (nil, %q)", config, err, "internal-error")
 	}
 }
 

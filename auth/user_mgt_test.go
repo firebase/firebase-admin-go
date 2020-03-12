@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/iterator"
 )
@@ -165,19 +166,19 @@ func TestGetNonExistingUser(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	we := `cannot find user from uid: "id-nonexisting"`
+	we := `no user exists with the uid: "id-nonexisting"`
 	user, err := s.Client.GetUser(context.Background(), "id-nonexisting")
 	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUser(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 
-	we = `cannot find user from email: "foo@bar.nonexisting"`
+	we = `no user exists with the email: "foo@bar.nonexisting"`
 	user, err = s.Client.GetUserByEmail(context.Background(), "foo@bar.nonexisting")
 	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUserByEmail(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
 	}
 
-	we = `cannot find user from phone number: "+12345678901"`
+	we = `no user exists with the phone number: "+12345678901"`
 	user, err = s.Client.GetUserByPhoneNumber(context.Background(), "+12345678901")
 	if user != nil || err == nil || err.Error() != we || !IsUserNotFound(err) {
 		t.Errorf("GetUserPhoneNumber(non-existing) = (%v, %q); want = (nil, %q)", user, err, we)
@@ -1207,8 +1208,8 @@ func TestSessionCookieError(t *testing.T) {
 		t.Fatalf("SessionCookie() = (%q, %v); want = (%q, error)", cookie, err, "")
 	}
 
-	want := fmt.Sprintf("http error status: 403; body: %s", resp)
-	if err.Error() != want || !IsInsufficientPermission(err) {
+	want := fmt.Sprintf("unexpected http response with status: 403\n%s", resp)
+	if err.Error() != want || !errorutils.IsPermissionDenied(err) {
 		t.Errorf("SessionCookie() error = %v; want = %q", err, want)
 	}
 }
@@ -1264,37 +1265,144 @@ func TestHTTPError(t *testing.T) {
 		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 	}
 
-	want := `http error status: 500; body: {"error":"test"}`
-	if err.Error() != want || !IsUnknown(err) {
+	want := "unexpected http response with status: 500\n{\"error\":\"test\"}"
+	if err.Error() != want || !errorutils.IsInternal(err) {
 		t.Errorf("GetUser() = %v; want = %q", err, want)
 	}
 }
 
 func TestHTTPErrorWithCode(t *testing.T) {
-	errorCodes := map[string]func(error) bool{
-		"CONFIGURATION_NOT_FOUND": IsConfigurationNotFound,
-		"DUPLICATE_EMAIL":         IsEmailAlreadyExists,
-		"DUPLICATE_LOCAL_ID":      IsUIDAlreadyExists,
-		"EMAIL_EXISTS":            IsEmailAlreadyExists,
-		"INSUFFICIENT_PERMISSION": IsInsufficientPermission,
-		"INVALID_EMAIL":           IsInvalidEmail,
-		"PHONE_NUMBER_EXISTS":     IsPhoneNumberAlreadyExists,
-		"PROJECT_NOT_FOUND":       IsProjectNotFound,
+	errorCodes := map[string]struct {
+		authCheck     func(error) bool
+		platformCheck func(error) bool
+		want          string
+	}{
+		"CONFIGURATION_NOT_FOUND": {
+			IsConfigurationNotFound,
+			errorutils.IsNotFound,
+			"no IdP configuration corresponding to the provided identifier",
+		},
+		"DUPLICATE_EMAIL": {
+			IsEmailAlreadyExists,
+			errorutils.IsAlreadyExists,
+			"user with the provided email already exists",
+		},
+		"DUPLICATE_LOCAL_ID": {
+			IsUIDAlreadyExists,
+			errorutils.IsAlreadyExists,
+			"user with the provided uid already exists",
+		},
+		"EMAIL_EXISTS": {
+			IsEmailAlreadyExists,
+			errorutils.IsAlreadyExists,
+			"user with the provided email already exists",
+		},
+		"INVALID_DYNAMIC_LINK_DOMAIN": {
+			IsInvalidDynamicLinkDomain,
+			errorutils.IsInvalidArgument,
+			"",
+		},
+		"PHONE_NUMBER_EXISTS": {
+			IsPhoneNumberAlreadyExists,
+			errorutils.IsAlreadyExists,
+			"user with the provided phone number already exists",
+		},
+		"UNAUTHORIZED_DOMAIN": {
+			IsUnauthorizedContinueURI,
+			errorutils.IsInvalidArgument,
+			"domain of the continue url is not whitelisted",
+		},
+		"USER_NOT_FOUND": {
+			IsUserNotFound,
+			errorutils.IsNotFound,
+			"no user record found for the given identifier",
+		},
 	}
 	s := echoServer(nil, t)
 	defer s.Close()
 	s.Client.baseClient.httpClient.RetryConfig = nil
 	s.Status = http.StatusInternalServerError
 
-	for code, check := range errorCodes {
+	for code, conf := range errorCodes {
 		s.Resp = []byte(fmt.Sprintf(`{"error":{"message":"%s"}}`, code))
 		u, err := s.Client.GetUser(context.Background(), "some uid")
 		if u != nil || err == nil {
 			t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
 		}
 
-		want := fmt.Sprintf(`http error status: 500; body: {"error":{"message":"%s"}}`, code)
-		if err.Error() != want || !check(err) {
+		if err.Error() != conf.want || !conf.authCheck(err) || !conf.platformCheck(err) {
+			t.Errorf("GetUser() = %v; want = %q", err, conf.want)
+		}
+	}
+}
+
+func TestAuthErrorWithCodeAndDetails(t *testing.T) {
+	resp := []byte(`{"error":{"message":"USER_NOT_FOUND: extra details"}}`)
+	s := echoServer(resp, t)
+	defer s.Close()
+	s.Client.baseClient.httpClient.RetryConfig = nil
+	s.Status = http.StatusInternalServerError
+
+	u, err := s.Client.GetUser(context.Background(), "some uid")
+	if u != nil || err == nil {
+		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
+	}
+
+	want := "no user record found for the given identifier: extra details"
+	if err.Error() != want || !IsUserNotFound(err) || !errorutils.IsNotFound(err) {
+		t.Errorf("GetUser() = %v; want = %q", err, want)
+	}
+}
+
+func TestAuthErrorWithUnknownCode(t *testing.T) {
+	resp := `{"error":{"message":"UNKNOWN_CODE: extra details"}}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	s.Client.baseClient.httpClient.RetryConfig = nil
+	s.Status = http.StatusInternalServerError
+
+	u, err := s.Client.GetUser(context.Background(), "some uid")
+	if u != nil || err == nil {
+		t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
+	}
+
+	want := fmt.Sprintf("unexpected http response with status: 500\n%s", resp)
+	if err.Error() != want || !errorutils.IsInternal(err) {
+		t.Errorf("GetUser() = %v; want = %q", err, want)
+	}
+}
+
+func TestUnmappedHTTPError(t *testing.T) {
+	errorCodes := map[string]struct {
+		authCheck func(error) bool
+	}{
+		"PROJECT_NOT_FOUND": {
+			IsProjectNotFound,
+		},
+		"INVALID_EMAIL": {
+			IsInvalidEmail,
+		},
+		"INSUFFICIENT_PERMISSION": {
+			IsInsufficientPermission,
+		},
+		"UNKNOWN": {
+			IsUnknown,
+		},
+	}
+	s := echoServer(nil, t)
+	defer s.Close()
+	s.Client.baseClient.httpClient.RetryConfig = nil
+	s.Status = http.StatusInternalServerError
+
+	for code, conf := range errorCodes {
+		s.Resp = []byte(fmt.Sprintf(`{"error":{"message":"%s"}}`, code))
+		u, err := s.Client.GetUser(context.Background(), "some uid")
+		if u != nil || err == nil {
+			t.Fatalf("GetUser() = (%v, %v); want = (nil, error)", u, err)
+		}
+
+		want := fmt.Sprintf("unexpected http response with status: 500\n%s", string(s.Resp))
+		if err.Error() != want || conf.authCheck(err) || !errorutils.IsInternal(err) {
 			t.Errorf("GetUser() = %v; want = %q", err, want)
 		}
 	}
