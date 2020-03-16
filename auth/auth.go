@@ -311,6 +311,8 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 }
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
+//
+// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guranteed to return true.
 func IsIDTokenRevoked(err error) bool {
 	return hasAuthErrorCode(err, idTokenRevoked)
 }
@@ -364,6 +366,8 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 }
 
 // IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
+//
+// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guranteed to return true.
 func IsSessionCookieRevoked(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieRevoked)
 }
