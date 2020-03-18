@@ -458,7 +458,7 @@ func validateEmail(email string) error {
 	if email == "" {
 		return fmt.Errorf("email must be a non-empty string")
 	}
-	if parts := strings.Split(email, "@"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	if !strings.Contains(email, "@") {
 		return fmt.Errorf("malformed email string: %q", email)
 	}
 	return nil
