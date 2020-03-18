@@ -203,6 +203,13 @@ func TestNetworkOutageError(t *testing.T) {
 	}{
 		{"NetDialError", &net.OpError{Op: "dial", Err: errors.New("test error")}},
 		{"NetReadError", &net.OpError{Op: "read", Err: errors.New("test error")}},
+		{
+			"WrappedNetReadError",
+			&net.OpError{
+				Op:  "test",
+				Err: &net.OpError{Op: "read", Err: errors.New("test error")},
+			},
+		},
 		{"ECONNREFUSED", syscall.ECONNREFUSED},
 	}
 

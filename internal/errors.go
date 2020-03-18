@@ -174,18 +174,23 @@ func newFirebaseErrorTransport(err error) *FirebaseError {
 	}
 }
 
+// isConnectionRefused attempts to determine if the given was caused by a failure to establish a
+// connection.
+//
+// A net.OpError where the Op field is set to "dial" or "read" are considered connection refused
+// errors. Similarly an ECONNREFUSED error code (Linux-specific) is also considered a connection
+// refused error.
 func isConnectionRefused(err error) bool {
 	switch t := err.(type) {
 	case *url.Error:
-		return isConnectionRefused(t.Unwrap())
+		return isConnectionRefused(t.Err)
 	case *net.OpError:
 		if t.Op == "dial" || t.Op == "read" {
 			return true
 		}
+		return isConnectionRefused(t.Err)
 	case syscall.Errno:
-		if t == syscall.ECONNREFUSED {
-			return true
-		}
+		return t == syscall.ECONNREFUSED
 	}
 
 	return false
