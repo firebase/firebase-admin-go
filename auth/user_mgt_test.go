@@ -283,15 +283,6 @@ func TestInvalidCreateUser(t *testing.T) {
 		}, {
 			(&UserToCreate{}).Email("a"),
 			`malformed email string: "a"`,
-		}, {
-			(&UserToCreate{}).Email("a@"),
-			`malformed email string: "a@"`,
-		}, {
-			(&UserToCreate{}).Email("@a"),
-			`malformed email string: "@a"`,
-		}, {
-			(&UserToCreate{}).Email("a@a@a"),
-			`malformed email string: "a@a@a"`,
 		},
 	}
 	client := &Client{
