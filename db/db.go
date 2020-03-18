@@ -69,7 +69,6 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	}
 
 	hc.CreateErrFn = handleRTDBError
-	hc.SuccessFn = internal.HasSuccessStatus
 	return &Client{
 		hc:           hc,
 		url:          fmt.Sprintf("https://%s", p.Host),

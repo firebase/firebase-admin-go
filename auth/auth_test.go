@@ -306,6 +306,7 @@ func TestCustomTokenInvalidCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	s.signer.(*iamSigner).httpClient.RetryConfig = nil
 	token, err := s.CustomToken(ctx, "user1")
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)

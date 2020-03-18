@@ -106,7 +106,6 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 
 	hc := internal.WithDefaultRetryConfig(transport)
 	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
