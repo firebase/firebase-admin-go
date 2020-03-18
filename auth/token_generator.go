@@ -31,7 +31,6 @@ import (
 	"sync"
 
 	"firebase.google.com/go/v4/internal"
-	"google.golang.org/api/transport"
 )
 
 type jwtHeader struct {
@@ -159,17 +158,14 @@ type iamSigner struct {
 }
 
 func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, config.Opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, config.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &iamSigner{
-		mutex: &sync.Mutex{},
-		httpClient: &internal.HTTPClient{
-			Client:    hc,
-			SuccessFn: internal.HasSuccessStatus,
-		},
+		mutex:        &sync.Mutex{},
+		httpClient:   hc,
 		serviceAcct:  config.ServiceAccountID,
 		metadataHost: "http://metadata.google.internal",
 		iamHost:      "https://iam.googleapis.com",
@@ -222,6 +218,11 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 }
 
 func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
+	// Use the built-in default client without request authorization or retries for this call.
+	noAuthClient := &internal.HTTPClient{
+		Client: http.DefaultClient,
+	}
+
 	url := fmt.Sprintf("%s/computeMetadata/v1/instance/service-accounts/default/email", s.metadataHost)
 	req := &internal.Request{
 		Method: http.MethodGet,
@@ -230,7 +231,8 @@ func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
 			internal.WithHeader("Metadata-Flavor", "Google"),
 		},
 	}
-	resp, err := s.httpClient.Do(ctx, req)
+
+	resp, err := noAuthClient.Do(ctx, req)
 	if err != nil {
 		return "", err
 	}

@@ -16,7 +16,9 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -43,8 +45,7 @@ func TestPlatformError(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
+		Client: http.DefaultClient,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -98,8 +99,7 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 	defer server.Close()
 
 	client := &HTTPClient{
-		Client:    http.DefaultClient,
-		SuccessFn: HasSuccessStatus,
+		Client: http.DefaultClient,
 	}
 	get := &Request{
 		Method: http.MethodGet,
@@ -144,5 +144,54 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		if fe.Ext == nil || len(fe.Ext) > 0 {
 			t.Errorf("[%d]: Do() err.Ext = %v; want = empty-map", httpStatus, fe.Ext)
 		}
+	}
+}
+
+func TestErrorHTTPResponse(t *testing.T) {
+	body := `{"key": "value"}`
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(body))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &HTTPClient{
+		Client: http.DefaultClient,
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    server.URL,
+	}
+	want := fmt.Sprintf("unexpected http response with status: 500\n%s", body)
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || err.Error() != want {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	hr := fe.Response
+	defer hr.Body.Close()
+	if hr.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Do() Response.StatusCode = %d; want = %d", hr.StatusCode, http.StatusInternalServerError)
+	}
+
+	b, err := ioutil.ReadAll(hr.Body)
+	if err != nil {
+		t.Fatalf("ReadAll(Response.Body) = %v", err)
+	}
+
+	var m map[string]string
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("Unmarshal(Response.Body) = %v", err)
+	}
+
+	if len(m) != 1 || m["key"] != "value" {
+		t.Errorf("Unmarshal(Response.Body) = %v; want = {key: value}", m)
 	}
 }

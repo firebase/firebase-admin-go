@@ -66,7 +66,6 @@ type iidClient struct {
 func newIIDClient(hc *http.Client) *iidClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleIIDError
-	client.SuccessFn = internal.HasSuccessStatus
 	client.Opts = []internal.HTTPOption{internal.WithHeader("access_token_auth", "true")}
 	return &iidClient{
 		iidEndpoint: iidEndpoint,

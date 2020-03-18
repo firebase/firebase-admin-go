@@ -884,7 +884,6 @@ type fcmClient struct {
 func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
-	client.SuccessFn = internal.HasSuccessStatus
 
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
