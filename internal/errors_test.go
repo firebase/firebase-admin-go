@@ -17,10 +17,14 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -144,6 +148,142 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		if fe.Ext == nil || len(fe.Ext) > 0 {
 			t.Errorf("[%d]: Do() err.Ext = %v; want = empty-map", httpStatus, fe.Ext)
 		}
+	}
+}
+
+func TestTimeoutError(t *testing.T) {
+	client := &HTTPClient{
+		Client: &http.Client{
+			Transport: &faultyTransport{
+				Err: &timeoutError{},
+			},
+		},
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    "http://test.url",
+	}
+	want := "timed out while making an http call"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != DeadlineExceeded {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, DeadlineExceeded)
+	}
+	if fe.Response != nil {
+		t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
+	}
+	if fe.Ext == nil || len(fe.Ext) > 0 {
+		t.Errorf("Do() err.Ext = %v; want = empty-map", fe.Ext)
+	}
+}
+
+type timeoutError struct{}
+
+func (t *timeoutError) Error() string {
+	return "test timeout error"
+}
+
+func (t *timeoutError) Timeout() bool {
+	return true
+}
+
+func TestNetworkOutageError(t *testing.T) {
+	errors := []struct {
+		name string
+		err  error
+	}{
+		{"NetDialError", &net.OpError{Op: "dial", Err: errors.New("test error")}},
+		{"NetReadError", &net.OpError{Op: "read", Err: errors.New("test error")}},
+		{
+			"WrappedNetReadError",
+			&net.OpError{
+				Op:  "test",
+				Err: &net.OpError{Op: "read", Err: errors.New("test error")},
+			},
+		},
+		{"ECONNREFUSED", syscall.ECONNREFUSED},
+	}
+
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    "http://test.url",
+	}
+	want := "failed to establish a connection"
+
+	for _, tc := range errors {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &HTTPClient{
+				Client: &http.Client{
+					Transport: &faultyTransport{
+						Err: tc.err,
+					},
+				},
+			}
+
+			resp, err := client.Do(context.Background(), get)
+			if resp != nil || err == nil || !strings.HasPrefix(err.Error(), want) {
+				t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+			}
+
+			fe, ok := err.(*FirebaseError)
+			if !ok {
+				t.Fatalf("Do() err = %v; want = FirebaseError", err)
+			}
+
+			if fe.ErrorCode != Unavailable {
+				t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unavailable)
+			}
+			if fe.Response != nil {
+				t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
+			}
+			if fe.Ext == nil || len(fe.Ext) > 0 {
+				t.Errorf("Do() err.Ext = %v; want = empty-map", fe.Ext)
+			}
+		})
+	}
+}
+
+func TestUnknownNetworkError(t *testing.T) {
+	client := &HTTPClient{
+		Client: &http.Client{
+			Transport: &faultyTransport{
+				Err: errors.New("unknown error"),
+			},
+		},
+	}
+	get := &Request{
+		Method: http.MethodGet,
+		URL:    "http://test.url",
+	}
+	want := "unknown error while making an http call"
+
+	resp, err := client.Do(context.Background(), get)
+	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
+	}
+
+	fe, ok := err.(*FirebaseError)
+	if !ok {
+		t.Fatalf("Do() err = %v; want = FirebaseError", err)
+	}
+
+	if fe.ErrorCode != Unknown {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unknown)
+	}
+	if fe.Response != nil {
+		t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
+	}
+	if fe.Ext == nil || len(fe.Ext) > 0 {
+		t.Errorf("Do() err.Ext = %v; want = empty-map", fe.Ext)
 	}
 }
 

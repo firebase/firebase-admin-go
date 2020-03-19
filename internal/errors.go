@@ -17,7 +17,11 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"syscall"
 )
 
 // ErrorCode represents the platform-wide error codes that can be raised by
@@ -147,4 +151,47 @@ func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 	}
 
 	return base
+}
+
+func newFirebaseErrorTransport(err error) *FirebaseError {
+	var code ErrorCode
+	var msg string
+	if os.IsTimeout(err) {
+		code = DeadlineExceeded
+		msg = fmt.Sprintf("timed out while making an http call: %v", err)
+	} else if isConnectionRefused(err) {
+		code = Unavailable
+		msg = fmt.Sprintf("failed to establish a connection: %v", err)
+	} else {
+		code = Unknown
+		msg = fmt.Sprintf("unknown error while making an http call: %v", err)
+	}
+
+	return &FirebaseError{
+		ErrorCode: code,
+		String:    msg,
+		Ext:       make(map[string]interface{}),
+	}
+}
+
+// isConnectionRefused attempts to determine if the given error was caused by a failure to establish a
+// connection.
+//
+// A net.OpError where the Op field is set to "dial" or "read" is considered a connection refused
+// error. Similarly an ECONNREFUSED error code (Linux-specific) is also considered a connection
+// refused error.
+func isConnectionRefused(err error) bool {
+	switch t := err.(type) {
+	case *url.Error:
+		return isConnectionRefused(t.Err)
+	case *net.OpError:
+		if t.Op == "dial" || t.Op == "read" {
+			return true
+		}
+		return isConnectionRefused(t.Err)
+	case syscall.Errno:
+		return t == syscall.ECONNREFUSED
+	}
+
+	return false
 }

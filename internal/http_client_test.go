@@ -834,10 +834,15 @@ func (e *faultyEntity) Mime() string {
 
 type faultyTransport struct {
 	RequestAttempts int
+	Err             error
 }
 
 func (e *faultyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	e.RequestAttempts++
+	if e.Err != nil {
+		return nil, e.Err
+	}
+
 	return nil, errors.New("test error")
 }
 
