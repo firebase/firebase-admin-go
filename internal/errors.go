@@ -174,7 +174,7 @@ func newFirebaseErrorTransport(err error) *FirebaseError {
 	}
 }
 
-// isConnectionRefused attempts to determine if the given was caused by a failure to establish a
+// isConnectionRefused attempts to determine if the given error was caused by a failure to establish a
 // connection.
 //
 // A net.OpError where the Op field is set to "dial" or "read" is considered a connection refused
