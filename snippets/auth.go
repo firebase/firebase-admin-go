@@ -252,7 +252,7 @@ func updateUser(ctx context.Context, client *auth.Client) {
 
 func updateUserLinkFederated(ctx context.Context, client *auth.Client) {
 	// [START update_user_link_federated]
-  // Link the user with a federated identity provider (like Google).
+	// Link the user with a federated identity provider (like Google).
 	params := (&auth.UserToUpdate{}).
 		ProviderToLink(&auth.UserProvider{ProviderID: "google.com", UID: "google_uid1234"})
 	u, err := client.UpdateUser(ctx, uid, params)
