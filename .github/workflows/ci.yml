@@ -1,5 +1,5 @@
-name: Go Continuous Integration
-on: [push, pull_request]
+name: Continuous Integration
+on: pull_request
 jobs:
 
   build:
@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         path: go/src/firebase.google.com/go
-    
+
     - name: Get dependencies
       run: go get -t -v $(go list ./... | grep -v integration)
 
@@ -43,7 +43,7 @@ jobs:
           echo "Go code is not formatted:"
           gofmt -d -s .
           exit 1
-        fi 
+        fi
 
     - name: Run Static Analyzer
       run: go vet -v firebase.google.com/go/...
