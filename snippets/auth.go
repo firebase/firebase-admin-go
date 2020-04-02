@@ -189,7 +189,7 @@ func getUserByProviderId(ctx context.Context, client *auth.Client) *auth.UserRec
 	// [START get_user_by_federated_id]
 	u, err := client.GetUserByProviderID(ctx, "google.com", "google_uid1234")
 	if err != nil {
-		log.Fatalf("error getting user by provider ID %s: %v\n", phone, err)
+		log.Fatalf("error getting user by provider ID: %v\n", err)
 	}
 	log.Printf("Successfully fetched user data: %v\n", u)
 	// [END get_user_by_federated_id]
@@ -251,6 +251,7 @@ func updateUser(ctx context.Context, client *auth.Client) {
 }
 
 func updateUserLinkFederated(ctx context.Context, client *auth.Client) {
+	uid := "someuid1234"
 	// [START update_user_link_federated]
 	// Link the user with a federated identity provider (like Google).
 	params := (&auth.UserToUpdate{}).
@@ -264,6 +265,7 @@ func updateUserLinkFederated(ctx context.Context, client *auth.Client) {
 }
 
 func updateUserUnlinkFederated(ctx context.Context, client *auth.Client) {
+	uid := "someuid1234"
 	// [START update_user_unlink_federated]
 	// Unlink the user from a federated identity provider (like Google).
 	params := (&auth.UserToUpdate{}).
