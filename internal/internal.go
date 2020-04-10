@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
 
@@ -40,7 +39,6 @@ var SystemClock = &systemClock{}
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
 	Opts             []option.ClientOption
-	Creds            *google.DefaultCredentials
 	ProjectID        string
 	ServiceAccountID string
 	Version          string
