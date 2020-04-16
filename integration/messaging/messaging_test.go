@@ -249,6 +249,12 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
+func TestTopicSubscriptionInfoInvalidToken(t *testing.T) {
+	if _, err := client.TopicSubscriptionInfo(context.Background(), "INVALID_TOKEN"); err == nil || !messaging.IsInvalidArgument(err) {
+		t.Errorf("TopicSubscriptionInfo() = %v; want InvalidArgumentError", err)
+	}
+}
+
 func checkSuccessfulSendResponse(sr *messaging.SendResponse) error {
 	if !sr.Success {
 		return errors.New("Success = false; want = true")

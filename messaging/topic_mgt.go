@@ -20,14 +20,17 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"firebase.google.com/go/internal"
 )
 
 const (
-	iidEndpoint    = "https://iid.googleapis.com/iid/v1"
-	iidSubscribe   = "batchAdd"
-	iidUnsubscribe = "batchRemove"
+	iidBaseEndpoint = "https://iid.googleapis.com/iid"
+	iidEndpoint     = iidBaseEndpoint + "/v1"
+	iidInfoEndpoint = iidBaseEndpoint + "/info"
+	iidSubscribe    = "batchAdd"
+	iidUnsubscribe  = "batchRemove"
 )
 
 var iidErrorCodes = map[string]struct{ Code, Msg string }{
@@ -84,6 +87,37 @@ func newTopicManagementResponse(resp *iidResponse) *TopicManagementResponse {
 	return tmr
 }
 
+// TopicSubscriptionInfoResponse is the result produced by querying the app instance with a token.
+//
+// TopicSubscriptionInfoResponse contains topic subscription information associated with the input
+// token; in particular for each topic the date when that topic was associated with the token is
+// provided.
+type TopicSubscriptionInfoResponse struct {
+	TopicMap map[string]*TopicInfo // TopicMap key is the topic name
+}
+
+// TopicInfo is a topic detail information.
+type TopicInfo struct {
+	Name    string
+	AddDate time.Time
+}
+
+type iidInfoClient struct {
+	iidInfoEndpoint string
+	httpClient      *internal.HTTPClient
+}
+
+func newIIDInfoClient(hc *http.Client) *iidInfoClient {
+	client := internal.WithDefaultRetryConfig(hc)
+	client.CreateErrFn = handleIIDInfoError
+	client.SuccessFn = internal.HasSuccessStatus
+	client.Opts = []internal.HTTPOption{internal.WithHeader("access_token_auth", "true"), internal.WithQueryParam("details", "true")}
+	return &iidInfoClient{
+		iidInfoEndpoint: iidInfoEndpoint,
+		httpClient:      client,
+	}
+}
+
 type iidClient struct {
 	iidEndpoint string
 	httpClient  *internal.HTTPClient
@@ -98,6 +132,34 @@ func newIIDClient(hc *http.Client) *iidClient {
 		iidEndpoint: iidEndpoint,
 		httpClient:  client,
 	}
+}
+
+// TopicSubscriptionInfo returns a list of topic subscriptions associated with the provided token.
+func (c *iidInfoClient) TopicSubscriptionInfo(ctx context.Context, token string) (*TopicSubscriptionInfoResponse, error) {
+	if token == "" {
+		return nil, fmt.Errorf("no token specified")
+	}
+
+	request := &internal.Request{
+		Method: http.MethodGet,
+		URL:    fmt.Sprintf("%s/%s", c.iidInfoEndpoint, token),
+	}
+	var result iidInfoResponse
+	if _, err := c.httpClient.DoAndUnmarshal(ctx, request, &result); err != nil {
+		return nil, err
+	}
+
+	tsir := &TopicSubscriptionInfoResponse{}
+	tsir.TopicMap = make(map[string]*TopicInfo)
+	if result.Rel != nil && result.Rel.Topics != nil {
+		for k, v := range *result.Rel.Topics {
+			tsir.TopicMap[k] = &TopicInfo{
+				Name:    k,
+				AddDate: v.AddDate,
+			}
+		}
+	}
+	return tsir, nil
 }
 
 // SubscribeToTopic subscribes a list of registration tokens to a topic.
@@ -187,4 +249,46 @@ func handleIIDError(resp *internal.Response) error {
 		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
 	}
 	return internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
+}
+
+type iidInfoResponse struct {
+	Rel *iidInfoRel `json:"rel,omitempty"`
+}
+
+type iidInfoRel struct {
+	Topics *map[string]iidTopicAddDateInfo `json:"topics,omitempty"`
+}
+
+type iidTopicAddDateInfo struct {
+	AddDate time.Time `json:"-"`
+}
+
+// UnmarshalJSON unmarshals a JSON string into a iidTopicAddDateInfo (for internal use only)
+func (i *iidTopicAddDateInfo) UnmarshalJSON(b []byte) error {
+	type iidTopicAddDateInfoInternal iidTopicAddDateInfo
+	s := struct {
+		AddDateString string `json:"addDate"`
+		*iidTopicAddDateInfoInternal
+	}{
+		iidTopicAddDateInfoInternal: (*iidTopicAddDateInfoInternal)(i),
+	}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if d, err := time.Parse("2006-01-02", s.AddDateString); err != nil {
+		return fmt.Errorf("invalid date: %q", s.AddDateString)
+	} else {
+		i.AddDate = d
+	}
+	return nil
+}
+
+func handleIIDInfoError(resp *internal.Response) error {
+	var ie iidError
+	json.Unmarshal(resp.Body, &ie) // ignore any json parse errors at this level
+	if resp.Status == http.StatusBadRequest {
+		return internal.Errorf(invalidArgument, "request contains an invalid argument; reason: %s", ie.Error)
+	} else {
+		return internal.Errorf(unknownError, "client encountered an unknown error; response: %s", string(resp.Body))
+	}
 }
