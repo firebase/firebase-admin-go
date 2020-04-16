@@ -185,6 +185,17 @@ func getUserByPhone(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	return u
 }
 
+func getUserByProviderId(ctx context.Context, client *auth.Client) *auth.UserRecord {
+	// [START get_user_by_federated_id]
+	u, err := client.GetUserByProviderID(ctx, "google.com", "google_uid1234")
+	if err != nil {
+		log.Fatalf("error getting user by provider ID: %v\n", err)
+	}
+	log.Printf("Successfully fetched user data: %v\n", u)
+	// [END get_user_by_federated_id]
+	return u
+}
+
 func createUser(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	// [START create_user_golang]
 	params := (&auth.UserToCreate{}).
@@ -237,6 +248,34 @@ func updateUser(ctx context.Context, client *auth.Client) {
 	}
 	log.Printf("Successfully updated user: %v\n", u)
 	// [END update_user_golang]
+}
+
+func updateUserLinkFederated(ctx context.Context, client *auth.Client) {
+	uid := "someuid1234"
+	// [START update_user_link_federated]
+	// Link the user with a federated identity provider (like Google).
+	params := (&auth.UserToUpdate{}).
+		ProviderToLink(&auth.UserProvider{ProviderID: "google.com", UID: "google_uid1234"})
+	u, err := client.UpdateUser(ctx, uid, params)
+	if err != nil {
+		log.Fatalf("error updating user: %v\n", err)
+	}
+	log.Printf("Successfully updated user: %v\n", u)
+	// [END update_user_link_federated]
+}
+
+func updateUserUnlinkFederated(ctx context.Context, client *auth.Client) {
+	uid := "someuid1234"
+	// [START update_user_unlink_federated]
+	// Unlink the user from a federated identity provider (like Google).
+	params := (&auth.UserToUpdate{}).
+		ProvidersToDelete([]string{"google.com"})
+	u, err := client.UpdateUser(ctx, uid, params)
+	if err != nil {
+		log.Fatalf("error updating user: %v\n", err)
+	}
+	log.Printf("Successfully updated user: %v\n", u)
+	// [END update_user_unlink_federated]
 }
 
 func deleteUser(ctx context.Context, client *auth.Client) {
