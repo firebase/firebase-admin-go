@@ -272,13 +272,12 @@ func (i *iidTopicAddDateInfo) UnmarshalJSON(b []byte) error {
 	}{
 		iidTopicAddDateInfoInternal: (*iidTopicAddDateInfoInternal)(i),
 	}
-	if err := json.Unmarshal(b, &s); err != nil {
+	var err error
+	if err = json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	if d, err := time.Parse("2006-01-02", s.AddDateString); err != nil {
+	if i.AddDate, err = time.Parse("2006-01-02", s.AddDateString); err != nil {
 		return fmt.Errorf("invalid date: %q", s.AddDateString)
-	} else {
-		i.AddDate = d
 	}
 	return nil
 }
@@ -288,7 +287,6 @@ func handleIIDInfoError(resp *internal.Response) error {
 	json.Unmarshal(resp.Body, &ie) // ignore any json parse errors at this level
 	if resp.Status == http.StatusBadRequest {
 		return internal.Errorf(invalidArgument, "request contains an invalid argument; reason: %s", ie.Error)
-	} else {
-		return internal.Errorf(unknownError, "client encountered an unknown error; response: %s", string(resp.Body))
 	}
+	return internal.Errorf(unknownError, "client encountered an unknown error; response: %s", string(resp.Body))
 }
