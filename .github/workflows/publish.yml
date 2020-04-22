@@ -55,7 +55,7 @@ jobs:
       uses: firebase/firebase-admin-node/.github/actions/send-tweet@master
       with:
         status: >
-          ${{ steps.postcheck.outputs.version }} of @Firebase Admin Go SDK is avaialble.
+          ${{ steps.postcheck.outputs.version }} of @Firebase Admin Go SDK is available.
           https://github.com/firebase/firebase-admin-go/releases/tag/${{ steps.postcheck.outputs.version }}
         consumer-key: ${{ secrets.FIREBASE_TWITTER_CONSUMER_KEY }}
         consumer-secret: ${{ secrets.FIREBASE_TWITTER_CONSUMER_SECRET }}
