@@ -57,14 +57,18 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		signer cryptoSigner
 		err    error
 	)
+
+	creds, _ := transport.Creds(ctx, conf.Opts...)
+
 	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
+	if creds != nil && len(creds.JSON) > 0 {
 		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(conf.Creds.JSON)
+		signer, err = signerFromCreds(creds.JSON)
 		if err != nil && err != errNotAServiceAcct {
 			return nil, err
 		}
 	}
+
 	if signer == nil {
 		if conf.ServiceAccountID != "" {
 			// If the SDK was initialized with a service account email, use it with the IAM service

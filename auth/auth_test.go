@@ -34,6 +34,7 @@ import (
 )
 
 const (
+	credEnvVar    = "GOOGLE_APPLICATION_CREDENTIALS"
 	testProjectID = "mock-project-id"
 	testVersion   = "test-version"
 )
@@ -82,7 +83,6 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	client, err := NewClient(context.Background(), &internal.AuthConfig{
-		Creds:     creds,
 		Opts:      optsWithServiceAcct,
 		ProjectID: creds.ProjectID,
 		Version:   testVersion,
@@ -176,7 +176,6 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 		}`),
 	}
 	conf := &internal.AuthConfig{
-		Creds:   creds,
 		Opts:    []option.ClientOption{option.WithCredentials(creds)},
 		Version: testVersion,
 	}
@@ -206,7 +205,11 @@ func TestNewClientWithMalformedCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
 	}
-	conf := &internal.AuthConfig{Creds: creds}
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithCredentials(creds),
+		},
+	}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
@@ -222,9 +225,58 @@ func TestNewClientWithInvalidPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	creds := &google.DefaultCredentials{JSON: b}
-	conf := &internal.AuthConfig{Creds: creds}
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithCredentials(creds),
+		},
+	}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	}
+}
+
+func TestNewClientAppDefaultCredentialsWithInvalidFile(t *testing.T) {
+	current := os.Getenv(credEnvVar)
+
+	if err := os.Setenv(credEnvVar, "../testdata/non_existing.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(credEnvVar, current)
+
+	conf := &internal.AuthConfig{}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+		t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+	}
+}
+
+func TestNewClientInvalidCredentialFile(t *testing.T) {
+	invalidFiles := []string{
+		"testdata",
+		"testdata/plain_text.txt",
+	}
+
+	ctx := context.Background()
+	for _, tc := range invalidFiles {
+		conf := &internal.AuthConfig{
+			Opts: []option.ClientOption{
+				option.WithCredentialsFile(tc),
+			},
+		}
+		if c, err := NewClient(ctx, conf); c != nil || err == nil {
+			t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+		}
+	}
+}
+
+func TestNewClientExplicitNoAuth(t *testing.T) {
+	ctx := context.Background()
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithoutAuthentication(),
+		},
+	}
+	if c, err := NewClient(ctx, conf); c == nil || err != nil {
+		t.Errorf("Auth() = (%v, %v); want (auth, nil)", c, err)
 	}
 }
 
@@ -298,8 +350,7 @@ func TestCustomTokenError(t *testing.T) {
 func TestCustomTokenInvalidCredential(t *testing.T) {
 	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Creds: nil,
-		Opts:  optsWithTokenSource,
+		Opts: optsWithTokenSource,
 	}
 	s, err := NewClient(ctx, conf)
 	if err != nil {

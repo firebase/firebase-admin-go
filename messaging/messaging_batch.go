@@ -38,7 +38,7 @@ const multipartBoundary = "__END_OF_PART__"
 // Messaging (FCM).
 //
 // It contains payload information as well as the list of device registration tokens to which the
-// message should be sent. A single MulticastMessage may contain up to 100 registration tokens.
+// message should be sent. A single MulticastMessage may contain up to 500 registration tokens.
 type MulticastMessage struct {
 	Tokens       []string
 	Data         map[string]string
@@ -89,7 +89,7 @@ type BatchResponse struct {
 
 // SendAll sends the messages in the given array via Firebase Cloud Messaging.
 //
-// The messages array may contain up to 100 messages. SendAll employs batching to send the entire
+// The messages array may contain up to 500 messages. SendAll employs batching to send the entire
 // array of mssages as a single RPC call. Compared to the `Send()` function,
 // this is a significantly more efficient way to send multiple messages. The responses list
 // obtained from the return value corresponds to the order of the input messages. An error from
@@ -105,7 +105,7 @@ func (c *fcmClient) SendAll(ctx context.Context, messages []*Message) (*BatchRes
 // This function does not actually deliver any messages to target devices. Instead, it performs all
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
-// The messages array may contain up to 100 messages. SendAllDryRun employs batching to send the
+// The messages array may contain up to 500 messages. SendAllDryRun employs batching to send the
 // entire array of mssages as a single RPC call. Compared to the `SendDryRun()` function, this
 // is a significantly more efficient way to validate sending multiple messages. The responses list
 // obtained from the return value corresponds to the order of the input messages. An error from
@@ -117,7 +117,7 @@ func (c *fcmClient) SendAllDryRun(ctx context.Context, messages []*Message) (*Ba
 
 // SendMulticast sends the given multicast message to all the FCM registration tokens specified.
 //
-// The tokens array in MulticastMessage may contain up to 100 tokens. SendMulticast uses the
+// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticast uses the
 // `SendAll()` function to send the given message to all the target recipients. The
 // responses list obtained from the return value corresponds to the order of the input tokens. An
 // error from SendMulticast indicates a total failure -- i.e. the message could not be sent to any
@@ -137,7 +137,7 @@ func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage
 // This function does not actually deliver any messages to target devices. Instead, it performs all
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
-// The tokens array in MulticastMessage may contain up to 100 tokens. SendMulticastDryRun uses the
+// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticastDryRun uses the
 // `SendAllDryRun()` function to send the given message. The responses list obtained from
 // the return value corresponds to the order of the input tokens. An error from SendMulticastDryRun
 // indicates a total failure -- i.e. none of the messages were sent to FCM for validation. Partial
