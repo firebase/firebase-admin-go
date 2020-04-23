@@ -247,3 +247,144 @@ var invalidTopicMgtArgs = []struct {
 		want:   "tokens list must not contain empty strings",
 	},
 }
+
+func TestTopicSubscriptionInfo(t *testing.T) {
+	var tr *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"appSigner": "sampleAppSigner",
+			"application": "sample.app",
+			"applicationVersion": "42",
+			"authorizedEntity": "42",
+			"platform": "ANDROID",
+			"rel": {
+				"topics": {
+					"test-topic1": {
+						"addDate": "2019-01-01"
+					},
+					"test-topic2": {
+						"addDate": "2020-04-15"
+					}
+				}
+			},
+			"scope": "*"
+		}`))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidInfoEndpoint = ts.URL
+	client.iidInfoClient.httpClient.RetryConfig = nil
+
+	resp, err := client.TopicSubscriptionInfo(ctx, "test-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tr == nil {
+		t.Fatalf("Request = nil; want non-nil")
+	}
+	if tr.Method != http.MethodGet {
+		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodGet)
+	}
+	if tr.URL.Path != "/test-token" {
+		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/test-token")
+	}
+	if tr.URL.Query().Get("details") != "true" {
+		t.Errorf("Query param details = %q; want = %q", tr.URL.Query().Get("details"), "true")
+	}
+	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
+		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+
+	if len(resp.TopicMap) != 2 {
+		t.Errorf("TopicMap length = %d; want = %d", len(resp.TopicMap), 2)
+	}
+
+	if topic1, ok := resp.TopicMap["test-topic1"]; !ok {
+		t.Errorf("TopicMap key missing; want = %q", "test-topic1")
+	} else {
+		if topic1.Name != "test-topic1" {
+			t.Errorf("TopicMap Name = %q; want = %q", topic1.Name, "test-topic1")
+		}
+		t1DateStr := topic1.AddDate.Format("2006-01-02")
+		if t1DateStr != "2019-01-01" {
+			t.Errorf("TopicMap Date = %q; want = %q", t1DateStr, "2019-01-01")
+		}
+	}
+
+	if topic2, ok := resp.TopicMap["test-topic2"]; !ok {
+		t.Errorf("TopicMap key missing; want = %q", "test-topic2")
+	} else {
+		if topic2.Name != "test-topic2" {
+			t.Errorf("TopicMap Name = %q; want = %q", topic2.Name, "test-topic2")
+		}
+		t2DateStr := topic2.AddDate.Format("2006-01-02")
+		if t2DateStr != "2020-04-15" {
+			t.Errorf("TopicMap Date = %q; want = %q", t2DateStr, "2020-04-15")
+		}
+	}
+}
+
+func TestTopicSubscriptionInfoEmptyToken(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.TopicSubscriptionInfo(ctx, ""); err == nil {
+		t.Errorf("TopicSubscriptionInfo(empty) = nil; want error")
+	}
+
+}
+
+func TestTopicSubscriptionInfoError(t *testing.T) {
+	var tr *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"error\": \"InvalidToken\"}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidInfoEndpoint = ts.URL
+	client.iidInfoClient.httpClient.RetryConfig = nil
+
+	_, err = client.TopicSubscriptionInfo(ctx, "bad-token")
+	if err == nil {
+		t.Errorf("TopicSubscriptionInfo(bad) = nil; want error")
+	} else {
+		if tr == nil {
+			t.Fatalf("Request = nil; want non-nil")
+		}
+		if tr.Method != http.MethodGet {
+			t.Errorf("Method = %q; want = %q", tr.Method, http.MethodGet)
+		}
+		if tr.URL.Path != "/bad-token" {
+			t.Errorf("Path = %q; want = %q", tr.URL.Path, "/bad-token")
+		}
+		if tr.URL.Query().Get("details") != "true" {
+			t.Errorf("Query param details = %q; want = %q", tr.URL.Query().Get("details"), "true")
+		}
+		if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
+			t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+		}
+
+		if !IsInvalidArgument(err) {
+			t.Errorf("TopicSubscriptionInfo(bad) = %v; want InvalidArgument error", err)
+		}
+	}
+}

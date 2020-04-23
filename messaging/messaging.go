@@ -901,6 +901,7 @@ type ErrorInfo struct {
 // Client is the interface for the Firebase Cloud Messaging (FCM) service.
 type Client struct {
 	*fcmClient
+	*iidInfoClient
 	*iidClient
 }
 
@@ -919,8 +920,9 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}
 
 	return &Client{
-		fcmClient: newFCMClient(hc, c),
-		iidClient: newIIDClient(hc),
+		fcmClient:     newFCMClient(hc, c),
+		iidInfoClient: newIIDInfoClient(hc),
+		iidClient:     newIIDClient(hc),
 	}, nil
 }
 
