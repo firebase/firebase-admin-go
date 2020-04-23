@@ -71,4 +71,5 @@ jobs:
     # If triggered by a PR against the master branch, run additional checks.
     - name: Publish preflight check
       if: github.event.pull_request.base.ref == 'master'
+      working-directory: ./go/src/firebase.google.com/go
       run: ./.github/scripts/publish_preflight_check.sh
