@@ -96,12 +96,16 @@ jobs:
 
     # We authorize this step with an access token that has write access to the master branch.
     - name: Merge to master
-      uses: devmasx/merge-branch@b57c127024eb70aef25b76a54e586638d17ee085
+      uses: actions/github-script@0.9.0
       with:
-        type: now
-        target_branch: master
-      env:
-        GITHUB_TOKEN: ${{ secrets.ADMIN_ACCESS_TOKEN }}
+        github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
+        script: |
+            github.repos.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: 'master',
+              head: 'dev'
+            })
 
     # We pull this action from a custom fork of a contributor until
     # https://github.com/actions/create-release/pull/32 is merged. Also note that v1 of
