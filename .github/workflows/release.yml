@@ -1,0 +1,138 @@
+# Copyright 2020 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Release Candidate
+
+on:
+  # Only run the workflow when a PR is updated or when a developer explicitly requests
+  # a build by sending a 'firebase_build' event.
+  pull_request:
+    types: [opened, synchronize, closed]
+
+  repository_dispatch:
+    types:
+      - firebase_build
+
+jobs:
+  stage_release:
+    # To publish a release, merge the release PR with the label 'release:publish'.
+    # To stage a release without publishing it, send a 'firebase_build' event or apply
+    # the 'release:stage' label to a PR.
+    if: github.event.action == 'firebase_build' ||
+      contains(github.event.pull_request.labels.*.name, 'release:stage') ||
+      (github.event.pull_request.merged &&
+        contains(github.event.pull_request.labels.*.name, 'release:publish'))
+
+    runs-on: ubuntu-latest
+
+    env:
+      GOPATH: ${{ github.workspace }}/go
+
+    # When manually triggering the build, the requester can specify a target branch or a tag
+    # via the 'ref' client parameter.
+    steps:
+    - name: Check out code into GOPATH
+      uses: actions/checkout@v2
+      with:
+        path: go/src/firebase.google.com/go
+        ref: ${{ github.event.client_payload.ref || github.ref }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.11
+
+    - name: Get dependencies
+      run: go get -t -v $(go list ./... | grep -v integration)
+
+    - name: Run Linter
+      run: |
+        echo
+        go get golang.org/x/lint/golint
+        $GOPATH/bin/golint -set_exit_status firebase.google.com/go/...
+
+    - name: Run Tests
+      working-directory: ./go/src/firebase.google.com/go
+      run: ./.github/scripts/run_all_tests.sh
+      env:
+        FIREBASE_SERVICE_ACCT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCT_KEY }}
+        FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+
+  publish_release:
+    needs: stage_release
+
+    # Check whether the release should be published. We publish only when the trigger PR is
+    #   1. merged
+    #   2. to the dev branch
+    #   3. with the label 'release:publish', and
+    #   4. the title prefix '[chore] Release '.
+    if: github.event.pull_request.merged &&
+      github.ref == 'dev' &&
+      contains(github.event.pull_request.labels.*.name, 'release:publish') &&
+      startsWith(github.event.pull_request.title, '[chore] Release ')
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source for publish
+      uses: actions/checkout@v2
+      with:
+        persist-credentials: false
+
+    - name: Publish preflight check
+      id: preflight
+      run: ./.github/scripts/publish_preflight_check.sh
+
+    # We authorize this step with an access token that has write access to the master branch.
+    - name: Merge to master
+      uses: actions/github-script@0.9.0
+      with:
+        github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
+        script: |
+            github.repos.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: 'master',
+              head: 'dev'
+            })
+
+    # We pull this action from a custom fork of a contributor until
+    # https://github.com/actions/create-release/pull/32 is merged. Also note that v1 of
+    # this action does not support the "body" parameter.
+    - name: Create release tag
+      uses: fleskesvor/create-release@1a72e235c178bf2ae6c51a8ae36febc24568c5fe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.preflight.outputs.version }}
+        release_name: Firebase Admin Go SDK ${{ steps.preflight.outputs.version }}
+        body: ${{ steps.preflight.outputs.changelog }}
+        commitish: master
+        draft: false
+        prerelease: false
+
+    # Post to Twitter if explicitly opted-in by adding the label 'release:tweet'.
+    - name: Post to Twitter
+      if: success() &&
+        contains(github.event.pull_request.labels.*.name, 'release:tweet')
+      uses: firebase/firebase-admin-node/.github/actions/send-tweet@master
+      with:
+        status: >
+          ${{ steps.preflight.outputs.version }} of @Firebase Admin Go SDK is available.
+          https://github.com/firebase/firebase-admin-go/releases/tag/${{ steps.preflight.outputs.version }}
+        consumer-key: ${{ secrets.FIREBASE_TWITTER_CONSUMER_KEY }}
+        consumer-secret: ${{ secrets.FIREBASE_TWITTER_CONSUMER_SECRET }}
+        access-token: ${{ secrets.FIREBASE_TWITTER_ACCESS_TOKEN }}
+        access-token-secret: ${{ secrets.FIREBASE_TWITTER_ACCESS_TOKEN_SECRET }}
+      continue-on-error: true

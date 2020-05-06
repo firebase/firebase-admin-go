@@ -39,7 +39,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "3.12.0"
+const Version = "3.12.1"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -47,7 +47,6 @@ const firebaseEnvName = "FIREBASE_CONFIG"
 // An App holds configuration and state common to all Firebase services that are exposed from the SDK.
 type App struct {
 	authOverride     map[string]interface{}
-	creds            *google.DefaultCredentials
 	dbURL            string
 	projectID        string
 	serviceAccountID string
@@ -67,7 +66,6 @@ type Config struct {
 // Auth returns an instance of auth.Client.
 func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
 	conf := &internal.AuthConfig{
-		Creds:            a.creds,
 		ProjectID:        a.projectID,
 		Opts:             a.opts,
 		ServiceAccountID: a.serviceAccountID,
@@ -142,28 +140,14 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
 	o := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
 	o = append(o, opts...)
-	creds, err := transport.Creds(ctx, o...)
-	if err != nil {
-		return nil, err
-	}
 	if config == nil {
+		var err error
 		if config, err = getConfigDefaults(); err != nil {
 			return nil, err
 		}
 	}
 
-	var pid string
-	if config.ProjectID != "" {
-		pid = config.ProjectID
-	} else if creds.ProjectID != "" {
-		pid = creds.ProjectID
-	} else {
-		pid = os.Getenv("GOOGLE_CLOUD_PROJECT")
-		if pid == "" {
-			pid = os.Getenv("GCLOUD_PROJECT")
-		}
-	}
-
+	pid := getProjectID(ctx, config, o...)
 	ao := defaultAuthOverrides
 	if config.AuthOverride != nil {
 		ao = *config.AuthOverride
@@ -171,7 +155,6 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 
 	return &App{
 		authOverride:     ao,
-		creds:            creds,
 		dbURL:            config.DatabaseURL,
 		projectID:        pid,
 		serviceAccountID: config.ServiceAccountID,
@@ -212,4 +195,21 @@ func getConfigDefaults() (*Config, error) {
 		fbc.AuthOverride = &nullMap
 	}
 	return fbc, nil
+}
+
+func getProjectID(ctx context.Context, config *Config, opts ...option.ClientOption) string {
+	if config.ProjectID != "" {
+		return config.ProjectID
+	}
+
+	creds, _ := transport.Creds(ctx, opts...)
+	if creds != nil && creds.ProjectID != "" {
+		return creds.ProjectID
+	}
+
+	if pid := os.Getenv("GOOGLE_CLOUD_PROJECT"); pid != "" {
+		return pid
+	}
+
+	return os.Getenv("GCLOUD_PROJECT")
 }

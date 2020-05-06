@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/firebase/firebase-admin-go/workflows/Continuous%20Integration/badge.svg)](https://github.com/firebase/firebase-admin-go/actions)
+[![Build Status](https://github.com/firebase/firebase-admin-go/workflows/Continuous%20Integration/badge.svg?branch=dev)](https://github.com/firebase/firebase-admin-go/actions)
 [![GoDoc](https://godoc.org/firebase.google.com/go?status.svg)](https://godoc.org/firebase.google.com/go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/firebase/firebase-admin-go)](https://goreportcard.com/report/github.com/firebase/firebase-admin-go)
 

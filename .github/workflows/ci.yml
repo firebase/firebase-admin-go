@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [1.11, 1.12, 1.13]
+        go: [1.12, 1.13, 1.14]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
@@ -29,7 +29,6 @@ jobs:
       run: go test -v -race -test.short ./...
 
     - name: Run Formatter
-      if: matrix.go != '1.11'
       run: |
         if [[ ! -z "$(gofmt -l -s .)" ]]; then
           echo "Go code is not formatted:"
