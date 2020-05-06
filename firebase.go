@@ -31,7 +31,6 @@ import (
 	"firebase.google.com/go/v4/internal"
 	"firebase.google.com/go/v4/messaging"
 	"firebase.google.com/go/v4/storage"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
