@@ -41,13 +41,14 @@ type jwtHeader struct {
 }
 
 type customToken struct {
-	Iss    string                 `json:"iss"`
-	Aud    string                 `json:"aud"`
-	Exp    int64                  `json:"exp"`
-	Iat    int64                  `json:"iat"`
-	Sub    string                 `json:"sub,omitempty"`
-	UID    string                 `json:"uid,omitempty"`
-	Claims map[string]interface{} `json:"claims,omitempty"`
+	Iss      string                 `json:"iss"`
+	Aud      string                 `json:"aud"`
+	Exp      int64                  `json:"exp"`
+	Iat      int64                  `json:"iat"`
+	Sub      string                 `json:"sub,omitempty"`
+	UID      string                 `json:"uid,omitempty"`
+	TenantID string                 `json:"tenant_id,omitempty"`
+	Claims   map[string]interface{} `json:"claims,omitempty"`
 }
 
 type jwtInfo struct {
