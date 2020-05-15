@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -908,6 +909,8 @@ type Client struct {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // the messaging service through firebase.App.
+//
+// It uses FIREBASE_MESSAGING_ENDPOINT environment variable to override default FCM endpoint.
 func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error) {
 	if c.ProjectID == "" {
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
@@ -943,8 +946,13 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
 		internal.WithHeader(firebaseClientHeader, version),
 	}
 
+	endpoint := os.Getenv("FIREBASE_MESSAGING_ENDPOINT")
+	if endpoint == "" {
+		endpoint = messagingEndpoint
+	}
+
 	return &fcmClient{
-		fcmEndpoint:   messagingEndpoint,
+		fcmEndpoint:   endpoint,
 		batchEndpoint: batchEndpoint,
 		project:       conf.ProjectID,
 		version:       version,
