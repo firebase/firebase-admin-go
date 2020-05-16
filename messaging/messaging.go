@@ -22,13 +22,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"firebase.google.com/go/internal"
+	"google.golang.org/api/option/internaloption"
 	"google.golang.org/api/transport"
 )
 
@@ -909,20 +909,19 @@ type Client struct {
 //
 // This function can only be invoked from within the SDK. Client applications should access the
 // the messaging service through firebase.App.
-//
-// It uses FIREBASE_MESSAGING_ENDPOINT environment variable to override default FCM endpoint.
 func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error) {
 	if c.ProjectID == "" {
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	c.Opts = append(c.Opts, internaloption.WithDefaultEndpoint(messagingEndpoint))
+	hc, endpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		fcmClient: newFCMClient(hc, c),
+		fcmClient: newFCMClient(hc, c, endpoint),
 		iidClient: newIIDClient(hc),
 	}, nil
 }
@@ -935,7 +934,7 @@ type fcmClient struct {
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
+func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, endpoint string) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 	client.SuccessFn = internal.HasSuccessStatus
@@ -944,11 +943,6 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
-	}
-
-	endpoint := os.Getenv("FIREBASE_MESSAGING_ENDPOINT")
-	if endpoint == "" {
-		endpoint = messagingEndpoint
 	}
 
 	return &fcmClient{
