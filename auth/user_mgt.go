@@ -824,7 +824,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		if err != nil {
 			return nil, err
 		}
-		lastRefreshTimestamp = t.Unix()
+		lastRefreshTimestamp = t.Unix() * 1000
 	}
 
 	return &ExportedUserRecord{
