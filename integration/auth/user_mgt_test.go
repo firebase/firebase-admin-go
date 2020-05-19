@@ -254,15 +254,15 @@ func TestLastRefreshTime(t *testing.T) {
 		t.Fatalf("GetUser(...) failed with error: %v", err)
 	}
 
-    // Ensure last refresh time is approx now (with tollerance of 10m)
-    now_millis := time.Now().Unix() * 1000
-    lastRefreshTimestamp := getUsersResult.UserMetadata.LastRefreshTimestamp
-    if lastRefreshTimestamp < now_millis - 10*60*1000 {
-        t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want >= %d", lastRefreshTimestamp, now_millis - 10*60*1000)
-    }
-    if now_millis + 10*60*1000 < lastRefreshTimestamp {
-        t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want <= %d", lastRefreshTimestamp, now_millis + 10*60*1000)
-    }
+	// Ensure last refresh time is approx now (with tollerance of 10m)
+	nowMillis := time.Now().Unix() * 1000
+	lastRefreshTimestamp := getUsersResult.UserMetadata.LastRefreshTimestamp
+	if lastRefreshTimestamp < nowMillis-10*60*1000 {
+		t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want >= %d", lastRefreshTimestamp, nowMillis-10*60*1000)
+	}
+	if nowMillis+10*60*1000 < lastRefreshTimestamp {
+		t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want <= %d", lastRefreshTimestamp, nowMillis+10*60*1000)
+	}
 }
 
 func TestUpdateNonExistingUser(t *testing.T) {
