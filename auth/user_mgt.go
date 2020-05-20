@@ -340,7 +340,6 @@ const (
 	unauthorizedContinueURI  = "unauthorized-continue-uri"
 	unknown                  = "unknown-error"
 	userNotFound             = "user-not-found"
-	maximumUserCountExceeded = "maximum-user-count-exceeded"
 )
 
 // IsConfigurationNotFound checks if the given error was due to a non-existing IdP configuration.
