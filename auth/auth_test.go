@@ -282,20 +282,26 @@ func TestNewClientExplicitNoAuth(t *testing.T) {
 
 func TestCustomToken(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, nil, t)
+	if err := verifyCustomToken(context.Background(), token, nil, ""); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	claims := map[string]interface{}{
 		"foo":     "bar",
@@ -306,19 +312,46 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, claims, t)
+	if err := verifyCustomToken(context.Background(), token, claims, ""); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	token, err := client.CustomTokenWithClaims(context.Background(), "user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, nil, t)
+	if err := verifyCustomToken(context.Background(), token, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCustomTokenForTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			tenantID: "tenantID",
+			signer:   testSigner,
+			clock:    testClock,
+		},
+	}
+	claims := map[string]interface{}{
+		"foo":     "bar",
+		"premium": true,
+	}
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyCustomToken(context.Background(), token, claims, "tenantID"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenError(t *testing.T) {
@@ -333,7 +366,7 @@ func TestCustomTokenError(t *testing.T) {
 		{"ReservedClaims", "uid", map[string]interface{}{"sub": "1234", "aud": "foo"}},
 	}
 
-	client := &Client{
+	client := &baseClient{
 		signer: testSigner,
 		clock:  testClock,
 	}
@@ -628,9 +661,9 @@ func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{
 			idTokenVerifier: testIDTokenVerifier,
+			signer:          testSigner,
+			clock:           testClock,
 		},
-		signer: testSigner,
-		clock:  testClock,
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
@@ -1137,52 +1170,61 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 	return nil
 }
 
-func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
+func verifyCustomToken(
+	ctx context.Context, token string, expected map[string]interface{}, tenantID string) error {
+
 	if err := testIDTokenVerifier.verifySignature(ctx, token); err != nil {
-		t.Fatal(err)
+		return err
 	}
+
 	var (
 		header  jwtHeader
 		payload customToken
 	)
 	segments := strings.Split(token, ".")
 	if err := decode(segments[0], &header); err != nil {
-		t.Fatal(err)
+		return err
 	}
 	if err := decode(segments[1], &payload); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	email, err := testSigner.Email(ctx)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	if header.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
+		return fmt.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
 	} else if header.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", header.Type)
+		return fmt.Errorf("Type: %q; want: 'JWT'", header.Type)
 	} else if payload.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
+		return fmt.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
 	} else if payload.Iss != email {
-		t.Errorf("Issuer: %q; want: %q", payload.Iss, email)
+		return fmt.Errorf("Issuer: %q; want: %q", payload.Iss, email)
 	} else if payload.Sub != email {
-		t.Errorf("Subject: %q; want: %q", payload.Sub, email)
+		return fmt.Errorf("Subject: %q; want: %q", payload.Sub, email)
 	}
 
 	now := testClock.Now().Unix()
 	if payload.Exp != now+3600 {
-		t.Errorf("Exp: %d; want: %d", payload.Exp, now+3600)
+		return fmt.Errorf("Exp: %d; want: %d", payload.Exp, now+3600)
 	}
 	if payload.Iat != now {
-		t.Errorf("Iat: %d; want: %d", payload.Iat, now)
+		return fmt.Errorf("Iat: %d; want: %d", payload.Iat, now)
 	}
 
 	for k, v := range expected {
 		if payload.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
+			return fmt.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
 	}
+
+	if payload.TenantID != tenantID {
+		return fmt.Errorf("Tenant ID: %q; want: %q", payload.TenantID, tenantID)
+	}
+
+	return nil
 }
 
 func logFatal(err error) {

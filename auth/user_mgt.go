@@ -34,6 +34,12 @@ const (
 	maxLenPayloadCC     = 1000
 	defaultProviderID   = "firebase"
 	idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
+
+	// Maximum number of users allowed to batch get at a time.
+	maxGetAccountsBatchSize = 100
+
+	// Maximum number of users allowed to batch delete at a time.
+	maxDeleteAccountsBatchSize = 1000
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -57,6 +63,9 @@ type UserInfo struct {
 type UserMetadata struct {
 	CreationTimestamp  int64
 	LastLogInTimestamp int64
+	// The time at which the user was last active (ID token refreshed), or 0 if
+	// the user was never active.
+	LastRefreshTimestamp int64
 }
 
 // UserRecord contains metadata associated with a Firebase user account.
@@ -491,6 +500,15 @@ func validatePhone(phone string) error {
 	return nil
 }
 
+func validateProvider(providerID string, providerUID string) error {
+	if providerID == "" {
+		return fmt.Errorf("providerID must be a non-empty string")
+	} else if providerUID == "" {
+		return fmt.Errorf("providerUID must be a non-empty string")
+	}
+	return nil
+}
+
 // End of validators
 
 // GetUser gets the user data corresponding to the specified user ID.
@@ -545,12 +563,13 @@ func (q *userQuery) build() map[string]interface{} {
 	}
 }
 
+type getAccountInfoResponse struct {
+	Users []*userQueryResponse `json:"users"`
+}
+
 func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
-	var parsed struct {
-		Users []*userQueryResponse `json:"users"`
-	}
-	_, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
-	if err != nil {
+	var parsed getAccountInfoResponse
+	if _, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed); err != nil {
 		return nil, err
 	}
 
@@ -561,6 +580,195 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 	return parsed.Users[0].makeUserRecord()
 }
 
+// A UserIdentifier identifies a user to be looked up.
+type UserIdentifier interface {
+	matches(ur *UserRecord) bool
+	populate(req *getAccountInfoRequest)
+}
+
+// A UIDIdentifier is used for looking up an account by uid.
+//
+// See GetUsers function.
+type UIDIdentifier struct {
+	UID string
+}
+
+func (id UIDIdentifier) matches(ur *UserRecord) bool {
+	return id.UID == ur.UID
+}
+
+func (id UIDIdentifier) populate(req *getAccountInfoRequest) {
+	req.LocalID = append(req.LocalID, id.UID)
+}
+
+// An EmailIdentifier is used for looking up an account by email.
+//
+// See GetUsers function.
+type EmailIdentifier struct {
+	Email string
+}
+
+func (id EmailIdentifier) matches(ur *UserRecord) bool {
+	return id.Email == ur.Email
+}
+
+func (id EmailIdentifier) populate(req *getAccountInfoRequest) {
+	req.Email = append(req.Email, id.Email)
+}
+
+// A PhoneIdentifier is used for looking up an account by phone number.
+//
+// See GetUsers function.
+type PhoneIdentifier struct {
+	PhoneNumber string
+}
+
+func (id PhoneIdentifier) matches(ur *UserRecord) bool {
+	return id.PhoneNumber == ur.PhoneNumber
+}
+
+func (id PhoneIdentifier) populate(req *getAccountInfoRequest) {
+	req.PhoneNumber = append(req.PhoneNumber, id.PhoneNumber)
+}
+
+// A ProviderIdentifier is used for looking up an account by federated provider.
+//
+// See GetUsers function.
+type ProviderIdentifier struct {
+	ProviderID  string
+	ProviderUID string
+}
+
+func (id ProviderIdentifier) matches(ur *UserRecord) bool {
+	for _, userInfo := range ur.ProviderUserInfo {
+		if id.ProviderID == userInfo.ProviderID && id.ProviderUID == userInfo.UID {
+			return true
+		}
+	}
+	return false
+}
+
+func (id ProviderIdentifier) populate(req *getAccountInfoRequest) {
+	req.FederatedUserID = append(
+		req.FederatedUserID,
+		federatedUserIdentifier{ProviderID: id.ProviderID, RawID: id.ProviderUID})
+}
+
+// A GetUsersResult represents the result of the GetUsers() API.
+type GetUsersResult struct {
+	// Set of UserRecords corresponding to the set of users that were requested.
+	// Only users that were found are listed here. The result set is unordered.
+	Users []*UserRecord
+
+	// Set of UserIdentifiers that were requested, but not found.
+	NotFound []UserIdentifier
+}
+
+type federatedUserIdentifier struct {
+	ProviderID string `json:"providerId,omitempty"`
+	RawID      string `json:"rawId,omitempty"`
+}
+
+type getAccountInfoRequest struct {
+	LocalID         []string                  `json:"localId,omitempty"`
+	Email           []string                  `json:"email,omitempty"`
+	PhoneNumber     []string                  `json:"phoneNumber,omitempty"`
+	FederatedUserID []federatedUserIdentifier `json:"federatedUserId,omitempty"`
+}
+
+func (req *getAccountInfoRequest) validate() error {
+	for i := range req.LocalID {
+		if err := validateUID(req.LocalID[i]); err != nil {
+			return err
+		}
+	}
+
+	for i := range req.Email {
+		if err := validateEmail(req.Email[i]); err != nil {
+			return err
+		}
+	}
+
+	for i := range req.PhoneNumber {
+		if err := validatePhone(req.PhoneNumber[i]); err != nil {
+			return err
+		}
+	}
+
+	for i := range req.FederatedUserID {
+		id := &req.FederatedUserID[i]
+		if err := validateProvider(id.ProviderID, id.RawID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func isUserFound(id UserIdentifier, urs [](*UserRecord)) bool {
+	for i := range urs {
+		if id.matches(urs[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetUsers returns the user data corresponding to the specified identifiers.
+//
+// There are no ordering guarantees; in particular, the nth entry in the users
+// result list is not guaranteed to correspond to the nth entry in the input
+// parameters list.
+//
+// A maximum of 100 identifiers may be supplied. If more than 100
+// identifiers are supplied, this method returns an error.
+//
+// Returns the corresponding user records. An error is returned instead if any
+// of the identifiers are invalid or if more than 100 identifiers are
+// specified.
+func (c *baseClient) GetUsers(
+	ctx context.Context, identifiers []UserIdentifier,
+) (*GetUsersResult, error) {
+	if len(identifiers) == 0 {
+		return &GetUsersResult{[](*UserRecord){}, [](UserIdentifier){}}, nil
+	} else if len(identifiers) > maxGetAccountsBatchSize {
+		return nil, fmt.Errorf(
+			"`identifiers` parameter must have <= %d entries", maxGetAccountsBatchSize)
+	}
+
+	var request getAccountInfoRequest
+	for i := range identifiers {
+		identifiers[i].populate(&request)
+	}
+
+	if err := request.validate(); err != nil {
+		return nil, err
+	}
+
+	var parsed getAccountInfoResponse
+	if _, err := c.post(ctx, "/accounts:lookup", request, &parsed); err != nil {
+		return nil, err
+	}
+
+	var userRecords [](*UserRecord)
+	for _, user := range parsed.Users {
+		userRecord, err := user.makeUserRecord()
+		if err != nil {
+			return nil, err
+		}
+		userRecords = append(userRecords, userRecord)
+	}
+
+	var notFound []UserIdentifier
+	for i := range identifiers {
+		if !isUserFound(identifiers[i], userRecords) {
+			notFound = append(notFound, identifiers[i])
+		}
+	}
+
+	return &GetUsersResult{userRecords, notFound}, nil
+}
+
 type userQueryResponse struct {
 	UID                string      `json:"localId,omitempty"`
 	DisplayName        string      `json:"displayName,omitempty"`
@@ -569,6 +777,7 @@ type userQueryResponse struct {
 	PhotoURL           string      `json:"photoUrl,omitempty"`
 	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
 	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
+	LastRefreshAt      string      `json:"lastRefreshAt,omitempty"`
 	ProviderID         string      `json:"providerId,omitempty"`
 	CustomAttributes   string      `json:"customAttributes,omitempty"`
 	Disabled           bool        `json:"disabled,omitempty"`
@@ -592,8 +801,7 @@ func (r *userQueryResponse) makeUserRecord() (*UserRecord, error) {
 func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error) {
 	var customClaims map[string]interface{}
 	if r.CustomAttributes != "" {
-		err := json.Unmarshal([]byte(r.CustomAttributes), &customClaims)
-		if err != nil {
+		if err := json.Unmarshal([]byte(r.CustomAttributes), &customClaims); err != nil {
 			return nil, err
 		}
 		if len(customClaims) == 0 {
@@ -607,6 +815,15 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 	hash := r.PasswordHash
 	if hash == b64Redacted {
 		hash = ""
+	}
+
+	var lastRefreshTimestamp int64
+	if r.LastRefreshAt != "" {
+		t, err := time.Parse(time.RFC3339, r.LastRefreshAt)
+		if err != nil {
+			return nil, err
+		}
+		lastRefreshTimestamp = t.Unix() * 1000
 	}
 
 	return &ExportedUserRecord{
@@ -626,8 +843,9 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			TenantID:               r.TenantID,
 			TokensValidAfterMillis: r.ValidSinceSeconds * 1000,
 			UserMetadata: &UserMetadata{
-				LastLogInTimestamp: r.LastLogInTimestamp,
-				CreationTimestamp:  r.CreationTimestamp,
+				LastLogInTimestamp:   r.LastLogInTimestamp,
+				CreationTimestamp:    r.CreationTimestamp,
+				LastRefreshTimestamp: lastRefreshTimestamp,
 			},
 		},
 		PasswordHash: hash,
@@ -726,6 +944,91 @@ func (c *baseClient) DeleteUser(ctx context.Context, uid string) error {
 	}
 	_, err := c.post(ctx, "/accounts:delete", payload, nil)
 	return err
+}
+
+// A DeleteUsersResult represents the result of the DeleteUsers() call.
+type DeleteUsersResult struct {
+	// The number of users that were deleted successfully (possibly zero). Users
+	// that did not exist prior to calling DeleteUsers() are considered to be
+	// successfully deleted.
+	SuccessCount int
+
+	// The number of users that failed to be deleted (possibly zero).
+	FailureCount int
+
+	// A list of DeleteUsersErrorInfo instances describing the errors that were
+	// encountered during the deletion. Length of this list is equal to the value
+	// of FailureCount.
+	Errors []*DeleteUsersErrorInfo
+}
+
+// DeleteUsersErrorInfo represents an error encountered while deleting a user
+// account.
+//
+// The Index field corresponds to the index of the failed user in the uids
+// array that was passed to DeleteUsers().
+type DeleteUsersErrorInfo struct {
+	Index  int    `json:"index,omitEmpty"`
+	Reason string `json:"message,omitEmpty"`
+}
+
+// DeleteUsers deletes the users specified by the given identifiers.
+//
+// Deleting a non-existing user won't generate an error. (i.e. this method is
+// idempotent.) Non-existing users are considered to be successfully
+// deleted, and are therefore counted in the DeleteUsersResult.SuccessCount
+// value.
+//
+// A maximum of 1000 identifiers may be supplied. If more than 1000
+// identifiers are supplied, this method returns an error.
+//
+// This API is currently rate limited at the server to 1 QPS. If you exceed
+// this, you may get a quota exceeded error. Therefore, if you want to delete
+// more than 1000 users, you may need to add a delay to ensure you don't go
+// over this limit.
+//
+// Returns the total number of successful/failed deletions, as well as the
+// array of errors that correspond to the failed deletions. An error is
+// returned if any of the identifiers are invalid or if more than 1000
+// identifiers are specified.
+func (c *baseClient) DeleteUsers(ctx context.Context, uids []string) (*DeleteUsersResult, error) {
+	if len(uids) == 0 {
+		return &DeleteUsersResult{}, nil
+	} else if len(uids) > maxDeleteAccountsBatchSize {
+		return nil, fmt.Errorf(
+			"`uids` parameter must have <= %d entries", maxDeleteAccountsBatchSize)
+	}
+
+	var payload struct {
+		LocalIds []string `json:"localIds"`
+		Force    bool     `json:"force"`
+	}
+	payload.Force = true
+
+	for i := range uids {
+		if err := validateUID(uids[i]); err != nil {
+			return nil, err
+		}
+
+		payload.LocalIds = append(payload.LocalIds, uids[i])
+	}
+
+	type batchDeleteAccountsResponse struct {
+		Errors []*DeleteUsersErrorInfo `json:"errors"`
+	}
+
+	resp := batchDeleteAccountsResponse{}
+	if _, err := c.post(ctx, "/accounts:batchDelete", payload, &resp); err != nil {
+		return nil, err
+	}
+
+	result := DeleteUsersResult{
+		FailureCount: len(resp.Errors),
+		SuccessCount: len(uids) - len(resp.Errors),
+		Errors:       resp.Errors,
+	}
+
+	return &result, nil
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry

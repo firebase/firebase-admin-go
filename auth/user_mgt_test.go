@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -154,6 +155,236 @@ func TestInvalidGetUser(t *testing.T) {
 	user, err = client.GetUserByPhoneNumber(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
+	}
+}
+
+// Checks to see if the users list contain the given uids. Order is ignored.
+//
+// Behaviour is undefined if there are duplicate entries in either of the
+// slices.
+//
+// This function is identical to the one in integration/auth/user_mgt_test.go
+func sameUsers(users [](*UserRecord), uids []string) bool {
+	if len(users) != len(uids) {
+		return false
+	}
+
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].UID < users[j].UID
+	})
+	sort.Slice(uids, func(i, j int) bool {
+		return uids[i] < uids[j]
+	})
+
+	for i := range users {
+		if users[i].UID != uids[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestGetUsersExceeds100(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	var identifiers [101]UserIdentifier
+	for i := 0; i < 101; i++ {
+		identifiers[i] = &UIDIdentifier{UID: fmt.Sprintf("id%d", i)}
+	}
+
+	getUsersResult, err := client.GetUsers(context.Background(), identifiers[:])
+	want := "`identifiers` parameter must have <= 100 entries"
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf(
+			"GetUsers() = (%v, %q); want = (nil, %q)",
+			getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersEmpty(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	getUsersResult, err := client.GetUsers(context.Background(), [](UserIdentifier){})
+	if getUsersResult == nil || err != nil {
+		t.Fatalf("GetUsers([]) = %q", err)
+	}
+
+	if len(getUsersResult.Users) != 0 {
+		t.Errorf("len(GetUsers([]).Users) = %d; want 0", len(getUsersResult.Users))
+	}
+	if len(getUsersResult.NotFound) != 0 {
+		t.Errorf("len(GetUsers([]).NotFound) = %d; want 0", len(getUsersResult.NotFound))
+	}
+}
+
+func TestGetUsersAllNonExisting(t *testing.T) {
+	resp := `{
+			"kind" : "identitytoolkit#GetAccountInfoResponse",
+			"users" : []
+		}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	notFoundIds := []UserIdentifier{&UIDIdentifier{"id that doesnt exist"}}
+	getUsersResult, err := s.Client.GetUsers(context.Background(), notFoundIds)
+	if err != nil {
+		t.Fatalf("GetUsers() = %q", err)
+	}
+
+	if len(getUsersResult.Users) != 0 {
+		t.Errorf(
+			"len(GetUsers().Users) = %d; want 0",
+			len(getUsersResult.Users))
+	}
+	if len(getUsersResult.NotFound) != len(notFoundIds) {
+		t.Errorf("len(GetUsers()).NotFound) = %d; want %d",
+			len(getUsersResult.NotFound), len(notFoundIds))
+	} else {
+		for i := range notFoundIds {
+			if getUsersResult.NotFound[i] != notFoundIds[i] {
+				t.Errorf("GetUsers().NotFound[%d] = %v; want %v",
+					i, getUsersResult.NotFound[i], notFoundIds[i])
+			}
+		}
+	}
+}
+
+func TestGetUsersInvalidUid(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	getUsersResult, err := client.GetUsers(
+		context.Background(),
+		[]UserIdentifier{&UIDIdentifier{"too long " + strings.Repeat(".", 128)}})
+	want := "uid string must not be longer than 128 characters"
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersInvalidEmail(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	getUsersResult, err := client.GetUsers(
+		context.Background(),
+		[]UserIdentifier{EmailIdentifier{"invalid email addr"}})
+	want := `malformed email string: "invalid email addr"`
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersInvalidPhoneNumber(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	getUsersResult, err := client.GetUsers(context.Background(), []UserIdentifier{
+		PhoneIdentifier{"invalid phone number"},
+	})
+	want := "phone number must be a valid, E.164 compliant identifier"
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersInvalidProvider(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	getUsersResult, err := client.GetUsers(context.Background(), []UserIdentifier{
+		ProviderIdentifier{ProviderID: "", ProviderUID: ""},
+	})
+	want := "providerID must be a non-empty string"
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersSingleBadIdentifier(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	identifiers := []UserIdentifier{
+		UIDIdentifier{"valid_id1"},
+		UIDIdentifier{"valid_id2"},
+		UIDIdentifier{"invalid id; too long. " + strings.Repeat(".", 128)},
+		UIDIdentifier{"valid_id3"},
+		UIDIdentifier{"valid_id4"},
+	}
+
+	getUsersResult, err := client.GetUsers(context.Background(), identifiers)
+	want := "uid string must not be longer than 128 characters"
+	if getUsersResult != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
+	}
+}
+
+func TestGetUsersMultipleIdentifierTypes(t *testing.T) {
+	mockUsers := []byte(`
+			{
+				"users": [{
+					"localId": "uid1",
+					"email": "user1@example.com",
+					"phoneNumber": "+15555550001"
+				}, {
+					"localId": "uid2",
+					"email": "user2@example.com",
+					"phoneNumber": "+15555550002"
+				}, {
+					"localId": "uid3",
+					"email": "user3@example.com",
+					"phoneNumber": "+15555550003"
+				}, {
+					"localId": "uid4",
+					"email": "user4@example.com",
+					"phoneNumber": "+15555550004",
+					"providerUserInfo": [{
+						"providerId": "google.com",
+						"rawId": "google_uid4"
+					}]
+				}]
+			}`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	identifiers := []UserIdentifier{
+		&UIDIdentifier{"uid1"},
+		&EmailIdentifier{"user2@example.com"},
+		&PhoneIdentifier{"+15555550003"},
+		&ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid4"},
+		&UIDIdentifier{"this-user-doesnt-exist"},
+	}
+
+	getUsersResult, err := s.Client.GetUsers(context.Background(), identifiers)
+	if err != nil {
+		t.Fatalf("GetUsers() = %q", err)
+	}
+
+	if !sameUsers(getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"}) {
+		t.Errorf("GetUsers() = %v; want = (uids from) %v (in any order)",
+			getUsersResult.Users, []string{"uid1", "uid2", "uid3", "uid4"})
+	}
+	if len(getUsersResult.NotFound) != 1 {
+		t.Errorf("GetUsers() = %d; want = 1", len(getUsersResult.NotFound))
+	} else {
+		if id, ok := getUsersResult.NotFound[0].(*UIDIdentifier); !ok {
+			t.Errorf("GetUsers().NotFound[0] not a UIDIdentifier")
+		} else {
+			if id.UID != "this-user-doesnt-exist" {
+				t.Errorf("GetUsers().NotFound[0].UID = %s; want = 'this-user-doesnt-exist'", id.UID)
+			}
+		}
 	}
 }
 
@@ -1077,6 +1308,110 @@ func TestInvalidDeleteUser(t *testing.T) {
 	if err := client.DeleteUser(context.Background(), ""); err == nil {
 		t.Errorf("DeleteUser('') = nil; want error")
 	}
+}
+
+func TestDeleteUsers(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	t.Run("should succeed given an empty list", func(t *testing.T) {
+		result, err := client.DeleteUsers(context.Background(), []string{})
+
+		if err != nil {
+			t.Fatalf("DeleteUsers([]) error %v; want = nil", err)
+		}
+
+		if result.SuccessCount != 0 {
+			t.Errorf("DeleteUsers([]).SuccessCount = %d; want = 0", result.SuccessCount)
+		}
+		if result.FailureCount != 0 {
+			t.Errorf("DeleteUsers([]).FailureCount = %d; want = 0", result.FailureCount)
+		}
+		if len(result.Errors) != 0 {
+			t.Errorf("len(DeleteUsers([]).Errors) = %d; want = 0", len(result.Errors))
+		}
+	})
+
+	t.Run("should be rejected when given more than 1000 identifiers", func(t *testing.T) {
+		uids := []string{}
+		for i := 0; i < 1001; i++ {
+			uids = append(uids, fmt.Sprintf("id%d", i))
+		}
+
+		_, err := client.DeleteUsers(context.Background(), uids)
+		if err == nil {
+			t.Fatalf("DeleteUsers([too_many_uids]) error nil; want not nil")
+		}
+
+		if err.Error() != "`uids` parameter must have <= 1000 entries" {
+			t.Errorf(
+				"DeleteUsers([too_many_uids]) returned an error of '%s'; "+
+					"expected '`uids` parameter must have <= 1000 entries'",
+				err.Error())
+		}
+	})
+
+	t.Run("should immediately fail given an invalid id", func(t *testing.T) {
+		tooLongUID := "too long " + strings.Repeat(".", 128)
+		_, err := client.DeleteUsers(context.Background(), []string{tooLongUID})
+
+		if err == nil {
+			t.Fatalf("DeleteUsers([too_long_uid]) error nil; want not nil")
+		}
+
+		if err.Error() != "uid string must not be longer than 128 characters" {
+			t.Errorf(
+				"DeleteUsers([too_long_uid]) returned an error of '%s'; "+
+					"expected 'uid string must not be longer than 128 characters'",
+				err.Error())
+		}
+	})
+
+	t.Run("should index errors correctly in result", func(t *testing.T) {
+		resp := `{
+      "errors": [{
+        "index": 0,
+        "localId": "uid1",
+        "message": "Error Message 1"
+      }, {
+        "index": 2,
+        "localId": "uid3",
+        "message": "Error Message 2"
+      }]
+    }`
+		s := echoServer([]byte(resp), t)
+		defer s.Close()
+
+		result, err := s.Client.DeleteUsers(context.Background(), []string{"uid1", "uid2", "uid3", "uid4"})
+
+		if err != nil {
+			t.Fatalf("DeleteUsers([...]) error %v; want = nil", err)
+		}
+
+		if result.SuccessCount != 2 {
+			t.Errorf("DeleteUsers([...]).SuccessCount = %d; want 2", result.SuccessCount)
+		}
+		if result.FailureCount != 2 {
+			t.Errorf("DeleteUsers([...]).FailureCount = %d; want 2", result.FailureCount)
+		}
+		if len(result.Errors) != 2 {
+			t.Errorf("len(DeleteUsers([...]).Errors) = %d; want 2", len(result.Errors))
+		} else {
+			if result.Errors[0].Index != 0 {
+				t.Errorf("DeleteUsers([...]).Errors[0].Index = %d; want 0", result.Errors[0].Index)
+			}
+			if result.Errors[0].Reason != "Error Message 1" {
+				t.Errorf("DeleteUsers([...]).Errors[0].Reason = %s; want Error Message 1", result.Errors[0].Reason)
+			}
+			if result.Errors[1].Index != 2 {
+				t.Errorf("DeleteUsers([...]).Errors[1].Index = %d; want 2", result.Errors[1].Index)
+			}
+			if result.Errors[1].Reason != "Error Message 2" {
+				t.Errorf("DeleteUsers([...]).Errors[1].Reason = %s; want Error Message 2", result.Errors[1].Reason)
+			}
+		}
+	})
 }
 
 func TestMakeExportedUser(t *testing.T) {

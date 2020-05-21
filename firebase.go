@@ -38,7 +38,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "3.12.1"
+const Version = "3.13.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"

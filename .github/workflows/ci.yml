@@ -9,7 +9,7 @@ jobs:
         GOPATH: ${{ github.workspace }}/go
     strategy:
       matrix:
-        go: [1.11, 1.12, 1.13]
+        go: [1.12, 1.13, 1.14]
     steps:
 
     - name: Set up Go ${{ matrix.go }}
@@ -37,7 +37,6 @@ jobs:
 
     - name: Run Formatter
       working-directory: ./go/src/firebase.google.com/go
-      if: matrix.go != '1.11'
       run: |
         if [[ ! -z "$(gofmt -l -s .)" ]]; then
           echo "Go code is not formatted:"

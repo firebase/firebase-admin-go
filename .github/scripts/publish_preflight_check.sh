@@ -64,6 +64,7 @@ if [[ ! "${RELEASE_VERSION}" =~ ^([0-9]*)\.([0-9]*)\.([0-9]*)$ ]]; then
 fi
 
 echo_info "Extracted release version: ${RELEASE_VERSION}"
+echo "::set-output name=version::v${RELEASE_VERSION}"
 
 
 echo_info ""
@@ -89,6 +90,30 @@ if [[ -n "${EXISTING_TAG}" ]]; then
 fi
 
 echo_info "Tag v${RELEASE_VERSION} does not exist."
+
+
+echo_info ""
+echo_info "--------------------------------------------"
+echo_info "Generating changelog"
+echo_info "--------------------------------------------"
+echo_info ""
+
+echo_info "---< git fetch origin dev --prune --unshallow >---"
+git fetch origin dev --prune --unshallow
+echo ""
+
+echo_info "Generating changelog from history..."
+readonly CURRENT_DIR=$(dirname "$0")
+readonly CHANGELOG=`${CURRENT_DIR}/generate_changelog.sh`
+echo "$CHANGELOG"
+
+# Parse and preformat the text to handle multi-line output.
+# See https://github.community/t5/GitHub-Actions/set-output-Truncates-Multiline-Strings/td-p/37870
+FILTERED_CHANGELOG=`echo "$CHANGELOG" | grep -v "\\[INFO\\]"`
+FILTERED_CHANGELOG="${FILTERED_CHANGELOG//'%'/'%25'}"
+FILTERED_CHANGELOG="${FILTERED_CHANGELOG//$'\n'/'%0A'}"
+FILTERED_CHANGELOG="${FILTERED_CHANGELOG//$'\r'/'%0D'}"
+echo "::set-output name=changelog::${FILTERED_CHANGELOG}"
 
 
 echo ""
