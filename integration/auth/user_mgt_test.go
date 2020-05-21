@@ -509,6 +509,17 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestDeleteUsers(t *testing.T) {
+	// Deletes users slowly. There's currently a 1qps limitation on this API.
+	// Without this helper, the integration tests occasionally hit that limit
+	// and fail.
+	//
+	// TODO(rsgowman): Remove this function when/if the 1qps limitation is
+	// relaxed.
+	slowDeleteUsers := func(ctx context.Context, uids []string) (*auth.DeleteUsersResult, error) {
+		time.Sleep(1 * time.Second)
+		return client.DeleteUsers(ctx, uids)
+	}
+
 	// Ensures the specified users don't exist. Expected to be called after
 	// deleting the users to ensure the delete method worked.
 	ensureUsersNotFound := func(t *testing.T, uids []string) {
@@ -546,7 +557,7 @@ func TestDeleteUsers(t *testing.T) {
 			newUserWithParams(t).UID, newUserWithParams(t).UID, newUserWithParams(t).UID,
 		}
 
-		result, err := client.DeleteUsers(context.Background(), uids)
+		result, err := slowDeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers([valid_ids]) error %v; want nil", err)
 		}
@@ -566,7 +577,7 @@ func TestDeleteUsers(t *testing.T) {
 
 	t.Run("deletes users that exist even when non-existing users also specified", func(t *testing.T) {
 		uids := []string{newUserWithParams(t).UID, "uid-that-doesnt-exist"}
-		result, err := client.DeleteUsers(context.Background(), uids)
+		result, err := slowDeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
 		}
@@ -586,7 +597,7 @@ func TestDeleteUsers(t *testing.T) {
 
 	t.Run("is idempotent", func(t *testing.T) {
 		deleteUserAndEnsureSuccess := func(t *testing.T, uids []string) {
-			result, err := client.DeleteUsers(context.Background(), uids)
+			result, err := slowDeleteUsers(context.Background(), uids)
 			if err != nil {
 				t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
 			}
