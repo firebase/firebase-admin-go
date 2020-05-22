@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"firebase.google.com/go/internal"
-	"google.golang.org/api/option/internaloption"
 	"google.golang.org/api/transport"
 )
 
@@ -914,10 +913,13 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	c.Opts = append(c.Opts, internaloption.WithDefaultEndpoint(messagingEndpoint))
 	hc, endpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
+	}
+
+	if endpoint == "" {
+		endpoint = messagingEndpoint
 	}
 
 	return &Client{
