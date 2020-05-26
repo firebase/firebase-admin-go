@@ -525,7 +525,8 @@ type getAccountInfoResponse struct {
 
 func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
 	var parsed getAccountInfoResponse
-	if resp, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed); err != nil {
+	resp, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
+	if err != nil {
 		return nil, err
 	}
 
