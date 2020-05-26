@@ -50,8 +50,6 @@ var reservedClaims = []string{
 type Client struct {
 	*baseClient
 	TenantManager *TenantManager
-	signer        cryptoSigner
-	clock         internal.Clock
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -121,11 +119,11 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
 		cookieVerifier:         cookieVerifier,
+		signer:                 signer,
+		clock:                  internal.SystemClock,
 	}
 	return &Client{
 		baseClient:    base,
-		signer:        signer,
-		clock:         internal.SystemClock,
 		TenantManager: newTenantManager(hc, conf, base),
 	}, nil
 }
@@ -149,13 +147,13 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 //     conjunction with the IAM service to sign tokens remotely.
 //
 // CustomToken returns an error the SDK fails to discover a viable mechanism for signing tokens.
-func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
+func (c *baseClient) CustomToken(ctx context.Context, uid string) (string, error) {
 	return c.CustomTokenWithClaims(ctx, uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
-func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
+func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
 	iss, err := c.signer.Email(ctx)
 	if err != nil {
 		return "", err
@@ -181,13 +179,14 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 	info := &jwtInfo{
 		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
 		payload: &customToken{
-			Iss:    iss,
-			Sub:    iss,
-			Aud:    firebaseAudience,
-			UID:    uid,
-			Iat:    now,
-			Exp:    now + oneHourInSeconds,
-			Claims: devClaims,
+			Iss:      iss,
+			Sub:      iss,
+			Aud:      firebaseAudience,
+			UID:      uid,
+			Iat:      now,
+			Exp:      now + oneHourInSeconds,
+			TenantID: c.tenantID,
+			Claims:   devClaims,
 		},
 	}
 	return info.Token(ctx, c.signer)
@@ -240,6 +239,8 @@ type baseClient struct {
 	httpClient             *internal.HTTPClient
 	idTokenVerifier        *tokenVerifier
 	cookieVerifier         *tokenVerifier
+	signer                 cryptoSigner
+	clock                  internal.Clock
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {

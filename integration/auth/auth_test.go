@@ -207,10 +207,19 @@ func verifyCustomToken(t *testing.T, ct, uid string) *auth.Token {
 }
 
 func signInWithCustomToken(token string) (string, error) {
-	req, err := json.Marshal(map[string]interface{}{
+	return signInWithCustomTokenForTenant(token, "")
+}
+
+func signInWithCustomTokenForTenant(token string, tenantID string) (string, error) {
+	payload := map[string]interface{}{
 		"token":             token,
 		"returnSecureToken": true,
-	})
+	}
+	if tenantID != "" {
+		payload["tenantId"] = tenantID
+	}
+
+	req, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
@@ -230,8 +239,9 @@ func signInWithCustomToken(token string) (string, error) {
 
 func signInWithPassword(email, password string) (string, error) {
 	req, err := json.Marshal(map[string]interface{}{
-		"email":    email,
-		"password": password,
+		"email":             email,
+		"password":          password,
+		"returnSecureToken": true,
 	})
 	if err != nil {
 		return "", err
