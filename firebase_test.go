@@ -391,10 +391,10 @@ func TestMessagingSendWithCustomEndpoint(t *testing.T) {
 	}
 
 	msg := &messaging.Message{
-		Token:   "...",
+		Token: "...",
 	}
 	n, err := c.Send(ctx, msg)
-	if n != name || err != nil{
+	if n != name || err != nil {
 		t.Errorf("Send() = (%q, %v); want (%q, nil)", n, err, name)
 	}
 }
