@@ -391,7 +391,6 @@ func TestMessagingSendWithCustomEndpoint(t *testing.T) {
 	}
 
 	msg := &messaging.Message{
-		Android: nil,
 		Token:   "...",
 	}
 	n, err := c.Send(ctx, msg)
