@@ -913,13 +913,17 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, endpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
+	if endpoint == "" {
+		endpoint = messagingEndpoint
+	}
+
 	return &Client{
-		fcmClient: newFCMClient(hc, c),
+		fcmClient: newFCMClient(hc, c, endpoint),
 		iidClient: newIIDClient(hc),
 	}, nil
 }
@@ -932,7 +936,7 @@ type fcmClient struct {
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
+func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, endpoint string) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 	client.SuccessFn = internal.HasSuccessStatus
@@ -944,7 +948,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
 	}
 
 	return &fcmClient{
-		fcmEndpoint:   messagingEndpoint,
+		fcmEndpoint:   endpoint,
 		batchEndpoint: batchEndpoint,
 		project:       conf.ProjectID,
 		version:       version,
