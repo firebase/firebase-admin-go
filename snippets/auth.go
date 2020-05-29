@@ -186,17 +186,12 @@ func getUserByPhone(ctx context.Context, client *auth.Client) *auth.UserRecord {
 }
 
 func bulkGetUsers(ctx context.Context, client *auth.Client) {
-	uid := "uid1"
-	email := "user@example.com"
-	phone := "+15555551234"
-	providerID := "google.com"
-	providerUID := "google_uid1"
 	// [START bulk_get_users_golang]
 	getUsersResult, err := client.GetUsers(ctx, []auth.UserIdentifier{
-		auth.UIDIdentifier{UID: uid},
-		auth.EmailIdentifier{Email: email},
-		auth.PhoneIdentifier{PhoneNumber: phone},
-		auth.ProviderIdentifier{ProviderID: providerID, ProviderUID: providerUID},
+		auth.UIDIdentifier{UID: "uid1"},
+		auth.EmailIdentifier{Email: "user@example.com"},
+		auth.PhoneIdentifier{PhoneNumber: "+15555551234"},
+		auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid1"},
 	})
 	if err != nil {
 		log.Fatalf("error retriving multiple users: %v\n", err)
@@ -280,11 +275,8 @@ func deleteUser(ctx context.Context, client *auth.Client) {
 }
 
 func bulkDeleteUsers(ctx context.Context, client *auth.Client) {
-	uid1 := "uid1"
-	uid2 := "uid2"
-	uid3 := "uid3"
 	// [START bulk_delete_users_golang]
-	deleteUsersResult, err := client.DeleteUsers(ctx, []string{uid1, uid2, uid3})
+	deleteUsersResult, err := client.DeleteUsers(ctx, []string{"uid1", "uid2", "uid3"})
 	if err != nil {
 		log.Fatalf("error deleting users: %v\n", err)
 	}
