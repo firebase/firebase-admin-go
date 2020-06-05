@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"firebase.google.com/go/messaging"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -358,6 +359,43 @@ func TestMessaging(t *testing.T) {
 
 	if c, err := app.Messaging(ctx); c == nil || err != nil {
 		t.Errorf("Messaging() = (%v, %v); want (iid, nil)", c, err)
+	}
+}
+
+func TestMessagingSendWithCustomEndpoint(t *testing.T) {
+	name := "custom-endpoint-ok"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{ \"name\":\"" + name + "\" }"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+
+	tokenSource := &testTokenSource{AccessToken: "mock-token-from-custom"}
+	app, err := NewApp(
+		ctx,
+		nil,
+		option.WithCredentialsFile("testdata/service_account.json"),
+		option.WithTokenSource(tokenSource),
+		option.WithEndpoint(ts.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := app.Messaging(ctx)
+	if c == nil || err != nil {
+		t.Fatalf("Messaging() = (%v, %v); want (iid, nil)", c, err)
+	}
+
+	msg := &messaging.Message{
+		Token: "...",
+	}
+	n, err := c.Send(ctx, msg)
+	if n != name || err != nil {
+		t.Errorf("Send() = (%q, %v); want (%q, nil)", n, err, name)
 	}
 }
 
