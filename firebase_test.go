@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"firebase.google.com/go/messaging"
+	"firebase.google.com/go/v4/messaging"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -376,8 +376,7 @@ func TestMessagingSendWithCustomEndpoint(t *testing.T) {
 	tokenSource := &testTokenSource{AccessToken: "mock-token-from-custom"}
 	app, err := NewApp(
 		ctx,
-		nil,
-		option.WithCredentialsFile("testdata/service_account.json"),
+		&Config{ProjectID: "test-project-id"},
 		option.WithTokenSource(tokenSource),
 		option.WithEndpoint(ts.URL),
 	)
@@ -391,7 +390,7 @@ func TestMessagingSendWithCustomEndpoint(t *testing.T) {
 	}
 
 	msg := &messaging.Message{
-		Token: "...",
+		Token: "token",
 	}
 	n, err := c.Send(ctx, msg)
 	if n != name || err != nil {
