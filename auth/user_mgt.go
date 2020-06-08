@@ -1089,7 +1089,7 @@ var serverError = map[string]*authError{
 	},
 	"INVALID_DYNAMIC_LINK_DOMAIN": {
 		code:     internal.InvalidArgument,
-		message:  "",
+		message:  "the provided dynamic link domain is not configured or authorized for the current project",
 		authCode: invalidDynamicLinkDomain,
 	},
 	"PHONE_NUMBER_EXISTS": {
@@ -1099,7 +1099,7 @@ var serverError = map[string]*authError{
 	},
 	"TENANT_NOT_FOUND": {
 		code:     internal.NotFound,
-		message:  "",
+		message:  "tenant with the specified ID does not exist",
 		authCode: tenantNotFound,
 	},
 	"UNAUTHORIZED_DOMAIN": {
