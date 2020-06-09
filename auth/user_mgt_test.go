@@ -1635,7 +1635,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 		"INVALID_DYNAMIC_LINK_DOMAIN": {
 			IsInvalidDynamicLinkDomain,
 			errorutils.IsInvalidArgument,
-			"",
+			"the provided dynamic link domain is not configured or authorized for the current project",
 		},
 		"PHONE_NUMBER_EXISTS": {
 			IsPhoneNumberAlreadyExists,

@@ -18,7 +18,6 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"go/build"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -35,7 +34,7 @@ const apiKeyPath = "integration_apikey.txt"
 
 // Resource returns the absolute path to the specified test resource file.
 func Resource(name string) string {
-	p := []string{build.Default.GOPATH, "src", "firebase.google.com", "go", "testdata", name}
+	p := []string{"..", "..", "testdata", name}
 	return filepath.Join(p...)
 }
 
