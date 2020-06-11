@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/iterator"
 )
 
@@ -153,11 +153,7 @@ func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tena
 		return nil, errors.New("tenant must not be nil")
 	}
 
-	mask, err := tenant.params.UpdateMask()
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct update mask: %v", err)
-	}
-
+	mask := tenant.params.UpdateMask()
 	if len(mask) == 0 {
 		return nil, errors.New("no parameters specified in the update request")
 	}

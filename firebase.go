@@ -15,7 +15,7 @@
 // Package firebase is the entry point to the Firebase Admin SDK. It provides functionality for initializing App
 // instances, which serve as the central entities that provide access to various other Firebase services exposed
 // from the SDK.
-package firebase // import "firebase.google.com/go"
+package firebase // import "firebase.google.com/go/v4"
 
 import (
 	"context"
@@ -25,12 +25,12 @@ import (
 	"os"
 
 	"cloud.google.com/go/firestore"
-	"firebase.google.com/go/auth"
-	"firebase.google.com/go/db"
-	"firebase.google.com/go/iid"
-	"firebase.google.com/go/internal"
-	"firebase.google.com/go/messaging"
-	"firebase.google.com/go/storage"
+	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/db"
+	"firebase.google.com/go/v4/iid"
+	"firebase.google.com/go/v4/internal"
+	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/storage"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )

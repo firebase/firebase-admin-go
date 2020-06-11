@@ -24,7 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 )
 
@@ -311,7 +312,7 @@ var validMessages = []struct {
 					Vibrate:            []int{100, 200, 100},
 					CustomData:         map[string]interface{}{"k1": "v1", "k2": "v2"},
 				},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "https://link.com",
 				},
 			},
@@ -959,7 +960,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			Webpush: &WebpushConfig{
 				Notification: &WebpushNotification{},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "link",
 				},
 			},
@@ -972,7 +973,7 @@ var invalidMessages = []struct {
 		req: &Message{
 			Webpush: &WebpushConfig{
 				Notification: &WebpushNotification{},
-				FcmOptions: &WebpushFcmOptions{
+				FCMOptions: &WebpushFCMOptions{
 					Link: "http://link.com",
 				},
 			},
@@ -1209,11 +1210,11 @@ func TestSendError(t *testing.T) {
 	client.fcmEndpoint = ts.URL
 	client.fcmClient.httpClient.RetryConfig = nil
 
-	for _, tc := range httpErrors {
+	for idx, tc := range httpErrors {
 		resp = tc.resp
 		name, err := client.Send(ctx, &Message{Topic: "topic"})
 		if err == nil || err.Error() != tc.want || !tc.check(err) {
-			t.Errorf("Send() = (%q, %v); want = (%q, %q)", name, err, "", tc.want)
+			t.Errorf("Send(%d) = (%q, %v); want = (%q, %q)", idx, name, err, "", tc.want)
 		}
 	}
 }
@@ -1277,60 +1278,89 @@ var httpErrors = []struct {
 }{
 	{
 		resp:  "{}",
-		want:  "http error status: 500; reason: server responded with an unknown error; response: {}",
-		check: IsUnknown,
+		want:  "unexpected http response with status: 500\n{}",
+		check: errorutils.IsInternal,
 	},
 	{
 		resp:  "{\"error\": {\"status\": \"INVALID_ARGUMENT\", \"message\": \"test error\"}}",
-		want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument; details: test error",
-		check: IsInvalidArgument,
+		want:  "test error",
+		check: errorutils.IsInvalidArgument,
 	},
 	{
-		resp: "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
-			"details: test error",
-		check: IsRegistrationTokenNotRegistered,
+		resp:  "{\"error\": {\"status\": \"NOT_FOUND\", \"message\": \"test error\"}}",
+		want:  "test error",
+		check: errorutils.IsNotFound,
 	},
 	{
-		resp: "{\"error\": {\"status\": \"QUOTA_EXCEEDED\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: messaging service quota exceeded; code: message-rate-exceeded; " +
-			"details: test error",
-		check: IsMessageRateExceeded,
+		resp:  "{\"error\": {\"status\": \"RESOURCE_EXHAUSTED\", \"message\": \"test error\"}}",
+		want:  "test error",
+		check: errorutils.IsResourceExhausted,
 	},
 	{
-		resp: "{\"error\": {\"status\": \"UNAVAILABLE\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: backend servers are temporarily unavailable; code: server-unavailable; " +
-			"details: test error",
-		check: IsServerUnavailable,
+		resp:  "{\"error\": {\"status\": \"UNAVAILABLE\", \"message\": \"test error\"}}",
+		want:  "test error",
+		check: errorutils.IsUnavailable,
 	},
 	{
-		resp: "{\"error\": {\"status\": \"INTERNAL\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: backend servers encountered an unknown internl error; code: internal-error; " +
-			"details: test error",
-		check: IsInternal,
-	},
-	{
-		resp: "{\"error\": {\"status\": \"APNS_AUTH_ERROR\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: apns certificate or auth key was invalid; code: invalid-apns-credentials; " +
-			"details: test error",
-		check: IsInvalidAPNSCredentials,
-	},
-	{
-		resp: "{\"error\": {\"status\": \"SENDER_ID_MISMATCH\", \"message\": \"test error\"}}",
-		want: "http error status: 500; reason: sender id does not match registration token; code: mismatched-credential; " +
-			"details: test error",
-		check: IsMismatchedCredential,
+		resp:  "{\"error\": {\"status\": \"INTERNAL\", \"message\": \"test error\"}}",
+		want:  "test error",
+		check: errorutils.IsInternal,
 	},
 	{
 		resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
 			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}`,
-		want: "http error status: 500; reason: app instance has been unregistered; code: registration-token-not-registered; " +
-			"details: test error",
-		check: IsRegistrationTokenNotRegistered,
+		want: "test error",
+		check: func(err error) bool {
+			return IsRegistrationTokenNotRegistered(err) && IsUnregistered(err)
+		},
+	},
+	{
+		resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "SENDER_ID_MISMATCH"}]}}`,
+		want: "test error",
+		check: func(err error) bool {
+			return IsMismatchedCredential(err) && IsSenderIDMismatch(err)
+		},
+	},
+	{
+		resp: `{"error": {"status": "RESOURCE_EXHAUSTED", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "QUOTA_EXCEEDED"}]}}`,
+		want: "test error",
+		check: func(err error) bool {
+			return IsMessageRateExceeded(err) && IsQuotaExceeded(err)
+		},
+	},
+	{
+		resp: `{"error": {"status": "UNAVAILABLE", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNAVAILABLE"}]}}`,
+		want: "test error",
+		check: func(err error) bool {
+			return IsServerUnavailable(err) && IsUnavailable(err)
+		},
+	},
+	{
+		resp: `{"error": {"status": "INTERNAL", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "INTERNAL"}]}}`,
+		want:  "test error",
+		check: IsInternal,
+	},
+	{
+		resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "INVALID_ARGUMENT"}]}}`,
+		want:  "test error",
+		check: IsInvalidArgument,
+	},
+	{
+		resp: `{"error": {"status": "INVALID_ARGUMENT", "message": "test error", "details": [` +
+			`{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "THIRD_PARTY_AUTH_ERROR"}]}}`,
+		want: "test error",
+		check: func(err error) bool {
+			return IsInvalidAPNSCredentials(err) && IsThirdPartyAuthError(err)
+		},
 	},
 	{
 		resp:  "not json",
-		want:  "http error status: 500; reason: server responded with an unknown error; response: not json",
-		check: IsUnknown,
+		want:  "unexpected http response with status: 500\nnot json",
+		check: errorutils.IsInternal,
 	},
 }
