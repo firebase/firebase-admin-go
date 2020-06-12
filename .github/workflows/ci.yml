@@ -2,8 +2,8 @@ name: Continuous Integration
 on: pull_request
 jobs:
 
-  build:
-    name: Build
+  module:
+    name: Module build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,3 +38,26 @@ jobs:
 
     - name: Run Static Analyzer
       run: go vet -v ./...
+
+  gopath:
+    name: Gopath build
+    runs-on: ubuntu-latest
+    env:
+      GOPATH: ${{ github.workspace }}/go
+
+    steps:
+    - name: Set up Go 1.12
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.12
+
+    - name: Check out code into GOPATH
+      uses: actions/checkout@v2
+      with:
+        path: go/src/firebase.google.com/go
+
+    - name: Get dependencies
+      run: go get -t -v $(go list ./... | grep -v integration)
+
+    - name: Run Unit Tests
+      run: go test -v -race -test.short firebase.google.com/go/...
