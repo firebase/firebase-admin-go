@@ -15,7 +15,7 @@
 // Package hash contains a collection of password hash algorithms that can be used with the
 // auth.ImportUsers() API. Refer to https://firebase.google.com/docs/auth/admin/import-users for
 // more details about supported hash algorithms.
-package hash // import "firebase.google.com/go/auth/hash"
+package hash
 
 import (
 	"encoding/base64"
