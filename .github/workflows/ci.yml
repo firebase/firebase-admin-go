@@ -60,5 +60,4 @@ jobs:
       run: go get -t -v $(go list ./... | grep -v integration)
 
     - name: Run Unit Tests
-      if: success() || failure()
       run: go test -v -race -test.short firebase.google.com/go/...
