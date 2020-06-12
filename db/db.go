@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package db contains functions for accessing the Firebase Realtime Database.
-package db // import "firebase.google.com/go/v4/db"
+package db
 
 import (
 	"context"

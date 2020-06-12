@@ -13,11 +13,13 @@
 // limitations under the License.
 
 // Package errorutils provides functions for checking and handling error conditions.
-package errorutils // import "firebase.google.com/go/v4/errorutils"
+package errorutils
 
-import "firebase.google.com/go/v4/internal"
+import (
+	"net/http"
 
-import "net/http"
+	"firebase.google.com/go/v4/internal"
+)
 
 // IsInvalidArgument checks if the given error was due to an invalid client argument.
 func IsInvalidArgument(err error) bool {
