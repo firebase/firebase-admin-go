@@ -43,8 +43,9 @@ jobs:
     name: Gopath build
     runs-on: ubuntu-latest
     env:
-        GOPATH: ${{ github.workspace }}/go
+      GOPATH: ${{ github.workspace }}/go
 
+    steps:
     - name: Set up Go 1.12
       uses: actions/setup-go@v1
       with:
