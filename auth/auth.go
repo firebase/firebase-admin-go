@@ -14,7 +14,7 @@
 
 // Package auth contains functions for minting custom authentication tokens, verifying Firebase ID tokens,
 // and managing users in a Firebase project.
-package auth
+package auth // import "firebase.google.com/go/v4/auth"
 
 import (
 	"context"
