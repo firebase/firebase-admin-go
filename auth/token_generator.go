@@ -30,8 +30,7 @@ import (
 	"strings"
 	"sync"
 
-	"firebase.google.com/go/internal"
-	"google.golang.org/api/transport"
+	"firebase.google.com/go/v4/internal"
 )
 
 type jwtHeader struct {
@@ -160,13 +159,14 @@ type iamSigner struct {
 }
 
 func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner, error) {
-	hc, _, err := transport.NewHTTPClient(ctx, config.Opts...)
+	hc, _, err := internal.NewHTTPClient(ctx, config.Opts...)
 	if err != nil {
 		return nil, err
 	}
+
 	return &iamSigner{
 		mutex:        &sync.Mutex{},
-		httpClient:   &internal.HTTPClient{Client: hc},
+		httpClient:   hc,
 		serviceAcct:  config.ServiceAccountID,
 		metadataHost: "http://metadata.google.internal",
 		iamHost:      "https://iam.googleapis.com",
@@ -178,53 +178,31 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	url := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:signBlob", s.iamHost, account)
 	body := map[string]interface{}{
 		"bytesToSign": base64.StdEncoding.EncodeToString(b),
 	}
 	req := &internal.Request{
-		Method: "POST",
+		Method: http.MethodPost,
 		URL:    url,
 		Body:   internal.NewJSONEntity(body),
 	}
-	resp, err := s.httpClient.Do(ctx, req)
-	if err != nil {
+	var signResponse struct {
+		Signature string `json:"signature"`
+	}
+	if _, err := s.httpClient.DoAndUnmarshal(ctx, req, &signResponse); err != nil {
 		return nil, err
-	} else if resp.Status == http.StatusOK {
-		var signResponse struct {
-			Signature string `json:"signature"`
-		}
-		if err := json.Unmarshal(resp.Body, &signResponse); err != nil {
-			return nil, err
-		}
-		return base64.StdEncoding.DecodeString(signResponse.Signature)
 	}
-	var signError struct {
-		Error struct {
-			Message string `json:"message"`
-			Status  string `json:"status"`
-		} `json:"error"`
-	}
-	json.Unmarshal(resp.Body, &signError) // ignore any json parse errors at this level
-	var (
-		clientCode, msg string
-		ok              bool
-	)
-	clientCode, ok = serverError[signError.Error.Status]
-	if !ok {
-		clientCode = unknown
-	}
-	msg = signError.Error.Message
-	if msg == "" {
-		msg = fmt.Sprintf("client encountered an unknown error; response: %s", string(resp.Body))
-	}
-	return nil, internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
+
+	return base64.StdEncoding.DecodeString(signResponse.Signature)
 }
 
 func (s iamSigner) Email(ctx context.Context) (string, error) {
 	if s.serviceAcct != "" {
 		return s.serviceAcct, nil
 	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	result, err := s.callMetadataService(ctx)
@@ -235,29 +213,35 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 			"for more details on creating custom tokens"
 		return "", fmt.Errorf(msg, err)
 	}
+
+	s.serviceAcct = result
 	return result, nil
 }
 
 func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
+	// Use the built-in default client without request authorization or retries for this call.
+	noAuthClient := &internal.HTTPClient{
+		Client: http.DefaultClient,
+	}
+
 	url := fmt.Sprintf("%s/computeMetadata/v1/instance/service-accounts/default/email", s.metadataHost)
 	req := &internal.Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 		Opts: []internal.HTTPOption{
 			internal.WithHeader("Metadata-Flavor", "Google"),
 		},
 	}
-	resp, err := s.httpClient.Do(ctx, req)
+
+	resp, err := noAuthClient.Do(ctx, req)
 	if err != nil {
 		return "", err
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return "", err
-	}
+
 	result := strings.TrimSpace(string(resp.Body))
 	if result == "" {
 		return "", errors.New("unexpected response from metadata service")
 	}
-	s.serviceAcct = result
+
 	return result, nil
 }

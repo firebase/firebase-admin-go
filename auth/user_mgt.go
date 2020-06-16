@@ -26,8 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"firebase.google.com/go/internal"
-	"google.golang.org/api/googleapi"
+	"firebase.google.com/go/v4/internal"
 )
 
 const (
@@ -325,126 +324,83 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 // Error handlers.
 
 const (
-	configurationNotFound    = "configuration-not-found"
-	emailAlreadyExists       = "email-already-exists"
-	idTokenRevoked           = "id-token-revoked"
-	insufficientPermission   = "insufficient-permission"
-	invalidDynamicLinkDomain = "invalid-dynamic-link-domain"
-	invalidEmail             = "invalid-email"
-	phoneNumberAlreadyExists = "phone-number-already-exists"
-	projectNotFound          = "project-not-found"
-	sessionCookieRevoked     = "session-cookie-revoked"
-	tenantIDMismatch         = "tenant-id-mismatch"
-	tenantNotFound           = "tenant-not-found"
-	uidAlreadyExists         = "uid-already-exists"
-	unauthorizedContinueURI  = "unauthorized-continue-uri"
-	unknown                  = "unknown-error"
-	userNotFound             = "user-not-found"
+	// Backend-generated error codes
+	configurationNotFound    = "CONFIGURATION_NOT_FOUND"
+	emailAlreadyExists       = "EMAIL_ALREADY_EXISTS"
+	invalidDynamicLinkDomain = "INVALID_DYNAMIC_LINK_DOMAIN"
+	phoneNumberAlreadyExists = "PHONE_NUMBER_ALREADY_EXISTS"
+	tenantNotFound           = "TENANT_NOT_FOUND"
+	uidAlreadyExists         = "UID_ALREADY_EXISTS"
+	unauthorizedContinueURI  = "UNAUTHORIZED_CONTINUE_URI"
+	userNotFound             = "USER_NOT_FOUND"
 )
 
 // IsConfigurationNotFound checks if the given error was due to a non-existing IdP configuration.
 func IsConfigurationNotFound(err error) bool {
-	return internal.HasErrorCode(err, configurationNotFound)
+	return hasAuthErrorCode(err, configurationNotFound)
 }
 
 // IsEmailAlreadyExists checks if the given error was due to a duplicate email.
 func IsEmailAlreadyExists(err error) bool {
-	return internal.HasErrorCode(err, emailAlreadyExists)
-}
-
-// IsIDTokenRevoked checks if the given error was due to a revoked ID token.
-func IsIDTokenRevoked(err error) bool {
-	return internal.HasErrorCode(err, idTokenRevoked)
+	return hasAuthErrorCode(err, emailAlreadyExists)
 }
 
 // IsInsufficientPermission checks if the given error was due to insufficient permissions.
+//
+// Deprecated. Always returns false.
 func IsInsufficientPermission(err error) bool {
-	return internal.HasErrorCode(err, insufficientPermission)
+	return false
 }
 
 // IsInvalidDynamicLinkDomain checks if the given error was due to an invalid dynamic link domain.
 func IsInvalidDynamicLinkDomain(err error) bool {
-	return internal.HasErrorCode(err, invalidDynamicLinkDomain)
+	return hasAuthErrorCode(err, invalidDynamicLinkDomain)
 }
 
 // IsInvalidEmail checks if the given error was due to an invalid email.
+//
+// Deprecated. Always returns false.
 func IsInvalidEmail(err error) bool {
-	return internal.HasErrorCode(err, invalidEmail)
+	return false
 }
 
 // IsPhoneNumberAlreadyExists checks if the given error was due to a duplicate phone number.
 func IsPhoneNumberAlreadyExists(err error) bool {
-	return internal.HasErrorCode(err, phoneNumberAlreadyExists)
+	return hasAuthErrorCode(err, phoneNumberAlreadyExists)
 }
 
 // IsProjectNotFound checks if the given error was due to a non-existing project.
+//
+// Deprecated. Always returns false.
 func IsProjectNotFound(err error) bool {
-	return internal.HasErrorCode(err, projectNotFound)
-}
-
-// IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
-func IsSessionCookieRevoked(err error) bool {
-	return internal.HasErrorCode(err, sessionCookieRevoked)
-}
-
-// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
-func IsTenantIDMismatch(err error) bool {
-	return internal.HasErrorCode(err, tenantIDMismatch)
+	return false
 }
 
 // IsTenantNotFound checks if the given error was due to a non-existing tenant ID.
 func IsTenantNotFound(err error) bool {
-	return internal.HasErrorCode(err, tenantNotFound)
+	return hasAuthErrorCode(err, tenantNotFound)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
 func IsUIDAlreadyExists(err error) bool {
-	return internal.HasErrorCode(err, uidAlreadyExists)
+	return hasAuthErrorCode(err, uidAlreadyExists)
 }
 
 // IsUnauthorizedContinueURI checks if the given error was due to an unauthorized continue URI domain.
 func IsUnauthorizedContinueURI(err error) bool {
-	return internal.HasErrorCode(err, unauthorizedContinueURI)
+	return hasAuthErrorCode(err, unauthorizedContinueURI)
 }
 
 // IsUnknown checks if the given error was due to a unknown server error.
+//
+// Deprecated. Always returns false.
 func IsUnknown(err error) bool {
-	return internal.HasErrorCode(err, unknown)
+	return false
 }
 
 // IsUserNotFound checks if the given error was due to non-existing user.
 func IsUserNotFound(err error) bool {
-	return internal.HasErrorCode(err, userNotFound)
-}
-
-var serverError = map[string]string{
-	"CONFIGURATION_NOT_FOUND":     configurationNotFound,
-	"DUPLICATE_EMAIL":             emailAlreadyExists,
-	"DUPLICATE_LOCAL_ID":          uidAlreadyExists,
-	"EMAIL_EXISTS":                emailAlreadyExists,
-	"INSUFFICIENT_PERMISSION":     insufficientPermission,
-	"INVALID_DYNAMIC_LINK_DOMAIN": invalidDynamicLinkDomain,
-	"INVALID_EMAIL":               invalidEmail,
-	"PERMISSION_DENIED":           insufficientPermission,
-	"PHONE_NUMBER_EXISTS":         phoneNumberAlreadyExists,
-	"PROJECT_NOT_FOUND":           projectNotFound,
-	"TENANT_NOT_FOUND":            tenantNotFound,
-	"UNAUTHORIZED_DOMAIN":         unauthorizedContinueURI,
-	"USER_NOT_FOUND":              userNotFound,
-}
-
-func handleServerError(err error) error {
-	gerr, ok := err.(*googleapi.Error)
-	if !ok {
-		// Not a back-end error
-		return err
-	}
-	serverCode := gerr.Message
-	clientCode, ok := serverError[serverCode]
-	if !ok {
-		clientCode = unknown
-	}
-	return internal.Error(clientCode, err.Error())
+	return hasAuthErrorCode(err, userNotFound)
 }
 
 // Validators.
@@ -569,12 +525,20 @@ type getAccountInfoResponse struct {
 
 func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
 	var parsed getAccountInfoResponse
-	if _, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed); err != nil {
+	resp, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
+	if err != nil {
 		return nil, err
 	}
 
 	if len(parsed.Users) == 0 {
-		return nil, internal.Errorf(userNotFound, "cannot find user from %s", query.description())
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.NotFound,
+			String:    fmt.Sprintf("no user exists with the %s", query.description()),
+			Response:  resp.LowLevelResponse(),
+			Ext: map[string]interface{}{
+				authErrorCode: userNotFound,
+			},
+		}
 	}
 
 	return parsed.Users[0].makeUserRecord()
@@ -1096,21 +1060,92 @@ func (c *baseClient) makeUserMgtURL(path string) (string, error) {
 	return url, nil
 }
 
+type authError struct {
+	code     internal.ErrorCode
+	message  string
+	authCode string
+}
+
+var serverError = map[string]*authError{
+	"CONFIGURATION_NOT_FOUND": {
+		code:     internal.NotFound,
+		message:  "no IdP configuration corresponding to the provided identifier",
+		authCode: configurationNotFound,
+	},
+	"DUPLICATE_EMAIL": {
+		code:     internal.AlreadyExists,
+		message:  "user with the provided email already exists",
+		authCode: emailAlreadyExists,
+	},
+	"DUPLICATE_LOCAL_ID": {
+		code:     internal.AlreadyExists,
+		message:  "user with the provided uid already exists",
+		authCode: uidAlreadyExists,
+	},
+	"EMAIL_EXISTS": {
+		code:     internal.AlreadyExists,
+		message:  "user with the provided email already exists",
+		authCode: emailAlreadyExists,
+	},
+	"INVALID_DYNAMIC_LINK_DOMAIN": {
+		code:     internal.InvalidArgument,
+		message:  "the provided dynamic link domain is not configured or authorized for the current project",
+		authCode: invalidDynamicLinkDomain,
+	},
+	"PHONE_NUMBER_EXISTS": {
+		code:     internal.AlreadyExists,
+		message:  "user with the provided phone number already exists",
+		authCode: phoneNumberAlreadyExists,
+	},
+	"TENANT_NOT_FOUND": {
+		code:     internal.NotFound,
+		message:  "tenant with the specified ID does not exist",
+		authCode: tenantNotFound,
+	},
+	"UNAUTHORIZED_DOMAIN": {
+		code:     internal.InvalidArgument,
+		message:  "domain of the continue url is not whitelisted",
+		authCode: unauthorizedContinueURI,
+	},
+	"USER_NOT_FOUND": {
+		code:     internal.NotFound,
+		message:  "no user record found for the given identifier",
+		authCode: userNotFound,
+	},
+}
+
 func handleHTTPError(resp *internal.Response) error {
+	err := internal.NewFirebaseError(resp)
+	code, detail := parseErrorResponse(resp)
+	if authErr, ok := serverError[code]; ok {
+		err.ErrorCode = authErr.code
+		err.Ext[authErrorCode] = authErr.authCode
+		if detail != "" {
+			err.String = fmt.Sprintf("%s: %s", authErr.message, detail)
+		} else {
+			err.String = authErr.message
+		}
+	}
+
+	return err
+}
+
+func parseErrorResponse(resp *internal.Response) (string, string) {
 	var httpErr struct {
 		Error struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	json.Unmarshal(resp.Body, &httpErr) // ignore any json parse errors at this level
-	serverCode := httpErr.Error.Message
-	clientCode, ok := serverError[serverCode]
-	if !ok {
-		clientCode = unknown
+	// ignore any json parse errors at this level
+	json.Unmarshal(resp.Body, &httpErr)
+
+	// Auth error response format: {"error": {"message": "AUTH_ERROR_CODE: Optional text"}}
+	code, detail := httpErr.Error.Message, ""
+	idx := strings.Index(code, ":")
+	if idx != -1 {
+		detail = strings.TrimSpace(code[idx+1:])
+		code = code[:idx]
 	}
-	return internal.Errorf(
-		clientCode,
-		"http error status: %d; body: %s",
-		resp.Status,
-		string(resp.Body))
+
+	return code, detail
 }

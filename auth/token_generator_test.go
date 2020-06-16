@@ -26,7 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/internal"
 )
 
 func TestEncodeToken(t *testing.T) {
@@ -161,9 +162,9 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: test reason"
+	want := "test reason"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsInsufficientPermission(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
@@ -188,9 +189,9 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: client encountered an unknown error; response: not json"
+	want := "unexpected http response with status: 403\nnot json"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsUnknown(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
@@ -251,11 +252,15 @@ func TestIAMSignerNoMetadataService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = signer.Email(ctx); err == nil {
-		t.Errorf("Email() = nil; want = error")
+	want := "failed to determine service account: "
+	_, err = signer.Email(ctx)
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("Email() = %v; want = %q", err, want)
 	}
-	if _, err = signer.Sign(ctx, []byte("input")); err == nil {
-		t.Errorf("Sign() = nil; want = error")
+
+	_, err = signer.Sign(ctx, []byte("input"))
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
 

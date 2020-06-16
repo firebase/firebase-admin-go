@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
@@ -44,7 +44,49 @@ const (
 	sessionCookieCertURL      = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys"
 	sessionCookieIssuerPrefix = "https://session.firebase.google.com/"
 	clockSkewSeconds          = 300
+	certificateFetchFailed    = "CERTIFICATE_FETCH_FAILED"
+	idTokenExpired            = "ID_TOKEN_EXPIRED"
+	idTokenInvalid            = "ID_TOKEN_INVALID"
+	sessionCookieExpired      = "SESSION_COOKIE_EXPIRED"
+	sessionCookieInvalid      = "SESSION_COOKIE_INVALID"
 )
+
+// IsCertificateFetchFailed checks if the given error was caused by a failure to fetch public key
+// certificates required to verify a JWT.
+func IsCertificateFetchFailed(err error) bool {
+	return hasAuthErrorCode(err, certificateFetchFailed)
+}
+
+// IsIDTokenExpired checks if the given error was due to an expired ID token.
+//
+// When IsIDTokenExpired returns true, IsIDTokenInvalid is guranteed to return true.
+func IsIDTokenExpired(err error) bool {
+	return hasAuthErrorCode(err, idTokenExpired)
+}
+
+// IsIDTokenInvalid checks if the given error was due to an invalid ID token.
+//
+// An ID token is considered invalid when it is malformed (i.e. contains incorrect data), expired
+// or revoked.
+func IsIDTokenInvalid(err error) bool {
+	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err)
+}
+
+// IsSessionCookieExpired checks if the given error was due to an expired session cookie.
+//
+// When IsSessionCookieExpired returns true, IsSessionCookieInvalid is guranteed to return true.
+func IsSessionCookieExpired(err error) bool {
+	return hasAuthErrorCode(err, sessionCookieExpired)
+}
+
+// IsSessionCookieInvalid checks if the given error was due to an invalid session cookie.
+//
+// A session cookie is considered invalid when it is malformed (i.e. contains incorrect data),
+// expired or revoked.
+func IsSessionCookieInvalid(err error) bool {
+	return hasAuthErrorCode(err, sessionCookieInvalid) || IsSessionCookieExpired(err) ||
+		IsSessionCookieRevoked(err)
+}
 
 // tokenVerifier verifies different types of Firebase token strings, including ID tokens and
 // session cookies.
@@ -54,6 +96,8 @@ type tokenVerifier struct {
 	docURL            string
 	projectID         string
 	issuerPrefix      string
+	invalidTokenCode  string
+	expiredTokenCode  string
 	keySource         keySource
 	clock             internal.Clock
 }
@@ -63,12 +107,15 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 	if err != nil {
 		return nil, err
 	}
+
 	return &tokenVerifier{
 		shortName:         "ID token",
 		articledShortName: "an ID token",
 		docURL:            "https://firebase.google.com/docs/auth/admin/verify-id-tokens",
 		projectID:         projectID,
 		issuerPrefix:      idTokenIssuerPrefix,
+		invalidTokenCode:  idTokenInvalid,
+		expiredTokenCode:  idTokenExpired,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
@@ -79,12 +126,15 @@ func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVeri
 	if err != nil {
 		return nil, err
 	}
+
 	return &tokenVerifier{
 		shortName:         "session cookie",
 		articledShortName: "a session cookie",
 		docURL:            "https://firebase.google.com/docs/auth/admin/manage-cookies",
 		projectID:         projectID,
 		issuerPrefix:      sessionCookieIssuerPrefix,
+		invalidTokenCode:  sessionCookieInvalid,
+		expiredTokenCode:  sessionCookieExpired,
 		keySource:         newHTTPKeySource(sessionCookieCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
@@ -105,17 +155,14 @@ func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVeri
 // decoded Token is returned.
 func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
 	if tv.projectID == "" {
+		// Configuration error.
 		return nil, errors.New("project id not available")
-	}
-	if token == "" {
-		return nil, fmt.Errorf("%s must be a non-empty string", tv.shortName)
 	}
 
 	// Validate the token content first. This is fast and cheap.
 	payload, err := tv.verifyContent(token)
 	if err != nil {
-		return nil, fmt.Errorf("%s; see %s for details on how to retrieve a valid %s",
-			err.Error(), tv.docURL, tv.shortName)
+		return nil, err
 	}
 
 	if err := tv.verifyTimestamps(payload); err != nil {
@@ -127,10 +174,75 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 	if err := tv.verifySignature(ctx, token); err != nil {
 		return nil, err
 	}
+
 	return payload, nil
 }
 
 func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
+	if token == "" {
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    fmt.Sprintf("%s must be a non-empty string", tv.shortName),
+			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
+		}
+	}
+
+	payload, err := tv.verifyHeaderAndBody(token)
+	if err != nil {
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String: fmt.Sprintf(
+				"%s; see %s for details on how to retrieve a valid %s",
+				err.Error(), tv.docURL, tv.shortName),
+			Ext: map[string]interface{}{authErrorCode: tv.invalidTokenCode},
+		}
+	}
+
+	return payload, nil
+}
+
+func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
+	if (payload.IssuedAt - clockSkewSeconds) > tv.clock.Now().Unix() {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    fmt.Sprintf("%s issued at future timestamp: %d", tv.shortName, payload.IssuedAt),
+			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
+		}
+	}
+
+	if (payload.Expires + clockSkewSeconds) < tv.clock.Now().Unix() {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    fmt.Sprintf("%s has expired at: %d", tv.shortName, payload.Expires),
+			Ext:       map[string]interface{}{authErrorCode: tv.expiredTokenCode},
+		}
+	}
+
+	return nil
+}
+
+func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) error {
+	keys, err := tv.keySource.Keys(ctx)
+	if err != nil {
+		return &internal.FirebaseError{
+			ErrorCode: internal.Unknown,
+			String:    err.Error(),
+			Ext:       map[string]interface{}{authErrorCode: certificateFetchFailed},
+		}
+	}
+
+	if !tv.verifySignatureWithKeys(ctx, token, keys) {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "failed to verify token signature",
+			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
+		}
+	}
+
+	return nil
+}
+
+func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
 	var (
 		header  jwtHeader
 		payload Token
@@ -190,27 +302,10 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 	return &payload, nil
 }
 
-func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
-	if (payload.IssuedAt - clockSkewSeconds) > tv.clock.Now().Unix() {
-		return fmt.Errorf("%s issued at future timestamp: %d", tv.shortName, payload.IssuedAt)
-	} else if (payload.Expires + clockSkewSeconds) < tv.clock.Now().Unix() {
-		return fmt.Errorf("%s has expired at: %d", tv.shortName, payload.Expires)
-	}
-	return nil
-}
-
-func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) error {
+func (tv *tokenVerifier) verifySignatureWithKeys(ctx context.Context, token string, keys []*publicKey) bool {
 	segments := strings.Split(token, ".")
-
 	var h jwtHeader
-	if err := decode(segments[0], &h); err != nil {
-		return err
-	}
-
-	keys, err := tv.keySource.Keys(ctx)
-	if err != nil {
-		return err
-	}
+	decode(segments[0], &h)
 
 	verified := false
 	for _, k := range keys {
@@ -221,10 +316,8 @@ func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) erro
 			}
 		}
 	}
-	if !verified {
-		return errors.New("failed to verify token signature")
-	}
-	return nil
+
+	return verified
 }
 
 func (tv *tokenVerifier) getProjectIDMatchMessage() string {
@@ -308,7 +401,7 @@ func (k *httpKeySource) hasExpired() bool {
 
 func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	k.CachedKeys = nil
-	req, err := http.NewRequest("GET", k.KeyURI, nil)
+	req, err := http.NewRequest(http.MethodGet, k.KeyURI, nil)
 	if err != nil {
 		return err
 	}
@@ -323,18 +416,22 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("invalid response (%d) while retrieving public keys: %s",
 			resp.StatusCode, string(contents))
 	}
+
 	newKeys, err := parsePublicKeys(contents)
 	if err != nil {
 		return err
 	}
+
 	maxAge, err := findMaxAge(resp)
 	if err != nil {
 		return err
 	}
+
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
 	return nil

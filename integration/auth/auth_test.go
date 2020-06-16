@@ -29,9 +29,9 @@ import (
 	"testing"
 	"time"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/auth"
-	"firebase.google.com/go/integration/internal"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/integration/internal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )

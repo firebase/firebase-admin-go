@@ -23,7 +23,7 @@ import (
 	"runtime"
 	"strings"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 )
 
@@ -68,17 +68,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return nil, err
 	}
 
-	ep := func(b []byte) string {
-		var p struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(b, &p); err != nil {
-			return ""
-		}
-		return p.Error
-	}
-	hc.ErrParser = ep
-
+	hc.CreateErrFn = handleRTDBError
 	return &Client{
 		hc:           hc,
 		url:          fmt.Sprintf("https://%s", p.Host),
@@ -102,24 +92,18 @@ func (c *Client) NewRef(path string) *Ref {
 	}
 }
 
-func (c *Client) send(
-	ctx context.Context,
-	method, path string,
-	body internal.HTTPEntity,
-	opts ...internal.HTTPOption) (*internal.Response, error) {
+func (c *Client) sendAndUnmarshal(
+	ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+	if strings.ContainsAny(req.URL, invalidChars) {
+		return nil, fmt.Errorf("invalid path with illegal characters: %q", req.URL)
+	}
 
-	if strings.ContainsAny(path, invalidChars) {
-		return nil, fmt.Errorf("invalid path with illegal characters: %q", path)
-	}
+	req.URL = fmt.Sprintf("%s%s.json", c.url, req.URL)
 	if c.authOverride != "" {
-		opts = append(opts, internal.WithQueryParam(authVarOverride, c.authOverride))
+		req.Opts = append(req.Opts, internal.WithQueryParam(authVarOverride, c.authOverride))
 	}
-	return c.hc.Do(ctx, &internal.Request{
-		Method: method,
-		URL:    fmt.Sprintf("%s%s.json", c.url, path),
-		Body:   body,
-		Opts:   opts,
-	})
+
+	return c.hc.DoAndUnmarshal(ctx, req, v)
 }
 
 func parsePath(path string) []string {
@@ -130,4 +114,17 @@ func parsePath(path string) []string {
 		}
 	}
 	return segs
+}
+
+func handleRTDBError(resp *internal.Response) error {
+	err := internal.NewFirebaseError(resp)
+	var p struct {
+		Error string `json:"error"`
+	}
+	json.Unmarshal(resp.Body, &p)
+	if p.Error != "" {
+		err.String = fmt.Sprintf("http error status: %d; reason: %s", resp.Status, p.Error)
+	}
+
+	return err
 }

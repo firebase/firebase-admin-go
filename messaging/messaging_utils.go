@@ -222,8 +222,8 @@ func validateWebpushConfig(webpush *WebpushConfig) error {
 			return fmt.Errorf("multiple specifications for the key %q", k)
 		}
 	}
-	if webpush.FcmOptions != nil {
-		link := webpush.FcmOptions.Link
+	if webpush.FCMOptions != nil {
+		link := webpush.FCMOptions.Link
 		p, err := url.ParseRequestURI(link)
 		if err != nil {
 			return fmt.Errorf("invalid link URL: %q", link)

@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
 type refOp func(r *Ref) error
@@ -289,6 +291,15 @@ func TestWelformedHttpError(t *testing.T) {
 			if err == nil || err.Error() != want {
 				t.Errorf("%s = %v; want = %v", tc.name, err, want)
 			}
+
+			if !errorutils.IsInternal(err) {
+				t.Errorf("IsInternal(err) = false; want = true")
+			}
+
+			resp := errorutils.HTTPResponse(err)
+			if resp == nil || resp.StatusCode != http.StatusInternalServerError {
+				t.Errorf("HTTPResponse(err) = %v; want = {StatusCode: %d}", resp, http.StatusInternalServerError)
+			}
 		})
 	}
 
@@ -303,12 +314,21 @@ func TestUnexpectedHttpError(t *testing.T) {
 	srv := mock.Start(client)
 	defer srv.Close()
 
-	want := "http error status: 500; reason: \"unexpected error\""
+	want := "unexpected http response with status: 500\n\"unexpected error\""
 	for _, tc := range testOps {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.op(testref)
 			if err == nil || err.Error() != want {
 				t.Errorf("%s = %v; want = %v", tc.name, err, want)
+			}
+
+			if !errorutils.IsInternal(err) {
+				t.Errorf("IsInternal(err) = false; want = true")
+			}
+
+			resp := errorutils.HTTPResponse(err)
+			if resp == nil || resp.StatusCode != http.StatusInternalServerError {
+				t.Errorf("HTTPResponse(err) = %v; want = {StatusCode: %d}", resp, http.StatusInternalServerError)
 			}
 		})
 	}
@@ -316,6 +336,59 @@ func TestUnexpectedHttpError(t *testing.T) {
 	wantReqs := len(testOps) * (1 + defaultMaxRetries)
 	if len(mock.Reqs) != wantReqs {
 		t.Errorf("Requests = %d; want = %d", len(mock.Reqs), wantReqs)
+	}
+}
+
+func TestPlatformErrorCodes(t *testing.T) {
+	mock := &mockServer{Resp: map[string]string{"error": "test error"}}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cases := []struct {
+		name   string
+		status int
+		check  func(err error) bool
+	}{
+		{
+			name:   "InvalidArgument",
+			status: http.StatusBadRequest,
+			check:  errorutils.IsInvalidArgument,
+		},
+		{
+			name:   "Unauthenticated",
+			status: http.StatusUnauthorized,
+			check:  errorutils.IsUnauthenticated,
+		},
+		{
+			name:   "NotFound",
+			status: http.StatusNotFound,
+			check:  errorutils.IsNotFound,
+		},
+		{
+			name:   "Internal",
+			status: http.StatusInternalServerError,
+			check:  errorutils.IsInternal,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock.Status = tc.status
+			want := fmt.Sprintf("http error status: %d; reason: test error", tc.status)
+			err := testref.Delete(context.Background())
+			if err == nil || err.Error() != want {
+				t.Errorf("Delete() = %v; want = %v", err, want)
+			}
+
+			if !tc.check(err) {
+				t.Errorf("Is%s(err) = false; want = true", tc.name)
+			}
+
+			resp := errorutils.HTTPResponse(err)
+			if resp == nil || resp.StatusCode != tc.status {
+				t.Errorf("HTTPResponse(err) = %v; want = {StatusCode: %d}", resp, tc.status)
+			}
+		})
 	}
 }
 
@@ -717,6 +790,42 @@ func TestTransactionAbort(t *testing.T) {
 		})
 	}
 	checkAllRequests(t, mock.Reqs, wanted)
+}
+
+func TestTransactionFailure(t *testing.T) {
+	mock := &mockServer{
+		Resp:   &person{"Peter Parker", 17},
+		Header: map[string]string{"ETag": "mock-etag1"},
+	}
+	srv := mock.Start(client)
+	defer srv.Close()
+
+	cnt := 0
+	var fn UpdateFn = func(t TransactionNode) (interface{}, error) {
+		if cnt == 0 {
+			mock.Status = http.StatusInternalServerError
+			mock.Resp = map[string]string{"error": "test error"}
+		}
+
+		cnt++
+		var p person
+		if err := t.Unmarshal(&p); err != nil {
+			return nil, err
+		}
+
+		p.Age++
+		return &p, nil
+	}
+
+	want := "http error status: 500; reason: test error"
+	err := testref.Transaction(context.Background(), fn)
+	if err == nil || err.Error() != want {
+		t.Errorf("Transaction() = %v; want = %v", err, want)
+	}
+
+	if !errorutils.IsInternal(err) {
+		t.Errorf("IsInternal() = false; want = true")
+	}
 }
 
 func TestDelete(t *testing.T) {

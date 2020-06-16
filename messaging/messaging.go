@@ -14,7 +14,7 @@
 
 // Package messaging contains functions for sending messages and managing
 // device subscriptions with Firebase Cloud Messaging (FCM).
-package messaging // import "firebase.google.com/go/messaging"
+package messaging
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/transport"
 )
 
@@ -39,71 +39,20 @@ const (
 	apiFormatVersionHeader = "X-GOOG-API-FORMAT-VERSION"
 	apiFormatVersion       = "2"
 
-	internalError                  = "internal-error"
-	invalidAPNSCredentials         = "invalid-apns-credentials"
-	invalidArgument                = "invalid-argument"
-	messageRateExceeded            = "message-rate-exceeded"
-	mismatchedCredential           = "mismatched-credential"
-	registrationTokenNotRegistered = "registration-token-not-registered"
-	serverUnavailable              = "server-unavailable"
-	tooManyTopics                  = "too-many-topics"
-	unknownError                   = "unknown-error"
+	apnsAuthError       = "APNS_AUTH_ERROR"
+	internalError       = "INTERNAL"
+	thirdPartyAuthError = "THIRD_PARTY_AUTH_ERROR"
+	invalidArgument     = "INVALID_ARGUMENT"
+	quotaExceeded       = "QUOTA_EXCEEDED"
+	senderIDMismatch    = "SENDER_ID_MISMATCH"
+	unregistered        = "UNREGISTERED"
+	unavailable         = "UNAVAILABLE"
 
 	rfc3339Zulu = "2006-01-02T15:04:05.000000000Z"
 )
 
 var (
 	topicNamePattern = regexp.MustCompile("^(/topics/)?(private/)?[a-zA-Z0-9-_.~%]+$")
-
-	fcmErrorCodes = map[string]struct{ Code, Msg string }{
-		// FCM v1 canonical error codes
-		"NOT_FOUND": {
-			registrationTokenNotRegistered,
-			"app instance has been unregistered; code: " + registrationTokenNotRegistered,
-		},
-		"PERMISSION_DENIED": {
-			mismatchedCredential,
-			"sender id does not match registration token; code: " + mismatchedCredential,
-		},
-		"RESOURCE_EXHAUSTED": {
-			messageRateExceeded,
-			"messaging service quota exceeded; code: " + messageRateExceeded,
-		},
-		"UNAUTHENTICATED": {
-			invalidAPNSCredentials,
-			"apns certificate or auth key was invalid; code: " + invalidAPNSCredentials,
-		},
-
-		// FCM v1 new error codes
-		"APNS_AUTH_ERROR": {
-			invalidAPNSCredentials,
-			"apns certificate or auth key was invalid; code: " + invalidAPNSCredentials,
-		},
-		"INTERNAL": {
-			internalError,
-			"backend servers encountered an unknown internl error; code: " + internalError,
-		},
-		"INVALID_ARGUMENT": {
-			invalidArgument,
-			"request contains an invalid argument; code: " + invalidArgument,
-		},
-		"SENDER_ID_MISMATCH": {
-			mismatchedCredential,
-			"sender id does not match registration token; code: " + mismatchedCredential,
-		},
-		"QUOTA_EXCEEDED": {
-			messageRateExceeded,
-			"messaging service quota exceeded; code: " + messageRateExceeded,
-		},
-		"UNAVAILABLE": {
-			serverUnavailable,
-			"backend servers are temporarily unavailable; code: " + serverUnavailable,
-		},
-		"UNREGISTERED": {
-			registrationTokenNotRegistered,
-			"app instance has been unregistered; code: " + registrationTokenNotRegistered,
-		},
-	}
 )
 
 // Message to be sent via Firebase Cloud Messaging.
@@ -554,7 +503,7 @@ type WebpushConfig struct {
 	Headers      map[string]string    `json:"headers,omitempty"`
 	Data         map[string]string    `json:"data,omitempty"`
 	Notification *WebpushNotification `json:"notification,omitempty"`
-	FcmOptions   *WebpushFcmOptions   `json:"fcm_options,omitempty"`
+	FCMOptions   *WebpushFCMOptions   `json:"fcm_options,omitempty"`
 }
 
 // WebpushNotificationAction represents an action that can be performed upon receiving a WebPush notification.
@@ -660,8 +609,8 @@ func (n *WebpushNotification) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// WebpushFcmOptions contains additional options for features provided by the FCM web SDK.
-type WebpushFcmOptions struct {
+// WebpushFCMOptions contains additional options for features provided by the FCM web SDK.
+type WebpushFCMOptions struct {
 	Link string `json:"link,omitempty"`
 }
 
@@ -913,13 +862,17 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, _, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, endpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
+	if endpoint == "" {
+		endpoint = messagingEndpoint
+	}
+
 	return &Client{
-		fcmClient: newFCMClient(hc, c),
+		fcmClient: newFCMClient(hc, c, endpoint),
 		iidClient: newIIDClient(hc),
 	}, nil
 }
@@ -932,10 +885,9 @@ type fcmClient struct {
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
+func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, endpoint string) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
-	client.SuccessFn = internal.HasSuccessStatus
 
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
@@ -944,7 +896,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig) *fcmClient {
 	}
 
 	return &fcmClient{
-		fcmEndpoint:   messagingEndpoint,
+		fcmEndpoint:   endpoint,
 		batchEndpoint: batchEndpoint,
 		project:       conf.ProjectID,
 		version:       version,
@@ -994,52 +946,95 @@ func (c *fcmClient) makeSendRequest(ctx context.Context, req *fcmRequest) (strin
 
 // IsInternal checks if the given error was due to an internal server error.
 func IsInternal(err error) bool {
-	return internal.HasErrorCode(err, internalError)
+	return hasMessagingErrorCode(err, internalError)
 }
 
 // IsInvalidAPNSCredentials checks if the given error was due to invalid APNS certificate or auth
 // key.
+//
+// Deprecated. Use IsThirdPartyAuthError().
 func IsInvalidAPNSCredentials(err error) bool {
-	return internal.HasErrorCode(err, invalidAPNSCredentials)
+	return IsThirdPartyAuthError(err)
+}
+
+// IsThirdPartyAuthError checks if the given error was due to invalid APNS certificate or auth
+// key.
+func IsThirdPartyAuthError(err error) bool {
+	return hasMessagingErrorCode(err, thirdPartyAuthError) || hasMessagingErrorCode(err, apnsAuthError)
 }
 
 // IsInvalidArgument checks if the given error was due to an invalid argument in the request.
 func IsInvalidArgument(err error) bool {
-	return internal.HasErrorCode(err, invalidArgument)
+	return hasMessagingErrorCode(err, invalidArgument)
 }
 
 // IsMessageRateExceeded checks if the given error was due to the client exceeding a quota.
+//
+// Deprecated. Use IsQuotaExceeded().
 func IsMessageRateExceeded(err error) bool {
-	return internal.HasErrorCode(err, messageRateExceeded)
+	return IsQuotaExceeded(err)
+}
+
+// IsQuotaExceeded checks if the given error was due to the client exceeding a quota.
+func IsQuotaExceeded(err error) bool {
+	return hasMessagingErrorCode(err, quotaExceeded)
 }
 
 // IsMismatchedCredential checks if the given error was due to an invalid credential or permission
 // error.
+//
+// Deprecated. Use IsSenderIDMismatch().
 func IsMismatchedCredential(err error) bool {
-	return internal.HasErrorCode(err, mismatchedCredential)
+	return IsSenderIDMismatch(err)
+}
+
+// IsSenderIDMismatch checks if the given error was due to an invalid credential or permission
+// error.
+func IsSenderIDMismatch(err error) bool {
+	return hasMessagingErrorCode(err, senderIDMismatch)
 }
 
 // IsRegistrationTokenNotRegistered checks if the given error was due to a registration token that
 // became invalid.
+//
+// Deprecated. Use IsUnregistered().
 func IsRegistrationTokenNotRegistered(err error) bool {
-	return internal.HasErrorCode(err, registrationTokenNotRegistered)
+	return IsUnregistered(err)
+}
+
+// IsUnregistered checks if the given error was due to a registration token that
+// became invalid.
+func IsUnregistered(err error) bool {
+	return hasMessagingErrorCode(err, unregistered)
 }
 
 // IsServerUnavailable checks if the given error was due to the backend server being temporarily
 // unavailable.
+//
+// Deprecated. Use IsUnavailable().
 func IsServerUnavailable(err error) bool {
-	return internal.HasErrorCode(err, serverUnavailable)
+	return IsUnavailable(err)
+}
+
+// IsUnavailable checks if the given error was due to the backend server being temporarily
+// unavailable.
+func IsUnavailable(err error) bool {
+	return hasMessagingErrorCode(err, unavailable)
 }
 
 // IsTooManyTopics checks if the given error was due to the client exceeding the allowed number
 // of topics.
+//
+// Deprecated. Always returns false.
 func IsTooManyTopics(err error) bool {
-	return internal.HasErrorCode(err, tooManyTopics)
+	return false
 }
 
 // IsUnknown checks if the given error was due to unknown error returned by the backend server.
+//
+// Deprecated. Always returns false.
 func IsUnknown(err error) bool {
-	return internal.HasErrorCode(err, unknownError)
+	return false
 }
 
 type fcmRequest struct {
@@ -1051,10 +1046,8 @@ type fcmResponse struct {
 	Name string `json:"name"`
 }
 
-type fcmError struct {
+type fcmErrorResponse struct {
 	Error struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
 		Details []struct {
 			Type      string `json:"@type"`
 			ErrorCode string `json:"errorCode"`
@@ -1063,29 +1056,25 @@ type fcmError struct {
 }
 
 func handleFCMError(resp *internal.Response) error {
-	var fe fcmError
+	base := internal.NewFirebaseErrorOnePlatform(resp)
+	var fe fcmErrorResponse
 	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
-	var serverCode string
 	for _, d := range fe.Error.Details {
 		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" {
-			serverCode = d.ErrorCode
+			base.Ext["messagingErrorCode"] = d.ErrorCode
 			break
 		}
 	}
-	if serverCode == "" {
-		serverCode = fe.Error.Status
+
+	return base
+}
+
+func hasMessagingErrorCode(err error, code string) bool {
+	fe, ok := err.(*internal.FirebaseError)
+	if !ok {
+		return false
 	}
 
-	var clientCode, msg string
-	info, ok := fcmErrorCodes[serverCode]
-	if ok {
-		clientCode, msg = info.Code, info.Msg
-	} else {
-		clientCode = unknownError
-		msg = fmt.Sprintf("server responded with an unknown error; response: %s", string(resp.Body))
-	}
-	if fe.Error.Message != "" {
-		msg += "; details: " + fe.Error.Message
-	}
-	return internal.Errorf(clientCode, "http error status: %d; reason: %s", resp.Status, msg)
+	got, ok := fe.Ext["messagingErrorCode"]
+	return ok && got == code
 }

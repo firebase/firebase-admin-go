@@ -23,9 +23,9 @@ import (
 	"net/http"
 	"time"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/auth"
-	"firebase.google.com/go/auth/hash"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/auth/hash"
 	"google.golang.org/api/iterator"
 )
 
@@ -185,6 +185,30 @@ func getUserByPhone(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	return u
 }
 
+func bulkGetUsers(ctx context.Context, client *auth.Client) {
+	// [START bulk_get_users_golang]
+	getUsersResult, err := client.GetUsers(ctx, []auth.UserIdentifier{
+		auth.UIDIdentifier{UID: "uid1"},
+		auth.EmailIdentifier{Email: "user@example.com"},
+		auth.PhoneIdentifier{PhoneNumber: "+15555551234"},
+		auth.ProviderIdentifier{ProviderID: "google.com", ProviderUID: "google_uid1"},
+	})
+	if err != nil {
+		log.Fatalf("error retriving multiple users: %v\n", err)
+	}
+
+	log.Printf("Successfully fetched user data:")
+	for _, u := range getUsersResult.Users {
+		log.Printf("%v", u)
+	}
+
+	log.Printf("Unable to find users corresponding to these identifiers:")
+	for _, id := range getUsersResult.NotFound {
+		log.Printf("%v", id)
+	}
+	// [END bulk_get_users_golang]
+}
+
 func createUser(ctx context.Context, client *auth.Client) *auth.UserRecord {
 	// [START create_user_golang]
 	params := (&auth.UserToCreate{}).
@@ -248,6 +272,21 @@ func deleteUser(ctx context.Context, client *auth.Client) {
 	}
 	log.Printf("Successfully deleted user: %s\n", uid)
 	// [END delete_user_golang]
+}
+
+func bulkDeleteUsers(ctx context.Context, client *auth.Client) {
+	// [START bulk_delete_users_golang]
+	deleteUsersResult, err := client.DeleteUsers(ctx, []string{"uid1", "uid2", "uid3"})
+	if err != nil {
+		log.Fatalf("error deleting users: %v\n", err)
+	}
+
+	log.Printf("Successfully deleted %d users", deleteUsersResult.SuccessCount)
+	log.Printf("Failed to delete %d users", deleteUsersResult.FailureCount)
+	for _, err := range deleteUsersResult.Errors {
+		log.Printf("%v", err)
+	}
+	// [END bulk_delete_users_golang]
 }
 
 func customClaimsSet(ctx context.Context, app *firebase.App) {

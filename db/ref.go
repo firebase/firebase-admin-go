@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 )
 
 // txnRetires is the maximum number of times a transaction is retried before giving up. Transaction
@@ -75,21 +75,26 @@ func (r *Ref) Child(path string) *Ref {
 // therefore v has the same requirements as the json package. Specifically, it must be a pointer,
 // and must not be nil.
 func (r *Ref) Get(ctx context.Context, v interface{}) error {
-	resp, err := r.send(ctx, "GET")
-	if err != nil {
-		return err
+	req := &internal.Request{
+		Method: http.MethodGet,
 	}
-	return resp.Unmarshal(http.StatusOK, v)
+	_, err := r.sendAndUnmarshal(ctx, req, v)
+	return err
 }
 
 // GetWithETag retrieves the value at the current database location, along with its ETag.
 func (r *Ref) GetWithETag(ctx context.Context, v interface{}) (string, error) {
-	resp, err := r.send(ctx, "GET", internal.WithHeader("X-Firebase-ETag", "true"))
+	req := &internal.Request{
+		Method: http.MethodGet,
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-Firebase-ETag", "true"),
+		},
+	}
+	resp, err := r.sendAndUnmarshal(ctx, req, v)
 	if err != nil {
 		return "", err
-	} else if err := resp.Unmarshal(http.StatusOK, v); err != nil {
-		return "", err
 	}
+
 	return resp.Header.Get("Etag"), nil
 }
 
@@ -97,11 +102,14 @@ func (r *Ref) GetWithETag(ctx context.Context, v interface{}) (string, error) {
 //
 // Shallow reads do not retrieve the child nodes of the current reference.
 func (r *Ref) GetShallow(ctx context.Context, v interface{}) error {
-	resp, err := r.send(ctx, "GET", internal.WithQueryParam("shallow", "true"))
-	if err != nil {
-		return err
+	req := &internal.Request{
+		Method: http.MethodGet,
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("shallow", "true"),
+		},
 	}
-	return resp.Unmarshal(http.StatusOK, v)
+	_, err := r.sendAndUnmarshal(ctx, req, v)
+	return err
 }
 
 // GetIfChanged retrieves the value and ETag of the current database location only if the specified
@@ -112,16 +120,26 @@ func (r *Ref) GetShallow(ctx context.Context, v interface{}) error {
 // If the etag matches, returns false along with the same ETag passed into the function. No data
 // will be stored in v in this case.
 func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (bool, string, error) {
-	resp, err := r.send(ctx, "GET", internal.WithHeader("If-None-Match", etag))
+	req := &internal.Request{
+		Method: http.MethodGet,
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("If-None-Match", etag),
+		},
+		SuccessFn: successOrNotModified,
+	}
+	resp, err := r.sendAndUnmarshal(ctx, req, nil)
 	if err != nil {
 		return false, "", err
 	}
+
 	if resp.Status == http.StatusNotModified {
 		return false, etag, nil
 	}
-	if err := resp.Unmarshal(http.StatusOK, v); err != nil {
+
+	if err := json.Unmarshal(resp.Body, v); err != nil {
 		return false, "", err
 	}
+
 	return true, resp.Header.Get("ETag"), nil
 }
 
@@ -131,11 +149,15 @@ func (r *Ref) GetIfChanged(ctx context.Context, etag string, v interface{}) (boo
 // v has the same requirements as the json package. Values like functions and channels cannot be
 // saved into Realtime Database.
 func (r *Ref) Set(ctx context.Context, v interface{}) error {
-	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithQueryParam("print", "silent"))
-	if err != nil {
-		return err
+	req := &internal.Request{
+		Method: http.MethodPut,
+		Body:   internal.NewJSONEntity(v),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("print", "silent"),
+		},
 	}
-	return resp.CheckStatus(http.StatusNoContent)
+	_, err := r.sendAndUnmarshal(ctx, req, nil)
+	return err
 }
 
 // SetIfUnchanged conditionally sets the data at this location to the given value.
@@ -143,16 +165,23 @@ func (r *Ref) Set(ctx context.Context, v interface{}) error {
 // Sets the data at this location to v only if the specified ETag matches. Returns true if the
 // value is written. Returns false if no changes are made to the database.
 func (r *Ref) SetIfUnchanged(ctx context.Context, etag string, v interface{}) (bool, error) {
-	resp, err := r.sendWithBody(ctx, "PUT", v, internal.WithHeader("If-Match", etag))
+	req := &internal.Request{
+		Method: http.MethodPut,
+		Body:   internal.NewJSONEntity(v),
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("If-Match", etag),
+		},
+		SuccessFn: successOrPreconditionFailed,
+	}
+	resp, err := r.sendAndUnmarshal(ctx, req, nil)
 	if err != nil {
 		return false, err
 	}
+
 	if resp.Status == http.StatusPreconditionFailed {
 		return false, nil
 	}
-	if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return false, err
-	}
+
 	return true, nil
 }
 
@@ -164,16 +193,18 @@ func (r *Ref) Push(ctx context.Context, v interface{}) (*Ref, error) {
 	if v == nil {
 		v = ""
 	}
-	resp, err := r.sendWithBody(ctx, "POST", v)
-	if err != nil {
-		return nil, err
+
+	req := &internal.Request{
+		Method: http.MethodPost,
+		Body:   internal.NewJSONEntity(v),
 	}
 	var d struct {
 		Name string `json:"name"`
 	}
-	if err := resp.Unmarshal(http.StatusOK, &d); err != nil {
+	if _, err := r.sendAndUnmarshal(ctx, req, &d); err != nil {
 		return nil, err
 	}
+
 	return r.Child(d.Name), nil
 }
 
@@ -182,11 +213,16 @@ func (r *Ref) Update(ctx context.Context, v map[string]interface{}) error {
 	if len(v) == 0 {
 		return fmt.Errorf("value argument must be a non-empty map")
 	}
-	resp, err := r.sendWithBody(ctx, "PATCH", v, internal.WithQueryParam("print", "silent"))
-	if err != nil {
-		return err
+
+	req := &internal.Request{
+		Method: http.MethodPatch,
+		Body:   internal.NewJSONEntity(v),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("print", "silent"),
+		},
 	}
-	return resp.CheckStatus(http.StatusNoContent)
+	_, err := r.sendAndUnmarshal(ctx, req, nil)
+	return err
 }
 
 // UpdateFn represents a function type that can be passed into Transaction().
@@ -207,28 +243,41 @@ type UpdateFn func(TransactionNode) (interface{}, error)
 // The update function may also force an early abort by returning an error instead of returning a
 // value.
 func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
-	resp, err := r.send(ctx, "GET", internal.WithHeader("X-Firebase-ETag", "true"))
+	req := &internal.Request{
+		Method: http.MethodGet,
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-Firebase-ETag", "true"),
+		},
+	}
+	resp, err := r.sendAndUnmarshal(ctx, req, nil)
 	if err != nil {
 		return err
-	} else if err := resp.CheckStatus(http.StatusOK); err != nil {
-		return err
 	}
-	etag := resp.Header.Get("Etag")
 
+	etag := resp.Header.Get("Etag")
 	for i := 0; i < txnRetries; i++ {
 		new, err := fn(&transactionNodeImpl{resp.Body})
 		if err != nil {
 			return err
 		}
-		resp, err = r.sendWithBody(ctx, "PUT", new, internal.WithHeader("If-Match", etag))
+
+		req := &internal.Request{
+			Method: http.MethodPut,
+			Body:   internal.NewJSONEntity(new),
+			Opts: []internal.HTTPOption{
+				internal.WithHeader("If-Match", etag),
+			},
+			SuccessFn: successOrPreconditionFailed,
+		}
+		resp, err = r.sendAndUnmarshal(ctx, req, nil)
 		if err != nil {
 			return err
 		}
+
 		if resp.Status == http.StatusOK {
 			return nil
-		} else if err := resp.CheckStatus(http.StatusPreconditionFailed); err != nil {
-			return err
 		}
+
 		etag = resp.Header.Get("ETag")
 	}
 	return fmt.Errorf("transaction aborted after failed retries")
@@ -236,26 +285,23 @@ func (r *Ref) Transaction(ctx context.Context, fn UpdateFn) error {
 
 // Delete removes this node from the database.
 func (r *Ref) Delete(ctx context.Context) error {
-	resp, err := r.send(ctx, "DELETE")
-	if err != nil {
-		return err
+	req := &internal.Request{
+		Method: http.MethodDelete,
 	}
-	return resp.CheckStatus(http.StatusOK)
+	_, err := r.sendAndUnmarshal(ctx, req, nil)
+	return err
 }
 
-func (r *Ref) send(
-	ctx context.Context,
-	method string,
-	opts ...internal.HTTPOption) (*internal.Response, error) {
-
-	return r.client.send(ctx, method, r.Path, nil, opts...)
+func (r *Ref) sendAndUnmarshal(
+	ctx context.Context, req *internal.Request, v interface{}) (*internal.Response, error) {
+	req.URL = r.Path
+	return r.client.sendAndUnmarshal(ctx, req, v)
 }
 
-func (r *Ref) sendWithBody(
-	ctx context.Context,
-	method string,
-	body interface{},
-	opts ...internal.HTTPOption) (*internal.Response, error) {
+func successOrNotModified(resp *internal.Response) bool {
+	return internal.HasSuccessStatus(resp) || resp.Status == http.StatusNotModified
+}
 
-	return r.client.send(ctx, method, r.Path, internal.NewJSONEntity(body), opts...)
+func successOrPreconditionFailed(resp *internal.Response) bool {
+	return internal.HasSuccessStatus(resp) || resp.Status == http.StatusPreconditionFailed
 }

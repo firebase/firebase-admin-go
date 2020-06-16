@@ -28,9 +28,10 @@ import (
 	"reflect"
 	"testing"
 
-	"firebase.google.com/go"
-	"firebase.google.com/go/db"
-	"firebase.google.com/go/integration/internal"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/db"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/integration/internal"
 )
 
 var client *db.Client
@@ -584,13 +585,24 @@ func TestNoAccess(t *testing.T) {
 	var got string
 	if err := r.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
+
 	if err := r.Set(context.Background(), "update"); err == nil {
 		t.Errorf("Set() = nil; want = error")
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
 }
 
@@ -600,10 +612,16 @@ func TestReadAccess(t *testing.T) {
 	if err := r.Get(context.Background(), &got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
 	}
-	if err := r.Set(context.Background(), "update"); err == nil {
-		t.Errorf("Set() = nil; want = error")
-	} else if err.Error() != permDenied {
+
+	err := r.Set(context.Background(), "update")
+	if err == nil {
+		t.Fatalf("Set() = nil; want = error")
+	}
+	if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+	if !errorutils.IsUnauthenticated(err) {
+		t.Errorf("IsUnauthenticated() = false; want = true")
 	}
 }
 
@@ -621,10 +639,15 @@ func TestReadWriteAccess(t *testing.T) {
 func TestQueryAccess(t *testing.T) {
 	r := aoClient.NewRef("_adminsdk/go/protected")
 	got := make(map[string]interface{})
-	if err := r.OrderByKey().LimitToFirst(2).Get(context.Background(), &got); err == nil {
-		t.Errorf("OrderByQuery() = nil; want = error")
-	} else if err.Error() != permDenied {
+	err := r.OrderByKey().LimitToFirst(2).Get(context.Background(), &got)
+	if err == nil {
+		t.Fatalf("OrderByQuery() = nil; want = error")
+	}
+	if err.Error() != permDenied {
 		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	}
+	if !errorutils.IsUnauthenticated(err) {
+		t.Errorf("IsUnauthenticated() = false; want = true")
 	}
 }
 
@@ -634,32 +657,53 @@ func TestGuestAccess(t *testing.T) {
 	if err := r.Get(context.Background(), &got); err != nil || got != "test" {
 		t.Errorf("Get() = (%q, %v); want = (%q, nil)", got, err, "test")
 	}
+
 	if err := r.Set(context.Background(), "update"); err == nil {
 		t.Errorf("Set() = nil; want = error")
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
 
 	got = ""
 	r = guestClient.NewRef("_adminsdk/go")
 	if err := r.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
 
 	c := r.Child("protected/user2")
 	if err := c.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
 
 	c = r.Child("admin")
 	if err := c.Get(context.Background(), &got); err == nil || got != "" {
 		t.Errorf("Get() = (%q, %v); want = (empty, error)", got, err)
-	} else if err.Error() != permDenied {
-		t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+	} else {
+		if err.Error() != permDenied {
+			t.Errorf("Error = %q; want = %q", err.Error(), permDenied)
+		}
+		if !errorutils.IsUnauthenticated(err) {
+			t.Errorf("IsUnauthenticated() = false; want = true")
+		}
 	}
 }
 

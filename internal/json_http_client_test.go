@@ -185,11 +185,10 @@ func TestDoAndUnmarshalTransportError(t *testing.T) {
 		URL:    server.URL,
 	}
 	var data interface{}
-	wantPrefix := "error while making http call: "
 
 	resp, err := client.DoAndUnmarshal(context.Background(), get, &data)
-	if resp != nil || err == nil || !strings.HasPrefix(err.Error(), wantPrefix) {
-		t.Errorf("DoAndUnmarshal() = (%v, %v); want = (nil, %q)", resp, err, wantPrefix)
+	if resp != nil || err == nil {
+		t.Errorf("DoAndUnmarshal() = (%v, %v); want = (nil, error)", resp, err)
 	}
 
 	if data != nil {

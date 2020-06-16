@@ -13,10 +13,9 @@
 // limitations under the License.
 
 // Package internal contains functionality that is only accessible from within the Admin SDK.
-package internal // import "firebase.google.com/go/internal"
+package internal
 
 import (
-	"fmt"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -72,35 +71,6 @@ type MessagingConfig struct {
 	Opts      []option.ClientOption
 	ProjectID string
 	Version   string
-}
-
-// FirebaseError is an error type containing an error code string.
-type FirebaseError struct {
-	Code   string
-	String string
-}
-
-func (fe *FirebaseError) Error() string {
-	return fe.String
-}
-
-// HasErrorCode checks if the given error contain a specific error code.
-func HasErrorCode(err error, code string) bool {
-	fe, ok := err.(*FirebaseError)
-	return ok && fe.Code == code
-}
-
-// Error creates a new FirebaseError from the specified error code and message.
-func Error(code string, msg string) *FirebaseError {
-	return &FirebaseError{
-		Code:   code,
-		String: msg,
-	}
-}
-
-// Errorf creates a new FirebaseError from the specified error code and message.
-func Errorf(code string, msg string, args ...interface{}) *FirebaseError {
-	return Error(code, fmt.Sprintf(msg, args...))
 }
 
 // MockTokenSource is a TokenSource implementation that can be used for testing.
