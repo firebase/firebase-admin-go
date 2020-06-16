@@ -249,9 +249,22 @@ func TestLastRefreshTime(t *testing.T) {
 		t.Errorf("signInWithPassword failed: %v", err)
 	}
 
-	getUsersResult, err := client.GetUser(context.Background(), userRecord.UID)
-	if err != nil {
-		t.Fatalf("GetUser(...) failed with error: %v", err)
+	// Attempt to retrieve the user 3 times (with a small delay between each attempt.) Occasionally,
+	// this call retrieves the user data without the lastLoginTime/lastRefreshTime fields; possibly
+	// because it's hitting a different server than what the login request used.
+	var getUsersResult *auth.UserRecord
+	for i := 0; i < 3; i++ {
+		var err error
+		getUsersResult, err = client.GetUser(context.Background(), userRecord.UID)
+		if err != nil {
+			t.Fatalf("GetUser(...) failed with error: %v", err)
+		}
+
+		if getUsersResult.UserMetadata.LastRefreshTimestamp != 0 {
+			break
+		}
+
+		time.Sleep(time.Second * time.Duration(2^i))
 	}
 
 	// Ensure last refresh time is approx now (with tollerance of 10m)
