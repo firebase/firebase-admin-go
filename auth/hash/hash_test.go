@@ -67,84 +67,84 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: HMACMD5{signerKey},
+		alg: HMACMD5{signerKey, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_MD5",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA1{signerKey},
+		alg: HMACSHA1{signerKey, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA1",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA256{signerKey},
+		alg: HMACSHA256{signerKey, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA256",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA512{signerKey},
+		alg: HMACSHA512{signerKey, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA512",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: MD5{0},
+		alg: MD5{0, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "MD5",
 			"rounds":        0,
 		},
 	},
 	{
-		alg: MD5{8192},
+		alg: MD5{8192, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "MD5",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA1{1},
+		alg: SHA1{1, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA1",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA1{8192},
+		alg: SHA1{8192, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA1",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA256{1},
+		alg: SHA256{1, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA256",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA256{8192},
+		alg: SHA256{8192, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA256",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA512{1},
+		alg: SHA512{1, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA512",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA512{8192},
+		alg: SHA512{8192, InputOrderUnspecified},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA512",
 			"rounds":        8192,
@@ -244,19 +244,19 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "MD5: rounds too low",
-		alg:  MD5{-1},
+		alg:  MD5{-1, InputOrderUnspecified},
 	},
 	{
 		name: "SHA1: rounds too low",
-		alg:  SHA1{0},
+		alg:  SHA1{0, InputOrderUnspecified},
 	},
 	{
 		name: "SHA256: rounds too low",
-		alg:  SHA256{0},
+		alg:  SHA256{0, InputOrderUnspecified},
 	},
 	{
 		name: "SHA512: rounds too low",
-		alg:  SHA512{0},
+		alg:  SHA512{0, InputOrderUnspecified},
 	},
 	{
 		name: "PBKDFSHA1: rounds too low",
@@ -268,19 +268,19 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "MD5: rounds too high",
-		alg:  MD5{8193},
+		alg:  MD5{8193, InputOrderUnspecified},
 	},
 	{
 		name: "SHA1: rounds too high",
-		alg:  SHA1{8193},
+		alg:  SHA1{8193, InputOrderUnspecified},
 	},
 	{
 		name: "SHA256: rounds too high",
-		alg:  SHA256{8193},
+		alg:  SHA256{8193, InputOrderUnspecified},
 	},
 	{
 		name: "SHA512: rounds too high",
-		alg:  SHA512{8193},
+		alg:  SHA512{8193, InputOrderUnspecified},
 	},
 	{
 		name: "PBKDFSHA1: rounds too high",
