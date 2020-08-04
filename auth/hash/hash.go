@@ -25,12 +25,12 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
-// InputOrder specifies the order in which users' passwords/salts are hashed
-type InputOrder int
+// InputOrderType specifies the order in which users' passwords/salts are hashed
+type InputOrderType int
 
-// Available InputOrder values
+// Available InputOrderType values
 const (
-	InputOrderUnspecified InputOrder = iota
+	InputOrderUnspecified InputOrderType = iota
 	InputOrderSaltFirst
 	InputOrderPasswordFirst
 )
@@ -107,7 +107,7 @@ func (s Scrypt) Config() (internal.HashConfig, error) {
 // for more details. Key is required.
 type HMACMD5 struct {
 	Key        []byte
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -122,7 +122,7 @@ func (h HMACMD5) Config() (internal.HashConfig, error) {
 // for more details.
 type HMACSHA1 struct {
 	Key        []byte
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -137,7 +137,7 @@ func (h HMACSHA1) Config() (internal.HashConfig, error) {
 // for more details.
 type HMACSHA256 struct {
 	Key        []byte
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -152,7 +152,7 @@ func (h HMACSHA256) Config() (internal.HashConfig, error) {
 // for more details.
 type HMACSHA512 struct {
 	Key        []byte
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -167,7 +167,7 @@ func (h HMACSHA512) Config() (internal.HashConfig, error) {
 // for more details.
 type MD5 struct {
 	Rounds     int
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -210,7 +210,7 @@ func (h PBKDFSHA1) Config() (internal.HashConfig, error) {
 // for more details.
 type SHA1 struct {
 	Rounds     int
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -225,7 +225,7 @@ func (h SHA1) Config() (internal.HashConfig, error) {
 // for more details.
 type SHA256 struct {
 	Rounds     int
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -240,7 +240,7 @@ func (h SHA256) Config() (internal.HashConfig, error) {
 // for more details.
 type SHA512 struct {
 	Rounds     int
-	InputOrder InputOrder
+	InputOrder InputOrderType
 }
 
 // Config returns the validated hash configuration.
@@ -248,7 +248,7 @@ func (h SHA512) Config() (internal.HashConfig, error) {
 	return basicConfig("SHA512", h.Rounds, h.InputOrder)
 }
 
-func hmacConfig(name string, key []byte, order InputOrder) (internal.HashConfig, error) {
+func hmacConfig(name string, key []byte, order InputOrderType) (internal.HashConfig, error) {
 	if len(key) == 0 {
 		return nil, errors.New("signer key not specified")
 	}
@@ -272,7 +272,7 @@ func hmacConfig(name string, key []byte, order InputOrder) (internal.HashConfig,
 	}, nil
 }
 
-func basicConfig(name string, rounds int, order InputOrder) (internal.HashConfig, error) {
+func basicConfig(name string, rounds int, order InputOrderType) (internal.HashConfig, error) {
 	minRounds := 0
 	maxRounds := 120000
 	switch name {
