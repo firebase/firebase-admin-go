@@ -27,6 +27,7 @@ import (
 
 // InputOrder specifies the order in which users' passwords/salts are hashed
 type InputOrder int
+
 // Available InputOrder values
 const (
 	InputOrderUnspecified InputOrder = iota
