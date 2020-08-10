@@ -252,9 +252,9 @@ func hmacConfig(name string, key []byte, order InputOrderType) (internal.HashCon
 	if len(key) == 0 {
 		return nil, errors.New("signer key not specified")
 	}
-	conf := internal.HashConfig {
-		"hashAlgorithm":	name,
-		"signerKey":		base64.RawURLEncoding.EncodeToString(key),
+	conf := internal.HashConfig{
+		"hashAlgorithm": name,
+		"signerKey":     base64.RawURLEncoding.EncodeToString(key),
 	}
 	if order == InputOrderSaltFirst {
 		conf["passwordHashOrder"] = "SALT_AND_PASSWORD"
@@ -277,7 +277,7 @@ func basicConfig(name string, rounds int, order InputOrderType) (internal.HashCo
 	if rounds < minRounds || maxRounds < rounds {
 		return nil, fmt.Errorf("rounds must be between %d and %d", minRounds, maxRounds)
 	}
-	
+
 	conf := internal.HashConfig{
 		"hashAlgorithm": name,
 		"rounds":        rounds,
