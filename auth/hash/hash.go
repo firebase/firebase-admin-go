@@ -252,24 +252,16 @@ func hmacConfig(name string, key []byte, order InputOrderType) (internal.HashCon
 	if len(key) == 0 {
 		return nil, errors.New("signer key not specified")
 	}
-	if order != InputOrderUnspecified {
-		if order == InputOrderSaltFirst {
-			return internal.HashConfig{
-				"hashAlgorithm":     name,
-				"signerKey":         base64.RawURLEncoding.EncodeToString(key),
-				"passwordHashOrder": "SALT_AND_PASSWORD",
-			}, nil
-		}
-		return internal.HashConfig{
-			"hashAlgorithm":     name,
-			"signerKey":         base64.RawURLEncoding.EncodeToString(key),
-			"passwordHashOrder": "PASSWORD_AND_SALT",
-		}, nil
+	conf := internal.HashConfig {
+		"hashAlgorithm":	name,
+		"signerKey":		base64.RawURLEncoding.EncodeToString(key),
 	}
-	return internal.HashConfig{
-		"hashAlgorithm": name,
-		"signerKey":     base64.RawURLEncoding.EncodeToString(key),
-	}, nil
+	if order == InputOrderSaltFirst {
+		conf["passwordHashOrder"] = "SALT_AND_PASSWORD"
+	} else if order == InputOrderPasswordFirst {
+		conf["passwordHashOrder"] = "PASSWORD_AND_SALT"
+	}
+	return conf, nil
 }
 
 func basicConfig(name string, rounds int, order InputOrderType) (internal.HashConfig, error) {
@@ -285,23 +277,15 @@ func basicConfig(name string, rounds int, order InputOrderType) (internal.HashCo
 	if rounds < minRounds || maxRounds < rounds {
 		return nil, fmt.Errorf("rounds must be between %d and %d", minRounds, maxRounds)
 	}
-	if order != InputOrderUnspecified {
-		if order == InputOrderSaltFirst {
-			return internal.HashConfig{
-				"hashAlgorithm":     name,
-				"rounds":            rounds,
-				"passwordHashOrder": "SALT_AND_PASSWORD",
-			}, nil
-		}
-		return internal.HashConfig{
-			"hashAlgorithm":     name,
-			"rounds":            rounds,
-			"passwordHashOrder": "PASSWORD_AND_SALT",
-		}, nil
-	}
-
-	return internal.HashConfig{
+	
+	conf := internal.HashConfig{
 		"hashAlgorithm": name,
 		"rounds":        rounds,
-	}, nil
+	}
+	if order == InputOrderSaltFirst {
+		conf["passwordHashOrder"] = "SALT_AND_PASSWORD"
+	} else if order == InputOrderPasswordFirst {
+		conf["passwordHashOrder"] = "PASSWORD_AND_SALT"
+	}
+	return conf, nil
 }

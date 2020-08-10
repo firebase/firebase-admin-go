@@ -5,7 +5,6 @@ go 1.11
 require (
 	cloud.google.com/go/firestore v1.1.1
 	cloud.google.com/go/storage v1.0.0
-	firebase.google.com/go v3.13.0+incompatible
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
