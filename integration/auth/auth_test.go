@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	officialHash "hash"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -266,15 +265,15 @@ func signInWithPassword(email, password string) (string, error) {
 }
 
 func TestSaltPasswordOrder(t *testing.T) {
-	uid := randomUID()
-	email := randomEmail(uid)
-	password := "pass123123"
-	key := "skeleton"
-	salt := "NaCl"
+	const (
+		password = "pass123123"
+		key      = "skeleton"
+		salt     = "NaCl"
+	)
 	tests := []struct {
 		testName   string
 		hashConfig auth.UserImportHash
-		localHash  officialHash.Hash
+		localHash  func() []byte
 	}{
 		{
 			testName: "SHA1_SaltFirst",
@@ -282,7 +281,11 @@ func TestSaltPasswordOrder(t *testing.T) {
 				Rounds:     1,
 				InputOrder: hash.InputOrderSaltFirst,
 			},
-			localHash: sha1.New(),
+			localHash: func() []byte {
+				h := sha1.New()
+				h.Write([]byte(salt + password))
+				return h.Sum(nil)
+			},
 		},
 		{
 			testName: "HMAC_SHA256_PasswordFirst",
@@ -290,31 +293,20 @@ func TestSaltPasswordOrder(t *testing.T) {
 				Key:        []byte(key),
 				InputOrder: hash.InputOrderPasswordFirst,
 			},
-			localHash: hmac.New(sha256.New, []byte(key)),
+			localHash: func() []byte {
+				h := hmac.New(sha256.New, []byte(key))
+				h.Write([]byte(password + salt))
+				return h.Sum(nil)
+			},
 		},
 	}
-	// h := hash.HMACSHA256{
-	// 	Key: []byte(key),
-	// 	InputOrder: InputOrderSaltFirst
-	// }
-	// myHash := hmac.New(sha256.New, []byte(key))
-	// myHash.Write([]byte(salt+password))
 	for _, test := range tests {
-		hC, _ := test.hashConfig.Config()
-		fmt.Println(hC)
-		if hC["passwordHashOrder"] == "PASSWORD_AND_SALT" {
-			test.localHash.Write([]byte(password + salt))
-		} else {
-			if hC["passwordHashOrder"] == "SALT_AND_PASSWORD" {
-				test.localHash.Write([]byte(salt + password))
-			} else {
-				t.Fatalf("Unexpected value for passwordHashOrder: %s", hC["passwordHashOrder"])
-			}
-		}
+		uid := randomUID()
+		email := randomEmail(uid)
 		user := (&auth.UserToImport{}).
 			UID(uid).
 			Email(email).
-			PasswordHash(test.localHash.Sum(nil)).
+			PasswordHash(test.localHash()).
 			PasswordSalt([]byte(salt))
 		result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user}, auth.WithHash(test.hashConfig))
 		if err != nil {
