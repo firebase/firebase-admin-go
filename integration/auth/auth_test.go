@@ -19,10 +19,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -278,22 +276,6 @@ func TestSaltPasswordOrder(t *testing.T) {
 		hashConfig auth.UserImportHash
 		localHash  officialHash.Hash
 	}{
-		// {
-		// 	testName: "MD5_SaltFirst",
-		// 	hashConfig: hash.MD5 {
-		// 		Rounds: 2,
-		// 		InputOrder: hash.InputOrderSaltFirst,
-		// 	},
-		// 	localHash: md5.New(),
-		// },
-		// {
-		// 	testName: "MD5_PasswordFirst",
-		// 	hashConfig: hash.MD5 {
-		// 		Rounds: 2,
-		// 		InputOrder: hash.InputOrderPasswordFirst,
-		// 	},
-		// 	localHash: md5.New(),
-		// },
 		{
 			testName: "SHA1_SaltFirst",
 			hashConfig: hash.SHA1{
@@ -303,108 +285,12 @@ func TestSaltPasswordOrder(t *testing.T) {
 			localHash: sha1.New(),
 		},
 		{
-			testName: "SHA1_PasswordFirst",
-			hashConfig: hash.SHA1{
-				Rounds:     1,
-				InputOrder: hash.InputOrderPasswordFirst,
-			},
-			localHash: sha1.New(),
-		},
-		{
-			testName: "SHA256_SaltFirst",
-			hashConfig: hash.SHA256{
-				Rounds:     1,
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: sha256.New(),
-		},
-		{
-			testName: "SHA256_PasswordFirst",
-			hashConfig: hash.SHA256{
-				Rounds:     1,
-				InputOrder: hash.InputOrderPasswordFirst,
-			},
-			localHash: sha256.New(),
-		},
-		{
-			testName: "SHA512_SaltFirst",
-			hashConfig: hash.SHA512{
-				Rounds:     1,
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: sha512.New(),
-		},
-		{
-			testName: "SHA512_PasswordFirst",
-			hashConfig: hash.SHA512{
-				Rounds:     1,
-				InputOrder: hash.InputOrderPasswordFirst,
-			},
-			localHash: sha512.New(),
-		},
-		{
-			testName: "HMAC_MD5_SaltFirst",
-			hashConfig: hash.HMACMD5{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: hmac.New(md5.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_MD5_PasswordFirst",
-			hashConfig: hash.HMACMD5{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderPasswordFirst,
-			},
-			localHash: hmac.New(md5.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_SHA1_SaltFirst",
-			hashConfig: hash.HMACSHA1{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: hmac.New(sha1.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_SHA1_PasswordFirst",
-			hashConfig: hash.HMACSHA1{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: hmac.New(sha1.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_SHA256_SaltFirst",
-			hashConfig: hash.HMACSHA256{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: hmac.New(sha256.New, []byte(key)),
-		},
-		{
 			testName: "HMAC_SHA256_PasswordFirst",
 			hashConfig: hash.HMACSHA256{
 				Key:        []byte(key),
 				InputOrder: hash.InputOrderPasswordFirst,
 			},
 			localHash: hmac.New(sha256.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_SHA512_SaltFirst",
-			hashConfig: hash.HMACSHA512{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderSaltFirst,
-			},
-			localHash: hmac.New(sha512.New, []byte(key)),
-		},
-		{
-			testName: "HMAC_SHA512_PasswordFirst",
-			hashConfig: hash.HMACSHA512{
-				Key:        []byte(key),
-				InputOrder: hash.InputOrderPasswordFirst,
-			},
-			localHash: hmac.New(sha512.New, []byte(key)),
 		},
 	}
 	// h := hash.HMACSHA256{
@@ -425,7 +311,6 @@ func TestSaltPasswordOrder(t *testing.T) {
 				t.Fatalf("Unexpected value for passwordHashOrder: %s", hC["passwordHashOrder"])
 			}
 		}
-		// TODO: Should this be test.localHash.Sum(make([]byte, 0))  ???
 		user := (&auth.UserToImport{}).
 			UID(uid).
 			Email(email).

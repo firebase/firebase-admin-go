@@ -486,11 +486,6 @@ var validHashesOrder = []struct {
 	},
 }
 
-var inputOrders = []InputOrderType{
-	InputOrderUnspecified,
-	InputOrderSaltFirst,
-	InputOrderPasswordFirst,
-}
 
 func TestHashOrder(t *testing.T) {
 	for idx, tc := range validHashesOrder {
