@@ -486,7 +486,6 @@ var validHashesOrder = []struct {
 	},
 }
 
-
 func TestHashOrder(t *testing.T) {
 	for idx, tc := range validHashesOrder {
 		got, err := tc.alg.Config()
