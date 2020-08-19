@@ -264,19 +264,19 @@ func signInWithPassword(email, password string) (string, error) {
 	return respBody.IDToken, err
 }
 
-func TestSaltPasswordOrder(t *testing.T) {
+func TestImportUserPasswordSaltOrder(t *testing.T) {
 	const (
 		password = "pass123123"
 		key      = "skeleton"
 		salt     = "NaCl"
 	)
 	tests := []struct {
-		testName   string
+		name       string
 		hashConfig auth.UserImportHash
 		localHash  func() []byte
 	}{
 		{
-			testName: "SHA1_SaltFirst",
+			name: "SHA1_SaltFirst",
 			hashConfig: hash.SHA1{
 				Rounds:     1,
 				InputOrder: hash.InputOrderSaltFirst,
@@ -288,7 +288,7 @@ func TestSaltPasswordOrder(t *testing.T) {
 			},
 		},
 		{
-			testName: "HMAC_SHA256_PasswordFirst",
+			name: "HMAC_SHA256_PasswordFirst",
 			hashConfig: hash.HMACSHA256{
 				Key:        []byte(key),
 				InputOrder: hash.InputOrderPasswordFirst,
@@ -314,7 +314,7 @@ func TestSaltPasswordOrder(t *testing.T) {
 		}
 		defer deleteUser(uid)
 		if result.SuccessCount != 1 || result.FailureCount != 0 {
-			t.Errorf("ImportUsers() = %#v; want = {SuccessCount: 1, FailureCount: 0}", result)
+			t.Errorf("ImportUsers(%s) = %#v; want = {SuccessCount: 1, FailureCount: 0}", test.name, result)
 		}
 
 		savedUser, err := client.GetUser(context.Background(), uid)
