@@ -276,12 +276,12 @@ func (s *mockSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return []byte("signature"), nil
+	return []byte("signedBlob"), nil
 }
 
 func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 	resp := map[string]interface{}{
-		"signature": base64.StdEncoding.EncodeToString([]byte(signature)),
+		"signedBlob": base64.StdEncoding.EncodeToString([]byte(signature)),
 	}
 	wantPath := fmt.Sprintf("/v1/projects/-/serviceAccounts/%s:signBlob", serviceAcct)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -294,8 +294,8 @@ func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 		if err := json.Unmarshal(reqBody, &m); err != nil {
 			t.Fatal(err)
 		}
-		if m["bytesToSign"] == "" {
-			t.Fatal("BytesToSign = empty; want = non-empty")
+		if m["payload"] == "" {
+			t.Fatal("payload = empty; want = non-empty")
 		}
 		if r.URL.Path != wantPath {
 			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)

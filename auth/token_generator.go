@@ -144,7 +144,7 @@ func (s serviceAccountSigner) Email(ctx context.Context) (string, error) {
 }
 
 // iamSigner is a cryptoSigner that signs data by sending them to the remote IAM service. See
-// https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob for details
+// https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/signBlob for details
 // regarding the REST API.
 //
 // The IAM service requires the identity of a service account. This can be specified explicitly
@@ -169,7 +169,7 @@ func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner,
 		httpClient:   hc,
 		serviceAcct:  config.ServiceAccountID,
 		metadataHost: "http://metadata.google.internal",
-		iamHost:      "https://iam.googleapis.com",
+		iamHost:      "https://iamcredentials.googleapis.com",
 	}, nil
 }
 
@@ -181,7 +181,7 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 
 	url := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:signBlob", s.iamHost, account)
 	body := map[string]interface{}{
-		"bytesToSign": base64.StdEncoding.EncodeToString(b),
+		"payload": base64.StdEncoding.EncodeToString(b),
 	}
 	req := &internal.Request{
 		Method: http.MethodPost,
@@ -189,7 +189,7 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 		Body:   internal.NewJSONEntity(body),
 	}
 	var signResponse struct {
-		Signature string `json:"signature"`
+		Signature string `json:"signedBlob"`
 	}
 	if _, err := s.httpClient.DoAndUnmarshal(ctx, req, &signResponse); err != nil {
 		return nil, err
