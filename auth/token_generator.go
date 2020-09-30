@@ -144,7 +144,7 @@ func (s serviceAccountSigner) Email(ctx context.Context) (string, error) {
 }
 
 // iamSigner is a cryptoSigner that signs data by sending them to the IAMCredentials service. See
-// https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/signBlob 
+// https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/signBlob
 // for details regarding the REST API.
 //
 // IAMCredentials requires the identity of a service account. This can be specified explicitly
