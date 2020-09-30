@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	messagingEndpoint = "https://fcm.googleapis.com/v1"
-	batchEndpoint     = "https://fcm.googleapis.com/batch"
+	defaultMessagingEndpoint = "https://fcm.googleapis.com/v1"
+	defaultBatchEndpoint     = "https://fcm.googleapis.com/batch"
 
 	firebaseClientHeader   = "X-Firebase-Client"
 	apiFormatVersionHeader = "X-GOOG-API-FORMAT-VERSION"
@@ -862,17 +862,20 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, endpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
+	hc, messagingEndpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	if endpoint == "" {
-		endpoint = messagingEndpoint
+	batchEndpoint := messagingEndpoint
+
+	if messagingEndpoint == "" {
+		messagingEndpoint = defaultMessagingEndpoint
+		batchEndpoint = defaultBatchEndpoint
 	}
 
 	return &Client{
-		fcmClient: newFCMClient(hc, c, endpoint),
+		fcmClient: newFCMClient(hc, c, messagingEndpoint, batchEndpoint),
 		iidClient: newIIDClient(hc),
 	}, nil
 }
@@ -885,7 +888,7 @@ type fcmClient struct {
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, endpoint string) *fcmClient {
+func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndpoint string, batchEndpoint string) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 
@@ -896,7 +899,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, endpoint stri
 	}
 
 	return &fcmClient{
-		fcmEndpoint:   endpoint,
+		fcmEndpoint:   messagingEndpoint,
 		batchEndpoint: batchEndpoint,
 		project:       conf.ProjectID,
 		version:       version,

@@ -251,6 +251,7 @@ func TestIAMSignerNoMetadataService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	signer.metadataHost = "http://non-existing.metadata.service"
 
 	want := "failed to determine service account: "
 	_, err = signer.Email(ctx)

@@ -18,6 +18,9 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -31,6 +34,7 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/auth/hash"
 	"firebase.google.com/go/v4/integration/internal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -258,6 +262,78 @@ func signInWithPassword(email, password string) (string, error) {
 		return "", err
 	}
 	return respBody.IDToken, err
+}
+
+func TestImportUserPasswordSaltOrder(t *testing.T) {
+	const (
+		password = "pass123123"
+		key      = "skeleton"
+		salt     = "NaCl"
+	)
+	tests := []struct {
+		name       string
+		hashConfig auth.UserImportHash
+		localHash  func() []byte
+	}{
+		{
+			name: "SHA1_SaltFirst",
+			hashConfig: hash.SHA1{
+				Rounds:     1,
+				InputOrder: hash.InputOrderSaltFirst,
+			},
+			localHash: func() []byte {
+				h := sha1.New()
+				h.Write([]byte(salt + password))
+				return h.Sum(nil)
+			},
+		},
+		{
+			name: "HMAC_SHA256_PasswordFirst",
+			hashConfig: hash.HMACSHA256{
+				Key:        []byte(key),
+				InputOrder: hash.InputOrderPasswordFirst,
+			},
+			localHash: func() []byte {
+				h := hmac.New(sha256.New, []byte(key))
+				h.Write([]byte(password + salt))
+				return h.Sum(nil)
+			},
+		},
+	}
+	for _, test := range tests {
+		uid := randomUID()
+		email := randomEmail(uid)
+		user := (&auth.UserToImport{}).
+			UID(uid).
+			Email(email).
+			PasswordHash(test.localHash()).
+			PasswordSalt([]byte(salt))
+		result, err := client.ImportUsers(context.Background(), []*auth.UserToImport{user}, auth.WithHash(test.hashConfig))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer deleteUser(uid)
+		if result.SuccessCount != 1 || result.FailureCount != 0 {
+			t.Errorf("ImportUsers(%s) = %#v; want = {SuccessCount: 1, FailureCount: 0}", test.name, result)
+		}
+
+		savedUser, err := client.GetUser(context.Background(), uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if savedUser.Email != email {
+			t.Errorf("GetUser(imported) = %q; want = %q", savedUser.Email, email)
+		}
+		idToken, err := signInWithPassword(email, "pass123123")
+		if err != nil {
+			t.Errorf("Sign in failed with %+v\nError: %s", test, err)
+			continue
+		}
+		if idToken == "" {
+			t.Errorf("ID Token = empty; want = non-empty")
+		}
+	}
+
 }
 
 func postRequest(url string, req []byte) ([]byte, error) {
