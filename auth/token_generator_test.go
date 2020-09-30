@@ -60,8 +60,8 @@ func TestEncodeToken(t *testing.T) {
 
 	if sig, err := base64.RawURLEncoding.DecodeString(parts[2]); err != nil {
 		t.Fatal(err)
-	} else if string(sig) != "signature" {
-		t.Errorf("decode(signature) = %q; want = %q", string(sig), "signature")
+	} else if string(sig) != "signedBlob" {
+		t.Errorf("decode(signature) = %q; want = %q", string(sig), "signedBlob")
 	}
 }
 
