@@ -179,3 +179,45 @@ func NewClient(ctx context.Context, c *internal.RemoteConfig) (*Client, error) {
 		projectID: c.ProjectID,
 	}, nil
 }
+
+// GetTemplate will retrieve the latest template
+func (c *Client) GetTemplate(ctx context.Context) (*Template, error) {
+	// TODO
+	return nil, nil
+}
+
+// GetTemplateAtVersion will retrieve the specified version of the template
+func (c *Client) GetTemplateAtVersion(ctx context.Context, versionNumber string) (*Template, error) {
+	// TODO
+	return nil, nil
+}
+
+// Versions will list the versions of the template
+func (c *Client) Versions(ctx context.Context, options *ListVersionsOptions) (*VersionIterator, error) {
+	// TODO
+	return nil, nil
+}
+
+// Rollback will perform a rollback operation on the template
+func (c *Client) Rollback(ctx context.Context, versionNumber string) (*Template, error) {
+	// TODO
+	return nil, nil
+}
+
+// PublishTemplate will publish the specified temnplate
+func (c *Client) PublishTemplate(ctx context.Context, template *Template) (*Template, error) {
+	// TODO
+	return nil, nil
+}
+
+// ValidateTemplate will run validations for the current template
+func (c *Client) ValidateTemplate(ctx context.Context, template *Template) (*Template, error) {
+	// TODO
+	return nil, nil
+}
+
+// ForcePublishTemplate will publish the template irrespective of the outcome from validations
+func (c *Client) ForcePublishTemplate(ctx context.Context, template *Template) (*Template, error) {
+	// TODO
+	return nil, nil
+}
