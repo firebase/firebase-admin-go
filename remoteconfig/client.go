@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"firebase.google.com/go/v4/internal"
 )
@@ -94,7 +95,7 @@ func (c *Client) UpdateRemoteConfig(eTag string, validateOnly bool) (*Response, 
 func (c *Client) ListVersions(options *ListVersionsOptions) (*ListVersionsResponse, error) {
 	var opts []internal.HTTPOption
 	if options.PageSize != 0 {
-		opts = append(opts, internal.WithQueryParam("pageSize", strconv.FormatInt(options.PageSize, 10)))
+		opts = append(opts, internal.WithQueryParam("pageSize", strconv.Itoa(options.PageSize)))
 	}
 
 	if options.PageToken != "" {
@@ -105,12 +106,12 @@ func (c *Client) ListVersions(options *ListVersionsOptions) (*ListVersionsRespon
 		opts = append(opts, internal.WithQueryParam("endVersionNumber", options.EndVersionNumber))
 	}
 
-	if options.StartTime != "" {
-		opts = append(opts, internal.WithQueryParam("startTime", options.StartTime))
+	if !options.StartTime.IsZero() {
+		opts = append(opts, internal.WithQueryParam("startTime", options.StartTime.Format(time.RFC3339Nano)))
 	}
 
-	if options.EndTime != "" {
-		opts = append(opts, internal.WithQueryParam("endTime", options.EndTime))
+	if !options.EndTime.IsZero() {
+		opts = append(opts, internal.WithQueryParam("endTime", options.EndTime.Format(time.RFC3339Nano)))
 	}
 
 	var data ListVersionsResponse
@@ -132,14 +133,15 @@ func (c *Client) ListVersions(options *ListVersionsOptions) (*ListVersionsRespon
 	return &data, nil
 }
 
-// Rollback https://firebase.google.com/docs/reference/remote-config/rest/v1/projects.remoteConfig/rollback
-func (c *Client) Rollback(versionNumber string) (*Template, error) {
+// Rollback will perform a rollback operation on the template
+// https://firebase.google.com/docs/reference/remote-config/rest/v1/projects.remoteConfig/rollback
+func (c *Client) Rollback(ctx context.Context, versionNumber string) (*Template, error) {
 	if versionNumber == "" {
 		return nil, errors.New("versionNumber is required to rollback a Remote Config template")
 	}
 
 	var data Template
-	url := fmt.Sprintf("%s:listVersions", c.getRootURL())
+	url := fmt.Sprintf("%s:rollback", c.getRootURL())
 
 	_, err := c.hc.DoAndUnmarshal(
 		context.Background(),
@@ -194,12 +196,6 @@ func (c *Client) GetTemplateAtVersion(ctx context.Context, versionNumber string)
 
 // Versions will list the versions of the template
 func (c *Client) Versions(ctx context.Context, options *ListVersionsOptions) (*VersionIterator, error) {
-	// TODO
-	return nil, nil
-}
-
-// Rollback will perform a rollback operation on the template
-func (c *Client) Rollback(ctx context.Context, versionNumber string) (*Template, error) {
 	// TODO
 	return nil, nil
 }
