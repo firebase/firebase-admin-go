@@ -73,6 +73,12 @@ type MessagingConfig struct {
 	Version   string
 }
 
+// RemoteConfig represents the configuration of Firebase Cloud Remote Config service.
+type RemoteConfig struct {
+	Opts      []option.ClientOption
+	ProjectID string
+}
+
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string
