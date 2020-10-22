@@ -27,6 +27,8 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"testing"
+
+	"google.golang.org/api/option"
 )
 
 var testMessages = []*Message{
@@ -509,6 +511,46 @@ func TestSendMulticast(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.batchEndpoint = ts.URL
+
+	br, err := client.SendMulticast(ctx, testMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponse(br, req, false); err != nil {
+		t.Errorf("SendMulticast() = %v", err)
+	}
+}
+
+func TestSendMulticastWithCustomEndpoint(t *testing.T) {
+	resp, err := createMultipartResponse(testSuccessResponse, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var req []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ = ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", wantMime)
+		w.Write(resp)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+
+	conf := *testMessagingConfig
+	customBatchEndpoint := fmt.Sprintf("%s/v1", ts.URL)
+	optEndpoint := option.WithEndpoint(customBatchEndpoint)
+	conf.Opts = append(conf.Opts, optEndpoint)
+
+	client, err := NewClient(ctx, &conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if customBatchEndpoint != client.batchEndpoint {
+		t.Errorf("client.batchEndpoint = %q; want = %q", client.batchEndpoint, customBatchEndpoint)
+	}
 
 	br, err := client.SendMulticast(ctx, testMulticastMessage)
 	if err != nil {

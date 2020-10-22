@@ -67,112 +67,112 @@ var validHashes = []struct {
 		},
 	},
 	{
-		alg: HMACMD5{signerKey},
+		alg: HMACMD5{Key: signerKey},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_MD5",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA1{signerKey},
+		alg: HMACSHA1{Key: signerKey},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA1",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA256{signerKey},
+		alg: HMACSHA256{Key: signerKey},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA256",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: HMACSHA512{signerKey},
+		alg: HMACSHA512{Key: signerKey},
 		want: internal.HashConfig{
 			"hashAlgorithm": "HMAC_SHA512",
 			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
 		},
 	},
 	{
-		alg: MD5{0},
+		alg: MD5{Rounds: 0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "MD5",
 			"rounds":        0,
 		},
 	},
 	{
-		alg: MD5{8192},
+		alg: MD5{Rounds: 8192},
 		want: internal.HashConfig{
 			"hashAlgorithm": "MD5",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA1{1},
+		alg: SHA1{Rounds: 1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA1",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA1{8192},
+		alg: SHA1{Rounds: 8192},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA1",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA256{1},
+		alg: SHA256{Rounds: 1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA256",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA256{8192},
+		alg: SHA256{Rounds: 8192},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA256",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: SHA512{1},
+		alg: SHA512{Rounds: 1},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA512",
 			"rounds":        1,
 		},
 	},
 	{
-		alg: SHA512{8192},
+		alg: SHA512{Rounds: 8192},
 		want: internal.HashConfig{
 			"hashAlgorithm": "SHA512",
 			"rounds":        8192,
 		},
 	},
 	{
-		alg: PBKDFSHA1{0},
+		alg: PBKDFSHA1{Rounds: 0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF_SHA1",
 			"rounds":        0,
 		},
 	},
 	{
-		alg: PBKDFSHA1{120000},
+		alg: PBKDFSHA1{Rounds: 120000},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF_SHA1",
 			"rounds":        120000,
 		},
 	},
 	{
-		alg: PBKDF2SHA256{0},
+		alg: PBKDF2SHA256{Rounds: 0},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF2_SHA256",
 			"rounds":        0,
 		},
 	},
 	{
-		alg: PBKDF2SHA256{120000},
+		alg: PBKDF2SHA256{Rounds: 120000},
 		want: internal.HashConfig{
 			"hashAlgorithm": "PBKDF2_SHA256",
 			"rounds":        120000,
@@ -244,51 +244,51 @@ var invalidHashes = []struct {
 	},
 	{
 		name: "MD5: rounds too low",
-		alg:  MD5{-1},
+		alg:  MD5{Rounds: -1},
 	},
 	{
 		name: "SHA1: rounds too low",
-		alg:  SHA1{0},
+		alg:  SHA1{Rounds: 0},
 	},
 	{
 		name: "SHA256: rounds too low",
-		alg:  SHA256{0},
+		alg:  SHA256{Rounds: 0},
 	},
 	{
 		name: "SHA512: rounds too low",
-		alg:  SHA512{0},
+		alg:  SHA512{Rounds: 0},
 	},
 	{
 		name: "PBKDFSHA1: rounds too low",
-		alg:  PBKDFSHA1{-1},
+		alg:  PBKDFSHA1{Rounds: -1},
 	},
 	{
 		name: "PBKDF2SHA256: rounds too low",
-		alg:  PBKDF2SHA256{-1},
+		alg:  PBKDF2SHA256{Rounds: -1},
 	},
 	{
 		name: "MD5: rounds too high",
-		alg:  MD5{8193},
+		alg:  MD5{Rounds: 8193},
 	},
 	{
 		name: "SHA1: rounds too high",
-		alg:  SHA1{8193},
+		alg:  SHA1{Rounds: 8193},
 	},
 	{
 		name: "SHA256: rounds too high",
-		alg:  SHA256{8193},
+		alg:  SHA256{Rounds: 8193},
 	},
 	{
 		name: "SHA512: rounds too high",
-		alg:  SHA512{8193},
+		alg:  SHA512{Rounds: 8193},
 	},
 	{
 		name: "PBKDFSHA1: rounds too high",
-		alg:  PBKDFSHA1{120001},
+		alg:  PBKDFSHA1{Rounds: 120001},
 	},
 	{
 		name: "PBKDF2SHA256: rounds too high",
-		alg:  PBKDF2SHA256{120001},
+		alg:  PBKDF2SHA256{Rounds: 120001},
 	},
 }
 
@@ -308,6 +308,191 @@ func TestInvalidHash(t *testing.T) {
 		got, err := tc.alg.Config()
 		if got != nil || err == nil {
 			t.Errorf("%s; Config() = (%v, %v); want = (nil, error)", tc.name, got, err)
+		}
+	}
+}
+
+var validHashesOrder = []struct {
+	alg  auth.UserImportHash
+	want internal.HashConfig
+}{
+	{
+		alg: HMACMD5{Key: signerKey, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "HMAC_MD5",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
+		},
+	},
+	{
+		alg: HMACMD5{Key: signerKey, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_MD5",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: HMACMD5{Key: signerKey, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_MD5",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: HMACSHA1{Key: signerKey, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "HMAC_SHA1",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
+		},
+	},
+	{
+		alg: HMACSHA1{Key: signerKey, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA1",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: HMACSHA1{Key: signerKey, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA1",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: HMACSHA256{Key: signerKey, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "HMAC_SHA256",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
+		},
+	},
+	{
+		alg: HMACSHA256{Key: signerKey, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA256",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: HMACSHA256{Key: signerKey, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA256",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: HMACSHA512{Key: signerKey, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "HMAC_SHA512",
+			"signerKey":     base64.RawURLEncoding.EncodeToString(signerKey),
+		},
+	},
+	{
+		alg: HMACSHA512{Key: signerKey, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA512",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: HMACSHA512{Key: signerKey, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "HMAC_SHA512",
+			"signerKey":         base64.RawURLEncoding.EncodeToString(signerKey),
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: SHA1{Rounds: 1, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA1",
+			"rounds":        1,
+		},
+	},
+	{
+		alg: SHA1{Rounds: 1, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA1",
+			"rounds":            1,
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: SHA1{Rounds: 1, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA1",
+			"rounds":            1,
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: SHA256{Rounds: 1, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA256",
+			"rounds":        1,
+		},
+	},
+	{
+		alg: SHA256{Rounds: 1, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA256",
+			"rounds":            1,
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: SHA256{Rounds: 1, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA256",
+			"rounds":            1,
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: SHA512{Rounds: 1, InputOrder: InputOrderUnspecified},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA512",
+			"rounds":        1,
+		},
+	},
+	{
+		alg: SHA512{Rounds: 1, InputOrder: InputOrderSaltFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA512",
+			"rounds":            1,
+			"passwordHashOrder": "SALT_AND_PASSWORD",
+		},
+	},
+	{
+		alg: SHA512{Rounds: 1, InputOrder: InputOrderPasswordFirst},
+		want: internal.HashConfig{
+			"hashAlgorithm":     "SHA512",
+			"rounds":            1,
+			"passwordHashOrder": "PASSWORD_AND_SALT",
+		},
+	},
+	{
+		alg: SHA512{Rounds: 8192},
+		want: internal.HashConfig{
+			"hashAlgorithm": "SHA512",
+			"rounds":        8192,
+		},
+	},
+}
+
+func TestHashOrder(t *testing.T) {
+	for idx, tc := range validHashesOrder {
+		got, err := tc.alg.Config()
+		if err != nil {
+			t.Errorf("[%d] Config() = %v", idx, err)
+		} else if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("[%d] Config() = %#v; want = %#v", idx, got, tc.want)
 		}
 	}
 }

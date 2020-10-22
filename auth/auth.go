@@ -138,8 +138,8 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 //   - If the SDK was initialized with service account credentials, uses the private key present in
 //     the credentials to sign tokens locally.
 //   - If a service account email was specified during initialization (via firebase.Config struct),
-//     calls the IAM service with that email to sign tokens remotely. See
-//     https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob.
+//     calls the IAMCredentials service with that email to sign tokens remotely. See
+//     https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/signBlob.
 //   - If the code is deployed in the Google App Engine standard environment, uses the App Identity
 //     service to sign tokens. See https://cloud.google.com/appengine/docs/standard/go/reference#SignBytes.
 //   - If the code is deployed in a different GCP-managed environment (e.g. Google Compute Engine),
