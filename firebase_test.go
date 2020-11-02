@@ -619,7 +619,7 @@ func TestAutoInitInvalidFiles(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			overwriteEnv(firebaseEnvName, test.filename)
 			_, err := NewApp(context.Background(), nil)
-			if err == nil || err.Error() != test.wantError {
+			if err == nil || !strings.Contains(err.Error(), test.wantError) {
 				t.Errorf("%s got error = %s; want = %s", test.name, err, test.wantError)
 			}
 		})

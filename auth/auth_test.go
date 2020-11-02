@@ -608,7 +608,7 @@ func TestVerifyIDTokenError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := client.VerifyIDToken(context.Background(), tc.token)
-			if !IsIDTokenInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsIDTokenInvalid(err) || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("VerifyIDToken(%q) = %v; want = %q", tc.name, err, tc.want)
 			}
 			if tc.name == "ExpiredToken" && !IsIDTokenExpired(err) {
@@ -923,7 +923,7 @@ func TestVerifySessionCookieError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := client.VerifySessionCookie(context.Background(), tc.token)
-			if !IsSessionCookieInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsSessionCookieInvalid(err) || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("VerifySessionCookie(%q) = %v; want = %q", tc.name, err, tc.want)
 			}
 			if tc.name == "ExpiredToken" && !IsSessionCookieExpired(err) {
