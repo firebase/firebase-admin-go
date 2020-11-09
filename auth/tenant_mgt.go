@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	tenantMgtEndpoint = "https://identitytoolkit.googleapis.com/v2beta1"
+	tenantMgtEndpoint = "https://identitytoolkit.googleapis.com/v2"
 )
 
 // Tenant represents a tenant in a multi-tenant application.
@@ -51,6 +51,7 @@ type Tenant struct {
 	DisplayName           string `json:"displayName"`
 	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
 	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
+	EnableAnonymousUser   bool   `json:"enableAnonymousUser"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -220,6 +221,7 @@ const (
 	tenantDisplayNameKey     = "displayName"
 	allowPasswordSignUpKey   = "allowPasswordSignup"
 	enableEmailLinkSignInKey = "enableEmailLinkSignin"
+	enableAnonymousUser      = "enableAnonymousUser"
 )
 
 // TenantToCreate represents the options used to create a new tenant.
@@ -242,6 +244,11 @@ func (t *TenantToCreate) AllowPasswordSignUp(allow bool) *TenantToCreate {
 // Disabling this makes the password required for email sign-in.
 func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
 	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+// EnableAnonymousUser enables or disables anonymous user.
+func (t *TenantToCreate) EnableAnonymousUser(enable bool) *TenantToCreate {
+	return t.set(enableAnonymousUser, enable)
 }
 
 func (t *TenantToCreate) set(key string, value interface{}) *TenantToCreate {
@@ -277,6 +284,11 @@ func (t *TenantToUpdate) AllowPasswordSignUp(allow bool) *TenantToUpdate {
 // Disabling this makes the password required for email sign-in.
 func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
 	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+// EnableAnonymousUser enables or disables anonymous user.
+func (t *TenantToUpdate) EnableAnonymousUser(enable bool) *TenantToUpdate {
+	return t.set(enableAnonymousUser, enable)
 }
 
 func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
