@@ -26,10 +26,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const (
-	tenantMgtEndpoint = "https://identitytoolkit.googleapis.com/v2beta1"
-)
-
 // Tenant represents a tenant in a multi-tenant application.
 //
 // Multi-tenancy support requires Google Cloud's Identity Platform (GCIP). To learn more about GCIP,
@@ -88,7 +84,7 @@ type TenantManager struct {
 func newTenantManager(client *internal.HTTPClient, conf *internal.AuthConfig, base *baseClient) *TenantManager {
 	return &TenantManager{
 		base:       base,
-		endpoint:   tenantMgtEndpoint,
+		endpoint:   base.tenantMgtEndpoint,
 		projectID:  conf.ProjectID,
 		httpClient: client,
 	}

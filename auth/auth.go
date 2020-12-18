@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 
 const (
 	authErrorCode    = "authErrorCode"
+	defaultAuthURL   = "https://identitytoolkit.googleapis.com"
 	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 	oneHourInSeconds = 3600
 
@@ -61,6 +63,17 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		signer cryptoSigner
 		err    error
 	)
+
+	baseURL := defaultAuthURL
+	if authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST"); authEmulatorHost != "" {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	}
+
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
 
 	creds, _ := transport.Creds(ctx, conf.Opts...)
 
@@ -113,8 +126,9 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	}
 
 	base := &baseClient{
-		userManagementEndpoint: idToolkitV1Endpoint,
+		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
+		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
@@ -234,6 +248,7 @@ type FirebaseInfo struct {
 type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
+	tenantMgtEndpoint      string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
