@@ -284,7 +284,11 @@ func TestNewClientExplicitNoAuth(t *testing.T) {
 }
 
 func TestNewClientEmulatorHostEnvVar(t *testing.T) {
-	os.Setenv(emulatorHostEnvVar, "localhost:9099")
+	emulatorHost := "localhost:9099"
+	idToolkitV1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v1"
+	idToolkitV2Beta1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v2beta1"
+
+	os.Setenv(emulatorHostEnvVar, emulatorHost)
 	defer os.Unsetenv(emulatorHostEnvVar)
 
 	conf := &internal.AuthConfig{
@@ -297,10 +301,6 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 		t.Fatal(err)
 	}
 	baseClient := client.baseClient
-
-	baseURL := fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", os.Getenv(emulatorHostEnvVar))
-	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
-	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
 	}
