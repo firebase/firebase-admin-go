@@ -298,9 +298,9 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	}
 	baseClient := client.baseClient
 
-	baseUrl := fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", os.Getenv(emulatorHostEnvVar))
-	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseUrl)
-	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseUrl)
+	baseURL := fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", os.Getenv(emulatorHostEnvVar))
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
 	}
