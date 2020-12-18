@@ -308,7 +308,7 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Beta1Endpoint)
 	}
 	if baseClient.tenantMgtEndpoint != idToolkitV2Beta1Endpoint {
-		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Beta1Endpoint)
+		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Beta1Endpoint)
 	}
 }
 
