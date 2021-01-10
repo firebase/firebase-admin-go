@@ -35,7 +35,6 @@ import (
 
 const (
 	credEnvVar                      = "GOOGLE_APPLICATION_CREDENTIALS"
-	emulatorHostEnvVar              = "FIREBASE_AUTH_EMULATOR_HOST"
 	testProjectID                   = "mock-project-id"
 	testVersion                     = "test-version"
 	defaultIDToolkitV1Endpoint      = "https://identitytoolkit.googleapis.com/v1"

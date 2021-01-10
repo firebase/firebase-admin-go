@@ -29,10 +29,11 @@ import (
 )
 
 const (
-	authErrorCode    = "authErrorCode"
-	defaultAuthURL   = "https://identitytoolkit.googleapis.com"
-	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-	oneHourInSeconds = 3600
+	authErrorCode      = "authErrorCode"
+	emulatorHostEnvVar = "FIREBASE_AUTH_EMULATOR_HOST"
+	defaultAuthURL     = "https://identitytoolkit.googleapis.com"
+	firebaseAudience   = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	oneHourInSeconds   = 3600
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
@@ -65,7 +66,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	)
 
 	baseURL := defaultAuthURL
-	if authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST"); authEmulatorHost != "" {
+	if authEmulatorHost := os.Getenv(emulatorHostEnvVar); authEmulatorHost != "" {
 		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
 	}
 
