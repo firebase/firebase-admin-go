@@ -61,20 +61,15 @@ type Client struct {
 // Auth service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
 	var (
-		signer cryptoSigner
-		err    error
+		isEmulator bool
+		signer     cryptoSigner
+		err        error
 	)
 
-	baseURL := defaultAuthURL
-	if authEmulatorHost := os.Getenv(emulatorHostEnvVar); authEmulatorHost != "" {
-		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	authEmulatorHost := os.Getenv(emulatorHostEnvVar)
+	if authEmulatorHost != "" {
+		isEmulator = true
 	}
-
-	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
-	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
-	userManagementEndpoint := idToolkitV1Endpoint
-	providerConfigEndpoint := idToolkitV2Beta1Endpoint
-	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
 
 	creds, _ := transport.Creds(ctx, conf.Opts...)
 
@@ -105,12 +100,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +120,16 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
+
+	baseURL := defaultAuthURL
+	if isEmulator {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	}
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
 
 	base := &baseClient{
 		userManagementEndpoint: userManagementEndpoint,

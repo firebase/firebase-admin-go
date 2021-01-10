@@ -694,6 +694,27 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenInEmulatorMode(t *testing.T) {
+	os.Setenv(emulatorHostEnvVar, "localhost:9099")
+	defer os.Unsetenv(emulatorHostEnvVar)
+
+	conf := &internal.AuthConfig{
+		ProjectID: "",
+		Opts:      optsWithTokenSource,
+	}
+	c, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("VeridyIDToken() didn't panic")
+		}
+	}()
+	c.VerifyIDToken(context.Background(), testIDToken)
+}
+
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{
@@ -713,7 +734,7 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1053,7 +1074,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	tv, err := newIDTokenVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1067,7 +1088,7 @@ func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 }
 
 func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newSessionCookieVerifier(ctx, testProjectID)
+	tv, err := newSessionCookieVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
