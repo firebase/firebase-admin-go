@@ -69,16 +69,19 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	authEmulatorHost := os.Getenv(emulatorHostEnvVar)
 	if authEmulatorHost != "" {
 		isEmulator = true
+		signer = emulatedSigner{}
 	}
 
-	creds, _ := transport.Creds(ctx, conf.Opts...)
+	if signer == nil {
+		creds, _ := transport.Creds(ctx, conf.Opts...)
 
-	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if creds != nil && len(creds.JSON) > 0 {
-		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(creds.JSON)
-		if err != nil && err != errNotAServiceAcct {
-			return nil, err
+		// Initialize a signer by following the go/firebase-admin-sign protocol.
+		if creds != nil && len(creds.JSON) > 0 {
+			// If the SDK was initialized with a service account, use it to sign bytes.
+			signer, err = signerFromCreds(creds.JSON)
+			if err != nil && err != errNotAServiceAcct {
+				return nil, err
+			}
 		}
 	}
 
@@ -197,7 +200,7 @@ func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devC
 
 	now := c.clock.Now().Unix()
 	info := &jwtInfo{
-		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		header: jwtHeader{Algorithm: c.signer.Algorithm(), Type: "JWT"},
 		payload: &customToken{
 			Iss:      iss,
 			Sub:      iss,

@@ -309,6 +309,9 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	if baseClient.tenantMgtEndpoint != idToolkitV2Beta1Endpoint {
 		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Beta1Endpoint)
 	}
+	if _, ok := baseClient.signer.(emulatedSigner); !ok {
+		t.Errorf("baseClient.signer = %#v; want = %#v", baseClient.signer, emulatedSigner{})
+	}
 }
 
 func TestCustomToken(t *testing.T) {
