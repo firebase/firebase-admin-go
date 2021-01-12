@@ -279,7 +279,7 @@ func TestEmulatedSigner(t *testing.T) {
 
 	algorithm := signer.Algorithm()
 	if algorithm != algorithmNone {
-		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmRS256)
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmNone)
 	}
 
 	email, err := signer.Email(context.Background())
