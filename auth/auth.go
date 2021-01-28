@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -28,9 +29,11 @@ import (
 )
 
 const (
-	authErrorCode    = "authErrorCode"
-	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-	oneHourInSeconds = 3600
+	authErrorCode      = "authErrorCode"
+	emulatorHostEnvVar = "FIREBASE_AUTH_EMULATOR_HOST"
+	defaultAuthURL     = "https://identitytoolkit.googleapis.com"
+	firebaseAudience   = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	oneHourInSeconds   = 3600
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
@@ -58,18 +61,27 @@ type Client struct {
 // Auth service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
 	var (
-		signer cryptoSigner
-		err    error
+		isEmulator bool
+		signer     cryptoSigner
+		err        error
 	)
 
-	creds, _ := transport.Creds(ctx, conf.Opts...)
+	authEmulatorHost := os.Getenv(emulatorHostEnvVar)
+	if authEmulatorHost != "" {
+		isEmulator = true
+		signer = emulatedSigner{}
+	}
 
-	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if creds != nil && len(creds.JSON) > 0 {
-		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(creds.JSON)
-		if err != nil && err != errNotAServiceAcct {
-			return nil, err
+	if signer == nil {
+		creds, _ := transport.Creds(ctx, conf.Opts...)
+
+		// Initialize a signer by following the go/firebase-admin-sign protocol.
+		if creds != nil && len(creds.JSON) > 0 {
+			// If the SDK was initialized with a service account, use it to sign bytes.
+			signer, err = signerFromCreds(creds.JSON)
+			if err != nil && err != errNotAServiceAcct {
+				return nil, err
+			}
 		}
 	}
 
@@ -91,12 +103,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +124,20 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
 
+	baseURL := defaultAuthURL
+	if isEmulator {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	}
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
+
 	base := &baseClient{
-		userManagementEndpoint: idToolkitV1Endpoint,
+		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
+		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
@@ -177,7 +200,7 @@ func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devC
 
 	now := c.clock.Now().Unix()
 	info := &jwtInfo{
-		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		header: jwtHeader{Algorithm: c.signer.Algorithm(), Type: "JWT"},
 		payload: &customToken{
 			Iss:      iss,
 			Sub:      iss,
@@ -234,6 +257,7 @@ type FirebaseInfo struct {
 type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
+	tenantMgtEndpoint      string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
