@@ -34,9 +34,11 @@ import (
 )
 
 const (
-	credEnvVar    = "GOOGLE_APPLICATION_CREDENTIALS"
-	testProjectID = "mock-project-id"
-	testVersion   = "test-version"
+	credEnvVar                      = "GOOGLE_APPLICATION_CREDENTIALS"
+	testProjectID                   = "mock-project-id"
+	testVersion                     = "test-version"
+	defaultIDToolkitV1Endpoint      = "https://identitytoolkit.googleapis.com/v1"
+	defaultIDToolkitV2Beta1Endpoint = "https://identitytoolkit.googleapis.com/v2beta1"
 )
 
 var (
@@ -277,6 +279,38 @@ func TestNewClientExplicitNoAuth(t *testing.T) {
 	}
 	if c, err := NewClient(ctx, conf); c == nil || err != nil {
 		t.Errorf("Auth() = (%v, %v); want (auth, nil)", c, err)
+	}
+}
+
+func TestNewClientEmulatorHostEnvVar(t *testing.T) {
+	emulatorHost := "localhost:9099"
+	idToolkitV1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v1"
+	idToolkitV2Beta1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v2beta1"
+
+	os.Setenv(emulatorHostEnvVar, emulatorHost)
+	defer os.Unsetenv(emulatorHostEnvVar)
+
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithoutAuthentication(),
+		},
+	}
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseClient := client.baseClient
+	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
+		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
+	}
+	if baseClient.providerConfigEndpoint != idToolkitV2Beta1Endpoint {
+		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Beta1Endpoint)
+	}
+	if baseClient.tenantMgtEndpoint != idToolkitV2Beta1Endpoint {
+		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Beta1Endpoint)
+	}
+	if _, ok := baseClient.signer.(emulatedSigner); !ok {
+		t.Errorf("baseClient.signer = %#v; want = %#v", baseClient.signer, emulatedSigner{})
 	}
 }
 
@@ -663,6 +697,27 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenInEmulatorMode(t *testing.T) {
+	os.Setenv(emulatorHostEnvVar, "localhost:9099")
+	defer os.Unsetenv(emulatorHostEnvVar)
+
+	conf := &internal.AuthConfig{
+		ProjectID: "",
+		Opts:      optsWithTokenSource,
+	}
+	c, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("VeridyIDToken() didn't panic")
+		}
+	}()
+	c.VerifyIDToken(context.Background(), testIDToken)
+}
+
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{
@@ -682,7 +737,7 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1022,7 +1077,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	tv, err := newIDTokenVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1036,7 +1091,7 @@ func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 }
 
 func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newSessionCookieVerifier(ctx, testProjectID)
+	tv, err := newSessionCookieVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1163,15 +1218,18 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 }
 
 func checkBaseClient(client *Client, wantProjectID string) error {
-	umc := client.baseClient
-	if umc.userManagementEndpoint != idToolkitV1Endpoint {
-		return fmt.Errorf("userManagementEndpoint = %q; want = %q", umc.userManagementEndpoint, idToolkitV1Endpoint)
+	baseClient := client.baseClient
+	if baseClient.userManagementEndpoint != defaultIDToolkitV1Endpoint {
+		return fmt.Errorf("userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, defaultIDToolkitV1Endpoint)
 	}
-	if umc.providerConfigEndpoint != providerConfigEndpoint {
-		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", umc.providerConfigEndpoint, providerConfigEndpoint)
+	if baseClient.providerConfigEndpoint != defaultIDToolkitV2Beta1Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
 	}
-	if umc.projectID != wantProjectID {
-		return fmt.Errorf("projectID = %q; want = %q", umc.projectID, wantProjectID)
+	if baseClient.tenantMgtEndpoint != defaultIDToolkitV2Beta1Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
+	}
+	if baseClient.projectID != wantProjectID {
+		return fmt.Errorf("projectID = %q; want = %q", baseClient.projectID, wantProjectID)
 	}
 
 	req, err := http.NewRequest(http.MethodGet, "https://firebase.google.com", nil)
@@ -1179,7 +1237,7 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return err
 	}
 
-	for _, opt := range umc.httpClient.Opts {
+	for _, opt := range baseClient.httpClient.Opts {
 		opt(req)
 	}
 	version := req.Header.Get("X-Client-Version")

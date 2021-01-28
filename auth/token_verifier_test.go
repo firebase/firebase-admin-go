@@ -28,7 +28,7 @@ import (
 )
 
 func TestNewIDTokenVerifier(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +47,9 @@ func TestNewIDTokenVerifier(t *testing.T) {
 	}
 	if ks.KeyURI != idTokenCertURL {
 		t.Errorf("tokenVerifier.certURL = %q; want = %q", ks.KeyURI, idTokenCertURL)
+	}
+	if tv.isEmulator != true {
+		t.Errorf("tokenVerifier.isEmulator = %t; want = %t", tv.isEmulator, true)
 	}
 }
 

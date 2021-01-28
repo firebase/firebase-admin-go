@@ -28,8 +28,6 @@ import (
 )
 
 const (
-	providerConfigEndpoint = "https://identitytoolkit.googleapis.com/v2beta1"
-
 	maxConfigs = 100
 
 	idpEntityIDKey = "idpConfig.idpEntityId"
