@@ -931,8 +931,8 @@ type DeleteUsersResult struct {
 // The Index field corresponds to the index of the failed user in the uids
 // array that was passed to DeleteUsers().
 type DeleteUsersErrorInfo struct {
-	Index  int    `json:"index,omitEmpty"`
-	Reason string `json:"message,omitEmpty"`
+	Index  int    `json:"index,omitempty"`
+	Reason string `json:"message,omitempty"`
 }
 
 // DeleteUsers deletes the users specified by the given identifiers.
