@@ -103,12 +103,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID, isEmulator)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID, isEmulator)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +144,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		cookieVerifier:         cookieVerifier,
 		signer:                 signer,
 		clock:                  internal.SystemClock,
+		isEmulator:             isEmulator,
 	}
 	return &Client{
 		baseClient:    base,
@@ -265,6 +266,7 @@ type baseClient struct {
 	cookieVerifier         *tokenVerifier
 	signer                 cryptoSigner
 	clock                  internal.Clock
+	isEmulator             bool
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {

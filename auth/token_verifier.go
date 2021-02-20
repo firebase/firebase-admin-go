@@ -100,10 +100,9 @@ type tokenVerifier struct {
 	expiredTokenCode  string
 	keySource         keySource
 	clock             internal.Clock
-	isEmulator        bool
 }
 
-func newIDTokenVerifier(ctx context.Context, projectID string, isEmulator bool) (*tokenVerifier, error) {
+func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -119,11 +118,10 @@ func newIDTokenVerifier(ctx context.Context, projectID string, isEmulator bool) 
 		expiredTokenCode:  idTokenExpired,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
-		isEmulator:        isEmulator,
 	}, nil
 }
 
-func newSessionCookieVerifier(ctx context.Context, projectID string, isEmulator bool) (*tokenVerifier, error) {
+func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -139,7 +137,6 @@ func newSessionCookieVerifier(ctx context.Context, projectID string, isEmulator 
 		expiredTokenCode:  sessionCookieExpired,
 		keySource:         newHTTPKeySource(sessionCookieCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
-		isEmulator:        isEmulator,
 	}, nil
 }
 
@@ -157,10 +154,6 @@ func newSessionCookieVerifier(ctx context.Context, projectID string, isEmulator 
 // If any of the above conditions are not met, an error is returned. Otherwise a pointer to a
 // decoded Token is returned.
 func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
-	if tv.isEmulator {
-		panic("not implemented")
-	}
-
 	if tv.projectID == "" {
 		// Configuration error.
 		return nil, errors.New("project id not available")

@@ -710,11 +710,6 @@ func TestVerifyIDTokenInEmulatorMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("VeridyIDToken() didn't panic")
-		}
-	}()
 	c.VerifyIDToken(context.Background(), testIDToken)
 }
 
@@ -737,7 +732,7 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID, false)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1077,7 +1072,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID, false)
+	tv, err := newIDTokenVerifier(ctx, testProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -1091,7 +1086,7 @@ func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 }
 
 func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newSessionCookieVerifier(ctx, testProjectID, false)
+	tv, err := newSessionCookieVerifier(ctx, testProjectID)
 	if err != nil {
 		return nil, err
 	}
