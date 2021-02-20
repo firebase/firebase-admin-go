@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -697,20 +698,88 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	}
 }
 
-func TestVerifyIDTokenInEmulatorMode(t *testing.T) {
-	os.Setenv(emulatorHostEnvVar, "localhost:9099")
-	defer os.Unsetenv(emulatorHostEnvVar)
+func TestVerifyIDTokenUnsigned(t *testing.T) {
+	token := getEmulatedIDToken(nil)
 
-	conf := &internal.AuthConfig{
-		ProjectID: "",
-		Opts:      optsWithTokenSource,
+	client := &Client{
+		baseClient: &baseClient{
+			idTokenVerifier: testIDTokenVerifier,
+		},
 	}
-	c, err := NewClient(context.Background(), conf)
+	_, err := client.VerifyIDToken(context.Background(), token)
+	if !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDToken(Unsigned) = %v; want = IDTokenInvalid", err)
+	}
+}
+
+func TestEmulatorVerifyIDToken(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	s.Client.isEmulator = true
+
+	token := getEmulatedIDToken(nil)
+	ft, err := s.Client.VerifyIDToken(context.Background(), token)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c.VerifyIDToken(context.Background(), testIDToken)
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestEmulatorVerifyIDTokenExpiredError(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.idTokenVerifier = testIDTokenVerifier
+	s.Client.isEmulator = true
+
+	now := testClock.Now().Unix()
+	token := getEmulatedIDToken(mockIDTokenPayload{
+		"iat": now - 1000,
+		"exp": now - clockSkewSeconds - 1,
+	})
+
+	_, err := s.Client.VerifyIDToken(context.Background(), token)
+	if !IsIDTokenExpired(err) {
+		t.Errorf("VerifyIDToken(Expired) = %v; want = IDTokenExpired", err)
+	}
+}
+
+func TestEmulatorVerifyIDTokenUnreachableEmulator(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts:      optsWithTokenSource,
+		ProjectID: testProjectID,
+		Version:   testVersion,
+	}
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.isEmulator = true
+
+	token := getEmulatedIDToken(nil)
+	_, err = client.VerifyIDToken(context.Background(), token)
+	if err == nil || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
+		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = %q", err, "failed to establish a connection")
+	}
 }
 
 func TestCustomTokenVerification(t *testing.T) {
@@ -1062,6 +1131,90 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	}
 }
 
+func TestVerifySessionCookieUnsigned(t *testing.T) {
+	token := getEmulatedSessionCookie(nil)
+
+	client := &Client{
+		baseClient: &baseClient{
+			cookieVerifier: testCookieVerifier,
+		},
+	}
+	_, err := client.VerifySessionCookie(context.Background(), token)
+	if !IsSessionCookieInvalid(err) {
+		t.Errorf("VerifySessionCookie(Unsigned) = %v; want = IDTokenInvalid", err)
+	}
+}
+
+func TestEmulatorVerifySessionCookie(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.cookieVerifier = testCookieVerifier
+	s.Client.isEmulator = true
+
+	token := getEmulatedSessionCookie(nil)
+	ft, err := s.Client.VerifySessionCookie(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := testClock.Now().Unix()
+	if ft.AuthTime != now-100 {
+		t.Errorf("AuthTime = %d; want = %d", ft.AuthTime, now-100)
+	}
+	if ft.Firebase.SignInProvider != "custom" {
+		t.Errorf("SignInProvider = %q; want = %q", ft.Firebase.SignInProvider, "custom")
+	}
+	if ft.Firebase.Tenant != "" {
+		t.Errorf("Tenant = %q; want = %q", ft.Firebase.Tenant, "")
+	}
+	if ft.Claims["admin"] != true {
+		t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
+	}
+	if ft.UID != ft.Subject {
+		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+}
+
+func TestEmulatorVerifySessionCookieExpiredError(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	s.Client.cookieVerifier = testCookieVerifier
+	s.Client.isEmulator = true
+
+	now := testClock.Now().Unix()
+	token := getEmulatedSessionCookie(mockIDTokenPayload{
+		"iat": now - 1000,
+		"exp": now - clockSkewSeconds - 1,
+	})
+
+	_, err := s.Client.VerifySessionCookie(context.Background(), token)
+	if !IsSessionCookieExpired(err) {
+		t.Errorf("VerifySessionCookie(Expired) = %v; want = IDTokenExpired", err)
+	}
+}
+
+func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
+	conf := &internal.AuthConfig{
+		Opts:      optsWithTokenSource,
+		ProjectID: testProjectID,
+		Version:   testVersion,
+	}
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.isEmulator = true
+
+	token := getEmulatedSessionCookie(nil)
+	_, err = client.VerifySessionCookie(context.Background(), token)
+	if err == nil || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
+		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = %q", err, "failed to establish a connection")
+	}
+}
+
 func signerForTests(ctx context.Context) (cryptoSigner, error) {
 	creds, err := transport.Creds(ctx, optsWithServiceAcct...)
 	if err != nil {
@@ -1129,21 +1282,47 @@ func (p mockIDTokenPayload) decodeFrom(s string) error {
 	return decode(s, &p)
 }
 
+type eConnRefusedTransport struct{}
+
+func (eConnRefusedTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, syscall.ECONNREFUSED
+}
+
 func getSessionCookie(p mockIDTokenPayload) string {
+	return getSessionCookieWithSigner(testSigner, p)
+}
+
+func getEmulatedSessionCookie(p mockIDTokenPayload) string {
+	return getSessionCookieWithSigner(emulatedSigner{}, p)
+}
+
+func getSessionCookieWithSigner(signer cryptoSigner, p mockIDTokenPayload) string {
 	pCopy := map[string]interface{}{
 		"iss": "https://session.firebase.google.com/" + testProjectID,
 	}
 	for k, v := range p {
 		pCopy[k] = v
 	}
-	return getIDToken(pCopy)
+	return getIDTokenWithSigner(signer, pCopy)
+}
+
+func getIDTokenWithSigner(signer cryptoSigner, p mockIDTokenPayload) string {
+	return getIDTokenWithSignerAndKid(signer, "mock-key-id-1", p)
 }
 
 func getIDToken(p mockIDTokenPayload) string {
-	return getIDTokenWithKid("mock-key-id-1", p)
+	return getIDTokenWithSigner(testSigner, p)
 }
 
 func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
+	return getIDTokenWithSignerAndKid(testSigner, kid, p)
+}
+
+func getEmulatedIDToken(p mockIDTokenPayload) string {
+	return getIDTokenWithSignerAndKid(emulatedSigner{}, "mock-key-id-1", p)
+}
+
+func getIDTokenWithSignerAndKid(signer cryptoSigner, kid string, p mockIDTokenPayload) string {
 	pCopy := mockIDTokenPayload{
 		"aud":       testProjectID,
 		"iss":       "https://securetoken.google.com/" + testProjectID,
@@ -1163,13 +1342,13 @@ func getIDTokenWithKid(kid string, p mockIDTokenPayload) string {
 
 	info := &jwtInfo{
 		header: jwtHeader{
-			Algorithm: "RS256",
+			Algorithm: signer.Algorithm(),
 			Type:      "JWT",
 			KeyID:     kid,
 		},
 		payload: pCopy,
 	}
-	token, err := info.Token(context.Background(), testSigner)
+	token, err := info.Token(context.Background(), signer)
 	logFatal(err)
 	return token
 }

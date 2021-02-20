@@ -153,20 +153,25 @@ func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVeri
 //
 // If any of the above conditions are not met, an error is returned. Otherwise a pointer to a
 // decoded Token is returned.
-func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token, error) {
+func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string, isEmulator bool) (*Token, error) {
 	if tv.projectID == "" {
 		// Configuration error.
 		return nil, errors.New("project id not available")
 	}
 
 	// Validate the token content first. This is fast and cheap.
-	payload, err := tv.verifyContent(token)
+	payload, err := tv.verifyContent(token, isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := tv.verifyTimestamps(payload); err != nil {
 		return nil, err
+	}
+
+	// In emulator mode, skip signature verification
+	if isEmulator {
+		return payload, nil
 	}
 
 	// Verifying the signature requires syncronized access to a key cache and
@@ -178,7 +183,7 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string) (*Token,
 	return payload, nil
 }
 
-func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
+func (tv *tokenVerifier) verifyContent(token string, isEmulator bool) (*Token, error) {
 	if token == "" {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
@@ -187,7 +192,7 @@ func (tv *tokenVerifier) verifyContent(token string) (*Token, error) {
 		}
 	}
 
-	payload, err := tv.verifyHeaderAndBody(token)
+	payload, err := tv.verifyHeaderAndBody(token, isEmulator)
 	if err != nil {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
@@ -242,7 +247,7 @@ func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) erro
 	return nil
 }
 
-func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
+func (tv *tokenVerifier) verifyHeaderAndBody(token string, isEmulator bool) (*Token, error) {
 	var (
 		header  jwtHeader
 		payload Token
@@ -262,13 +267,13 @@ func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
 	}
 
 	issuer := tv.issuerPrefix + tv.projectID
-	if header.KeyID == "" {
+	if !isEmulator && header.KeyID == "" {
 		if payload.Audience == firebaseAudience {
 			return nil, fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
 		}
 		return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
 	}
-	if header.Algorithm != "RS256" {
+	if !isEmulator && header.Algorithm != "RS256" {
 		return nil, fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
 			tv.shortName, header.Algorithm)
 	}
