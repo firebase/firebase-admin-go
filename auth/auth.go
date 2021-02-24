@@ -320,22 +320,20 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		}
 	}
 
-	if !c.isEmulator && !checkRevoked {
-		return decoded, nil
-	}
-
-	revoked, err := c.checkRevoked(ctx, decoded)
-	if err != nil {
-		return nil, err
-	}
-
-	if revoked {
-		return nil, &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "ID token has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: idTokenRevoked,
-			},
+	if c.isEmulator || checkRevoked {
+		revoked, err := c.checkRevoked(ctx, decoded)
+		if err != nil {
+			return nil, err
+		}
+	
+		if revoked {
+			return nil, &internal.FirebaseError{
+				ErrorCode: internal.InvalidArgument,
+				String:    "ID token has been revoked",
+				Ext: map[string]interface{}{
+					authErrorCode: idTokenRevoked,
+				},
+			}
 		}
 	}
 
@@ -388,22 +386,20 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 		return nil, err
 	}
 
-	if !c.isEmulator && !checkRevoked {
-		return decoded, nil
-	}
-
-	revoked, err := c.checkRevoked(ctx, decoded)
-	if err != nil {
-		return nil, err
-	}
-
-	if revoked {
-		return nil, &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "session cookie has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: sessionCookieRevoked,
-			},
+	if c.isEmulator || checkRevoked {
+		revoked, err := c.checkRevoked(ctx, decoded)
+		if err != nil {
+			return nil, err
+		}
+	
+		if revoked {
+			return nil, &internal.FirebaseError{
+				ErrorCode: internal.InvalidArgument,
+				String:    "session cookie has been revoked",
+				Ext: map[string]interface{}{
+					authErrorCode: sessionCookieRevoked,
+				},
+			}
 		}
 	}
 
