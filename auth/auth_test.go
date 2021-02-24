@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
+	"firebase.google.com/go/v4/errorutils"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -777,8 +778,8 @@ func TestEmulatorVerifyIDTokenUnreachableEmulator(t *testing.T) {
 
 	token := getEmulatedIDToken(nil)
 	_, err = client.VerifyIDToken(context.Background(), token)
-	if err == nil || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
-		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = %q", err, "failed to establish a connection")
+	if err == nil || !errorutils.IsUnavailable(err) || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
+		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = Unavailable", err)
 	}
 }
 
@@ -1210,8 +1211,8 @@ func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
 
 	token := getEmulatedSessionCookie(nil)
 	_, err = client.VerifySessionCookie(context.Background(), token)
-	if err == nil || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
-		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = %q", err, "failed to establish a connection")
+	if err == nil || !errorutils.IsUnavailable(err) || !strings.HasPrefix(err.Error(), "failed to establish a connection") {
+		t.Errorf("VerifyIDToken(UnreachableEmulator) = %v; want = Unavailable", err)
 	}
 }
 
