@@ -325,7 +325,7 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		if err != nil {
 			return nil, err
 		}
-	
+
 		if revoked {
 			return nil, &internal.FirebaseError{
 				ErrorCode: internal.InvalidArgument,
@@ -391,7 +391,7 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 		if err != nil {
 			return nil, err
 		}
-	
+
 		if revoked {
 			return nil, &internal.FirebaseError{
 				ErrorCode: internal.InvalidArgument,
