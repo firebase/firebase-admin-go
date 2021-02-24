@@ -307,7 +307,7 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
 	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken, c.isEmulator)
 	if err != nil {
-		return decoded, err
+		return nil, err
 	}
 
 	if c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
@@ -385,7 +385,7 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevoked bool) (*Token, error) {
 	decoded, err := c.cookieVerifier.VerifyToken(ctx, sessionCookie, c.isEmulator)
 	if err != nil {
-		return decoded, err
+		return nil, err
 	}
 
 	if !c.isEmulator && !checkRevoked {
