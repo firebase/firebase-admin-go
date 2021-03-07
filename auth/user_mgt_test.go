@@ -173,12 +173,13 @@ func TestGetUserByProviderId(t *testing.T) {
 		},
 	}
 
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
 	for _, tc := range cases {
 		t.Run(tc.providerID+":"+tc.providerUID, func(t *testing.T) {
-			// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
-			mockUsers := []byte(`{ "users": [{}] }`)
-			s := echoServer(mockUsers, t)
-			defer s.Close()
 
 			_, err := s.Client.GetUserByProviderID(context.Background(), tc.providerID, tc.providerUID)
 			if err != nil {
