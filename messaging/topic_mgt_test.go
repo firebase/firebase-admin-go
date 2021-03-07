@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
 func TestSubscribe(t *testing.T) {
@@ -41,7 +43,7 @@ func TestSubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL
+	client.iidEndpoint = ts.URL + "/v1"
 
 	resp, err := client.SubscribeToTopic(ctx, []string{"id1", "id2"}, "test-topic")
 	if err != nil {
@@ -84,7 +86,7 @@ func TestUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL
+	client.iidEndpoint = ts.URL + "/v1"
 
 	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1", "id2"}, "test-topic")
 	if err != nil {
@@ -113,8 +115,9 @@ func TestInvalidUnsubscribe(t *testing.T) {
 
 func TestTopicManagementError(t *testing.T) {
 	var resp string
+	var status int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(status)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(resp))
 	}))
@@ -125,46 +128,49 @@ func TestTopicManagementError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL
+	client.iidEndpoint = ts.URL + "/v1"
 	client.iidClient.httpClient.RetryConfig = nil
 
 	cases := []struct {
-		resp, want string
-		check      func(error) bool
+		name, resp, want string
+		status           int
+		check            func(err error) bool
 	}{
 		{
-			resp:  "{}",
-			want:  "http error status: 500; reason: client encountered an unknown error; response: {}",
-			check: IsUnknown,
+			name:   "EmptyResponse",
+			resp:   "{}",
+			want:   "unexpected http response with status: 500\n{}",
+			status: http.StatusInternalServerError,
+			check:  errorutils.IsInternal,
 		},
 		{
-			resp:  "{\"error\": \"INVALID_ARGUMENT\"}",
-			want:  "http error status: 500; reason: request contains an invalid argument; code: invalid-argument",
-			check: IsInvalidArgument,
+			name:   "ErrorCode",
+			resp:   "{\"error\": \"INVALID_ARGUMENT\"}",
+			want:   "error while calling the iid service: INVALID_ARGUMENT",
+			status: http.StatusBadRequest,
+			check:  errorutils.IsInvalidArgument,
 		},
 		{
-			resp:  "{\"error\": \"TOO_MANY_TOPICS\"}",
-			want:  "http error status: 500; reason: client exceeded the number of allowed topics; code: too-many-topics",
-			check: IsTooManyTopics,
-		},
-		{
-			resp:  "not json",
-			want:  "http error status: 500; reason: client encountered an unknown error; response: not json",
-			check: IsUnknown,
+			name:   "NotJson",
+			resp:   "not json",
+			want:   "unexpected http response with status: 500\nnot json",
+			status: http.StatusInternalServerError,
+			check:  errorutils.IsInternal,
 		},
 	}
+
 	for _, tc := range cases {
 		resp = tc.resp
+		status = tc.status
+
 		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
 		if err == nil || err.Error() != tc.want || !tc.check(err) {
-			t.Errorf("SubscribeToTopic() = (%#v, %v); want = (nil, %q)", tmr, err, tc.want)
+			t.Errorf("SubscribeToTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, tmr, err, tc.want)
 		}
-	}
-	for _, tc := range cases {
-		resp = tc.resp
-		tmr, err := client.UnsubscribeFromTopic(ctx, []string{"id1"}, "topic")
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("UnsubscribeFromTopic() = (%#v, %v); want = (nil, %q)", tmr, err, tc.want)
+
+		tmr, err = client.UnsubscribeFromTopic(ctx, []string{"id1"}, "topic")
+		if err == nil || err.Error() != tc.want || !tc.check(err) {
+			t.Errorf("UnsubscribeFromTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, tmr, err, tc.want)
 		}
 	}
 }
@@ -185,7 +191,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 	if tr.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
-	wantOp := "/" + op
+	wantOp := "/v1:" + op
 	if tr.URL.Path != wantOp {
 		t.Errorf("Path = %q; want = %q", tr.URL.Path, wantOp)
 	}
@@ -208,8 +214,8 @@ func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
 	if e.Index != 1 {
 		t.Errorf("ErrorInfo.Index = %d; want = %d", e.Index, 1)
 	}
-	if e.Reason != "unknown-error" {
-		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "unknown-error")
+	if e.Reason != "error_reason" {
+		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "error_reason")
 	}
 }
 

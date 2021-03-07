@@ -27,15 +27,18 @@ import (
 	"testing"
 	"time"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
 const (
-	testProjectID = "mock-project-id"
-	testVersion   = "test-version"
+	credEnvVar                      = "GOOGLE_APPLICATION_CREDENTIALS"
+	testProjectID                   = "mock-project-id"
+	testVersion                     = "test-version"
+	defaultIDToolkitV1Endpoint      = "https://identitytoolkit.googleapis.com/v1"
+	defaultIDToolkitV2Beta1Endpoint = "https://identitytoolkit.googleapis.com/v2beta1"
 )
 
 var (
@@ -82,7 +85,6 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	client, err := NewClient(context.Background(), &internal.AuthConfig{
-		Creds:     creds,
 		Opts:      optsWithServiceAcct,
 		ProjectID: creds.ProjectID,
 		Version:   testVersion,
@@ -176,7 +178,6 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 		}`),
 	}
 	conf := &internal.AuthConfig{
-		Creds:   creds,
 		Opts:    []option.ClientOption{option.WithCredentials(creds)},
 		Version: testVersion,
 	}
@@ -206,7 +207,11 @@ func TestNewClientWithMalformedCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
 	}
-	conf := &internal.AuthConfig{Creds: creds}
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithCredentials(creds),
+		},
+	}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
@@ -222,28 +227,115 @@ func TestNewClientWithInvalidPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	creds := &google.DefaultCredentials{JSON: b}
-	conf := &internal.AuthConfig{Creds: creds}
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithCredentials(creds),
+		},
+	}
 	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
 		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
 	}
 }
 
+func TestNewClientAppDefaultCredentialsWithInvalidFile(t *testing.T) {
+	current := os.Getenv(credEnvVar)
+
+	if err := os.Setenv(credEnvVar, "../testdata/non_existing.json"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv(credEnvVar, current)
+
+	conf := &internal.AuthConfig{}
+	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
+		t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+	}
+}
+
+func TestNewClientInvalidCredentialFile(t *testing.T) {
+	invalidFiles := []string{
+		"testdata",
+		"testdata/plain_text.txt",
+	}
+
+	ctx := context.Background()
+	for _, tc := range invalidFiles {
+		conf := &internal.AuthConfig{
+			Opts: []option.ClientOption{
+				option.WithCredentialsFile(tc),
+			},
+		}
+		if c, err := NewClient(ctx, conf); c != nil || err == nil {
+			t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+		}
+	}
+}
+
+func TestNewClientExplicitNoAuth(t *testing.T) {
+	ctx := context.Background()
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithoutAuthentication(),
+		},
+	}
+	if c, err := NewClient(ctx, conf); c == nil || err != nil {
+		t.Errorf("Auth() = (%v, %v); want (auth, nil)", c, err)
+	}
+}
+
+func TestNewClientEmulatorHostEnvVar(t *testing.T) {
+	emulatorHost := "localhost:9099"
+	idToolkitV1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v1"
+	idToolkitV2Beta1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v2beta1"
+
+	os.Setenv(emulatorHostEnvVar, emulatorHost)
+	defer os.Unsetenv(emulatorHostEnvVar)
+
+	conf := &internal.AuthConfig{
+		Opts: []option.ClientOption{
+			option.WithoutAuthentication(),
+		},
+	}
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseClient := client.baseClient
+	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
+		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
+	}
+	if baseClient.providerConfigEndpoint != idToolkitV2Beta1Endpoint {
+		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Beta1Endpoint)
+	}
+	if baseClient.tenantMgtEndpoint != idToolkitV2Beta1Endpoint {
+		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Beta1Endpoint)
+	}
+	if _, ok := baseClient.signer.(emulatedSigner); !ok {
+		t.Errorf("baseClient.signer = %#v; want = %#v", baseClient.signer, emulatedSigner{})
+	}
+}
+
 func TestCustomToken(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, nil, t)
+	if err := verifyCustomToken(context.Background(), token, nil, ""); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenWithClaims(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	claims := map[string]interface{}{
 		"foo":     "bar",
@@ -254,19 +346,46 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, claims, t)
+	if err := verifyCustomToken(context.Background(), token, claims, ""); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenWithNilClaims(t *testing.T) {
 	client := &Client{
-		signer: testSigner,
-		clock:  testClock,
+		baseClient: &baseClient{
+			signer: testSigner,
+			clock:  testClock,
+		},
 	}
 	token, err := client.CustomTokenWithClaims(context.Background(), "user1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyCustomToken(context.Background(), token, nil, t)
+	if err := verifyCustomToken(context.Background(), token, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCustomTokenForTenant(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{
+			tenantID: "tenantID",
+			signer:   testSigner,
+			clock:    testClock,
+		},
+	}
+	claims := map[string]interface{}{
+		"foo":     "bar",
+		"premium": true,
+	}
+	token, err := client.CustomTokenWithClaims(context.Background(), "user1", claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyCustomToken(context.Background(), token, claims, "tenantID"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCustomTokenError(t *testing.T) {
@@ -281,7 +400,7 @@ func TestCustomTokenError(t *testing.T) {
 		{"ReservedClaims", "uid", map[string]interface{}{"sub": "1234", "aud": "foo"}},
 	}
 
-	client := &Client{
+	client := &baseClient{
 		signer: testSigner,
 		clock:  testClock,
 	}
@@ -298,14 +417,14 @@ func TestCustomTokenError(t *testing.T) {
 func TestCustomTokenInvalidCredential(t *testing.T) {
 	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Creds: nil,
-		Opts:  optsWithTokenSource,
+		Opts: optsWithTokenSource,
 	}
 	s, err := NewClient(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	s.signer.(*iamSigner).httpClient.RetryConfig = nil
 	token, err := s.CustomToken(ctx, "user1")
 	if token != "" || err == nil {
 		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
@@ -426,8 +545,9 @@ func TestVerifyIDTokenInvalidSignature(t *testing.T) {
 	parts := strings.Split(testIDToken, ".")
 	token := fmt.Sprintf("%s:%s:invalidsignature", parts[0], parts[1])
 
-	if ft, err := client.VerifyIDToken(context.Background(), token); ft != nil || err == nil {
-		t.Errorf("VerifyIDToken('invalid-signature') = (%v, %v); want = (nil, error)", ft, err)
+	ft, err := client.VerifyIDToken(context.Background(), token)
+	if ft != nil || !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDToken('invalid-signature') = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 }
 
@@ -522,8 +642,11 @@ func TestVerifyIDTokenError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := client.VerifyIDToken(context.Background(), tc.token)
-			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsIDTokenInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifyIDToken(%q) = %v; want = %q", tc.name, err, tc.want)
+			}
+			if tc.name == "ExpiredToken" && !IsIDTokenExpired(err) {
+				t.Errorf("VerifyIDToken(%q) = %v; want = IDTokenExpired", tc.name, err)
 			}
 		})
 	}
@@ -553,8 +676,9 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 			idTokenVerifier: testIDTokenVerifier,
 		},
 	}
-	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
-		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want error")
+	_, err = client.VerifyIDToken(context.Background(), token)
+	if !IsIDTokenInvalid(err) {
+		t.Errorf("VerifyIDToken(InvalidAlgorithm) = nil; want = IDTokenInvalid")
 	}
 }
 
@@ -573,26 +697,47 @@ func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
 	}
 }
 
+func TestVerifyIDTokenInEmulatorMode(t *testing.T) {
+	os.Setenv(emulatorHostEnvVar, "localhost:9099")
+	defer os.Unsetenv(emulatorHostEnvVar)
+
+	conf := &internal.AuthConfig{
+		ProjectID: "",
+		Opts:      optsWithTokenSource,
+	}
+	c, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("VeridyIDToken() didn't panic")
+		}
+	}()
+	c.VerifyIDToken(context.Background(), testIDToken)
+}
+
 func TestCustomTokenVerification(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{
 			idTokenVerifier: testIDTokenVerifier,
+			signer:          testSigner,
+			clock:           testClock,
 		},
-		signer: testSigner,
-		clock:  testClock,
 	}
 	token, err := client.CustomToken(context.Background(), "user1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := client.VerifyIDToken(context.Background(), token); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
+	if _, err := client.VerifyIDToken(context.Background(), token); !IsIDTokenInvalid(err) {
+		t.Error("VeridyIDToken() = nil; want = IDTokenInvalid")
 	}
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,8 +747,8 @@ func TestCertificateRequestError(t *testing.T) {
 			idTokenVerifier: tv,
 		},
 	}
-	if _, err := client.VerifyIDToken(context.Background(), testIDToken); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
+	if _, err := client.VerifyIDToken(context.Background(), testIDToken); !IsCertificateFetchFailed(err) {
+		t.Error("VeridyIDToken() = nil; want = CertificateFetchFailed")
 	}
 }
 
@@ -648,8 +793,8 @@ func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || err == nil {
-		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
+	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -664,7 +809,7 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
-	if p != nil || err == nil || err.Error() != we || !IsIDTokenRevoked(err) {
+	if p != nil || !IsIDTokenRevoked(err) || !IsIDTokenInvalid(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -681,8 +826,8 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
-	if p != nil || err == nil || !IsUserNotFound(err) {
-		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
+	if p != nil || !IsUserNotFound(err) {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
 	}
 }
 
@@ -833,8 +978,11 @@ func TestVerifySessionCookieError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := client.VerifySessionCookie(context.Background(), tc.token)
-			if err == nil || !strings.HasPrefix(err.Error(), tc.want) {
+			if !IsSessionCookieInvalid(err) || !strings.HasPrefix(err.Error(), tc.want) {
 				t.Errorf("VerifySessionCookie(%q) = %v; want = %q", tc.name, err, tc.want)
+			}
+			if tc.name == "ExpiredToken" && !IsSessionCookieExpired(err) {
+				t.Errorf("VerifySessionCookie(%q) = %v; want = SessionCookieExpired", tc.name, err)
 			}
 		})
 	}
@@ -881,8 +1029,8 @@ func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 	s.Client.cookieVerifier = testCookieVerifier
 
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
-	if ft != nil || err == nil {
-		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, error)", ft, err)
+	if ft != nil || !IsSessionCookieInvalid(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, SessionCookieInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -897,7 +1045,7 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
-	if p != nil || err == nil || err.Error() != we || !IsSessionCookieRevoked(err) {
+	if p != nil || !IsSessionCookieRevoked(err) || !IsSessionCookieInvalid(err) || err.Error() != we {
 		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -914,8 +1062,8 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	s.Client.cookieVerifier = testCookieVerifier
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
-	if p != nil || err == nil || !IsUserNotFound(err) {
-		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, user-not-found)", p, err, nil)
+	if p != nil || !IsUserNotFound(err) {
+		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
 	}
 }
 
@@ -929,7 +1077,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	tv, err := newIDTokenVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -943,7 +1091,7 @@ func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 }
 
 func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newSessionCookieVerifier(ctx, testProjectID)
+	tv, err := newSessionCookieVerifier(ctx, testProjectID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1041,6 +1189,12 @@ func checkIDTokenVerifier(tv *tokenVerifier, projectID string) error {
 	if tv.shortName != "ID token" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "ID token")
 	}
+	if tv.invalidTokenCode != idTokenInvalid {
+		return fmt.Errorf("invalidTokenCode = %q; want = %q", tv.invalidTokenCode, idTokenInvalid)
+	}
+	if tv.expiredTokenCode != idTokenExpired {
+		return fmt.Errorf("expiredTokenCode = %q; want = %q", tv.expiredTokenCode, idTokenExpired)
+	}
 	return nil
 }
 
@@ -1054,19 +1208,28 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 	if tv.shortName != "session cookie" {
 		return fmt.Errorf("shortName = %q; want = %q", tv.shortName, "session cookie")
 	}
+	if tv.invalidTokenCode != sessionCookieInvalid {
+		return fmt.Errorf("invalidTokenCode = %q; want = %q", tv.invalidTokenCode, sessionCookieInvalid)
+	}
+	if tv.expiredTokenCode != sessionCookieExpired {
+		return fmt.Errorf("expiredTokenCode = %q; want = %q", tv.expiredTokenCode, sessionCookieExpired)
+	}
 	return nil
 }
 
 func checkBaseClient(client *Client, wantProjectID string) error {
-	umc := client.baseClient
-	if umc.userManagementEndpoint != idToolkitV1Endpoint {
-		return fmt.Errorf("userManagementEndpoint = %q; want = %q", umc.userManagementEndpoint, idToolkitV1Endpoint)
+	baseClient := client.baseClient
+	if baseClient.userManagementEndpoint != defaultIDToolkitV1Endpoint {
+		return fmt.Errorf("userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, defaultIDToolkitV1Endpoint)
 	}
-	if umc.providerConfigEndpoint != providerConfigEndpoint {
-		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", umc.providerConfigEndpoint, providerConfigEndpoint)
+	if baseClient.providerConfigEndpoint != defaultIDToolkitV2Beta1Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
 	}
-	if umc.projectID != wantProjectID {
-		return fmt.Errorf("projectID = %q; want = %q", umc.projectID, wantProjectID)
+	if baseClient.tenantMgtEndpoint != defaultIDToolkitV2Beta1Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
+	}
+	if baseClient.projectID != wantProjectID {
+		return fmt.Errorf("projectID = %q; want = %q", baseClient.projectID, wantProjectID)
 	}
 
 	req, err := http.NewRequest(http.MethodGet, "https://firebase.google.com", nil)
@@ -1074,7 +1237,7 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return err
 	}
 
-	for _, opt := range umc.httpClient.Opts {
+	for _, opt := range baseClient.httpClient.Opts {
 		opt(req)
 	}
 	version := req.Header.Get("X-Client-Version")
@@ -1086,52 +1249,61 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 	return nil
 }
 
-func verifyCustomToken(ctx context.Context, token string, expected map[string]interface{}, t *testing.T) {
+func verifyCustomToken(
+	ctx context.Context, token string, expected map[string]interface{}, tenantID string) error {
+
 	if err := testIDTokenVerifier.verifySignature(ctx, token); err != nil {
-		t.Fatal(err)
+		return err
 	}
+
 	var (
 		header  jwtHeader
 		payload customToken
 	)
 	segments := strings.Split(token, ".")
 	if err := decode(segments[0], &header); err != nil {
-		t.Fatal(err)
+		return err
 	}
 	if err := decode(segments[1], &payload); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	email, err := testSigner.Email(ctx)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	if header.Algorithm != "RS256" {
-		t.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
+		return fmt.Errorf("Algorithm: %q; want: 'RS256'", header.Algorithm)
 	} else if header.Type != "JWT" {
-		t.Errorf("Type: %q; want: 'JWT'", header.Type)
+		return fmt.Errorf("Type: %q; want: 'JWT'", header.Type)
 	} else if payload.Aud != firebaseAudience {
-		t.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
+		return fmt.Errorf("Audience: %q; want: %q", payload.Aud, firebaseAudience)
 	} else if payload.Iss != email {
-		t.Errorf("Issuer: %q; want: %q", payload.Iss, email)
+		return fmt.Errorf("Issuer: %q; want: %q", payload.Iss, email)
 	} else if payload.Sub != email {
-		t.Errorf("Subject: %q; want: %q", payload.Sub, email)
+		return fmt.Errorf("Subject: %q; want: %q", payload.Sub, email)
 	}
 
 	now := testClock.Now().Unix()
 	if payload.Exp != now+3600 {
-		t.Errorf("Exp: %d; want: %d", payload.Exp, now+3600)
+		return fmt.Errorf("Exp: %d; want: %d", payload.Exp, now+3600)
 	}
 	if payload.Iat != now {
-		t.Errorf("Iat: %d; want: %d", payload.Iat, now)
+		return fmt.Errorf("Iat: %d; want: %d", payload.Iat, now)
 	}
 
 	for k, v := range expected {
 		if payload.Claims[k] != v {
-			t.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
+			return fmt.Errorf("Claim[%q]: %v; want: %v", k, payload.Claims[k], v)
 		}
 	}
+
+	if payload.TenantID != tenantID {
+		return fmt.Errorf("Tenant ID: %q; want: %q", payload.TenantID, tenantID)
+	}
+
+	return nil
 }
 
 func logFatal(err error) {

@@ -26,7 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/internal"
 )
 
 func TestEncodeToken(t *testing.T) {
@@ -59,8 +60,8 @@ func TestEncodeToken(t *testing.T) {
 
 	if sig, err := base64.RawURLEncoding.DecodeString(parts[2]); err != nil {
 		t.Fatal(err)
-	} else if string(sig) != "signature" {
-		t.Errorf("decode(signature) = %q; want = %q", string(sig), "signature")
+	} else if string(sig) != "signedBlob" {
+		t.Errorf("decode(signature) = %q; want = %q", string(sig), "signedBlob")
 	}
 }
 
@@ -102,6 +103,10 @@ func TestServiceAccountSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmRS256 {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmRS256)
+	}
 	email, err := signer.Email(context.Background())
 	if email != sa.ClientEmail || err != nil {
 		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, sa.ClientEmail)
@@ -121,6 +126,11 @@ func TestIAMSigner(t *testing.T) {
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmRS256 {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmRS256)
 	}
 	email, err := signer.Email(ctx)
 	if email != conf.ServiceAccountID || err != nil {
@@ -161,9 +171,9 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: test reason"
+	want := "test reason"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsInsufficientPermission(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
@@ -188,9 +198,9 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	defer server.Close()
 	signer.iamHost = server.URL
 
-	want := "http error status: 403; reason: client encountered an unknown error; response: not json"
+	want := "unexpected http response with status: 403\nnot json"
 	_, err = signer.Sign(context.Background(), []byte("input"))
-	if err == nil || !IsUnknown(err) || err.Error() != want {
+	if err == nil || !errorutils.IsPermissionDenied(err) || err.Error() != want {
 		t.Errorf("Sign() = %v; want = %q", err, want)
 	}
 }
@@ -250,17 +260,52 @@ func TestIAMSignerNoMetadataService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	signer.metadataHost = "http://non-existing.metadata.service"
 
-	if _, err = signer.Email(ctx); err == nil {
-		t.Errorf("Email() = nil; want = error")
+	want := "failed to determine service account: "
+	_, err = signer.Email(ctx)
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("Email() = %v; want = %q", err, want)
 	}
-	if _, err = signer.Sign(ctx, []byte("input")); err == nil {
-		t.Errorf("Sign() = nil; want = error")
+
+	_, err = signer.Sign(ctx, []byte("input"))
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("Sign() = %v; want = %q", err, want)
+	}
+}
+
+func TestEmulatedSigner(t *testing.T) {
+	signer := emulatedSigner{}
+
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmNone {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmNone)
+	}
+
+	email, err := signer.Email(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if email != emulatorEmail {
+		t.Errorf("Email() = %q; want = %q", email, emulatorEmail)
+	}
+
+	wantSignature := ""
+	sign, err := signer.Sign(context.Background(), []byte("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sign) != wantSignature {
+		t.Errorf("Sign() = %q; want = %q", string(sign), wantSignature)
 	}
 }
 
 type mockSigner struct {
 	err error
+}
+
+func (s *mockSigner) Algorithm() string {
+	return ""
 }
 
 func (s *mockSigner) Email(ctx context.Context) (string, error) {
@@ -271,12 +316,12 @@ func (s *mockSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return []byte("signature"), nil
+	return []byte("signedBlob"), nil
 }
 
 func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 	resp := map[string]interface{}{
-		"signature": base64.StdEncoding.EncodeToString([]byte(signature)),
+		"signedBlob": base64.StdEncoding.EncodeToString([]byte(signature)),
 	}
 	wantPath := fmt.Sprintf("/v1/projects/-/serviceAccounts/%s:signBlob", serviceAcct)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -289,8 +334,8 @@ func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 		if err := json.Unmarshal(reqBody, &m); err != nil {
 			t.Fatal(err)
 		}
-		if m["bytesToSign"] == "" {
-			t.Fatal("BytesToSign = empty; want = non-empty")
+		if m["payload"] == "" {
+			t.Fatal("payload = empty; want = non-empty")
 		}
 		if r.URL.Path != wantPath {
 			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)

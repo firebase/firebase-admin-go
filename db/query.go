@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package db // import "firebase.google.com/go/db"
+package db
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 )
 
 // QueryNode represents a data node retrieved from an ordered query.
@@ -109,11 +109,14 @@ func (q *Query) Get(ctx context.Context, v interface{}) error {
 	if err := initQueryParams(q, qp); err != nil {
 		return err
 	}
-	resp, err := q.client.send(ctx, "GET", q.path, nil, internal.WithQueryParams(qp))
-	if err != nil {
-		return err
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    q.path,
+		Opts:   []internal.HTTPOption{internal.WithQueryParams(qp)},
 	}
-	return resp.Unmarshal(http.StatusOK, v)
+	_, err := q.client.sendAndUnmarshal(ctx, req, v)
+	return err
 }
 
 // GetOrdered executes the Query and returns the results as an ordered slice.

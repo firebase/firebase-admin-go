@@ -22,8 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"firebase.google.com/go/iid"
-	"firebase.google.com/go/integration/internal"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/iid"
+	"firebase.google.com/go/v4/integration/internal"
 )
 
 var client *iid.Client
@@ -57,7 +58,7 @@ func TestNonExisting(t *testing.T) {
 		t.Errorf("DeleteInstanceID(non-existing) = nil; want error")
 	}
 	want := `instance id "fictive-ID0": failed to find the instance id`
-	if !iid.IsNotFound(err) || err.Error() != want {
+	if !errorutils.IsNotFound(err) || err.Error() != want {
 		t.Errorf("DeleteInstanceID(non-existing) = %v; want = %v", err, want)
 	}
 }

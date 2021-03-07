@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/messaging"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -57,11 +58,6 @@ func TestServiceAcctFile(t *testing.T) {
 	}
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
-	}
-	if app.creds == nil {
-		t.Error("Credentials: nil; want creds")
-	} else if len(app.creds.JSON) == 0 {
-		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -116,11 +112,6 @@ func TestRefreshTokenFile(t *testing.T) {
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
 	}
-	if app.creds == nil {
-		t.Error("Credentials: nil; want creds")
-	} else if len(app.creds.JSON) == 0 {
-		t.Error("JSON: empty; want; non-empty")
-	}
 }
 
 func TestRefreshTokenFileWithConfig(t *testing.T) {
@@ -134,11 +125,6 @@ func TestRefreshTokenFileWithConfig(t *testing.T) {
 	}
 	if len(app.opts) != 2 {
 		t.Errorf("Client opts: %d; want: 2", len(app.opts))
-	}
-	if app.creds == nil {
-		t.Error("Credentials: nil; want creds")
-	} else if len(app.creds.JSON) == 0 {
-		t.Error("JSON: empty; want; non-empty")
 	}
 }
 
@@ -157,11 +143,6 @@ func TestRefreshTokenWithEnvVar(t *testing.T) {
 		}
 		if app.projectID != "mock-project-id" {
 			t.Errorf("[env=%s] Project ID: %q; want: mock-project-id", varName, app.projectID)
-		}
-		if app.creds == nil {
-			t.Errorf("[env=%s] Credentials: nil; want creds", varName)
-		} else if len(app.creds.JSON) == 0 {
-			t.Errorf("[env=%s] JSON: empty; want; non-empty", varName)
 		}
 	}
 	for _, varName := range []string{"GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"} {
@@ -185,11 +166,6 @@ func TestAppDefault(t *testing.T) {
 	if len(app.opts) != 1 {
 		t.Errorf("Client opts: %d; want: 1", len(app.opts))
 	}
-	if app.creds == nil {
-		t.Error("Credentials: nil; want creds")
-	} else if len(app.creds.JSON) == 0 {
-		t.Error("JSON: empty; want; non-empty")
-	}
 }
 
 func TestAppDefaultWithInvalidFile(t *testing.T) {
@@ -201,8 +177,8 @@ func TestAppDefaultWithInvalidFile(t *testing.T) {
 	defer os.Setenv(credEnvVar, current)
 
 	app, err := NewApp(context.Background(), nil)
-	if app != nil || err == nil {
-		t.Errorf("NewApp() = (%v, %v); want: (nil, error)", app, err)
+	if app == nil || err != nil {
+		t.Fatalf("NewApp() = (%v, %v); want = (app, nil)", app, err)
 	}
 }
 
@@ -215,9 +191,17 @@ func TestInvalidCredentialFile(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range invalidFiles {
 		app, err := NewApp(ctx, nil, option.WithCredentialsFile(tc))
-		if app != nil || err == nil {
-			t.Errorf("NewApp(%q) = (%v, %v); want: (nil, error)", tc, app, err)
+		if app == nil || err != nil {
+			t.Fatalf("NewApp() = (%v, %v); want = (app, nil)", app, err)
 		}
+	}
+}
+
+func TestExplicitNoAuth(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithoutAuthentication())
+	if app == nil || err != nil {
+		t.Fatalf("NewApp() = (%v, %v); want = (app, nil)", app, err)
 	}
 }
 
@@ -375,6 +359,42 @@ func TestMessaging(t *testing.T) {
 
 	if c, err := app.Messaging(ctx); c == nil || err != nil {
 		t.Errorf("Messaging() = (%v, %v); want (iid, nil)", c, err)
+	}
+}
+
+func TestMessagingSendWithCustomEndpoint(t *testing.T) {
+	name := "custom-endpoint-ok"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{ \"name\":\"" + name + "\" }"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+
+	tokenSource := &testTokenSource{AccessToken: "mock-token-from-custom"}
+	app, err := NewApp(
+		ctx,
+		&Config{ProjectID: "test-project-id"},
+		option.WithTokenSource(tokenSource),
+		option.WithEndpoint(ts.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := app.Messaging(ctx)
+	if c == nil || err != nil {
+		t.Fatalf("Messaging() = (%v, %v); want (iid, nil)", c, err)
+	}
+
+	msg := &messaging.Message{
+		Token: "token",
+	}
+	n, err := c.Send(ctx, msg)
+	if n != name || err != nil {
+		t.Errorf("Send() = (%q, %v); want (%q, nil)", n, err, name)
 	}
 }
 

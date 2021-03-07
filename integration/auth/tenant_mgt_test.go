@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"firebase.google.com/go/auth"
+	"firebase.google.com/go/v4/auth"
 	"google.golang.org/api/iterator"
 )
 
@@ -97,6 +97,10 @@ func TestTenantManager(t *testing.T) {
 		}
 	})
 
+	t.Run("CustomTokens", func(t *testing.T) {
+		testTenantAwareCustomToken(t, id)
+	})
+
 	t.Run("UserManagement", func(t *testing.T) {
 		testTenantAwareUserManagement(t, id)
 	})
@@ -152,6 +156,40 @@ func TestTenantManager(t *testing.T) {
 
 		id = ""
 	})
+}
+
+func testTenantAwareCustomToken(t *testing.T, id string) {
+	tenantClient, err := client.TenantManager.AuthForTenant(id)
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	uid := randomUID()
+	ct, err := tenantClient.CustomToken(context.Background(), uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idToken, err := signInWithCustomTokenForTenant(ct, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		tenantClient.DeleteUser(context.Background(), uid)
+	}()
+
+	vt, err := tenantClient.VerifyIDToken(context.Background(), idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
+	}
+	if vt.Firebase.Tenant != id {
+		t.Errorf("Tenant = %q; want = %q", vt.Firebase.Tenant, id)
+	}
 }
 
 func testTenantAwareUserManagement(t *testing.T, id string) {
