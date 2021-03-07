@@ -476,17 +476,39 @@ func TestUpdateUser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer func() {
+			// Unlink user from federated provider
+			params = (&auth.UserToUpdate{}).ProvidersToDelete([]string{"google.com"})
+			userRecord, err = client.UpdateUser(context.Background(), updateUser.UID, params)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		// Ensure link operation worked as expected
 		providerUIDs := mapToProviderUIDs(userRecord.ProviderUserInfo)
 		providerIDs := mapToProviderIDs(userRecord.ProviderUserInfo)
 		if !contains(providerUIDs, googleFederatedUID) {
-			t.Errorf("UpdateUser().ProviderUserInfo[*].UID want include %v; got %v",
-				googleFederatedUID, providerUIDs)
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID = %v; want include %q",
+				providerUIDs, googleFederatedUID)
 		}
 		if !contains(providerIDs, "google.com") {
-			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID want include 'google.com'; got %v",
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID = %v; want include 'google.com'",
 				providerIDs)
+		}
+	})
+
+	t.Run("UnlinkFederatedProvider", func(t *testing.T) {
+		// Link user to federated provider
+		googleFederatedUID := "google_uid_" + generateRandomAlphaNumericString(10)
+		params := (&auth.UserToUpdate{}).
+			ProviderToLink((&auth.UserProvider{
+				ProviderID: "google.com",
+				UID:        googleFederatedUID,
+			}))
+		userRecord, err := client.UpdateUser(context.Background(), updateUser.UID, params)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Unlink user from federated provider
@@ -497,14 +519,14 @@ func TestUpdateUser(t *testing.T) {
 		}
 
 		// Ensure unlink operation worked as expected
-		providerUIDs = mapToProviderUIDs(userRecord.ProviderUserInfo)
-		providerIDs = mapToProviderIDs(userRecord.ProviderUserInfo)
+		providerUIDs := mapToProviderUIDs(userRecord.ProviderUserInfo)
+		providerIDs := mapToProviderIDs(userRecord.ProviderUserInfo)
 		if contains(providerUIDs, googleFederatedUID) {
-			t.Errorf("UpdateUser().ProviderUserInfo[*].UID want NOT include %v; got %v",
-				googleFederatedUID, providerUIDs)
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID = %v; want NOT include %q",
+				providerUIDs, googleFederatedUID)
 		}
 		if contains(providerIDs, "google.com") {
-			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID want NOT include 'google.com'; got %v",
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID = %v; want NOT include 'google.com'",
 				providerIDs)
 		}
 	})
@@ -569,18 +591,14 @@ func TestUpdateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("NoopsGivenEmptyProvidersToDelete", func(t *testing.T) {
-		userRecord := createTestUser("NoopWithEmptyProvidersToDeleteUser")
+	t.Run("ErrorsGivenEmptyProvidersToDelete", func(t *testing.T) {
+		userRecord := createTestUser("ErrorWithEmptyProvidersToDeleteUser")
 		defer deleteUser(userRecord.UID)
 
 		gotUserRecord, err := client.UpdateUser(context.Background(), userRecord.UID,
 			(&auth.UserToUpdate{}).ProvidersToDelete([]string{}))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(gotUserRecord, userRecord) {
-			t.Errorf("UpdateUser() got = %#v; want = %#v", gotUserRecord, userRecord)
+		if err == nil || gotUserRecord != nil {
+			t.Errorf("UpdateUser() = (%#v, nil); want (nil, error)", gotUserRecord)
 		}
 	})
 }
@@ -1154,7 +1172,7 @@ func importUser(t *testing.T, uid string, userToImport *auth.UserToImport) *auth
 func deletePhoneNumberUser(t *testing.T, phoneNumber string) {
 	userRecord, err := client.GetUserByPhoneNumber(context.Background(), phoneNumber)
 	if err != nil {
-		if strings.HasPrefix(err.Error(), "cannot find user from phone number:") {
+		if auth.IsUserNotFound(err) {
 			// User already doesn't exist.
 			return
 		}

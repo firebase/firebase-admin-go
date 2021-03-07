@@ -667,7 +667,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 			"user provider must specify a provider ID",
 		}, {
 			(&UserToUpdate{}).ProvidersToDelete([]string{""}),
-			"All providersToDelete must be non-empty strings",
+			"providersToDelete must not include empty strings",
 		}, {
 			(&UserToUpdate{}).
 				Email("user@example.com").
@@ -675,9 +675,9 @@ func TestInvalidUpdateUser(t *testing.T) {
 					ProviderID: "email",
 					UID:        "user@example.com",
 				}),
-			"Both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
-				"were set. To link to the email/password provider, only specify the " +
-				"UserToUpdate.Email field.",
+			"both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+				"were set; to link to the email/password provider, only specify the " +
+				"UserToUpdate.Email field",
 		}, {
 			(&UserToUpdate{}).
 				PhoneNumber("+15555550001").
@@ -685,16 +685,16 @@ func TestInvalidUpdateUser(t *testing.T) {
 					ProviderID: "phone",
 					UID:        "+15555550001",
 				}),
-			"Both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
-				"were set. To link to the phone provider, only specify the " +
-				"UserToUpdate.PhoneNumber field.",
+			"both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+				"were set; to link to the phone provider, only specify the " +
+				"UserToUpdate.PhoneNumber field",
 		}, {
 			(&UserToUpdate{}).
 				PhoneNumber("").
 				ProvidersToDelete([]string{"phone"}),
-			"Both UserToUpdate.PhoneNumber='' and " +
-				"UserToUpdate.ProvidersToDelete=['phone'] were set. To unlink from a " +
-				"phone provider, only specify the UserToUpdate.PhoneNumber='''field.",
+			"both UserToUpdate.PhoneNumber='' and " +
+				"UserToUpdate.ProvidersToDelete=['phone'] were set; to unlink from a " +
+				"phone provider, only specify the UserToUpdate.PhoneNumber='' field",
 		},
 	}
 
@@ -808,6 +808,12 @@ var updateUserCases = []struct {
 		(&UserToUpdate{}).PhoneNumber("").ProvidersToDelete([]string{"google.com"}),
 		map[string]interface{}{
 			"deleteProvider": []string{"phone", "google.com"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProvidersToDelete([]string{"email", "phone"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"email", "phone"},
 		},
 	},
 	{

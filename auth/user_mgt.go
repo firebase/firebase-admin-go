@@ -226,6 +226,16 @@ func (u *UserToUpdate) ProviderToLink(userProvider *UserProvider) *UserToUpdate 
 
 // ProvidersToDelete unlinks this user from the specified providers.
 func (u *UserToUpdate) ProvidersToDelete(providerIds []string) *UserToUpdate {
+	// skip setting the value to empty if it's already empty.
+	if len(providerIds) == 0 {
+		if u.params == nil {
+			return u
+		}
+		if _, ok := u.params["providersToDelete"]; !ok {
+			return u
+		}
+	}
+
 	return u.set("providersToDelete", providerIds)
 }
 
@@ -326,10 +336,10 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			if _, ok := req["email"]; ok {
 				// We could relax this to only return an error if the email addrs don't
 				// match. But for now, we'll be extra picky.
-				return nil, fmt.Errorf(
-					"Both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
-						"were set. To link to the email/password provider, only specify the " +
-						"UserToUpdate.Email field.")
+				return nil, errors.New(
+					"both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+						"were set; to link to the email/password provider, only specify the " +
+						"UserToUpdate.Email field")
 			}
 			req["email"] = userProvider.UID
 			delete(req, "linkProviderUserInfo")
@@ -337,10 +347,10 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			if _, ok := req["phoneNumber"]; ok {
 				// We could relax this to only return an error if the phone numbers don't
 				// match. But for now, we'll be extra picky.
-				return nil, fmt.Errorf(
-					"Both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
-						"were set. To link to the phone provider, only specify the " +
-						"UserToUpdate.PhoneNumber field.")
+				return nil, errors.New(
+					"both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+						"were set; to link to the phone provider, only specify the " +
+						"UserToUpdate.PhoneNumber field")
 			}
 			req["phoneNumber"] = userProvider.UID
 			delete(req, "linkProviderUserInfo")
@@ -356,7 +366,7 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 
 		for _, providerToDelete := range providersToDelete.([]string) {
 			if providerToDelete == "" {
-				return nil, fmt.Errorf("All providersToDelete must be non-empty strings")
+				return nil, errors.New("providersToDelete must not include empty strings")
 			}
 
 			// If we've been told to unlink the phone provider both via setting
@@ -364,11 +374,11 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			// 'phone', then we'll reject that. Though it might also be reasonable to
 			// relax this restriction and just unlink it.
 			if providerToDelete == "phone" {
-				for i := range deleteProvider {
-					if deleteProvider[i] == "phone" {
-						return nil, fmt.Errorf("Both UserToUpdate.PhoneNumber='' and " +
-							"UserToUpdate.ProvidersToDelete=['phone'] were set. To unlink from a " +
-							"phone provider, only specify the UserToUpdate.PhoneNumber='''field.")
+				for _, prov := range deleteProvider {
+					if prov == "phone" {
+						return nil, errors.New("both UserToUpdate.PhoneNumber='' and " +
+							"UserToUpdate.ProvidersToDelete=['phone'] were set; to unlink from a " +
+							"phone provider, only specify the UserToUpdate.PhoneNumber='' field")
 					}
 				}
 			}
