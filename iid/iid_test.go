@@ -21,7 +21,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 )
 
@@ -104,6 +105,17 @@ func TestDeleteInstanceIDError(t *testing.T) {
 	client.client.RetryConfig = nil
 
 	errorHandlers := map[int]func(error) bool{
+		http.StatusBadRequest:          errorutils.IsInvalidArgument,
+		http.StatusUnauthorized:        errorutils.IsUnauthenticated,
+		http.StatusForbidden:           errorutils.IsPermissionDenied,
+		http.StatusNotFound:            errorutils.IsNotFound,
+		http.StatusConflict:            errorutils.IsConflict,
+		http.StatusTooManyRequests:     errorutils.IsResourceExhausted,
+		http.StatusInternalServerError: errorutils.IsInternal,
+		http.StatusServiceUnavailable:  errorutils.IsUnavailable,
+	}
+
+	deprecatedErrorHandlers := map[int]func(error) bool{
 		http.StatusBadRequest:          IsInvalidArgument,
 		http.StatusUnauthorized:        IsInsufficientPermission,
 		http.StatusForbidden:           IsInsufficientPermission,
@@ -116,9 +128,19 @@ func TestDeleteInstanceIDError(t *testing.T) {
 
 	for code, check := range errorHandlers {
 		status = code
-		want := fmt.Sprintf("instance id %q: %s", "test-iid", errorCodes[code].message)
+		want := fmt.Sprintf("instance id %q: %s", "test-iid", errorMessages[code])
 		err := client.DeleteInstanceID(ctx, "test-iid")
 		if err == nil || !check(err) || err.Error() != want {
+			t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
+		}
+
+		resp := errorutils.HTTPResponse(err)
+		if resp.StatusCode != code {
+			t.Errorf("HTTPResponse().StatusCode = %d; want = %d", resp.StatusCode, code)
+		}
+
+		deprecatedCheck := deprecatedErrorHandlers[code]
+		if !deprecatedCheck(err) {
 			t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
 		}
 
@@ -155,10 +177,16 @@ func TestDeleteInstanceIDUnexpectedError(t *testing.T) {
 	}
 	client.endpoint = ts.URL
 
-	want := "http error status: 511; reason: {}"
+	want := "unexpected http response with status: 511\n{}"
 	err = client.DeleteInstanceID(ctx, "test-iid")
-	if err == nil || !IsUnknown(err) || err.Error() != want {
+	if err == nil || err.Error() != want {
 		t.Errorf("DeleteInstanceID() = %v; want = %v", err, want)
+	}
+	if !IsUnknown(err) {
+		t.Errorf("IsUnknown() = false; want = true")
+	}
+	if !errorutils.IsUnknown(err) {
+		t.Errorf("errorutils.IsUnknown() = false; want = true")
 	}
 
 	if tr == nil {
@@ -190,7 +218,6 @@ func TestDeleteInstanceIDConnectionError(t *testing.T) {
 	client.client.RetryConfig = nil
 
 	if err := client.DeleteInstanceID(ctx, "test-iid"); err == nil {
-		t.Errorf("DeleteInstanceID() = nil; want = error")
-		return
+		t.Fatalf("DeleteInstanceID() = nil; want = error")
 	}
 }

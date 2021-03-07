@@ -13,14 +13,14 @@
 // limitations under the License.
 
 // Package storage provides functions for accessing Google Cloud Storge buckets.
-package storage // import "firebase.google.com/go/storage"
+package storage
 
 import (
 	"context"
 	"errors"
 
 	"cloud.google.com/go/storage"
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 )
 
 // Client is the interface for the Firebase Storage service.

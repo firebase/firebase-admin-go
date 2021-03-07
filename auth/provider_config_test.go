@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"firebase.google.com/go/v4/errorutils"
 	"google.golang.org/api/iterator"
 )
 
@@ -247,8 +248,8 @@ func TestCreateOIDCProviderConfigError(t *testing.T) {
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
-	if oidc != nil || !IsUnknown(err) {
-		t.Errorf("CreateOIDCProviderConfig() = (%v, %v); want = (nil, %q)", oidc, err, "unknown-error")
+	if oidc != nil || !errorutils.IsInternal(err) {
+		t.Errorf("CreateOIDCProviderConfig() = (%v, %v); want = (nil, %q)", oidc, err, "internal-error")
 	}
 }
 
@@ -583,8 +584,8 @@ func TestOIDCProviderConfigsError(t *testing.T) {
 	client.baseClient.httpClient.RetryConfig = nil
 	it := client.OIDCProviderConfigs(context.Background(), "")
 	config, err := it.Next()
-	if config != nil || err == nil || !IsUnknown(err) {
-		t.Errorf("OIDCProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
+	if config != nil || err == nil || !errorutils.IsInternal(err) {
+		t.Errorf("OIDCProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "internal-error")
 	}
 }
 
@@ -775,8 +776,8 @@ func TestCreateSAMLProviderConfigError(t *testing.T) {
 		RPEntityID(samlProviderConfig.RPEntityID).
 		CallbackURL(samlProviderConfig.CallbackURL)
 	saml, err := client.CreateSAMLProviderConfig(context.Background(), options)
-	if saml != nil || !IsUnknown(err) {
-		t.Errorf("CreateSAMLProviderConfig() = (%v, %v); want = (nil, %q)", saml, err, "unknown-error")
+	if saml != nil || !errorutils.IsInternal(err) {
+		t.Errorf("CreateSAMLProviderConfig() = (%v, %v); want = (nil, %q)", saml, err, "internal-error")
 	}
 }
 
@@ -1211,8 +1212,8 @@ func TestSAMLProviderConfigsError(t *testing.T) {
 	client.baseClient.httpClient.RetryConfig = nil
 	it := client.SAMLProviderConfigs(context.Background(), "")
 	config, err := it.Next()
-	if config != nil || err == nil || !IsUnknown(err) {
-		t.Errorf("SAMLProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "unknown-error")
+	if config != nil || err == nil || !errorutils.IsInternal(err) {
+		t.Errorf("SAMLProviderConfigs() = (%v, %v); want = (nil, %q)", config, err, "internal-error")
 	}
 }
 

@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"firebase.google.com/go/auth"
-	"firebase.google.com/go/auth/hash"
+	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/auth/hash"
 	"google.golang.org/api/iterator"
 )
 
@@ -287,14 +287,32 @@ func TestLastRefreshTime(t *testing.T) {
 		t.Errorf("signInWithPassword failed: %v", err)
 	}
 
-	getUsersResult, err := client.GetUser(context.Background(), userRecord.UID)
-	if err != nil {
-		t.Fatalf("GetUser(...) failed with error: %v", err)
+	// Attempt to retrieve the user 3 times (with a small delay between each attempt.) Occasionally,
+	// this call retrieves the user data without the lastLoginTime/lastRefreshTime fields; possibly
+	// because it's hitting a different server than what the login request used.
+	var getUsersResult *auth.UserRecord
+	for i := 0; i < 3; i++ {
+		var err error
+		getUsersResult, err = client.GetUser(context.Background(), userRecord.UID)
+		if err != nil {
+			t.Fatalf("GetUser(...) failed with error: %v", err)
+		}
+
+		if getUsersResult.UserMetadata.LastRefreshTimestamp != 0 {
+			break
+		}
+
+		time.Sleep(time.Second * time.Duration(2^i))
 	}
-	if getUsersResult.UserMetadata.LastRefreshTimestamp <= 0 {
-		t.Errorf(
-			"GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want > 0",
-			getUsersResult.UserMetadata.LastRefreshTimestamp)
+
+	// Ensure last refresh time is approx now (with tollerance of 10m)
+	nowMillis := time.Now().Unix() * 1000
+	lastRefreshTimestamp := getUsersResult.UserMetadata.LastRefreshTimestamp
+	if lastRefreshTimestamp < nowMillis-10*60*1000 {
+		t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want >= %d", lastRefreshTimestamp, nowMillis-10*60*1000)
+	}
+	if nowMillis+10*60*1000 < lastRefreshTimestamp {
+		t.Errorf("GetUser(...).UserMetadata.LastRefreshTimestamp = %d; want <= %d", lastRefreshTimestamp, nowMillis+10*60*1000)
 	}
 }
 
@@ -542,6 +560,17 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestDeleteUsers(t *testing.T) {
+	// Deletes users slowly. There's currently a 1qps limitation on this API.
+	// Without this helper, the integration tests occasionally hit that limit
+	// and fail.
+	//
+	// TODO(rsgowman): Remove this function when/if the 1qps limitation is
+	// relaxed.
+	slowDeleteUsers := func(ctx context.Context, uids []string) (*auth.DeleteUsersResult, error) {
+		time.Sleep(1 * time.Second)
+		return client.DeleteUsers(ctx, uids)
+	}
+
 	// Ensures the specified users don't exist. Expected to be called after
 	// deleting the users to ensure the delete method worked.
 	ensureUsersNotFound := func(t *testing.T, uids []string) {
@@ -579,7 +608,7 @@ func TestDeleteUsers(t *testing.T) {
 			newUserWithParams(t).UID, newUserWithParams(t).UID, newUserWithParams(t).UID,
 		}
 
-		result, err := client.DeleteUsers(context.Background(), uids)
+		result, err := slowDeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers([valid_ids]) error %v; want nil", err)
 		}
@@ -599,7 +628,7 @@ func TestDeleteUsers(t *testing.T) {
 
 	t.Run("deletes users that exist even when non-existing users also specified", func(t *testing.T) {
 		uids := []string{newUserWithParams(t).UID, "uid-that-doesnt-exist"}
-		result, err := client.DeleteUsers(context.Background(), uids)
+		result, err := slowDeleteUsers(context.Background(), uids)
 		if err != nil {
 			t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
 		}
@@ -619,7 +648,7 @@ func TestDeleteUsers(t *testing.T) {
 
 	t.Run("is idempotent", func(t *testing.T) {
 		deleteUserAndEnsureSuccess := func(t *testing.T, uids []string) {
-			result, err := client.DeleteUsers(context.Background(), uids)
+			result, err := slowDeleteUsers(context.Background(), uids)
 			if err != nil {
 				t.Fatalf("DeleteUsers(uids) error %v; want nil", err)
 			}

@@ -20,16 +20,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
-	"firebase.google.com/go/internal"
+	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/transport"
 )
 
 const (
-	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-	oneHourInSeconds = 3600
+	authErrorCode      = "authErrorCode"
+	emulatorHostEnvVar = "FIREBASE_AUTH_EMULATOR_HOST"
+	defaultAuthURL     = "https://identitytoolkit.googleapis.com"
+	firebaseAudience   = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	oneHourInSeconds   = 3600
+
+	// SDK-generated error codes
+	idTokenRevoked       = "ID_TOKEN_REVOKED"
+	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
+	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
 
 var reservedClaims = []string{
@@ -44,8 +53,6 @@ var reservedClaims = []string{
 type Client struct {
 	*baseClient
 	TenantManager *TenantManager
-	signer        cryptoSigner
-	clock         internal.Clock
 }
 
 // NewClient creates a new instance of the Firebase Auth Client.
@@ -54,17 +61,30 @@ type Client struct {
 // Auth service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
 	var (
-		signer cryptoSigner
-		err    error
+		isEmulator bool
+		signer     cryptoSigner
+		err        error
 	)
-	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if conf.Creds != nil && len(conf.Creds.JSON) > 0 {
-		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(conf.Creds.JSON)
-		if err != nil && err != errNotAServiceAcct {
-			return nil, err
+
+	authEmulatorHost := os.Getenv(emulatorHostEnvVar)
+	if authEmulatorHost != "" {
+		isEmulator = true
+		signer = emulatedSigner{}
+	}
+
+	if signer == nil {
+		creds, _ := transport.Creds(ctx, conf.Opts...)
+
+		// Initialize a signer by following the go/firebase-admin-sign protocol.
+		if creds != nil && len(creds.JSON) > 0 {
+			// If the SDK was initialized with a service account, use it to sign bytes.
+			signer, err = signerFromCreds(creds.JSON)
+			if err != nil && err != errNotAServiceAcct {
+				return nil, err
+			}
 		}
 	}
+
 	if signer == nil {
 		if conf.ServiceAccountID != "" {
 			// If the SDK was initialized with a service account email, use it with the IAM service
@@ -83,12 +103,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID, isEmulator)
 	if err != nil {
 		return nil, err
 	}
@@ -100,23 +120,33 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 
 	hc := internal.WithDefaultRetryConfig(transport)
 	hc.CreateErrFn = handleHTTPError
-	hc.SuccessFn = internal.HasSuccessStatus
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
 
+	baseURL := defaultAuthURL
+	if isEmulator {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	}
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
+
 	base := &baseClient{
-		userManagementEndpoint: idToolkitV1Endpoint,
+		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
+		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
 		cookieVerifier:         cookieVerifier,
+		signer:                 signer,
+		clock:                  internal.SystemClock,
 	}
 	return &Client{
 		baseClient:    base,
-		signer:        signer,
-		clock:         internal.SystemClock,
 		TenantManager: newTenantManager(hc, conf, base),
 	}, nil
 }
@@ -131,8 +161,8 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 //   - If the SDK was initialized with service account credentials, uses the private key present in
 //     the credentials to sign tokens locally.
 //   - If a service account email was specified during initialization (via firebase.Config struct),
-//     calls the IAM service with that email to sign tokens remotely. See
-//     https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signBlob.
+//     calls the IAMCredentials service with that email to sign tokens remotely. See
+//     https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/signBlob.
 //   - If the code is deployed in the Google App Engine standard environment, uses the App Identity
 //     service to sign tokens. See https://cloud.google.com/appengine/docs/standard/go/reference#SignBytes.
 //   - If the code is deployed in a different GCP-managed environment (e.g. Google Compute Engine),
@@ -140,13 +170,13 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 //     conjunction with the IAM service to sign tokens remotely.
 //
 // CustomToken returns an error the SDK fails to discover a viable mechanism for signing tokens.
-func (c *Client) CustomToken(ctx context.Context, uid string) (string, error) {
+func (c *baseClient) CustomToken(ctx context.Context, uid string) (string, error) {
 	return c.CustomTokenWithClaims(ctx, uid, nil)
 }
 
 // CustomTokenWithClaims is similar to CustomToken, but in addition to the user ID, it also encodes
 // all the key-value pairs in the provided map as claims in the resulting JWT.
-func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
+func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devClaims map[string]interface{}) (string, error) {
 	iss, err := c.signer.Email(ctx)
 	if err != nil {
 		return "", err
@@ -170,15 +200,16 @@ func (c *Client) CustomTokenWithClaims(ctx context.Context, uid string, devClaim
 
 	now := c.clock.Now().Unix()
 	info := &jwtInfo{
-		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		header: jwtHeader{Algorithm: c.signer.Algorithm(), Type: "JWT"},
 		payload: &customToken{
-			Iss:    iss,
-			Sub:    iss,
-			Aud:    firebaseAudience,
-			UID:    uid,
-			Iat:    now,
-			Exp:    now + oneHourInSeconds,
-			Claims: devClaims,
+			Iss:      iss,
+			Sub:      iss,
+			Aud:      firebaseAudience,
+			UID:      uid,
+			Iat:      now,
+			Exp:      now + oneHourInSeconds,
+			TenantID: c.tenantID,
+			Claims:   devClaims,
 		},
 	}
 	return info.Token(ctx, c.signer)
@@ -226,11 +257,14 @@ type FirebaseInfo struct {
 type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
+	tenantMgtEndpoint      string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
 	idTokenVerifier        *tokenVerifier
 	cookieVerifier         *tokenVerifier
+	signer                 cryptoSigner
+	clock                  internal.Clock
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {
@@ -256,10 +290,21 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken)
 	if err == nil && c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
-		return nil, internal.Errorf(tenantIDMismatch, "invalid tenant id: %q", decoded.Firebase.Tenant)
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
+			Ext: map[string]interface{}{
+				authErrorCode: tenantIDMismatch,
+			},
+		}
 	}
 
 	return decoded, err
+}
+
+// IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
+func IsTenantIDMismatch(err error) bool {
+	return hasAuthErrorCode(err, tenantIDMismatch)
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
@@ -279,10 +324,25 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 	if err != nil {
 		return nil, err
 	}
+
 	if revoked {
-		return nil, internal.Error(idTokenRevoked, "ID token has been revoked")
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "ID token has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: idTokenRevoked,
+			},
+		}
 	}
+
 	return decoded, nil
+}
+
+// IsIDTokenRevoked checks if the given error was due to a revoked ID token.
+//
+// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guranteed to return true.
+func IsIDTokenRevoked(err error) bool {
+	return hasAuthErrorCode(err, idTokenRevoked)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -319,10 +379,25 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 	if err != nil {
 		return nil, err
 	}
+
 	if revoked {
-		return nil, internal.Error(sessionCookieRevoked, "session cookie has been revoked")
+		return nil, &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "session cookie has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: sessionCookieRevoked,
+			},
+		}
 	}
+
 	return decoded, nil
+}
+
+// IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
+//
+// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guranteed to return true.
+func IsSessionCookieRevoked(err error) bool {
+	return hasAuthErrorCode(err, sessionCookieRevoked)
 }
 
 func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {
@@ -332,4 +407,14 @@ func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, erro
 	}
 
 	return token.IssuedAt*1000 < user.TokensValidAfterMillis, nil
+}
+
+func hasAuthErrorCode(err error, code string) bool {
+	fe, ok := err.(*internal.FirebaseError)
+	if !ok {
+		return false
+	}
+
+	got, ok := fe.Ext[authErrorCode]
+	return ok && got == code
 }

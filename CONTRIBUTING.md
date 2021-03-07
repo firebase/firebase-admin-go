@@ -137,6 +137,14 @@ required to ensure that exported user records contain the password hashes of the
 3. Click 'ADD ANOTHER ROLE' and choose 'Firebase Authentication Admin'.
 4. Click 'SAVE'.
 
+Some of the integration tests require an
+[Identity Platform](https://cloud.google.com/identity-platform/) project with multi-tenancy
+[enabled](https://cloud.google.com/identity-platform/docs/multi-tenancy-quickstart#enabling_multi-tenancy).
+An existing Firebase project can be upgraded to an Identity Platform project without losing any
+functionality via the
+[Identity Platform Marketplace Page](https://console.cloud.google.com/customer-identity). Note that
+charges may be incurred for active users beyond the Identity Platform free tier.
+
 Now you can invoke the test suite as follows:
 
 ```bash
