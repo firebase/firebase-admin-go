@@ -67,6 +67,54 @@ var testUser = &UserRecord{
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	TenantID:     "testTenant",
+	MultiFactor: &MultiFactorSettings{
+		EnrolledFactors: []*MultiFactorInfo{
+			{
+				PhoneInfo:       "+31612345678",
+				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				DisplayName:     "My MFA Phone",
+				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
+			},
+		},
+	},
+}
+
+var emptyFactors []*MultiFactorInfo
+var testUserWithoutMFA = &UserRecord{
+	UserInfo: &UserInfo{
+		UID:         "testusernomfa",
+		Email:       "testusernomfa@example.com",
+		PhoneNumber: "+1234567890",
+		DisplayName: "Test User Without MFA",
+		PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+		ProviderID:  defaultProviderID,
+	},
+	Disabled: false,
+
+	EmailVerified: true,
+	ProviderUserInfo: []*UserInfo{
+		{
+			ProviderID:  "password",
+			DisplayName: "Test User Without MFA",
+			PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+			Email:       "testusernomfa@example.com",
+			UID:         "testuid",
+		}, {
+			ProviderID:  "phone",
+			PhoneNumber: "+1234567890",
+			UID:         "testuid",
+		},
+	},
+	TokensValidAfterMillis: 1494364393000,
+	UserMetadata: &UserMetadata{
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211232000,
+	},
+	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+	TenantID:     "testTenant",
+	MultiFactor: &MultiFactorSettings{
+		EnrolledFactors: emptyFactors,
+	},
 }
 
 func TestGetUser(t *testing.T) {
@@ -427,7 +475,7 @@ func TestListUsers(t *testing.T) {
 	want := []*ExportedUserRecord{
 		{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
 		{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
-		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
+		{UserRecord: testUserWithoutMFA, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
 	testIterator := func(iter *UserIterator, token string, req string) {
@@ -1443,6 +1491,14 @@ func TestMakeExportedUser(t *testing.T) {
 				PhoneNumber: "+1234567890",
 				UID:         "testuid",
 			}},
+		MFAInfo: []*MultiFactorInfo{
+			{
+				PhoneInfo:       "+31612345678",
+				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				DisplayName:     "My MFA Phone",
+				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
+			},
+		},
 	}
 
 	want := &ExportedUserRecord{

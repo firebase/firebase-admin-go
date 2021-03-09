@@ -56,6 +56,19 @@ type UserInfo struct {
 	UID        string `json:"rawId,omitempty"`
 }
 
+// MultiFactorInfo describes a user enrolled second factor.
+type MultiFactorInfo struct {
+	PhoneInfo       string `json:"phoneInfo"`
+	MFAEnrollmentID string `json:"mfaEnrollmentId"`
+	DisplayName     string `json:"displayName"`
+	EnrolledAt      string `json:"enrolledAt"`
+}
+
+// MultiFactorSettings describes the multi-factor related user settings.
+type MultiFactorSettings struct {
+	EnrolledFactors []*MultiFactorInfo
+}
+
 // UserMetadata contains additional metadata associated with a user account.
 // Timestamps are in milliseconds since epoch.
 type UserMetadata struct {
@@ -76,6 +89,7 @@ type UserRecord struct {
 	TokensValidAfterMillis int64 // milliseconds since epoch.
 	UserMetadata           *UserMetadata
 	TenantID               string
+	MultiFactor            *MultiFactorSettings
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -733,23 +747,24 @@ func (c *baseClient) GetUsers(
 }
 
 type userQueryResponse struct {
-	UID                string      `json:"localId,omitempty"`
-	DisplayName        string      `json:"displayName,omitempty"`
-	Email              string      `json:"email,omitempty"`
-	PhoneNumber        string      `json:"phoneNumber,omitempty"`
-	PhotoURL           string      `json:"photoUrl,omitempty"`
-	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
-	LastRefreshAt      string      `json:"lastRefreshAt,omitempty"`
-	ProviderID         string      `json:"providerId,omitempty"`
-	CustomAttributes   string      `json:"customAttributes,omitempty"`
-	Disabled           bool        `json:"disabled,omitempty"`
-	EmailVerified      bool        `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
-	PasswordHash       string      `json:"passwordHash,omitempty"`
-	PasswordSalt       string      `json:"salt,omitempty"`
-	TenantID           string      `json:"tenantId,omitempty"`
-	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
+	UID                string             `json:"localId,omitempty"`
+	DisplayName        string             `json:"displayName,omitempty"`
+	Email              string             `json:"email,omitempty"`
+	PhoneNumber        string             `json:"phoneNumber,omitempty"`
+	PhotoURL           string             `json:"photoUrl,omitempty"`
+	CreationTimestamp  int64              `json:"createdAt,string,omitempty"`
+	LastLogInTimestamp int64              `json:"lastLoginAt,string,omitempty"`
+	LastRefreshAt      string             `json:"lastRefreshAt,omitempty"`
+	ProviderID         string             `json:"providerId,omitempty"`
+	CustomAttributes   string             `json:"customAttributes,omitempty"`
+	Disabled           bool               `json:"disabled,omitempty"`
+	EmailVerified      bool               `json:"emailVerified,omitempty"`
+	ProviderUserInfo   []*UserInfo        `json:"providerUserInfo,omitempty"`
+	PasswordHash       string             `json:"passwordHash,omitempty"`
+	PasswordSalt       string             `json:"salt,omitempty"`
+	TenantID           string             `json:"tenantId,omitempty"`
+	ValidSinceSeconds  int64              `json:"validSince,string,omitempty"`
+	MFAInfo            []*MultiFactorInfo `json:"mfaInfo,omitempty"`
 }
 
 func (r *userQueryResponse) makeUserRecord() (*UserRecord, error) {
@@ -809,6 +824,9 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				LastLogInTimestamp:   r.LastLogInTimestamp,
 				CreationTimestamp:    r.CreationTimestamp,
 				LastRefreshTimestamp: lastRefreshTimestamp,
+			},
+			MultiFactor: &MultiFactorSettings{
+				EnrolledFactors: r.MFAInfo,
 			},
 		},
 		PasswordHash: hash,
