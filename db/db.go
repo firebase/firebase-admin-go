@@ -48,8 +48,8 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 		return nil, err
 	} else if p.Scheme != "https" {
 		return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
-	} else if !strings.HasSuffix(p.Host, ".firebaseio.com") {
-		return nil, fmt.Errorf("invalid database URL: %q; want host: %q", c.URL, "firebaseio.com")
+	} else if !(strings.HasSuffix(p.Host, ".firebaseio.com") || strings.HasSuffix(p.Host, ".firebasedatabase.app")) {
+		return nil, fmt.Errorf("invalid database URL: %q; want host: %q or %q", c.URL, "firebaseio.com", ".firebasedatabase.app")
 	}
 
 	var ao []byte
