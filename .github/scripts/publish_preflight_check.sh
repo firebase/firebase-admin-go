@@ -92,8 +92,6 @@ fi
 echo_info "Tag v${RELEASE_VERSION} does not exist."
 
 
-<<<<<<< HEAD
-=======
 echo_info ""
 echo_info "--------------------------------------------"
 echo_info "Generating changelog"
@@ -118,7 +116,6 @@ FILTERED_CHANGELOG="${FILTERED_CHANGELOG//$'\r'/'%0D'}"
 echo "::set-output name=changelog::${FILTERED_CHANGELOG}"
 
 
->>>>>>> origin/dev
 echo ""
 echo_info "--------------------------------------------"
 echo_info "PREFLIGHT SUCCESSFUL"

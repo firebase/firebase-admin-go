@@ -148,7 +148,7 @@ func TestGetUserByProviderIDNotFound(t *testing.T) {
 
 	userRecord, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
 	want := "cannot find user from providerID: { google.com, google_uid1 }"
-	if userRecord != nil || err == nil || err.Error() != want {
+	if userRecord != nil || err == nil || err.Error() != want || !IsUserNotFound(err) {
 		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
