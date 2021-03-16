@@ -1208,8 +1208,7 @@ func deletePhoneNumberUser(t *testing.T, phoneNumber string) {
 		t.Fatal(err)
 	}
 
-	err = client.DeleteUser(context.Background(), userRecord.UID)
-	if err != nil {
+	if err = client.DeleteUser(context.Background(), userRecord.UID); err != nil {
 		t.Fatal(err)
 	}
 }
