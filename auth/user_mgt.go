@@ -64,9 +64,12 @@ type MultiFactorInfoResponse struct {
 	EnrolledAt      string `json:"enrolledAt"`
 }
 
+// MultiFactorID represents the type of an enrolled factor, for now only Phone
+// is available.
 type MultiFactorID string
 
 const (
+	// Phone represents an enrolled factor of type Phone / SMS
 	Phone MultiFactorID = "phone"
 )
 
