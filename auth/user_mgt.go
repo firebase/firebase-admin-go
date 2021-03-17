@@ -56,12 +56,12 @@ type UserInfo struct {
 	UID        string `json:"rawId,omitempty"`
 }
 
-// MultiFactorInfoResponse describes the `mfaInfo` of the user record API response
-type MultiFactorInfoResponse struct {
-	MFAEnrollmentID string `json:"mfaEnrollmentId"`
-	DisplayName     string `json:"displayName"`
-	PhoneInfo       string `json:"phoneInfo"`
-	EnrolledAt      string `json:"enrolledAt"`
+// multiFactorInfoResponse describes the `mfaInfo` of the user record API response
+type multiFactorInfoResponse struct {
+	MFAEnrollmentID string `json:"mfaEnrollmentId,omitempty"`
+	DisplayName     string `json:"displayName,omitempty"`
+	PhoneInfo       string `json:"phoneInfo,omitempty"`
+	EnrolledAt      string `json:"enrolledAt,omitempty"`
 }
 
 // MultiFactorID represents the type of an enrolled factor, for now only Phone
@@ -73,8 +73,8 @@ const (
 	Phone MultiFactorID = "phone"
 )
 
-// PhoneMultiFactorInfo describes a user enrolled second phone factor.
-type PhoneMultiFactorInfo struct {
+// MultiFactorInfo describes a user enrolled second phone factor.
+type MultiFactorInfo struct {
 	UID                 string
 	DisplayName         string
 	EnrollmentTimestamp int64
@@ -84,7 +84,7 @@ type PhoneMultiFactorInfo struct {
 
 // MultiFactorSettings describes the multi-factor related user settings.
 type MultiFactorSettings struct {
-	EnrolledFactors []*PhoneMultiFactorInfo
+	EnrolledFactors []*MultiFactorInfo
 }
 
 // UserMetadata contains additional metadata associated with a user account.
@@ -782,7 +782,7 @@ type userQueryResponse struct {
 	PasswordSalt       string                     `json:"salt,omitempty"`
 	TenantID           string                     `json:"tenantId,omitempty"`
 	ValidSinceSeconds  int64                      `json:"validSince,string,omitempty"`
-	MFAInfo            []*MultiFactorInfoResponse `json:"mfaInfo,omitempty"`
+	MFAInfo            []*multiFactorInfoResponse `json:"mfaInfo,omitempty"`
 }
 
 func (r *userQueryResponse) makeUserRecord() (*UserRecord, error) {
@@ -824,7 +824,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 
 	// Map the MFA info to a slice of enrolled factors. Currently there is only
 	// support for PhoneMultiFactorInfo.
-	var enrolledFactors []*PhoneMultiFactorInfo
+	var enrolledFactors []*MultiFactorInfo
 	for _, factor := range r.MFAInfo {
 		var enrollmentTimestamp int64
 		if factor.EnrolledAt != "" {
@@ -835,7 +835,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			enrollmentTimestamp = t.Unix() * 1000
 		}
 
-		enrolledFactors = append(enrolledFactors, &PhoneMultiFactorInfo{
+		enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
 			UID:                 factor.MFAEnrollmentID,
 			DisplayName:         factor.DisplayName,
 			EnrollmentTimestamp: enrollmentTimestamp,

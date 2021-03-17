@@ -68,19 +68,19 @@ var testUser = &UserRecord{
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	TenantID:     "testTenant",
 	MultiFactor: &MultiFactorSettings{
-		EnrolledFactors: []*PhoneMultiFactorInfo{
+		EnrolledFactors: []*MultiFactorInfo{
 			{
 				UID:                 "0aaded3f-5e73-461d-aef9-37b48e3769be",
 				FactorID:            Phone,
 				EnrollmentTimestamp: 1614776780000,
-				PhoneNumber:         "+31612345678",
+				PhoneNumber:         "+1234567890",
 				DisplayName:         "My MFA Phone",
 			},
 		},
 	},
 }
 
-var emptyFactors []*PhoneMultiFactorInfo
+var emptyFactors []*MultiFactorInfo
 var testUserWithoutMFA = &UserRecord{
 	UserInfo: &UserInfo{
 		UID:         "testusernomfa",
@@ -1492,9 +1492,9 @@ func TestMakeExportedUser(t *testing.T) {
 				PhoneNumber: "+1234567890",
 				UID:         "testuid",
 			}},
-		MFAInfo: []*MultiFactorInfoResponse{
+		MFAInfo: []*multiFactorInfoResponse{
 			{
-				PhoneInfo:       "+31612345678",
+				PhoneInfo:       "+1234567890",
 				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
 				DisplayName:     "My MFA Phone",
 				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
