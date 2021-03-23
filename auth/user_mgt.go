@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	maxLenPayloadCC   = 1000
-	defaultProviderID = "firebase"
+	maxLenPayloadCC     = 1000
+	defaultProviderID   = "firebase"
+	idToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 
 	// Maximum number of users allowed to batch get at a time.
 	maxGetAccountsBatchSize = 100
@@ -217,6 +218,34 @@ func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate {
 	return u.set("photoUrl", url)
 }
 
+// ProviderToLink links this user to the specified provider.
+//
+// Linking a provider to an existing user account does not invalidate the
+// refresh token of that account. In other words, the existing account would
+// continue to be able to access resources, despite not having used the newly
+// linked provider to log in. If you wish to force the user to authenticate
+// with this new provider, you need to (a) revoke their refresh token (see
+// https://firebase.google.com/docs/auth/admin/manage-sessions#revoke_refresh_tokens),
+// and (b) ensure no other authentication methods are present on this account.
+func (u *UserToUpdate) ProviderToLink(userProvider *UserProvider) *UserToUpdate {
+	return u.set("linkProviderUserInfo", userProvider)
+}
+
+// ProvidersToDelete unlinks this user from the specified providers.
+func (u *UserToUpdate) ProvidersToDelete(providerIds []string) *UserToUpdate {
+	// skip setting the value to empty if it's already empty.
+	if len(providerIds) == 0 {
+		if u.params == nil {
+			return u
+		}
+		if _, ok := u.params["providersToDelete"]; !ok {
+			return u
+		}
+	}
+
+	return u.set("providersToDelete", providerIds)
+}
+
 // revokeRefreshTokens revokes all refresh tokens for a user by setting the validSince property
 // to the present in epoch seconds.
 func (u *UserToUpdate) revokeRefreshTokens() *UserToUpdate {
@@ -296,6 +325,78 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			return nil, err
 		}
 	}
+
+	if linkProviderUserInfo, ok := req["linkProviderUserInfo"]; ok {
+		userProvider := linkProviderUserInfo.(*UserProvider)
+		if err := validateProviderUserInfo(userProvider); err != nil {
+			return nil, err
+		}
+
+		// Although we don't really advertise it, we want to also handle linking of
+		// non-federated idps with this call. So if we detect one of them, we'll
+		// adjust the properties parameter appropriately. This *does* imply that a
+		// conflict could arise, e.g. if the user provides a phoneNumber property,
+		// but also provides a providerToLink with a 'phone' provider id. In that
+		// case, we'll return an error.
+
+		if userProvider.ProviderID == "email" {
+			if _, ok := req["email"]; ok {
+				// We could relax this to only return an error if the email addrs don't
+				// match. But for now, we'll be extra picky.
+				return nil, errors.New(
+					"both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+						"were set; to link to the email/password provider, only specify the " +
+						"UserToUpdate.Email field")
+			}
+			req["email"] = userProvider.UID
+			delete(req, "linkProviderUserInfo")
+		} else if userProvider.ProviderID == "phone" {
+			if _, ok := req["phoneNumber"]; ok {
+				// We could relax this to only return an error if the phone numbers don't
+				// match. But for now, we'll be extra picky.
+				return nil, errors.New(
+					"both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+						"were set; to link to the phone provider, only specify the " +
+						"UserToUpdate.PhoneNumber field")
+			}
+			req["phoneNumber"] = userProvider.UID
+			delete(req, "linkProviderUserInfo")
+		}
+	}
+
+	if providersToDelete, ok := req["providersToDelete"]; ok {
+		var deleteProvider []string
+		list, ok := req["deleteProvider"]
+		if ok {
+			deleteProvider = list.([]string)
+		}
+
+		for _, providerToDelete := range providersToDelete.([]string) {
+			if providerToDelete == "" {
+				return nil, errors.New("providersToDelete must not include empty strings")
+			}
+
+			// If we've been told to unlink the phone provider both via setting
+			// phoneNumber to "" *and* by setting providersToDelete to include
+			// 'phone', then we'll reject that. Though it might also be reasonable to
+			// relax this restriction and just unlink it.
+			if providerToDelete == "phone" {
+				for _, prov := range deleteProvider {
+					if prov == "phone" {
+						return nil, errors.New("both UserToUpdate.PhoneNumber='' and " +
+							"UserToUpdate.ProvidersToDelete=['phone'] were set; to unlink from a " +
+							"phone provider, only specify the UserToUpdate.PhoneNumber='' field")
+					}
+				}
+			}
+
+			deleteProvider = append(deleteProvider, providerToDelete)
+		}
+
+		req["deleteProvider"] = deleteProvider
+		delete(req, "providersToDelete")
+	}
+
 	return req, nil
 }
 
@@ -451,6 +552,16 @@ func validatePhone(phone string) error {
 	}
 	if !regexp.MustCompile(`\+.*[0-9A-Za-z]`).MatchString(phone) {
 		return fmt.Errorf("phone number must be a valid, E.164 compliant identifier")
+	}
+	return nil
+}
+
+func validateProviderUserInfo(p *UserProvider) error {
+	if p.UID == "" {
+		return fmt.Errorf("user provider must specify a uid")
+	}
+	if p.ProviderID == "" {
+		return fmt.Errorf("user provider must specify a provider ID")
 	}
 	return nil
 }

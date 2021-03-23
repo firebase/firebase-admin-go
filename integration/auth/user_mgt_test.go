@@ -386,37 +386,239 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	user := newUserWithParams(t)
-	defer deleteUser(user.UID)
+	// Creates a new user for testing purposes. The user's uid will be
+	// '$name_$tenRandomChars' and email will be
+	// '$name_$tenRandomChars@example.com'.
+	createTestUser := func(name string) *auth.UserRecord {
+		// TODO(rsgowman: This function could usefully be employed throughout
+		// this file.
+		tenRandomChars := generateRandomAlphaNumericString(10)
+		userRecord, err := client.CreateUser(context.Background(),
+			(&auth.UserToCreate{}).
+				UID(name+"_"+tenRandomChars).
+				DisplayName(name).
+				Email(name+"_"+tenRandomChars+"@example.com"),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return userRecord
+	}
 
-	uid := randomUID()
-	newEmail := randomEmail(uid)
-	newPhone := randomPhoneNumber()
-	want := auth.UserInfo{
-		UID:         user.UID,
-		Email:       newEmail,
-		PhoneNumber: newPhone,
-		DisplayName: "Updated Name",
-		ProviderID:  "firebase",
-		PhotoURL:    "https://example.com/updated.png",
+	mapToProviderUIDs := func(userInfos [](*auth.UserInfo)) []string {
+		providerUIDs := []string{}
+		for i := range userInfos {
+			providerUIDs = append(providerUIDs, userInfos[i].UID)
+		}
+		return providerUIDs
 	}
-	params := (&auth.UserToUpdate{}).
-		Email(newEmail).
-		PhoneNumber(newPhone).
-		DisplayName("Updated Name").
-		PhotoURL("https://example.com/updated.png").
-		EmailVerified(true).
-		Password("newpassowrd")
-	got, err := client.UpdateUser(context.Background(), user.UID, params)
-	if err != nil {
-		t.Fatal(err)
+
+	mapToProviderIDs := func(userInfos [](*auth.UserInfo)) []string {
+		providerIDs := []string{}
+		for i := range userInfos {
+			providerIDs = append(providerIDs, userInfos[i].ProviderID)
+		}
+		return providerIDs
 	}
-	if !reflect.DeepEqual(*got.UserInfo, want) {
-		t.Errorf("UpdateUser().UserInfo = (%#v, %v); want = (%#v, nil)", *got.UserInfo, err, want)
+
+	contains := func(list []string, target string) bool {
+		for i := range list {
+			if list[i] == target {
+				return true
+			}
+		}
+		return false
 	}
-	if !got.EmailVerified {
-		t.Error("UpdateUser().EmailVerified = false; want = true")
+
+	containsAll := func(list []string, targets []string) bool {
+		for i := range targets {
+			if !contains(list, targets[i]) {
+				return false
+			}
+		}
+		return true
 	}
+
+	containsNone := func(list []string, targets []string) bool {
+		for i := range targets {
+			if contains(list, targets[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	updateUser := createTestUser("UpdateUser")
+	defer deleteUser(updateUser.UID)
+
+	t.Run("SimpleUpdate", func(t *testing.T) {
+		uid := randomUID()
+		newEmail := randomEmail(uid)
+		newPhone := randomPhoneNumber()
+		want := auth.UserInfo{
+			UID:         updateUser.UID,
+			Email:       newEmail,
+			PhoneNumber: newPhone,
+			DisplayName: "Updated Name",
+			ProviderID:  "firebase",
+			PhotoURL:    "https://example.com/updated.png",
+		}
+		params := (&auth.UserToUpdate{}).
+			Email(newEmail).
+			PhoneNumber(newPhone).
+			DisplayName("Updated Name").
+			PhotoURL("https://example.com/updated.png").
+			EmailVerified(true).
+			Password("newpassowrd")
+		got, err := client.UpdateUser(context.Background(), updateUser.UID, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(*got.UserInfo, want) {
+			t.Errorf("UpdateUser().UserInfo = (%#v, %v); want = (%#v, nil)", *got.UserInfo, err, want)
+		}
+		if !got.EmailVerified {
+			t.Error("UpdateUser().EmailVerified = false; want = true")
+		}
+	})
+
+	t.Run("LinkFederatedProvider", func(t *testing.T) {
+		// Link user to federated provider
+		googleFederatedUID := "google_uid_" + generateRandomAlphaNumericString(10)
+		params := (&auth.UserToUpdate{}).
+			ProviderToLink((&auth.UserProvider{
+				ProviderID: "google.com",
+				UID:        googleFederatedUID,
+			}))
+		userRecord, err := client.UpdateUser(context.Background(), updateUser.UID, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			// Unlink user from federated provider
+			params = (&auth.UserToUpdate{}).ProvidersToDelete([]string{"google.com"})
+			userRecord, err = client.UpdateUser(context.Background(), updateUser.UID, params)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		// Ensure link operation worked as expected
+		providerUIDs := mapToProviderUIDs(userRecord.ProviderUserInfo)
+		providerIDs := mapToProviderIDs(userRecord.ProviderUserInfo)
+		if !contains(providerUIDs, googleFederatedUID) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID = %v; want include %q",
+				providerUIDs, googleFederatedUID)
+		}
+		if !contains(providerIDs, "google.com") {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID = %v; want include 'google.com'",
+				providerIDs)
+		}
+	})
+
+	t.Run("UnlinkFederatedProvider", func(t *testing.T) {
+		// Link user to federated provider
+		googleFederatedUID := "google_uid_" + generateRandomAlphaNumericString(10)
+		params := (&auth.UserToUpdate{}).
+			ProviderToLink((&auth.UserProvider{
+				ProviderID: "google.com",
+				UID:        googleFederatedUID,
+			}))
+		userRecord, err := client.UpdateUser(context.Background(), updateUser.UID, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unlink user from federated provider
+		params = (&auth.UserToUpdate{}).ProvidersToDelete([]string{"google.com"})
+		userRecord, err = client.UpdateUser(context.Background(), updateUser.UID, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Ensure unlink operation worked as expected
+		providerUIDs := mapToProviderUIDs(userRecord.ProviderUserInfo)
+		providerIDs := mapToProviderIDs(userRecord.ProviderUserInfo)
+		if contains(providerUIDs, googleFederatedUID) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID = %v; want NOT include %q",
+				providerUIDs, googleFederatedUID)
+		}
+		if contains(providerIDs, "google.com") {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID = %v; want NOT include 'google.com'",
+				providerIDs)
+		}
+	})
+
+	t.Run("UnlinkMultipleProvidersAtOnce", func(t *testing.T) {
+		deletePhoneNumberUser(t, "+15555550001")
+
+		googleFederatedUID := "google_uid_" + generateRandomAlphaNumericString(10)
+		facebookFederatedUID := "facebook_uid_" + generateRandomAlphaNumericString(10)
+
+		userRecord, err := client.UpdateUser(context.Background(), updateUser.UID,
+			(&auth.UserToUpdate{}).
+				PhoneNumber("+15555550001").
+				ProviderToLink((&auth.UserProvider{
+					ProviderID: "google.com",
+					UID:        googleFederatedUID,
+				})))
+		if err != nil {
+			t.Fatal(err)
+		}
+		userRecord, err = client.UpdateUser(context.Background(), updateUser.UID,
+			(&auth.UserToUpdate{}).
+				ProviderToLink((&auth.UserProvider{
+					ProviderID: "facebook.com",
+					UID:        facebookFederatedUID,
+				})))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		providerUIDs := mapToProviderUIDs(userRecord.ProviderUserInfo)
+		providerIDs := mapToProviderIDs(userRecord.ProviderUserInfo)
+		wantAll := []string{googleFederatedUID, facebookFederatedUID, "+15555550001"}
+		if !containsAll(providerUIDs, wantAll) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID want include all %v; got %v",
+				wantAll, providerUIDs)
+		}
+		wantAll = []string{"google.com", "facebook.com", "phone"}
+		if !containsAll(providerIDs, wantAll) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID want include all %v; got %v",
+				wantAll, providerIDs)
+		}
+
+		userRecord, err = client.UpdateUser(context.Background(), updateUser.UID,
+			(&auth.UserToUpdate{}).
+				ProvidersToDelete([]string{"google.com", "facebook.com", "phone"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		providerUIDs = mapToProviderUIDs(userRecord.ProviderUserInfo)
+		providerIDs = mapToProviderIDs(userRecord.ProviderUserInfo)
+		notWantAll := []string{googleFederatedUID, facebookFederatedUID, "+15555550001"}
+		if !containsNone(providerUIDs, notWantAll) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].UID want not include all %v; got %v",
+				notWantAll, providerUIDs)
+		}
+		notWantAll = []string{"google.com", "facebook.com", "phone"}
+		if !containsNone(providerIDs, notWantAll) {
+			t.Errorf("UpdateUser().ProviderUserInfo[*].ProviderID want not include all %v; got %v",
+				notWantAll, providerIDs)
+		}
+	})
+
+	t.Run("ErrorsGivenEmptyProvidersToDelete", func(t *testing.T) {
+		userRecord := createTestUser("ErrorWithEmptyProvidersToDeleteUser")
+		defer deleteUser(userRecord.UID)
+
+		gotUserRecord, err := client.UpdateUser(context.Background(), userRecord.UID,
+			(&auth.UserToUpdate{}).ProvidersToDelete([]string{}))
+		if err == nil || gotUserRecord != nil {
+			t.Errorf("UpdateUser() = (%#v, nil); want (nil, error)", gotUserRecord)
+		}
+	})
 }
 
 func TestDisableUser(t *testing.T) {
@@ -922,25 +1124,33 @@ func signInWithEmailLink(email, oobCode string) (string, error) {
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomUID() string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	b := make([]rune, 32)
-	for i := range b {
-		b[i] = letters[seededRand.Intn(len(letters))]
-	}
-	return string(b)
+	return generateRandomAlphaNumericString(32)
 }
 
 func randomPhoneNumber() string {
-	var digits = []rune("0123456789")
-	b := make([]rune, 10)
-	for i := range b {
-		b[i] = digits[rand.Intn(len(digits))]
-	}
-	return "+1" + string(b)
+	return "+1" + generateRandomNumericString(10)
 }
 
 func randomEmail(uid string) string {
 	return strings.ToLower(fmt.Sprintf("%s@example.%s.com", uid[:12], uid[12:]))
+}
+
+func generateRandomNumericString(length int) string {
+	digits := []rune("0123456789")
+	return generateRandomString(length, digits)
+}
+
+func generateRandomAlphaNumericString(length int) string {
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	return generateRandomString(length, letters)
+}
+
+func generateRandomString(length int, runes []rune) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = runes[seededRand.Intn(len(runes))]
+	}
+	return string(b)
 }
 
 func newUserWithParams(t *testing.T) *auth.UserRecord {
@@ -982,4 +1192,23 @@ func importUser(t *testing.T, uid string, userToImport *auth.UserToImport) *auth
 		t.Fatalf("GetUser(%s) for imported user failed: %v", uid, err)
 	}
 	return userRecord
+}
+
+// Helper function that deletes the user with the specified phone number if it
+// exists.
+// TODO(rsgowman): This function was ported from node.js port; a number of tests
+// there use this, but haven't been ported to go yet. Do so.
+func deletePhoneNumberUser(t *testing.T, phoneNumber string) {
+	userRecord, err := client.GetUserByPhoneNumber(context.Background(), phoneNumber)
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			// User already doesn't exist.
+			return
+		}
+		t.Fatal(err)
+	}
+
+	if err = client.DeleteUser(context.Background(), userRecord.UID); err != nil {
+		t.Fatal(err)
+	}
 }
