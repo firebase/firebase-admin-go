@@ -236,11 +236,8 @@ func (u *UserToImport) validatedUserInfo() (map[string]interface{}, error) {
 
 	if providers, ok := info["providerUserInfo"]; ok {
 		for _, p := range providers.([]*UserProvider) {
-			if p.UID == "" {
-				return nil, fmt.Errorf("user provdier must specify a uid")
-			}
-			if p.ProviderID == "" {
-				return nil, fmt.Errorf("user provider must specify a provider ID")
+			if err := validateProviderUserInfo(p); err != nil {
+				return nil, err
 			}
 		}
 	}

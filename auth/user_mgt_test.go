@@ -141,21 +141,95 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 	}
 }
 
+func TestGetUserByProviderIDNotFound(t *testing.T) {
+	mockUsers := []byte(`{ "users": [] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	userRecord, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
+	want := "cannot find user from providerID: { google.com, google_uid1 }"
+	if userRecord != nil || err == nil || err.Error() != want || !IsUserNotFound(err) {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+}
+
+func TestGetUserByProviderId(t *testing.T) {
+	cases := []struct {
+		providerID  string
+		providerUID string
+		want        string
+	}{
+		{
+			"google.com",
+			"google_uid1",
+			`{"federatedUserId":[{"providerId":"google.com","rawId":"google_uid1"}]}`,
+		}, {
+			"phone",
+			"+15555550001",
+			`{"phoneNumber":["+15555550001"]}`,
+		}, {
+			"email",
+			"user@example.com",
+			`{"email":["user@example.com"]}`,
+		},
+	}
+
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	for _, tc := range cases {
+		t.Run(tc.providerID+":"+tc.providerUID, func(t *testing.T) {
+
+			_, err := s.Client.GetUserByProviderID(context.Background(), tc.providerID, tc.providerUID)
+			if err != nil {
+				t.Fatalf("GetUserByProviderID() = %q", err)
+			}
+
+			got := string(s.Rbody)
+			if got != tc.want {
+				t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, tc.want)
+			}
+
+			wantPath := "/projects/mock-project-id/accounts:lookup"
+			if s.Req[0].RequestURI != wantPath {
+				t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+			}
+		})
+	}
+}
+
 func TestInvalidGetUser(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{},
 	}
+
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByEmail(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserByEmail('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByPhoneNumber(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	userRecord, err := client.GetUserByProviderID(context.Background(), "", "google_uid1")
+	want := "providerID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+
+	userRecord, err = client.GetUserByProviderID(context.Background(), "google.com", "")
+	want = "providerUID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
 
@@ -654,6 +728,48 @@ func TestInvalidUpdateUser(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).Password("short"),
 			"password must be a string at least 6 characters long",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com"}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com", UID: ""}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "", UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProvidersToDelete([]string{""}),
+			"providersToDelete must not include empty strings",
+		}, {
+			(&UserToUpdate{}).
+				Email("user@example.com").
+				ProviderToLink(&UserProvider{
+					ProviderID: "email",
+					UID:        "user@example.com",
+				}),
+			"both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+				"were set; to link to the email/password provider, only specify the " +
+				"UserToUpdate.Email field",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("+15555550001").
+				ProviderToLink(&UserProvider{
+					ProviderID: "phone",
+					UID:        "+15555550001",
+				}),
+			"both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+				"were set; to link to the phone provider, only specify the " +
+				"UserToUpdate.PhoneNumber field",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("").
+				ProvidersToDelete([]string{"phone"}),
+			"both UserToUpdate.PhoneNumber='' and " +
+				"UserToUpdate.ProvidersToDelete=['phone'] were set; to unlink from a " +
+				"phone provider, only specify the UserToUpdate.PhoneNumber='' field",
 		},
 	}
 
@@ -751,6 +867,43 @@ var updateUserCases = []struct {
 			"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
 			"deleteProvider":  []string{"phone"},
 		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "google.com",
+			UID:        "google_uid",
+		}),
+		map[string]interface{}{
+			"linkProviderUserInfo": &UserProvider{
+				ProviderID: "google.com",
+				UID:        "google_uid",
+			}},
+	},
+	{
+		(&UserToUpdate{}).PhoneNumber("").ProvidersToDelete([]string{"google.com"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"phone", "google.com"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProvidersToDelete([]string{"email", "phone"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"email", "phone"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "email",
+			UID:        "user@example.com",
+		}),
+		map[string]interface{}{"email": "user@example.com"},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "phone",
+			UID:        "+15555550001",
+		}),
+		map[string]interface{}{"phoneNumber": "+15555550001"},
 	},
 	{
 		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
@@ -1115,7 +1268,7 @@ func TestUserToImportError(t *testing.T) {
 					ProviderID: "google.com",
 				},
 			}),
-			"user provdier must specify a uid",
+			"user provider must specify a uid",
 		},
 	}
 
