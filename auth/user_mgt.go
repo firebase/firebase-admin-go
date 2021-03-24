@@ -609,7 +609,6 @@ func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*U
 	})
 }
 
-
 // GetUserByProviderID is an alias for GetUserByProviderUID.
 //
 // Deprecated. Use GetUserByProviderUID instead.
@@ -620,7 +619,7 @@ func (c *baseClient) GetUserByProviderID(ctx context.Context, providerID string,
 // GetUserByProviderUID gets the user data for the user corresponding to a given provider ID.
 //
 // See
-// [Retrieve user data](https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data)
+// https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data
 // for code samples and detailed documentation.
 //
 // `providerID` indicates the provider, such as 'google.com' for the Google provider.
