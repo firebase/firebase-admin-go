@@ -609,15 +609,22 @@ func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*U
 	})
 }
 
-// GetUserByProviderID gets the user data for the user corresponding to a given provider ID.
+// GetUserByProviderID is an alias for GetUserByProviderUID.
+//
+// Deprecated. Use GetUserByProviderUID instead.
+func (c *baseClient) GetUserByProviderID(ctx context.Context, providerID string, providerUID string) (*UserRecord, error) {
+	return c.GetUserByProviderUID(ctx, providerID, providerUID)
+}
+
+// GetUserByProviderUID gets the user data for the user corresponding to a given provider ID.
 //
 // See
-// [Retrieve user data](https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data)
+// https://firebase.google.com/docs/auth/admin/manage-users#retrieve_user_data
 // for code samples and detailed documentation.
 //
 // `providerID` indicates the provider, such as 'google.com' for the Google provider.
 // `providerUID` is the user identifier for the given provider.
-func (c *baseClient) GetUserByProviderID(ctx context.Context, providerID string, providerUID string) (*UserRecord, error) {
+func (c *baseClient) GetUserByProviderUID(ctx context.Context, providerID string, providerUID string) (*UserRecord, error) {
 	// Although we don't really advertise it, we want to also handle non-federated
 	// IDPs with this call. So if we detect one of them, we'll reroute this
 	// request appropriately.
