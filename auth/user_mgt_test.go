@@ -146,10 +146,10 @@ func TestGetUserByProviderIDNotFound(t *testing.T) {
 	s := echoServer(mockUsers, t)
 	defer s.Close()
 
-	userRecord, err := s.Client.GetUserByProviderID(context.Background(), "google.com", "google_uid1")
+	userRecord, err := s.Client.GetUserByProviderUID(context.Background(), "google.com", "google_uid1")
 	want := "cannot find user from providerID: { google.com, google_uid1 }"
 	if userRecord != nil || err == nil || err.Error() != want || !IsUserNotFound(err) {
-		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
 
@@ -182,19 +182,19 @@ func TestGetUserByProviderId(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.providerID+":"+tc.providerUID, func(t *testing.T) {
 
-			_, err := s.Client.GetUserByProviderID(context.Background(), tc.providerID, tc.providerUID)
+			_, err := s.Client.GetUserByProviderUID(context.Background(), tc.providerID, tc.providerUID)
 			if err != nil {
-				t.Fatalf("GetUserByProviderID() = %q", err)
+				t.Fatalf("GetUserByProviderUID() = %q", err)
 			}
 
 			got := string(s.Rbody)
 			if got != tc.want {
-				t.Errorf("GetUserByProviderID() Req = %v; want = %v", got, tc.want)
+				t.Errorf("GetUserByProviderUID() Req = %v; want = %v", got, tc.want)
 			}
 
 			wantPath := "/projects/mock-project-id/accounts:lookup"
 			if s.Req[0].RequestURI != wantPath {
-				t.Errorf("GetUserByProviderID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+				t.Errorf("GetUserByProviderUID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 			}
 		})
 	}
@@ -220,16 +220,16 @@ func TestInvalidGetUser(t *testing.T) {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
 	}
 
-	userRecord, err := client.GetUserByProviderID(context.Background(), "", "google_uid1")
+	userRecord, err := client.GetUserByProviderUID(context.Background(), "", "google_uid1")
 	want := "providerID must be a non-empty string"
 	if userRecord != nil || err == nil || err.Error() != want {
-		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 
-	userRecord, err = client.GetUserByProviderID(context.Background(), "google.com", "")
+	userRecord, err = client.GetUserByProviderUID(context.Background(), "google.com", "")
 	want = "providerUID must be a non-empty string"
 	if userRecord != nil || err == nil || err.Error() != want {
-		t.Errorf("GetUserByProviderID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
 
