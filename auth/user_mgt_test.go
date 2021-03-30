@@ -44,8 +44,7 @@ var testUser = &UserRecord{
 		PhotoURL:    "http://www.example.com/testuser/photo.png",
 		ProviderID:  defaultProviderID,
 	},
-	Disabled: false,
-
+	Disabled:      false,
 	EmailVerified: true,
 	ProviderUserInfo: []*UserInfo{
 		{
@@ -71,7 +70,7 @@ var testUser = &UserRecord{
 		EnrolledFactors: []*MultiFactorInfo{
 			{
 				UID:                 "0aaded3f-5e73-461d-aef9-37b48e3769be",
-				FactorID:            Phone,
+				FactorID:            "phone",
 				EnrollmentTimestamp: 1614776780000,
 				PhoneNumber:         "+1234567890",
 				DisplayName:         "My MFA Phone",
@@ -80,7 +79,6 @@ var testUser = &UserRecord{
 	},
 }
 
-var emptyFactors []*MultiFactorInfo
 var testUserWithoutMFA = &UserRecord{
 	UserInfo: &UserInfo{
 		UID:         "testusernomfa",
@@ -90,8 +88,7 @@ var testUserWithoutMFA = &UserRecord{
 		PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
 		ProviderID:  defaultProviderID,
 	},
-	Disabled: false,
-
+	Disabled:      false,
 	EmailVerified: true,
 	ProviderUserInfo: []*UserInfo{
 		{
@@ -113,9 +110,7 @@ var testUserWithoutMFA = &UserRecord{
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	TenantID:     "testTenant",
-	MultiFactor: &MultiFactorSettings{
-		EnrolledFactors: emptyFactors,
-	},
+	MultiFactor:  &MultiFactorSettings{},
 }
 
 func TestGetUser(t *testing.T) {
@@ -1674,6 +1669,22 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if exported.PasswordSalt != want.PasswordSalt {
 		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
+	}
+}
+
+func TestUnsupportedAuthFactor(t *testing.T) {
+	queryResponse := &userQueryResponse{
+		UID: "uid1",
+		MFAInfo: []*multiFactorInfoResponse{
+			{
+				MFAEnrollmentID: "enrollementId",
+			},
+		},
+	}
+
+	exported, err := queryResponse.makeExportedUserRecord()
+	if exported != nil || err == nil {
+		t.Errorf("makeExportedUserRecord() = (%v, %v); want = (nil, error)", exported, err)
 	}
 }
 
