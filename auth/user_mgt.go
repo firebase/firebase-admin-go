@@ -57,6 +57,37 @@ type UserInfo struct {
 	UID        string `json:"rawId,omitempty"`
 }
 
+// multiFactorInfoResponse describes the `mfaInfo` of the user record API response
+type multiFactorInfoResponse struct {
+	MFAEnrollmentID string `json:"mfaEnrollmentId,omitempty"`
+	DisplayName     string `json:"displayName,omitempty"`
+	PhoneInfo       string `json:"phoneInfo,omitempty"`
+	EnrolledAt      string `json:"enrolledAt,omitempty"`
+}
+
+// MultiFactorID represents the type of an enrolled factor, for now only Phone
+// is available.
+type MultiFactorID string
+
+const (
+	// Phone represents an enrolled factor of type Phone / SMS
+	Phone MultiFactorID = "phone"
+)
+
+// MultiFactorInfo describes a user enrolled second phone factor.
+type MultiFactorInfo struct {
+	UID                 string
+	DisplayName         string
+	EnrollmentTimestamp int64
+	FactorID            MultiFactorID
+	PhoneNumber         string
+}
+
+// MultiFactorSettings describes the multi-factor related user settings.
+type MultiFactorSettings struct {
+	EnrolledFactors []*MultiFactorInfo
+}
+
 // UserMetadata contains additional metadata associated with a user account.
 // Timestamps are in milliseconds since epoch.
 type UserMetadata struct {
@@ -77,6 +108,7 @@ type UserRecord struct {
 	TokensValidAfterMillis int64 // milliseconds since epoch.
 	UserMetadata           *UserMetadata
 	TenantID               string
+	MultiFactor            *MultiFactorSettings
 }
 
 // UserToCreate is the parameter struct for the CreateUser function.
@@ -892,23 +924,24 @@ func (c *baseClient) GetUsers(
 }
 
 type userQueryResponse struct {
-	UID                string      `json:"localId,omitempty"`
-	DisplayName        string      `json:"displayName,omitempty"`
-	Email              string      `json:"email,omitempty"`
-	PhoneNumber        string      `json:"phoneNumber,omitempty"`
-	PhotoURL           string      `json:"photoUrl,omitempty"`
-	CreationTimestamp  int64       `json:"createdAt,string,omitempty"`
-	LastLogInTimestamp int64       `json:"lastLoginAt,string,omitempty"`
-	LastRefreshAt      string      `json:"lastRefreshAt,omitempty"`
-	ProviderID         string      `json:"providerId,omitempty"`
-	CustomAttributes   string      `json:"customAttributes,omitempty"`
-	Disabled           bool        `json:"disabled,omitempty"`
-	EmailVerified      bool        `json:"emailVerified,omitempty"`
-	ProviderUserInfo   []*UserInfo `json:"providerUserInfo,omitempty"`
-	PasswordHash       string      `json:"passwordHash,omitempty"`
-	PasswordSalt       string      `json:"salt,omitempty"`
-	TenantID           string      `json:"tenantId,omitempty"`
-	ValidSinceSeconds  int64       `json:"validSince,string,omitempty"`
+	UID                string                     `json:"localId,omitempty"`
+	DisplayName        string                     `json:"displayName,omitempty"`
+	Email              string                     `json:"email,omitempty"`
+	PhoneNumber        string                     `json:"phoneNumber,omitempty"`
+	PhotoURL           string                     `json:"photoUrl,omitempty"`
+	CreationTimestamp  int64                      `json:"createdAt,string,omitempty"`
+	LastLogInTimestamp int64                      `json:"lastLoginAt,string,omitempty"`
+	LastRefreshAt      string                     `json:"lastRefreshAt,omitempty"`
+	ProviderID         string                     `json:"providerId,omitempty"`
+	CustomAttributes   string                     `json:"customAttributes,omitempty"`
+	Disabled           bool                       `json:"disabled,omitempty"`
+	EmailVerified      bool                       `json:"emailVerified,omitempty"`
+	ProviderUserInfo   []*UserInfo                `json:"providerUserInfo,omitempty"`
+	PasswordHash       string                     `json:"passwordHash,omitempty"`
+	PasswordSalt       string                     `json:"salt,omitempty"`
+	TenantID           string                     `json:"tenantId,omitempty"`
+	ValidSinceSeconds  int64                      `json:"validSince,string,omitempty"`
+	MFAInfo            []*multiFactorInfoResponse `json:"mfaInfo,omitempty"`
 }
 
 func (r *userQueryResponse) makeUserRecord() (*UserRecord, error) {
@@ -948,6 +981,28 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 		lastRefreshTimestamp = t.Unix() * 1000
 	}
 
+	// Map the MFA info to a slice of enrolled factors. Currently there is only
+	// support for PhoneMultiFactorInfo.
+	var enrolledFactors []*MultiFactorInfo
+	for _, factor := range r.MFAInfo {
+		var enrollmentTimestamp int64
+		if factor.EnrolledAt != "" {
+			t, err := time.Parse(time.RFC3339, factor.EnrolledAt)
+			if err != nil {
+				return nil, err
+			}
+			enrollmentTimestamp = t.Unix() * 1000
+		}
+
+		enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
+			UID:                 factor.MFAEnrollmentID,
+			DisplayName:         factor.DisplayName,
+			EnrollmentTimestamp: enrollmentTimestamp,
+			FactorID:            Phone,
+			PhoneNumber:         factor.PhoneInfo,
+		})
+	}
+
 	return &ExportedUserRecord{
 		UserRecord: &UserRecord{
 			UserInfo: &UserInfo{
@@ -968,6 +1023,9 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				LastLogInTimestamp:   r.LastLogInTimestamp,
 				CreationTimestamp:    r.CreationTimestamp,
 				LastRefreshTimestamp: lastRefreshTimestamp,
+			},
+			MultiFactor: &MultiFactorSettings{
+				EnrolledFactors: enrolledFactors,
 			},
 		},
 		PasswordHash: hash,
