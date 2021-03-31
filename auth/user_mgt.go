@@ -65,21 +65,12 @@ type multiFactorInfoResponse struct {
 	EnrolledAt      string `json:"enrolledAt,omitempty"`
 }
 
-// MultiFactorID represents the type of an enrolled factor, for now only Phone
-// is available.
-type MultiFactorID string
-
-const (
-	// Phone represents an enrolled factor of type Phone / SMS
-	Phone MultiFactorID = "phone"
-)
-
 // MultiFactorInfo describes a user enrolled second phone factor.
 type MultiFactorInfo struct {
 	UID                 string
 	DisplayName         string
 	EnrollmentTimestamp int64
-	FactorID            MultiFactorID
+	FactorID            string
 	PhoneNumber         string
 }
 
@@ -994,11 +985,15 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			enrollmentTimestamp = t.Unix() * 1000
 		}
 
+		if factor.PhoneInfo == "" {
+			return nil, fmt.Errorf("unsupported multi-factor auth response: %#v", factor)
+		}
+
 		enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
 			UID:                 factor.MFAEnrollmentID,
 			DisplayName:         factor.DisplayName,
 			EnrollmentTimestamp: enrollmentTimestamp,
-			FactorID:            Phone,
+			FactorID:            "phone",
 			PhoneNumber:         factor.PhoneInfo,
 		})
 	}
