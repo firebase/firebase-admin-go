@@ -44,8 +44,7 @@ var testUser = &UserRecord{
 		PhotoURL:    "http://www.example.com/testuser/photo.png",
 		ProviderID:  defaultProviderID,
 	},
-	Disabled: false,
-
+	Disabled:      false,
 	EmailVerified: true,
 	ProviderUserInfo: []*UserInfo{
 		{
@@ -67,6 +66,51 @@ var testUser = &UserRecord{
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	TenantID:     "testTenant",
+	MultiFactor: &MultiFactorSettings{
+		EnrolledFactors: []*MultiFactorInfo{
+			{
+				UID:                 "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				FactorID:            "phone",
+				EnrollmentTimestamp: 1614776780000,
+				PhoneNumber:         "+1234567890",
+				DisplayName:         "My MFA Phone",
+			},
+		},
+	},
+}
+
+var testUserWithoutMFA = &UserRecord{
+	UserInfo: &UserInfo{
+		UID:         "testusernomfa",
+		Email:       "testusernomfa@example.com",
+		PhoneNumber: "+1234567890",
+		DisplayName: "Test User Without MFA",
+		PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+		ProviderID:  defaultProviderID,
+	},
+	Disabled:      false,
+	EmailVerified: true,
+	ProviderUserInfo: []*UserInfo{
+		{
+			ProviderID:  "password",
+			DisplayName: "Test User Without MFA",
+			PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+			Email:       "testusernomfa@example.com",
+			UID:         "testuid",
+		}, {
+			ProviderID:  "phone",
+			PhoneNumber: "+1234567890",
+			UID:         "testuid",
+		},
+	},
+	TokensValidAfterMillis: 1494364393000,
+	UserMetadata: &UserMetadata{
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211232000,
+	},
+	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+	TenantID:     "testTenant",
+	MultiFactor:  &MultiFactorSettings{},
 }
 
 func TestGetUser(t *testing.T) {
@@ -501,7 +545,7 @@ func TestListUsers(t *testing.T) {
 	want := []*ExportedUserRecord{
 		{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
 		{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
-		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
+		{UserRecord: testUserWithoutMFA, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
 	testIterator := func(iter *UserIterator, token string, req string) {
@@ -1596,6 +1640,14 @@ func TestMakeExportedUser(t *testing.T) {
 				PhoneNumber: "+1234567890",
 				UID:         "testuid",
 			}},
+		MFAInfo: []*multiFactorInfoResponse{
+			{
+				PhoneInfo:       "+1234567890",
+				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				DisplayName:     "My MFA Phone",
+				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
+			},
+		},
 	}
 
 	want := &ExportedUserRecord{
@@ -1617,6 +1669,22 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if exported.PasswordSalt != want.PasswordSalt {
 		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
+	}
+}
+
+func TestUnsupportedAuthFactor(t *testing.T) {
+	queryResponse := &userQueryResponse{
+		UID: "uid1",
+		MFAInfo: []*multiFactorInfoResponse{
+			{
+				MFAEnrollmentID: "enrollementId",
+			},
+		},
+	}
+
+	exported, err := queryResponse.makeExportedUserRecord()
+	if exported != nil || err == nil {
+		t.Errorf("makeExportedUserRecord() = (%v, %v); want = (nil, error)", exported, err)
 	}
 }
 

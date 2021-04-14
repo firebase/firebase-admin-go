@@ -164,7 +164,7 @@ func TestTenantListUsers(t *testing.T) {
 	want := []*ExportedUserRecord{
 		{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
 		{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
-		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
+		{UserRecord: testUserWithoutMFA, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
 	testIterator := func(iter *UserIterator, token string, req string) {

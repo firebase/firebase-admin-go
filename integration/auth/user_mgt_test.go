@@ -403,6 +403,7 @@ func TestCreateUser(t *testing.T) {
 		t.Fatalf("CreateUser() = %v; want = nil", err)
 	}
 	defer deleteUser(user.UID)
+	var emptyFactors []*auth.MultiFactorInfo
 	want := auth.UserRecord{
 		UserInfo: &auth.UserInfo{
 			UID:        user.UID,
@@ -412,6 +413,9 @@ func TestCreateUser(t *testing.T) {
 			CreationTimestamp: user.UserMetadata.CreationTimestamp,
 		},
 		TokensValidAfterMillis: user.TokensValidAfterMillis,
+		MultiFactor: &auth.MultiFactorSettings{
+			EnrolledFactors: emptyFactors,
+		},
 	}
 	if !reflect.DeepEqual(*user, want) {
 		t.Errorf("CreateUser() = %#v; want = %#v", *user, want)
