@@ -44,8 +44,7 @@ var testUser = &UserRecord{
 		PhotoURL:    "http://www.example.com/testuser/photo.png",
 		ProviderID:  defaultProviderID,
 	},
-	Disabled: false,
-
+	Disabled:      false,
 	EmailVerified: true,
 	ProviderUserInfo: []*UserInfo{
 		{
@@ -67,6 +66,51 @@ var testUser = &UserRecord{
 	},
 	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
 	TenantID:     "testTenant",
+	MultiFactor: &MultiFactorSettings{
+		EnrolledFactors: []*MultiFactorInfo{
+			{
+				UID:                 "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				FactorID:            "phone",
+				EnrollmentTimestamp: 1614776780000,
+				PhoneNumber:         "+1234567890",
+				DisplayName:         "My MFA Phone",
+			},
+		},
+	},
+}
+
+var testUserWithoutMFA = &UserRecord{
+	UserInfo: &UserInfo{
+		UID:         "testusernomfa",
+		Email:       "testusernomfa@example.com",
+		PhoneNumber: "+1234567890",
+		DisplayName: "Test User Without MFA",
+		PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+		ProviderID:  defaultProviderID,
+	},
+	Disabled:      false,
+	EmailVerified: true,
+	ProviderUserInfo: []*UserInfo{
+		{
+			ProviderID:  "password",
+			DisplayName: "Test User Without MFA",
+			PhotoURL:    "http://www.example.com/testusernomfa/photo.png",
+			Email:       "testusernomfa@example.com",
+			UID:         "testuid",
+		}, {
+			ProviderID:  "phone",
+			PhoneNumber: "+1234567890",
+			UID:         "testuid",
+		},
+	},
+	TokensValidAfterMillis: 1494364393000,
+	UserMetadata: &UserMetadata{
+		CreationTimestamp:  1234567890000,
+		LastLogInTimestamp: 1233211232000,
+	},
+	CustomClaims: map[string]interface{}{"admin": true, "package": "gold"},
+	TenantID:     "testTenant",
+	MultiFactor:  &MultiFactorSettings{},
 }
 
 func TestGetUser(t *testing.T) {
@@ -141,21 +185,95 @@ func TestGetUserByPhoneNumber(t *testing.T) {
 	}
 }
 
+func TestGetUserByProviderIDNotFound(t *testing.T) {
+	mockUsers := []byte(`{ "users": [] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	userRecord, err := s.Client.GetUserByProviderUID(context.Background(), "google.com", "google_uid1")
+	want := "cannot find user from providerID: { google.com, google_uid1 }"
+	if userRecord != nil || err == nil || err.Error() != want || !IsUserNotFound(err) {
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+}
+
+func TestGetUserByProviderId(t *testing.T) {
+	cases := []struct {
+		providerID  string
+		providerUID string
+		want        string
+	}{
+		{
+			"google.com",
+			"google_uid1",
+			`{"federatedUserId":[{"providerId":"google.com","rawId":"google_uid1"}]}`,
+		}, {
+			"phone",
+			"+15555550001",
+			`{"phoneNumber":["+15555550001"]}`,
+		}, {
+			"email",
+			"user@example.com",
+			`{"email":["user@example.com"]}`,
+		},
+	}
+
+	// The resulting user isn't parsed, so it just needs to exist (even if it's empty).
+	mockUsers := []byte(`{ "users": [{}] }`)
+	s := echoServer(mockUsers, t)
+	defer s.Close()
+
+	for _, tc := range cases {
+		t.Run(tc.providerID+":"+tc.providerUID, func(t *testing.T) {
+
+			_, err := s.Client.GetUserByProviderUID(context.Background(), tc.providerID, tc.providerUID)
+			if err != nil {
+				t.Fatalf("GetUserByProviderUID() = %q", err)
+			}
+
+			got := string(s.Rbody)
+			if got != tc.want {
+				t.Errorf("GetUserByProviderUID() Req = %v; want = %v", got, tc.want)
+			}
+
+			wantPath := "/projects/mock-project-id/accounts:lookup"
+			if s.Req[0].RequestURI != wantPath {
+				t.Errorf("GetUserByProviderUID() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+			}
+		})
+	}
+}
+
 func TestInvalidGetUser(t *testing.T) {
 	client := &Client{
 		baseClient: &baseClient{},
 	}
+
 	user, err := client.GetUser(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUser('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByEmail(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserByEmail('') = (%v, %v); want = (nil, error)", user, err)
 	}
+
 	user, err = client.GetUserByPhoneNumber(context.Background(), "")
 	if user != nil || err == nil {
 		t.Errorf("GetUserPhoneNumber('') = (%v, %v); want = (nil, error)", user, err)
+	}
+
+	userRecord, err := client.GetUserByProviderUID(context.Background(), "", "google_uid1")
+	want := "providerID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
+	}
+
+	userRecord, err = client.GetUserByProviderUID(context.Background(), "google.com", "")
+	want = "providerUID must be a non-empty string"
+	if userRecord != nil || err == nil || err.Error() != want {
+		t.Errorf("GetUserByProviderUID() = (%v, %q); want = (nil, %q)", userRecord, err, want)
 	}
 }
 
@@ -427,7 +545,7 @@ func TestListUsers(t *testing.T) {
 	want := []*ExportedUserRecord{
 		{UserRecord: testUser, PasswordHash: "passwordhash1", PasswordSalt: "salt1"},
 		{UserRecord: testUser, PasswordHash: "passwordhash2", PasswordSalt: "salt2"},
-		{UserRecord: testUser, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
+		{UserRecord: testUserWithoutMFA, PasswordHash: "passwordhash3", PasswordSalt: "salt3"},
 	}
 
 	testIterator := func(iter *UserIterator, token string, req string) {
@@ -654,6 +772,48 @@ func TestInvalidUpdateUser(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).Password("short"),
 			"password must be a string at least 6 characters long",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com"}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "google.com", UID: ""}),
+			"user provider must specify a uid",
+		}, {
+			(&UserToUpdate{}).ProviderToLink(&UserProvider{ProviderID: "", UID: "google_uid"}),
+			"user provider must specify a provider ID",
+		}, {
+			(&UserToUpdate{}).ProvidersToDelete([]string{""}),
+			"providersToDelete must not include empty strings",
+		}, {
+			(&UserToUpdate{}).
+				Email("user@example.com").
+				ProviderToLink(&UserProvider{
+					ProviderID: "email",
+					UID:        "user@example.com",
+				}),
+			"both UserToUpdate.Email and UserToUpdate.ProviderToLink.ProviderID='email' " +
+				"were set; to link to the email/password provider, only specify the " +
+				"UserToUpdate.Email field",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("+15555550001").
+				ProviderToLink(&UserProvider{
+					ProviderID: "phone",
+					UID:        "+15555550001",
+				}),
+			"both UserToUpdate.PhoneNumber and UserToUpdate.ProviderToLink.ProviderID='phone' " +
+				"were set; to link to the phone provider, only specify the " +
+				"UserToUpdate.PhoneNumber field",
+		}, {
+			(&UserToUpdate{}).
+				PhoneNumber("").
+				ProvidersToDelete([]string{"phone"}),
+			"both UserToUpdate.PhoneNumber='' and " +
+				"UserToUpdate.ProvidersToDelete=['phone'] were set; to unlink from a " +
+				"phone provider, only specify the UserToUpdate.PhoneNumber='' field",
 		},
 	}
 
@@ -751,6 +911,43 @@ var updateUserCases = []struct {
 			"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
 			"deleteProvider":  []string{"phone"},
 		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "google.com",
+			UID:        "google_uid",
+		}),
+		map[string]interface{}{
+			"linkProviderUserInfo": &UserProvider{
+				ProviderID: "google.com",
+				UID:        "google_uid",
+			}},
+	},
+	{
+		(&UserToUpdate{}).PhoneNumber("").ProvidersToDelete([]string{"google.com"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"phone", "google.com"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProvidersToDelete([]string{"email", "phone"}),
+		map[string]interface{}{
+			"deleteProvider": []string{"email", "phone"},
+		},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "email",
+			UID:        "user@example.com",
+		}),
+		map[string]interface{}{"email": "user@example.com"},
+	},
+	{
+		(&UserToUpdate{}).ProviderToLink(&UserProvider{
+			ProviderID: "phone",
+			UID:        "+15555550001",
+		}),
+		map[string]interface{}{"phoneNumber": "+15555550001"},
 	},
 	{
 		(&UserToUpdate{}).CustomClaims(map[string]interface{}{"a": strings.Repeat("a", 992)}),
@@ -1115,7 +1312,7 @@ func TestUserToImportError(t *testing.T) {
 					ProviderID: "google.com",
 				},
 			}),
-			"user provdier must specify a uid",
+			"user provider must specify a uid",
 		},
 	}
 
@@ -1443,6 +1640,14 @@ func TestMakeExportedUser(t *testing.T) {
 				PhoneNumber: "+1234567890",
 				UID:         "testuid",
 			}},
+		MFAInfo: []*multiFactorInfoResponse{
+			{
+				PhoneInfo:       "+1234567890",
+				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				DisplayName:     "My MFA Phone",
+				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
+			},
+		},
 	}
 
 	want := &ExportedUserRecord{
@@ -1464,6 +1669,22 @@ func TestMakeExportedUser(t *testing.T) {
 	}
 	if exported.PasswordSalt != want.PasswordSalt {
 		t.Errorf("PasswordSalt = %q; want = %q", exported.PasswordSalt, want.PasswordSalt)
+	}
+}
+
+func TestUnsupportedAuthFactor(t *testing.T) {
+	queryResponse := &userQueryResponse{
+		UID: "uid1",
+		MFAInfo: []*multiFactorInfoResponse{
+			{
+				MFAEnrollmentID: "enrollementId",
+			},
+		},
+	}
+
+	exported, err := queryResponse.makeExportedUserRecord()
+	if exported != nil || err == nil {
+		t.Errorf("makeExportedUserRecord() = (%v, %v); want = (nil, error)", exported, err)
 	}
 }
 
