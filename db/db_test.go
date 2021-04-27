@@ -160,7 +160,7 @@ func TestInvalidURL(t *testing.T) {
 		"",
 		"foo",
 		"http://db.firebaseio.com",
-		"https://firebase.google.com",
+		"http://firebase.google.com",
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
