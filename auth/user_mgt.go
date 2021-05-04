@@ -450,6 +450,7 @@ const (
 	// Backend-generated error codes
 	configurationNotFound    = "CONFIGURATION_NOT_FOUND"
 	emailAlreadyExists       = "EMAIL_ALREADY_EXISTS"
+	emailNotFound            = "EMAIL_NOT_FOUND"
 	invalidDynamicLinkDomain = "INVALID_DYNAMIC_LINK_DOMAIN"
 	phoneNumberAlreadyExists = "PHONE_NUMBER_ALREADY_EXISTS"
 	tenantNotFound           = "TENANT_NOT_FOUND"
@@ -466,6 +467,11 @@ func IsConfigurationNotFound(err error) bool {
 // IsEmailAlreadyExists checks if the given error was due to a duplicate email.
 func IsEmailAlreadyExists(err error) bool {
 	return hasAuthErrorCode(err, emailAlreadyExists)
+}
+
+// IsEmailNotFound checks if the given error was due to the user record corresponding to the email not being found.
+func IsEmailNotFound(err error) bool {
+	return hasAuthErrorCode(err, emailNotFound)
 }
 
 // IsInsufficientPermission checks if the given error was due to insufficient permissions.
@@ -1297,6 +1303,11 @@ var serverError = map[string]*authError{
 		code:     internal.AlreadyExists,
 		message:  "user with the provided email already exists",
 		authCode: emailAlreadyExists,
+	},
+	"EMAIL_NOT_FOUND": {
+		code:     internal.NotFound,
+		message:  "no user record found for the given email",
+		authCode: emailNotFound,
 	},
 	"INVALID_DYNAMIC_LINK_DOMAIN": {
 		code:     internal.InvalidArgument,
