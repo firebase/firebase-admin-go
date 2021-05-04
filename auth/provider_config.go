@@ -38,11 +38,15 @@ const (
 	spEntityIDKey  = "spConfig.spEntityId"
 	callbackURIKey = "spConfig.callbackUri"
 
-	clientIDKey = "clientId"
-	issuerKey   = "issuer"
+	clientIDKey     = "clientId"
+	clientSecretKey = "clientSecret"
+	issuerKey       = "issuer"
 
 	displayNameKey = "displayName"
 	enabledKey     = "enabled"
+
+	idTokenResponseTypeKey = "responseType.idToken"
+	codeResponseTypeKey    = "responseType.code"
 )
 
 type nestedMap map[string]interface{}
@@ -113,11 +117,14 @@ func buildMask(data map[string]interface{}) []string {
 // OIDCProviderConfig is the OIDC auth provider configuration.
 // See https://openid.net/specs/openid-connect-core-1_0-final.html.
 type OIDCProviderConfig struct {
-	ID          string
-	DisplayName string
-	Enabled     bool
-	ClientID    string
-	Issuer      string
+	ID                  string
+	DisplayName         string
+	Enabled             bool
+	ClientID            string
+	Issuer              string
+	ClientSecret        string
+	CodeResponseType    bool
+	IDTokenResponseType bool
 }
 
 // OIDCProviderConfigToCreate represents the options used to create a new OIDCProviderConfig.
@@ -152,6 +159,18 @@ func (config *OIDCProviderConfigToCreate) Enabled(enabled bool) *OIDCProviderCon
 	return config.set(enabledKey, enabled)
 }
 
+func (config *OIDCProviderConfigToCreate) ClientSecret(secret string) *OIDCProviderConfigToCreate {
+	return config.set(clientSecretKey, secret)
+}
+
+func (config *OIDCProviderConfigToCreate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToCreate {
+	return config.set(idTokenResponseTypeKey, enabled)
+}
+
+func (config *OIDCProviderConfigToCreate) CodeResponseType(enabled bool) *OIDCProviderConfigToCreate {
+	return config.set(codeResponseTypeKey, enabled)
+}
+
 func (config *OIDCProviderConfigToCreate) set(key string, value interface{}) *OIDCProviderConfigToCreate {
 	if config.params == nil {
 		config.params = make(nestedMap)
@@ -178,6 +197,12 @@ func (config *OIDCProviderConfigToCreate) buildRequest() (nestedMap, string, err
 		return nil, "", errors.New("Issuer must not be empty")
 	} else if _, err := url.ParseRequestURI(val); err != nil {
 		return nil, "", fmt.Errorf("failed to parse Issuer: %v", err)
+	}
+
+	if val, ok := config.params.Get(codeResponseTypeKey); ok && val.(bool) {
+		if val, ok := config.params.GetString(clientSecretKey); !ok || val == "" {
+			return nil, "", errors.New("Client Secret must not be empty for Code Response Type")
+		}
 	}
 
 	return config.params, config.id, nil
@@ -213,6 +238,18 @@ func (config *OIDCProviderConfigToUpdate) Enabled(enabled bool) *OIDCProviderCon
 	return config.set(enabledKey, enabled)
 }
 
+func (config *OIDCProviderConfigToUpdate) ClientSecret(secret string) *OIDCProviderConfigToUpdate {
+	return config.set(clientSecretKey, secret)
+}
+
+func (config *OIDCProviderConfigToUpdate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToUpdate {
+	return config.set(idTokenResponseTypeKey, enabled)
+}
+
+func (config *OIDCProviderConfigToUpdate) CodeResponseType(enabled bool) *OIDCProviderConfigToUpdate {
+	return config.set(codeResponseTypeKey, enabled)
+}
+
 func (config *OIDCProviderConfigToUpdate) set(key string, value interface{}) *OIDCProviderConfigToUpdate {
 	if config.params == nil {
 		config.params = make(nestedMap)
@@ -237,6 +274,12 @@ func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 		}
 		if _, err := url.ParseRequestURI(val); err != nil {
 			return nil, fmt.Errorf("failed to parse Issuer: %v", err)
+		}
+	}
+
+	if val, ok := config.params.Get(codeResponseTypeKey); ok && val.(bool) {
+		if val, ok := config.params.GetString(clientSecretKey); !ok || val == "" {
+			return nil, errors.New("Client Secret must not be empty for Code Response Type")
 		}
 	}
 
@@ -826,20 +869,30 @@ func (c *baseClient) makeRequest(
 }
 
 type oidcProviderConfigDAO struct {
-	Name        string `json:"name"`
-	ClientID    string `json:"clientId"`
-	Issuer      string `json:"issuer"`
-	DisplayName string `json:"displayName"`
-	Enabled     bool   `json:"enabled"`
+	Name         string                   `json:"name"`
+	ClientID     string                   `json:"clientId"`
+	Issuer       string                   `json:"issuer"`
+	DisplayName  string                   `json:"displayName"`
+	Enabled      bool                     `json:"enabled"`
+	ClientSecret string                   `json:"clientSecret"`
+	ResponseType oidcProviderResponseType `json:"responseType"`
+}
+
+type oidcProviderResponseType struct {
+	Code    bool `json:"code"`
+	IDToken bool `json:"idToken"`
 }
 
 func (dao *oidcProviderConfigDAO) toOIDCProviderConfig() *OIDCProviderConfig {
 	return &OIDCProviderConfig{
-		ID:          extractResourceID(dao.Name),
-		DisplayName: dao.DisplayName,
-		Enabled:     dao.Enabled,
-		ClientID:    dao.ClientID,
-		Issuer:      dao.Issuer,
+		ID:                  extractResourceID(dao.Name),
+		DisplayName:         dao.DisplayName,
+		Enabled:             dao.Enabled,
+		ClientID:            dao.ClientID,
+		Issuer:              dao.Issuer,
+		ClientSecret:        dao.ClientSecret,
+		CodeResponseType:    dao.ResponseType.Code,
+		IDTokenResponseType: dao.ResponseType.IDToken,
 	}
 }
 
