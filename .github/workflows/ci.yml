@@ -25,6 +25,11 @@ jobs:
         GOLINT=`go list -f {{.Target}} golang.org/x/lint/golint`
         $GOLINT -set_exit_status ./...
 
+    # Fix https://github.com/golang/go/issues/44129#issuecomment-788351567
+    - name: Fetch dependencies
+      if: matrix.go == '1.16'
+      run: go get -t ./...
+
     - name: Run Unit Tests
       if: success() || failure()
       run: go test -v -race -test.short ./...
