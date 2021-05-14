@@ -6,8 +6,9 @@ jobs:
     name: Module build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go: [1.14, 1.15]
+        go: [1.14, 1.15, 1.16]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
