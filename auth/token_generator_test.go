@@ -103,6 +103,10 @@ func TestServiceAccountSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmRS256 {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmRS256)
+	}
 	email, err := signer.Email(context.Background())
 	if email != sa.ClientEmail || err != nil {
 		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, sa.ClientEmail)
@@ -122,6 +126,11 @@ func TestIAMSigner(t *testing.T) {
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmRS256 {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmRS256)
 	}
 	email, err := signer.Email(ctx)
 	if email != conf.ServiceAccountID || err != nil {
@@ -265,8 +274,38 @@ func TestIAMSignerNoMetadataService(t *testing.T) {
 	}
 }
 
+func TestEmulatedSigner(t *testing.T) {
+	signer := emulatedSigner{}
+
+	algorithm := signer.Algorithm()
+	if algorithm != algorithmNone {
+		t.Errorf("Algorithm() = %q; want = %q", algorithm, algorithmNone)
+	}
+
+	email, err := signer.Email(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if email != emulatorEmail {
+		t.Errorf("Email() = %q; want = %q", email, emulatorEmail)
+	}
+
+	wantSignature := ""
+	sign, err := signer.Sign(context.Background(), []byte("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sign) != wantSignature {
+		t.Errorf("Sign() = %q; want = %q", string(sign), wantSignature)
+	}
+}
+
 type mockSigner struct {
 	err error
+}
+
+func (s *mockSigner) Algorithm() string {
+	return ""
 }
 
 func (s *mockSigner) Email(ctx context.Context) (string, error) {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -28,9 +29,11 @@ import (
 )
 
 const (
-	authErrorCode    = "authErrorCode"
-	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
-	oneHourInSeconds = 3600
+	authErrorCode      = "authErrorCode"
+	emulatorHostEnvVar = "FIREBASE_AUTH_EMULATOR_HOST"
+	defaultAuthURL     = "https://identitytoolkit.googleapis.com"
+	firebaseAudience   = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+	oneHourInSeconds   = 3600
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
@@ -58,18 +61,27 @@ type Client struct {
 // Auth service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
 	var (
-		signer cryptoSigner
-		err    error
+		isEmulator bool
+		signer     cryptoSigner
+		err        error
 	)
 
-	creds, _ := transport.Creds(ctx, conf.Opts...)
+	authEmulatorHost := os.Getenv(emulatorHostEnvVar)
+	if authEmulatorHost != "" {
+		isEmulator = true
+		signer = emulatedSigner{}
+	}
 
-	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if creds != nil && len(creds.JSON) > 0 {
-		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(creds.JSON)
-		if err != nil && err != errNotAServiceAcct {
-			return nil, err
+	if signer == nil {
+		creds, _ := transport.Creds(ctx, conf.Opts...)
+
+		// Initialize a signer by following the go/firebase-admin-sign protocol.
+		if creds != nil && len(creds.JSON) > 0 {
+			// If the SDK was initialized with a service account, use it to sign bytes.
+			signer, err = signerFromCreds(creds.JSON)
+			if err != nil && err != errNotAServiceAcct {
+				return nil, err
+			}
 		}
 	}
 
@@ -112,15 +124,27 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
 	}
 
+	baseURL := defaultAuthURL
+	if isEmulator {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
+	}
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
+
 	base := &baseClient{
-		userManagementEndpoint: idToolkitV1Endpoint,
+		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
+		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
 		cookieVerifier:         cookieVerifier,
 		signer:                 signer,
 		clock:                  internal.SystemClock,
+		isEmulator:             isEmulator,
 	}
 	return &Client{
 		baseClient:    base,
@@ -177,7 +201,7 @@ func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devC
 
 	now := c.clock.Now().Unix()
 	info := &jwtInfo{
-		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		header: jwtHeader{Algorithm: c.signer.Algorithm(), Type: "JWT"},
 		payload: &customToken{
 			Iss:      iss,
 			Sub:      iss,
@@ -234,6 +258,7 @@ type FirebaseInfo struct {
 type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
+	tenantMgtEndpoint      string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
@@ -241,6 +266,7 @@ type baseClient struct {
 	cookieVerifier         *tokenVerifier
 	signer                 cryptoSigner
 	clock                  internal.Clock
+	isEmulator             bool
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {
@@ -257,15 +283,34 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens#retrieve_id_tokens_on_clients for
 // more details on how to obtain an ID token in a client app.
 //
-// This function does not make any RPC calls most of the time. The only time it makes an RPC call
-// is when Google public keys need to be refreshed. These keys get cached up to 24 hours, and
-// therefore the RPC overhead gets amortized over many invocations of this function.
+// In non-emulator mode, this function does not make any RPC calls most of the time.
+// The only time it makes an RPC call is when Google public keys need to be refreshed.
+// These keys get cached up to 24 hours, and therefore the RPC overhead gets amortized
+// over many invocations of this function.
 //
 // This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
-	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken)
-	if err == nil && c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
+	return c.verifyIDToken(ctx, idToken, false)
+}
+
+// VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
+// token has not been revoked.
+//
+// Unlike `VerifyIDToken()`, this function must make an RPC call to perform the revocation check.
+// Developers are advised to take this additional overhead into consideration when including this
+// function in an authorization flow that gets executed often.
+func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
+	return c.verifyIDToken(ctx, idToken, true)
+}
+
+func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
+	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken, c.isEmulator)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
 			String:    fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
@@ -275,43 +320,29 @@ func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token,
 		}
 	}
 
-	return decoded, err
+	if c.isEmulator || checkRevoked {
+		revoked, err := c.checkRevoked(ctx, decoded)
+		if err != nil {
+			return nil, err
+		}
+
+		if revoked {
+			return nil, &internal.FirebaseError{
+				ErrorCode: internal.InvalidArgument,
+				String:    "ID token has been revoked",
+				Ext: map[string]interface{}{
+					authErrorCode: idTokenRevoked,
+				},
+			}
+		}
+	}
+
+	return decoded, nil
 }
 
 // IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
 func IsTenantIDMismatch(err error) bool {
 	return hasAuthErrorCode(err, tenantIDMismatch)
-}
-
-// VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
-// token has not been revoked.
-//
-// This function uses `VerifyIDToken()` internally to verify the ID token JWT. However, unlike
-// `VerifyIDToken()` this function must make an RPC call to perform the revocation check.
-// Developers are advised to take this additional overhead into consideration when including this
-// function in an authorization flow that gets executed often.
-func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken string) (*Token, error) {
-	decoded, err := c.VerifyIDToken(ctx, idToken)
-	if err != nil {
-		return nil, err
-	}
-
-	revoked, err := c.checkRevoked(ctx, decoded)
-	if err != nil {
-		return nil, err
-	}
-
-	if revoked {
-		return nil, &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "ID token has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: idTokenRevoked,
-			},
-		}
-	}
-
-	return decoded, nil
 }
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
@@ -328,41 +359,47 @@ func IsIDTokenRevoked(err error) bool {
 // decoded claims in the input JWT. See https://firebase.google.com/docs/auth/admin/manage-cookies for more details on
 // how to obtain a session cookie.
 //
-// This function does not make any RPC calls most of the time. The only time it makes an RPC call
-// is when Google public keys need to be refreshed. These keys get cached up to 24 hours, and
-// therefore the RPC overhead gets amortized over many invocations of this function.
+// In non-emulator mode, this function does not make any RPC calls most of the time.
+// The only time it makes an RPC call is when Google public keys need to be refreshed.
+// These keys get cached up to 24 hours, and therefore the RPC overhead gets amortized
+// over many invocations of this function.
 //
 // This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
-	return c.cookieVerifier.VerifyToken(ctx, sessionCookie)
+	return c.verifySessionCookie(ctx, sessionCookie, false)
 }
 
 // VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
 // cookie has not been revoked.
 //
-// This function uses `VerifySessionCookie()` internally to verify the cookie JWT. However, unlike
-// `VerifySessionCookie()` this function must make an RPC call to perform the revocation check.
+// Unlike `VerifySessionCookie()`, this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
 func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
-	decoded, err := c.VerifySessionCookie(ctx, sessionCookie)
+	return c.verifySessionCookie(ctx, sessionCookie, true)
+}
+
+func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevoked bool) (*Token, error) {
+	decoded, err := c.cookieVerifier.VerifyToken(ctx, sessionCookie, c.isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	revoked, err := c.checkRevoked(ctx, decoded)
-	if err != nil {
-		return nil, err
-	}
+	if c.isEmulator || checkRevoked {
+		revoked, err := c.checkRevoked(ctx, decoded)
+		if err != nil {
+			return nil, err
+		}
 
-	if revoked {
-		return nil, &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "session cookie has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: sessionCookieRevoked,
-			},
+		if revoked {
+			return nil, &internal.FirebaseError{
+				ErrorCode: internal.InvalidArgument,
+				String:    "session cookie has been revoked",
+				Ext: map[string]interface{}{
+					authErrorCode: sessionCookieRevoked,
+				},
+			}
 		}
 	}
 

@@ -559,6 +559,101 @@ var validMessages = []struct {
 			"topic": "test-topic",
 		},
 	},
+	{
+		name: "AndroidNotificationPriorityMin",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Priority: PriorityMin,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"notification_priority": "PRIORITY_MIN",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationPriorityLow",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Priority: PriorityLow,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"notification_priority": "PRIORITY_LOW",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationPriorityDefault",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Priority: PriorityDefault,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"notification_priority": "PRIORITY_DEFAULT",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationPriorityHigh",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Priority: PriorityHigh,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"notification_priority": "PRIORITY_HIGH",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationPriorityMax",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Priority: PriorityMax,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"notification_priority": "PRIORITY_MAX",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
 }
 
 var invalidMessages = []struct {
