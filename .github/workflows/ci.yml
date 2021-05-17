@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [1.12, 1.13, 1.14]
+        go: [1.12, 1.16]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
@@ -15,12 +15,14 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
 
+    - name: Install golint
+      run: go get golang.org/x/lint/golint
+
     - name: Check out code
       uses: actions/checkout@v2
 
     - name: Run Linter
       run: |
-        go get -u golang.org/x/lint/golint
         GOLINT=`go list -f {{.Target}} golang.org/x/lint/golint`
         $GOLINT -set_exit_status ./...
 
