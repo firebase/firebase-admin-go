@@ -6,6 +6,7 @@ jobs:
     name: Module build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         go: [1.12, 1.16]
 
@@ -46,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOPATH: ${{ github.workspace }}/go
+      GO111MODULE: off
 
     steps:
     - name: Set up Go 1.16
