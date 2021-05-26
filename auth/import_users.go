@@ -143,8 +143,19 @@ func (u *UserToImport) PhoneNumber(phoneNumber string) *UserToImport {
 
 // Metadata setter.
 func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
-	u.set("createdAt", metadata.CreationTimestamp)
-	return u.set("lastLoginAt", metadata.LastLogInTimestamp)
+	if metadata == nil {
+		return u
+	}
+
+	if metadata.CreationTimestamp != 0 {
+		u.set("createdAt", metadata.CreationTimestamp)
+	}
+
+	if metadata.LastLogInTimestamp != 0 {
+		u.set("lastLoginAt", metadata.LastLogInTimestamp)
+	}
+
+	return u
 }
 
 // CustomClaims setter.
