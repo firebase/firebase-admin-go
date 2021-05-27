@@ -1186,11 +1186,11 @@ func TestUserToImport(t *testing.T) {
 		},
 		{
 			user: (&UserToImport{}).UID("test").Metadata(&UserMetadata{
-				CreationTimestamp:  int64(100),
+				CreationTimestamp: int64(100),
 			}),
 			want: map[string]interface{}{
-				"localId":     "test",
-				"createdAt":   int64(100),
+				"localId":   "test",
+				"createdAt": int64(100),
 			},
 		},
 		{

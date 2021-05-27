@@ -143,10 +143,6 @@ func (u *UserToImport) PhoneNumber(phoneNumber string) *UserToImport {
 
 // Metadata setter.
 func (u *UserToImport) Metadata(metadata *UserMetadata) *UserToImport {
-	if metadata == nil {
-		return u
-	}
-
 	if metadata.CreationTimestamp != 0 {
 		u.set("createdAt", metadata.CreationTimestamp)
 	}
