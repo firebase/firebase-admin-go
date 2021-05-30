@@ -1,4 +1,4 @@
-module github.com/zkrzyzanowski/firebase-admin-go/v4
+module firebase.google.com/go/v4
 
 go 1.11
 
@@ -9,3 +9,5 @@ require (
 	google.golang.org/api v0.40.0
 	google.golang.org/appengine v1.6.7
 )
+
+replace firebase.google.com/go/v4 => github.com/zkrzyzanowski/firebase-admin-go/v4 v4.6.0
