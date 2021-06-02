@@ -1185,6 +1185,24 @@ func TestUserToImport(t *testing.T) {
 			},
 		},
 		{
+			user: (&UserToImport{}).UID("test").Metadata(&UserMetadata{
+				CreationTimestamp: int64(100),
+			}),
+			want: map[string]interface{}{
+				"localId":   "test",
+				"createdAt": int64(100),
+			},
+		},
+		{
+			user: (&UserToImport{}).UID("test").Metadata(&UserMetadata{
+				LastLogInTimestamp: int64(150),
+			}),
+			want: map[string]interface{}{
+				"localId":     "test",
+				"lastLoginAt": int64(150),
+			},
+		},
+		{
 			user: (&UserToImport{}).UID("test").PasswordHash([]byte("password")),
 			want: map[string]interface{}{
 				"localId":      "test",

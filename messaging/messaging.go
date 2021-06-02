@@ -263,7 +263,7 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 		priorities := map[string]AndroidNotificationPriority{
 			"PRIORITY_MIN":     PriorityMin,
 			"PRIORITY_LOW":     PriorityLow,
-			"PRIORITY_DEFUALT": PriorityDefault,
+			"PRIORITY_DEFAULT": PriorityDefault,
 			"PRIORITY_HIGH":    PriorityHigh,
 			"PRIORITY_MAX":     PriorityMax,
 		}

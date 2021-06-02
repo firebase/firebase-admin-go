@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
 const (
@@ -174,6 +176,27 @@ func TestPasswordResetLinkWithSettings(t *testing.T) {
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
 		t.Fatalf("PasswordResetLinkWithSettings() %v", err)
+	}
+}
+
+func TestPasswordResetLinkWithSettingsNonExistingUser(t *testing.T) {
+	resp := `{
+		"error": {
+			"message": "EMAIL_NOT_FOUND"
+		}
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	s.Status = http.StatusBadRequest
+
+	link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
+	if link != "" || err == nil {
+		t.Errorf("PasswordResetLinkWithSettings() = (%q, %v); want = (%q, error)", link, err, "")
+	}
+
+	want := "no user record found for the given email"
+	if err.Error() != want || !IsEmailNotFound(err) || !errorutils.IsNotFound(err) {
+		t.Errorf("PasswordResetLinkWithSettings() error = %v; want = %q", err, want)
 	}
 }
 
