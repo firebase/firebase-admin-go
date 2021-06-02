@@ -136,12 +136,31 @@ func TestNewClientAuthOverrides(t *testing.T) {
 	}
 }
 
+func TestValidURLS(t *testing.T) {
+	cases := []string{
+		"https://test-db.firebaseio.com",
+		"https://test-db.firebasedatabase.app",
+	}
+	for _, tc := range cases {
+		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+			Opts: testOpts,
+			URL:  tc,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.url != tc {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		}
+	}
+}
+
 func TestInvalidURL(t *testing.T) {
 	cases := []string{
 		"",
 		"foo",
 		"http://db.firebaseio.com",
-		"https://firebase.google.com",
+		"http://firebase.google.com",
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{

@@ -6,8 +6,9 @@ jobs:
     name: Module build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go: [1.12, 1.13, 1.14]
+        go: [1.12, 1.16]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
@@ -15,12 +16,14 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
 
+    - name: Install golint
+      run: go get golang.org/x/lint/golint
+
     - name: Check out code
       uses: actions/checkout@v2
 
     - name: Run Linter
       run: |
-        go get -u golang.org/x/lint/golint
         GOLINT=`go list -f {{.Target}} golang.org/x/lint/golint`
         $GOLINT -set_exit_status ./...
 
@@ -44,12 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOPATH: ${{ github.workspace }}/go
+      GO111MODULE: off
 
     steps:
-    - name: Set up Go 1.12
+    - name: Set up Go 1.16
       uses: actions/setup-go@v1
       with:
-        go-version: 1.12
+        go-version: 1.16
 
     - name: Check out code into GOPATH
       uses: actions/checkout@v2
