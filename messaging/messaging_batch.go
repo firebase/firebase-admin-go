@@ -31,7 +31,9 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
-const maxMessages = 500
+// MaxMessages is the maximum number of messages that can be included in the message array.
+const MaxMessages = 500
+
 const multipartBoundary = "__END_OF_PART__"
 
 // MulticastMessage represents a message that can be sent to multiple devices via Firebase Cloud
@@ -52,8 +54,8 @@ func (mm *MulticastMessage) toMessages() ([]*Message, error) {
 	if len(mm.Tokens) == 0 {
 		return nil, errors.New("tokens must not be nil or empty")
 	}
-	if len(mm.Tokens) > maxMessages {
-		return nil, fmt.Errorf("tokens must not contain more than %d elements", maxMessages)
+	if len(mm.Tokens) > MaxMessages {
+		return nil, fmt.Errorf("tokens must not contain more than %d elements", MaxMessages)
 	}
 
 	var messages []*Message
@@ -166,8 +168,8 @@ func (c *fcmClient) sendBatch(
 		return nil, errors.New("messages must not be nil or empty")
 	}
 
-	if len(messages) > maxMessages {
-		return nil, fmt.Errorf("messages must not contain more than %d elements", maxMessages)
+	if len(messages) > MaxMessages {
+		return nil, fmt.Errorf("messages must not contain more than %d elements", MaxMessages)
 	}
 
 	request, err := c.newBatchRequest(messages, dryRun)
