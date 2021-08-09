@@ -303,7 +303,7 @@ func TestWelformedHttpError(t *testing.T) {
 		})
 	}
 
-	wantReqs := len(testOps) * (1 + defaultMaxRetries)
+	wantReqs := len(testOps)
 	if len(mock.Reqs) != wantReqs {
 		t.Errorf("Requests = %d; want = %d", len(mock.Reqs), wantReqs)
 	}
