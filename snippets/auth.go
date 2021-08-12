@@ -1425,12 +1425,10 @@ func verifyIDTokenAndCheckRevokedTenant(ctx context.Context, tenantClient *auth.
 	if err != nil {
 		if auth.IsIDTokenRevoked(err) {
 			// Token is revoked. Inform the user to reauthenticate or signOut() the user.
+		} else if auth.IsUserDisabled(err) {
+			// Token is disabled.
 		} else {
-			if auth.IsIDTokenDisabled(err) {
-				// Token is disabled.
-			} else {
-				// Token is invalid
-			}
+			// Token is invalid
 		}
 	}
 	log.Printf("Verified ID token: %v\n", token)

@@ -37,7 +37,7 @@ const (
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
-	idTokenDisabled      = "ID_TOKEN_DISABLED"
+	userDisabled         = "USER_DISABLED"
 	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
 	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
@@ -322,27 +322,28 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		revoked, disabled, err := c.checkRevokedOrDisabled(ctx, decoded)
+		errMessageDisabled := &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "User has been disabled",
+			Ext: map[string]interface{}{
+				authErrorCode: userDisabled,
+			},
+		}
+		err := c.checkRevokedOrDisabled(ctx, decoded, userDisabled, errMessageDisabled)
 		if err != nil {
 			return nil, err
 		}
-		if revoked {
-			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "ID token has been revoked",
-				Ext: map[string]interface{}{
-					authErrorCode: idTokenRevoked,
-				},
-			}
+
+		errMessageRevoked := &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "ID token has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: idTokenRevoked,
+			},
 		}
-		if disabled {
-			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "ID token has been disabled",
-				Ext: map[string]interface{}{
-					authErrorCode: idTokenDisabled,
-				},
-			}
+		err = c.checkRevokedOrDisabled(ctx, decoded, idTokenRevoked, errMessageRevoked)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -356,16 +357,16 @@ func IsTenantIDMismatch(err error) bool {
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
 //
-// When IsIDTokenRevoked returns true, IsIDTokenInvalid is garuanteed to return true.
+// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guaranteed to return true.
 func IsIDTokenRevoked(err error) bool {
 	return hasAuthErrorCode(err, idTokenRevoked)
 }
 
-// IsIDTokenDisabled checks if the given error was due to a disabled ID token
+// IsUserDisabled checks if the given error was due to a disabled ID token
 //
-// When IsIDTokenDisabled returns true, IsIDTokenInvalid is garuanteed to return true.
-func IsIDTokenDisabled(err error) bool {
-	return hasAuthErrorCode(err, idTokenDisabled)
+// When IsUserDisabled returns true, IsIDTokenInvalid is guaranteed to return true.
+func IsUserDisabled(err error) bool {
+	return hasAuthErrorCode(err, userDisabled)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -403,20 +404,16 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		// A session cookie can't be disabled, so no need to check that boolean
-		revoked, _, err := c.checkRevokedOrDisabled(ctx, decoded)
+		errMessageRevoked := &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "session cookie has been revoked",
+			Ext: map[string]interface{}{
+				authErrorCode: sessionCookieRevoked,
+			},
+		}
+		err := c.checkRevokedOrDisabled(ctx, decoded, sessionCookieRevoked, errMessageRevoked)
 		if err != nil {
 			return nil, err
-		}
-
-		if revoked {
-			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "session cookie has been revoked",
-				Ext: map[string]interface{}{
-					authErrorCode: sessionCookieRevoked,
-				},
-			}
 		}
 	}
 
@@ -431,18 +428,18 @@ func IsSessionCookieRevoked(err error) bool {
 }
 
 // checkRevokedOrDisabled checks whether the input token has been revoked or disabled.
-func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token) (revoked bool, disabled bool, err error) {
+func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, errCode string, errMessage *internal.FirebaseError) error {
 	user, err := c.GetUser(ctx, token.UID)
 	if err != nil {
-		return false, false, err
+		return err
 	}
-	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return true, false, nil
+	if (errCode == idTokenRevoked || errCode == sessionCookieRevoked) && token.IssuedAt*1000 < user.TokensValidAfterMillis {
+		return errMessage
 	}
-	if user.Disabled {
-		return false, true, nil
+	if errCode == userDisabled && user.Disabled {
+		return errMessage
 	}
-	return false, false, nil
+	return nil
 }
 
 func hasAuthErrorCode(err error, code string) bool {

@@ -69,7 +69,7 @@ func IsIDTokenExpired(err error) bool {
 // An ID token is considered invalid when it is malformed (i.e. contains incorrect data), expired
 // or revoked.
 func IsIDTokenInvalid(err error) bool {
-	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err) || IsIDTokenDisabled(err)
+	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err) || IsUserDisabled(err)
 }
 
 // IsSessionCookieExpired checks if the given error was due to an expired session cookie.

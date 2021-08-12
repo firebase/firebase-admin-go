@@ -44,12 +44,13 @@ const (
 )
 
 var (
-	testGetUserResponse []byte
-	testIDToken         string
-	testSessionCookie   string
-	testSigner          cryptoSigner
-	testIDTokenVerifier *tokenVerifier
-	testCookieVerifier  *tokenVerifier
+	testGetUserResponse         []byte
+	testGetDisabledUserResponse []byte
+	testIDToken                 string
+	testSessionCookie           string
+	testSigner                  cryptoSigner
+	testIDTokenVerifier         *tokenVerifier
+	testCookieVerifier          *tokenVerifier
 
 	optsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
@@ -74,6 +75,9 @@ func TestMain(m *testing.M) {
 	logFatal(err)
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	logFatal(err)
+
+	testGetDisabledUserResponse, err = ioutil.ReadFile("../testdata/get_disabled_user.json")
 	logFatal(err)
 
 	testIDToken = getIDToken(nil)
@@ -852,13 +856,13 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 	}
 }
 
-func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
+func TestInvalidTokenDoesNotCheckRevokedOrDisabled(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) || IsIDTokenDisabled(err) {
+	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) || IsUserDisabled(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
@@ -875,6 +879,20 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
 	if p != nil || !IsIDTokenRevoked(err) || !IsIDTokenInvalid(err) || err.Error() != we {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
+func TestVerifyIDTokenAndCheckDisabledError(t *testing.T) {
+	s := echoServer(testGetDisabledUserResponse, t)
+	defer s.Close()
+	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.idTokenVerifier = testIDTokenVerifier
+
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
+	we := "User has been disabled"
+	if p != nil || !IsUserDisabled(err) || !IsIDTokenInvalid(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
