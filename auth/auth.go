@@ -37,7 +37,7 @@ const (
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
-	idTokenDisabled		 = "ID_TOKEN_DISABLED"
+	idTokenDisabled      = "ID_TOKEN_DISABLED"
 	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
 	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
@@ -328,8 +328,8 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		}
 		if revoked {
 			return nil, &internal.FirebaseError{
-				ErrorCode:	internal.InvalidArgument,
-				String:		"ID token has been revoked",
+				ErrorCode: internal.InvalidArgument,
+				String:    "ID token has been revoked",
 				Ext: map[string]interface{}{
 					authErrorCode: idTokenRevoked,
 				},
@@ -337,8 +337,8 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		}
 		if disabled {
 			return nil, &internal.FirebaseError{
-				ErrorCode:	internal.InvalidArgument,
-				String:		"ID token has been disabled",
+				ErrorCode: internal.InvalidArgument,
+				String:    "ID token has been disabled",
 				Ext: map[string]interface{}{
 					authErrorCode: idTokenDisabled,
 				},
