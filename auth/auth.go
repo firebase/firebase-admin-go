@@ -37,6 +37,7 @@ const (
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
+	idTokenDisabled		 = "ID_TOKEN_DISABLED"
 	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
 	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
@@ -288,14 +289,14 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 // These keys get cached up to 24 hours, and therefore the RPC overhead gets amortized
 // over many invocations of this function.
 //
-// This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
+// This does not check whether or not the token has been revoked or disabled. Use `VerifyIDTokenAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	return c.verifyIDToken(ctx, idToken, false)
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
-// token has not been revoked.
+// token has not been revoked or disabled.
 //
 // Unlike `VerifyIDToken()`, this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
@@ -304,7 +305,7 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 	return c.verifyIDToken(ctx, idToken, true)
 }
 
-func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
+func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevokedOrDisabled bool) (*Token, error) {
 	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken, c.isEmulator)
 	if err != nil {
 		return nil, err
@@ -320,18 +321,26 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		}
 	}
 
-	if c.isEmulator || checkRevoked {
-		revoked, err := c.checkRevoked(ctx, decoded)
+	if c.isEmulator || checkRevokedOrDisabled {
+		revoked, disabled, err := c.checkRevokedOrDisabled(ctx, decoded)
 		if err != nil {
 			return nil, err
 		}
-
 		if revoked {
 			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "ID token has been revoked",
+				ErrorCode:	internal.InvalidArgument,
+				String:		"ID token has been revoked",
 				Ext: map[string]interface{}{
 					authErrorCode: idTokenRevoked,
+				},
+			}
+		}
+		if disabled {
+			return nil, &internal.FirebaseError{
+				ErrorCode:	internal.InvalidArgument,
+				String:		"ID token has been disabled",
+				Ext: map[string]interface{}{
+					authErrorCode: idTokenDisabled,
 				},
 			}
 		}
@@ -347,9 +356,16 @@ func IsTenantIDMismatch(err error) bool {
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
 //
-// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guranteed to return true.
+// When IsIDTokenRevoked returns true, IsIDTokenInvalid is garuanteed to return true.
 func IsIDTokenRevoked(err error) bool {
 	return hasAuthErrorCode(err, idTokenRevoked)
+}
+
+// IsIDTokenDisabled checks if the given error was due to a disabled ID token
+//
+// When IsIDTokenDisabled returns true, IsIDTokenInvalid is garuanteed to return true.
+func IsIDTokenDisabled(err error) bool {
+	return hasAuthErrorCode(err, idTokenDisabled)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -380,14 +396,15 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 	return c.verifySessionCookie(ctx, sessionCookie, true)
 }
 
-func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevoked bool) (*Token, error) {
+func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevokedOrDisabled bool) (*Token, error) {
 	decoded, err := c.cookieVerifier.VerifyToken(ctx, sessionCookie, c.isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.isEmulator || checkRevoked {
-		revoked, err := c.checkRevoked(ctx, decoded)
+	if c.isEmulator || checkRevokedOrDisabled {
+		// A session cookie can't be disabled, so no need to check that boolean
+		revoked, _, err := c.checkRevokedOrDisabled(ctx, decoded)
 		if err != nil {
 			return nil, err
 		}
@@ -408,18 +425,24 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 
 // IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
 //
-// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guranteed to return true.
+// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guaranteed to return true.
 func IsSessionCookieRevoked(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieRevoked)
 }
 
-func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {
+// checkRevokedOrDisabled checks whether the input token has been revoked or disabled.
+func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token) (revoked bool, disabled bool, err error) {
 	user, err := c.GetUser(ctx, token.UID)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-
-	return token.IssuedAt*1000 < user.TokensValidAfterMillis, nil
+	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
+		return true, false, nil
+	}
+	if user.Disabled {
+		return false, true, nil
+	}
+	return false, false, nil
 }
 
 func hasAuthErrorCode(err error, code string) bool {

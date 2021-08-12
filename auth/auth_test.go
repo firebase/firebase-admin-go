@@ -858,7 +858,7 @@ func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) {
+	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) || IsIDTokenDisabled(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
