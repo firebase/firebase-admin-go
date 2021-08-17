@@ -7,21 +7,6 @@
       "phoneNumber": "+1234567890",
       "emailVerified": true,
       "displayName": "Test User",
-      "providerUserInfo": [
-        {
-          "providerId": "password",
-          "displayName": "Test User",
-          "photoUrl": "http://www.example.com/testuser/photo.png",
-          "federatedId": "testuser@example.com",
-          "email": "testuser@example.com",
-          "rawId": "testuid"
-        },
-        {
-          "providerId": "phone",
-          "phoneNumber": "+1234567890",
-          "rawId": "testuid"
-        }
-      ],
       "photoUrl": "http://www.example.com/testuser/photo.png",
       "passwordHash": "passwordhash",
       "salt": "salt===",
@@ -31,15 +16,7 @@
       "createdAt": "1234567890000",
       "lastLoginAt": "1233211232000",
       "customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
-      "tenantId": "testTenant",
-      "mfaInfo": [
-        {
-          "phoneInfo": "+1234567890",
-          "mfaEnrollmentId": "0aaded3f-5e73-461d-aef9-37b48e3769be",
-          "displayName": "My MFA Phone",
-          "enrolledAt": "2021-03-03T13:06:20.542896Z"
-        }
-      ]
+      "tenantId": "testTenant"
     }
   ]
 }

@@ -322,18 +322,6 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		errMessageDisabled := &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "User has been disabled",
-			Ext: map[string]interface{}{
-				authErrorCode: userDisabled,
-			},
-		}
-		err := c.checkRevokedOrDisabled(ctx, decoded, userDisabled, errMessageDisabled)
-		if err != nil {
-			return nil, err
-		}
-
 		errMessageRevoked := &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
 			String:    "ID token has been revoked",
@@ -433,10 +421,17 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 	if err != nil {
 		return err
 	}
-	if (errCode == idTokenRevoked || errCode == sessionCookieRevoked) && token.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return errMessage
+	if errCode == userDisabled {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "user has been disabled",
+			Ext: map[string]interface{}{
+				authErrorCode: userDisabled,
+			},
+		}
+
 	}
-	if errCode == userDisabled && user.Disabled {
+	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
 		return errMessage
 	}
 	return nil
