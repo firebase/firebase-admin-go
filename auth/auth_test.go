@@ -891,7 +891,7 @@ func TestVerifyIDTokenAndCheckDisabledError(t *testing.T) {
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
-	we := "User has been disabled"
+	we := "user has been disabled"
 	if p != nil || !IsUserDisabled(err) || !IsIDTokenInvalid(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)

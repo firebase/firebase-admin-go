@@ -421,7 +421,7 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 	if err != nil {
 		return err
 	}
-	if errCode == userDisabled {
+	if user.Disabled {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
 			String:    "user has been disabled",
