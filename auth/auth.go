@@ -322,14 +322,7 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		errMessageRevoked := &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "ID token has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: idTokenRevoked,
-			},
-		}
-		err = c.checkRevokedOrDisabled(ctx, decoded, idTokenRevoked, errMessageRevoked)
+		err = c.checkRevokedOrDisabled(ctx, decoded, idTokenRevoked, "ID token has been revoked")
 		if err != nil {
 			return nil, err
 		}
@@ -392,14 +385,7 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		errMessageRevoked := &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
-			String:    "session cookie has been revoked",
-			Ext: map[string]interface{}{
-				authErrorCode: sessionCookieRevoked,
-			},
-		}
-		err := c.checkRevokedOrDisabled(ctx, decoded, sessionCookieRevoked, errMessageRevoked)
+		err := c.checkRevokedOrDisabled(ctx, decoded, sessionCookieRevoked, "session cookie has been revoked")
 		if err != nil {
 			return nil, err
 		}
@@ -416,7 +402,7 @@ func IsSessionCookieRevoked(err error) bool {
 }
 
 // checkRevokedOrDisabled checks whether the input token has been revoked or disabled.
-func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, errCode string, errMessage *internal.FirebaseError) error {
+func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, errCode string, errMessage string) error {
 	user, err := c.GetUser(ctx, token.UID)
 	if err != nil {
 		return err
@@ -432,7 +418,13 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 
 	}
 	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
-		return errMessage
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    errMessage,
+			Ext: map[string]interface{}{
+				authErrorCode: errCode,
+			},
+		}
 	}
 	return nil
 }

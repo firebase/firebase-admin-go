@@ -186,7 +186,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	}
 }
 
-func TestDisableRefreshTokens(t *testing.T) {
+func TestIDTokenForDisabledUser(t *testing.T) {
 	uid := "user_disabled"
 	ct, err := client.CustomToken(context.Background(), uid)
 	if err != nil {
@@ -209,11 +209,14 @@ func TestDisableRefreshTokens(t *testing.T) {
 	// Disable the user
 	updates := auth.UserToUpdate{}
 	updates.Disabled(true)
-	client.UpdateUser(context.Background(), uid, &updates)
+	_, err = client.UpdateUser(context.Background(), uid, &updates)
+	if err != nil {
+		t.Fatalf("failed to disable user with UpdateUser: %v", err)
+	}
 
 	vt, err = client.VerifyIDTokenAndCheckRevoked(context.Background(), idt)
 	we := "user has been disabled"
-	if vt != nil || err == nil || err.Error() != we {
+	if vt != nil || err == nil || !auth.IsUserDisabled(err) || err.Error() != we {
 		t.Errorf("tok, err := VerifyIDTokenAndCheckRevoked(); got (%v, %s) ; want (%v, %v)",
 			vt, err, nil, we)
 	}
