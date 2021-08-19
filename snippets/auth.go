@@ -711,7 +711,7 @@ func userProfileHandler(client *auth.Client) http.HandlerFunc {
 
 		// Verify the session cookie. In this case an additional check is added to detect
 		// if the user's Firebase session was revoked, user deleted/disabled, etc.
-		decoded, err := client.VerifySessionCookieAndCheckRevokedOrDisabled(r.Context(), cookie.Value)
+		decoded, err := client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
 		if err != nil {
 			// Session cookie is invalid. Force user to login.
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -737,7 +737,7 @@ func adminUserHandler(client *auth.Client) http.HandlerFunc {
 			return
 		}
 
-		decoded, err := client.VerifySessionCookieAndCheckRevokedOrDisabled(r.Context(), cookie.Value)
+		decoded, err := client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
 		if err != nil {
 			// Session cookie is invalid. Force user to login.
 			http.Redirect(w, r, "/login", http.StatusFound)

@@ -990,12 +990,12 @@ func TestSessionCookie(t *testing.T) {
 		t.Errorf("SessionCookie() = %q; want = non-empty", cookie)
 	}
 
-	vt, err := client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), cookie)
+	vt, err := client.VerifySessionCookieAndCheckRevoked(context.Background(), cookie)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if vt.UID != uid {
-		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled() UID = %q; want = %q", vt.UID, uid)
+		t.Errorf("VerifySessionCookieAndCheckRevoked() UID = %q; want = %q", vt.UID, uid)
 	}
 
 	// The backend stores the validSince property in seconds since the epoch.
@@ -1008,9 +1008,9 @@ func TestSessionCookie(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vt, err = client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), cookie)
+	vt, err = client.VerifySessionCookieAndCheckRevoked(context.Background(), cookie)
 	if vt != nil || err == nil || !auth.IsSessionCookieRevoked(err) {
-		t.Errorf("tok, err := VerifySessionCookieAndCheckRevokedOrDisabled() = (%v, %v); want = (nil, session-cookie-revoked)",
+		t.Errorf("tok, err := VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, session-cookie-revoked)",
 			vt, err)
 	}
 
