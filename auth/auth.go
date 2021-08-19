@@ -362,19 +362,19 @@ func IsUserDisabled(err error) bool {
 // These keys get cached up to 24 hours, and therefore the RPC overhead gets amortized
 // over many invocations of this function.
 //
-// This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevoked()`
+// This does not check whether or not the cookie has been revoked. Use `VerifySessionCookieAndCheckRevokedOrDisabled()`
 // when a revocation check is needed.
 func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) (*Token, error) {
 	return c.verifySessionCookie(ctx, sessionCookie, false)
 }
 
-// VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
-// cookie has not been revoked.
+// VerifySessionCookieAndCheckRevokedOrDisabled verifies the provided session cookie, and additionally checks that the
+// cookie has not been revoked and the user has not been disabled.
 //
 // Unlike `VerifySessionCookie()`, this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
 // function in an authorization flow that gets executed often.
-func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*Token, error) {
+func (c *Client) VerifySessionCookieAndCheckRevokedOrDisabled(ctx context.Context, sessionCookie string) (*Token, error) {
 	return c.verifySessionCookie(ctx, sessionCookie, true)
 }
 

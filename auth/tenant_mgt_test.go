@@ -1054,7 +1054,7 @@ func TestTenantVerifyIDTokenAndCheckRevoked(t *testing.T) {
 
 	wantURI := "/projects/mock-project-id/tenants/tenantID/accounts:lookup"
 	if s.Req[0].RequestURI != wantURI {
-		t.Errorf("VerifySessionCookieAndCheckRevoked() URL = %q; want = %q", s.Req[0].RequestURI, wantURI)
+		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled() URL = %q; want = %q", s.Req[0].RequestURI, wantURI)
 	}
 }
 

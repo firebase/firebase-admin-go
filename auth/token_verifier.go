@@ -85,7 +85,7 @@ func IsSessionCookieExpired(err error) bool {
 // expired or revoked.
 func IsSessionCookieInvalid(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieInvalid) || IsSessionCookieExpired(err) ||
-		IsSessionCookieRevoked(err)
+		IsSessionCookieRevoked(err) || IsUserDisabled(err)
 }
 
 // tokenVerifier verifies different types of Firebase token strings, including ID tokens and

@@ -1094,7 +1094,7 @@ func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
 	defer s.Close()
 
 	s.Client.cookieVerifier = testCookieVerifier
-	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), testSessionCookie)
+	ft, err := s.Client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), testSessionCookie)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1111,9 +1111,9 @@ func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 	defer s.Close()
 	s.Client.cookieVerifier = testCookieVerifier
 
-	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
+	ft, err := s.Client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), "")
 	if ft != nil || !IsSessionCookieInvalid(err) {
-		t.Errorf("VerifySessionCookieAndCheckRevoked() = (%v, %v); want = (nil, SessionCookieInvalid)", ft, err)
+		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled() = (%v, %v); want = (nil, SessionCookieInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
 		t.Errorf("Revocation checks = %d; want = 0", len(s.Req))
@@ -1126,10 +1126,24 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
 	s.Client.cookieVerifier = testCookieVerifier
 
-	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
+	p, err := s.Client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
 	if p != nil || !IsSessionCookieRevoked(err) || !IsSessionCookieInvalid(err) || err.Error() != we {
-		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
+func TestVerifySessionCookieAndCheckDisabledError(t *testing.T) {
+	s := echoServer(testGetDisabledUserResponse, t)
+	defer s.Close()
+	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testCookieVerifier
+
+	p, err := s.Client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), revokedCookie)
+	we := "user has been disabled"
+	if p != nil || !IsUserDisabled(err) || !IsSessionCookieInvalid(err) || err.Error() != we {
+		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
 }
@@ -1144,9 +1158,9 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
 	s.Client.cookieVerifier = testCookieVerifier
 
-	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
+	p, err := s.Client.VerifySessionCookieAndCheckRevokedOrDisabled(context.Background(), revokedCookie)
 	if p != nil || !IsUserNotFound(err) {
-		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
+		t.Errorf("VerifySessionCookieAndCheckRevokedOrDisabled(ctx, token) =(%v, %v); want = (%v, UserNotFound)", p, err, nil)
 	}
 }
 
