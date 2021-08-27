@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
@@ -45,6 +47,10 @@ const (
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
 	"exp", "firebase", "iat", "iss", "jti", "nbf", "nonce", "sub",
+}
+
+var emulatorToken = &oauth2.Token{
+	AccessToken: "owner",
 }
 
 // Client is the interface for the Firebase auth service.
@@ -114,7 +120,15 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	transport, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	var opts []option.ClientOption
+	if isEmulator {
+		ts := oauth2.StaticTokenSource(emulatorToken)
+		opts = append(opts, option.WithTokenSource(ts))
+	} else {
+		opts = append(opts, conf.Opts...)
+	}
+
+	transport, _, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
