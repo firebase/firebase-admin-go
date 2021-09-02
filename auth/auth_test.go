@@ -296,15 +296,11 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	os.Setenv(emulatorHostEnvVar, emulatorHost)
 	defer os.Unsetenv(emulatorHostEnvVar)
 
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithoutAuthentication(),
-		},
-	}
-	client, err := NewClient(context.Background(), conf)
+	client, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	baseClient := client.baseClient
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
@@ -778,6 +774,7 @@ func TestEmulatorVerifyIDTokenUnreachableEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.httpClient.RetryConfig = nil
 	client.isEmulator = true
 
 	token := getEmulatedIDToken(nil)
@@ -1239,6 +1236,7 @@ func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.httpClient.RetryConfig = nil
 	client.isEmulator = true
 
 	token := getEmulatedSessionCookie(nil)
