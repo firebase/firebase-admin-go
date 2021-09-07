@@ -1,6 +1,8 @@
 package remoteconfig
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/api/iterator"
@@ -78,6 +80,42 @@ type Condition struct {
 	TagColor   TagColor `json:"tagColor"`
 }
 
+// UnmarshalJSON unmarshals a JSON string into a Condition (for internal use only).
+func (c *Condition) UnmarshalJSON(b []byte) error {
+	type conditionInternal Condition
+	temp := struct {
+		TagColor string `json:"tagColor"`
+		*conditionInternal
+	}{
+		conditionInternal: (*conditionInternal)(c),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+
+	if temp.TagColor != "" {
+		colours := map[string]TagColor{
+			"BLUE":        Blue,
+			"BROWN":       Brown,
+			"CYAN":        Cyan,
+			"DEEP_ORANGE": DeepOrange,
+			"GREEN":       Green,
+			"INDIGO":      Indigo,
+			"LIME":        Lime,
+			"ORANGE":      Orange,
+			"PINK":        Pink,
+			"PURPLE":      Purple,
+			"TEAL":        Teal,
+		}
+		if tag, ok := colours[temp.TagColor]; ok {
+			c.TagColor = tag
+		} else {
+			return fmt.Errorf("unknown tag colour value: %q", temp.TagColor)
+		}
+	}
+	return nil
+}
+
 // RemoteConfig represents a Remote Config
 type RemoteConfig struct {
 	Conditions      []Condition               `json:"conditions"`
@@ -101,22 +139,42 @@ type Parameter struct {
 
 // ParameterValue .
 type ParameterValue struct {
-	explicitValue   string
-	useInAppDefault bool
+	Value           string
+	UseInAppDefault bool
 }
 
-// UseInAppDefaultValue returns a parameter value with the in app default as false
+// UnmarshalJSON unmarshals a JSON string into an ParameterValue (for internal use only).
+func (pv *ParameterValue) UnmarshalJSON(b []byte) error {
+	temp := struct {
+		Value           string `json:"value"`
+		UseInAppDefault bool   `json:"useInAppDefault"`
+	}{}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+
+	if temp.UseInAppDefault {
+		pv.UseInAppDefault = true
+		return nil
+	}
+
+	pv.Value = temp.Value
+	return nil
+}
+
+// UseInAppDefaultValue returns a parameter value with the in app default as true
 func UseInAppDefaultValue() *ParameterValue {
 	return &ParameterValue{
-		useInAppDefault: false,
+		UseInAppDefault: true,
 	}
 }
 
 // NewExplicitParameterValue will add a new explicit parameter value
 func NewExplicitParameterValue(value string) *ParameterValue {
-	pm := UseInAppDefaultValue()
-	pm.explicitValue = value
-	return pm
+	return &ParameterValue{
+		UseInAppDefault: false,
+		Value:           value,
+	}
 }
 
 // ParameterGroup representing a Remote Config parameter group
