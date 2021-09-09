@@ -70,8 +70,8 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 // RetryConfig.
 //
 // The default RetryConfig retries requests on all low-level network errors as well as on HTTP
-// InternalServerError (500) and ServiceUnavailable (503) errors. Repeatedly failing requests are
-// retried up to 4 times with exponential backoff. Retry delay is never longer than 2 minutes.
+// ServiceUnavailable (503) error. Repeatedly failing requests are retried up to 4 times 
+// with exponential backoff. Retry delay is never longer than 2 minutes.
 func WithDefaultRetryConfig(hc *http.Client) *HTTPClient {
 	twoMinutes := time.Duration(2) * time.Minute
 	return &HTTPClient{
