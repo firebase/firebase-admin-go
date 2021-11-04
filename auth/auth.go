@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
@@ -37,6 +39,7 @@ const (
 
 	// SDK-generated error codes
 	idTokenRevoked       = "ID_TOKEN_REVOKED"
+	userDisabled         = "USER_DISABLED"
 	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
 	tenantIDMismatch     = "TENANT_ID_MISMATCH"
 )
@@ -44,6 +47,10 @@ const (
 var reservedClaims = []string{
 	"acr", "amr", "at_hash", "aud", "auth_time", "azp", "cnf", "c_hash",
 	"exp", "firebase", "iat", "iss", "jti", "nbf", "nonce", "sub",
+}
+
+var emulatorToken = &oauth2.Token{
+	AccessToken: "owner",
 }
 
 // Client is the interface for the Firebase auth service.
@@ -113,7 +120,15 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	transport, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	var opts []option.ClientOption
+	if isEmulator {
+		ts := oauth2.StaticTokenSource(emulatorToken)
+		opts = append(opts, option.WithTokenSource(ts))
+	} else {
+		opts = append(opts, conf.Opts...)
+	}
+
+	transport, _, err := transport.NewHTTPClient(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -288,14 +303,14 @@ func (c *baseClient) withTenantID(tenantID string) *baseClient {
 // These keys get cached up to 24 hours, and therefore the RPC overhead gets amortized
 // over many invocations of this function.
 //
-// This does not check whether or not the token has been revoked. Use `VerifyIDTokenAndCheckRevoked()`
+// This does not check whether or not the token has been revoked or disabled. Use `VerifyIDTokenAndCheckRevoked()`
 // when a revocation check is needed.
 func (c *baseClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
 	return c.verifyIDToken(ctx, idToken, false)
 }
 
 // VerifyIDTokenAndCheckRevoked verifies the provided ID token, and additionally checks that the
-// token has not been revoked.
+// token has not been revoked or disabled.
 //
 // Unlike `VerifyIDToken()`, this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
@@ -304,7 +319,7 @@ func (c *baseClient) VerifyIDTokenAndCheckRevoked(ctx context.Context, idToken s
 	return c.verifyIDToken(ctx, idToken, true)
 }
 
-func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevoked bool) (*Token, error) {
+func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRevokedOrDisabled bool) (*Token, error) {
 	decoded, err := c.idTokenVerifier.VerifyToken(ctx, idToken, c.isEmulator)
 	if err != nil {
 		return nil, err
@@ -320,20 +335,10 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 		}
 	}
 
-	if c.isEmulator || checkRevoked {
-		revoked, err := c.checkRevoked(ctx, decoded)
+	if c.isEmulator || checkRevokedOrDisabled {
+		err = c.checkRevokedOrDisabled(ctx, decoded, idTokenRevoked, "ID token has been revoked")
 		if err != nil {
 			return nil, err
-		}
-
-		if revoked {
-			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "ID token has been revoked",
-				Ext: map[string]interface{}{
-					authErrorCode: idTokenRevoked,
-				},
-			}
 		}
 	}
 
@@ -347,9 +352,16 @@ func IsTenantIDMismatch(err error) bool {
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
 //
-// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guranteed to return true.
+// When IsIDTokenRevoked returns true, IsIDTokenInvalid is guaranteed to return true.
 func IsIDTokenRevoked(err error) bool {
 	return hasAuthErrorCode(err, idTokenRevoked)
+}
+
+// IsUserDisabled checks if the given error was due to a disabled ID token
+//
+// When IsUserDisabled returns true, IsIDTokenInvalid is guaranteed to return true.
+func IsUserDisabled(err error) bool {
+	return hasAuthErrorCode(err, userDisabled)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -371,7 +383,7 @@ func (c *Client) VerifySessionCookie(ctx context.Context, sessionCookie string) 
 }
 
 // VerifySessionCookieAndCheckRevoked verifies the provided session cookie, and additionally checks that the
-// cookie has not been revoked.
+// cookie has not been revoked and the user has not been disabled.
 //
 // Unlike `VerifySessionCookie()`, this function must make an RPC call to perform the revocation check.
 // Developers are advised to take this additional overhead into consideration when including this
@@ -380,26 +392,16 @@ func (c *Client) VerifySessionCookieAndCheckRevoked(ctx context.Context, session
 	return c.verifySessionCookie(ctx, sessionCookie, true)
 }
 
-func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevoked bool) (*Token, error) {
+func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, checkRevokedOrDisabled bool) (*Token, error) {
 	decoded, err := c.cookieVerifier.VerifyToken(ctx, sessionCookie, c.isEmulator)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.isEmulator || checkRevoked {
-		revoked, err := c.checkRevoked(ctx, decoded)
+	if c.isEmulator || checkRevokedOrDisabled {
+		err := c.checkRevokedOrDisabled(ctx, decoded, sessionCookieRevoked, "session cookie has been revoked")
 		if err != nil {
 			return nil, err
-		}
-
-		if revoked {
-			return nil, &internal.FirebaseError{
-				ErrorCode: internal.InvalidArgument,
-				String:    "session cookie has been revoked",
-				Ext: map[string]interface{}{
-					authErrorCode: sessionCookieRevoked,
-				},
-			}
 		}
 	}
 
@@ -408,18 +410,37 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 
 // IsSessionCookieRevoked checks if the given error was due to a revoked session cookie.
 //
-// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guranteed to return true.
+// When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guaranteed to return true.
 func IsSessionCookieRevoked(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieRevoked)
 }
 
-func (c *baseClient) checkRevoked(ctx context.Context, token *Token) (bool, error) {
+// checkRevokedOrDisabled checks whether the input token has been revoked or disabled.
+func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, errCode string, errMessage string) error {
 	user, err := c.GetUser(ctx, token.UID)
 	if err != nil {
-		return false, err
+		return err
 	}
+	if user.Disabled {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    "user has been disabled",
+			Ext: map[string]interface{}{
+				authErrorCode: userDisabled,
+			},
+		}
 
-	return token.IssuedAt*1000 < user.TokensValidAfterMillis, nil
+	}
+	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
+		return &internal.FirebaseError{
+			ErrorCode: internal.InvalidArgument,
+			String:    errMessage,
+			Ext: map[string]interface{}{
+				authErrorCode: errCode,
+			},
+		}
+	}
+	return nil
 }
 
 func hasAuthErrorCode(err error, code string) bool {

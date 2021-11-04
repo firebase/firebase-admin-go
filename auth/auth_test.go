@@ -44,12 +44,13 @@ const (
 )
 
 var (
-	testGetUserResponse []byte
-	testIDToken         string
-	testSessionCookie   string
-	testSigner          cryptoSigner
-	testIDTokenVerifier *tokenVerifier
-	testCookieVerifier  *tokenVerifier
+	testGetUserResponse         []byte
+	testGetDisabledUserResponse []byte
+	testIDToken                 string
+	testSessionCookie           string
+	testSigner                  cryptoSigner
+	testIDTokenVerifier         *tokenVerifier
+	testCookieVerifier          *tokenVerifier
 
 	optsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
@@ -74,6 +75,9 @@ func TestMain(m *testing.M) {
 	logFatal(err)
 
 	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	logFatal(err)
+
+	testGetDisabledUserResponse, err = ioutil.ReadFile("../testdata/get_disabled_user.json")
 	logFatal(err)
 
 	testIDToken = getIDToken(nil)
@@ -292,15 +296,11 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	os.Setenv(emulatorHostEnvVar, emulatorHost)
 	defer os.Unsetenv(emulatorHostEnvVar)
 
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithoutAuthentication(),
-		},
-	}
-	client, err := NewClient(context.Background(), conf)
+	client, err := NewClient(context.Background(), &internal.AuthConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	baseClient := client.baseClient
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
@@ -774,6 +774,7 @@ func TestEmulatorVerifyIDTokenUnreachableEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.httpClient.RetryConfig = nil
 	client.isEmulator = true
 
 	token := getEmulatedIDToken(nil)
@@ -852,13 +853,13 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 	}
 }
 
-func TestInvalidTokenDoesNotCheckRevoked(t *testing.T) {
+func TestInvalidTokenDoesNotCheckRevokedOrDisabled(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	s.Client.idTokenVerifier = testIDTokenVerifier
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
-	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) {
+	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) || IsUserDisabled(err) {
 		t.Errorf("VerifyIDTokenAndCheckRevoked() = (%v, %v); want = (nil, IDTokenInvalid)", ft, err)
 	}
 	if len(s.Req) != 0 {
@@ -875,6 +876,20 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
 	if p != nil || !IsIDTokenRevoked(err) || !IsIDTokenInvalid(err) || err.Error() != we {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
+func TestVerifyIDTokenAndCheckDisabledError(t *testing.T) {
+	s := echoServer(testGetDisabledUserResponse, t)
+	defer s.Close()
+	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.idTokenVerifier = testIDTokenVerifier
+
+	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
+	we := "user has been disabled"
+	if p != nil || !IsUserDisabled(err) || !IsIDTokenInvalid(err) || err.Error() != we {
 		t.Errorf("VerifyIDTokenAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
 			p, err, nil, we)
 	}
@@ -1116,6 +1131,20 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 	}
 }
 
+func TestVerifySessionCookieAndCheckDisabledError(t *testing.T) {
+	s := echoServer(testGetDisabledUserResponse, t)
+	defer s.Close()
+	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
+	s.Client.cookieVerifier = testCookieVerifier
+
+	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
+	we := "user has been disabled"
+	if p != nil || !IsUserDisabled(err) || !IsSessionCookieInvalid(err) || err.Error() != we {
+		t.Errorf("VerifySessionCookieAndCheckRevoked(ctx, token) =(%v, %v); want = (%v, %v)",
+			p, err, nil, we)
+	}
+}
+
 func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	resp := `{
 		"kind" : "identitytoolkit#GetAccountInfoResponse",
@@ -1207,6 +1236,7 @@ func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.httpClient.Client.Transport = eConnRefusedTransport{}
+	client.httpClient.RetryConfig = nil
 	client.isEmulator = true
 
 	token := getEmulatedSessionCookie(nil)

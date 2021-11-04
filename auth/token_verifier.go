@@ -69,7 +69,7 @@ func IsIDTokenExpired(err error) bool {
 // An ID token is considered invalid when it is malformed (i.e. contains incorrect data), expired
 // or revoked.
 func IsIDTokenInvalid(err error) bool {
-	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err)
+	return hasAuthErrorCode(err, idTokenInvalid) || IsIDTokenExpired(err) || IsIDTokenRevoked(err) || IsUserDisabled(err)
 }
 
 // IsSessionCookieExpired checks if the given error was due to an expired session cookie.
@@ -85,7 +85,7 @@ func IsSessionCookieExpired(err error) bool {
 // expired or revoked.
 func IsSessionCookieInvalid(err error) bool {
 	return hasAuthErrorCode(err, sessionCookieInvalid) || IsSessionCookieExpired(err) ||
-		IsSessionCookieRevoked(err)
+		IsSessionCookieRevoked(err) || IsUserDisabled(err)
 }
 
 // tokenVerifier verifies different types of Firebase token strings, including ID tokens and
