@@ -186,6 +186,42 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	}
 }
 
+func TestIDTokenForDisabledUser(t *testing.T) {
+	uid := "user_disabled"
+	ct, err := client.CustomToken(context.Background(), uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idt, err := signInWithCustomToken(ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteUser(uid)
+
+	vt, err := client.VerifyIDTokenAndCheckRevoked(context.Background(), idt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
+	}
+
+	// Disable the user
+	updates := auth.UserToUpdate{}
+	updates.Disabled(true)
+	_, err = client.UpdateUser(context.Background(), uid, &updates)
+	if err != nil {
+		t.Fatalf("failed to disable user with UpdateUser: %v", err)
+	}
+
+	vt, err = client.VerifyIDTokenAndCheckRevoked(context.Background(), idt)
+	we := "user has been disabled"
+	if vt != nil || err == nil || !auth.IsUserDisabled(err) || err.Error() != we {
+		t.Errorf("tok, err := VerifyIDTokenAndCheckRevoked(); got (%v, %s) ; want (%v, %v)",
+			vt, err, nil, we)
+	}
+}
+
 // verifyCustomToken verifies the given custom token by signing into a Firebase project with it.
 //
 // A successful sign in creates the user account in the Firebase back-end. This method ensures that

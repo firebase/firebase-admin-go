@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	gcs "cloud.google.com/go/storage"
-	"firebase.google.com/go/v4"
+	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/integration/internal"
 	"firebase.google.com/go/v4/storage"
 )

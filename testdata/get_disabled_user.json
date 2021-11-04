@@ -1,0 +1,22 @@
+{
+  "kind": "identitytoolkit#GetAccountInfoResponse",
+  "users": [
+    {
+      "localId": "testuser",
+      "email": "testuser@example.com",
+      "phoneNumber": "+1234567890",
+      "emailVerified": true,
+      "displayName": "Test User",
+      "photoUrl": "http://www.example.com/testuser/photo.png",
+      "passwordHash": "passwordhash",
+      "salt": "salt===",
+      "passwordUpdatedAt": 1.494364393E+12,
+      "validSince": "1494364393",
+      "disabled": true,
+      "createdAt": "1234567890000",
+      "lastLoginAt": "1233211232000",
+      "customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
+      "tenantId": "testTenant"
+    }
+  ]
+}
