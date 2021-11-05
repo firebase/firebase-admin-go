@@ -111,7 +111,7 @@ func sendAll(ctx context.Context, client *messaging.Client) {
 	registrationToken := "YOUR_REGISTRATION_TOKEN"
 
 	// [START send_all]
-	// Create a list containing up to 100 messages.
+	// Create a list containing up to 500 messages.
 	messages := []*messaging.Message{
 		{
 			Notification: &messaging.Notification{
@@ -142,7 +142,7 @@ func sendAll(ctx context.Context, client *messaging.Client) {
 
 func sendMulticast(ctx context.Context, client *messaging.Client) {
 	// [START send_multicast]
-	// Create a list containing up to 100 registration tokens.
+	// Create a list containing up to 500 registration tokens.
 	// This registration tokens come from the client FCM SDKs.
 	registrationTokens := []string{
 		"YOUR_REGISTRATION_TOKEN_1",
@@ -170,7 +170,7 @@ func sendMulticast(ctx context.Context, client *messaging.Client) {
 
 func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client) {
 	// [START send_multicast_error]
-	// Create a list containing up to 100 registration tokens.
+	// Create a list containing up to 500 registration tokens.
 	// This registration tokens come from the client FCM SDKs.
 	registrationTokens := []string{
 		"YOUR_REGISTRATION_TOKEN_1",
