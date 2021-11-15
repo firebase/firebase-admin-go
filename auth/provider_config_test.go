@@ -33,7 +33,12 @@ const oidcConfigResponse = `{
     "clientId": "CLIENT_ID",
     "issuer": "https://oidc.com/issuer",
     "displayName": "oidcProviderName",
-    "enabled": true
+    "enabled": true,
+		"clientSecret": "CLIENT_SECRET",
+		"responseType": {
+			"code": true,
+			"idToken": true
+		}
 }`
 
 const samlConfigResponse = `{
@@ -67,11 +72,14 @@ var idpCertsMap = []interface{}{
 }
 
 var oidcProviderConfig = &OIDCProviderConfig{
-	ID:          "oidc.provider",
-	DisplayName: "oidcProviderName",
-	Enabled:     true,
-	ClientID:    "CLIENT_ID",
-	Issuer:      "https://oidc.com/issuer",
+	ID:                  "oidc.provider",
+	DisplayName:         "oidcProviderName",
+	Enabled:             true,
+	ClientID:            "CLIENT_ID",
+	Issuer:              "https://oidc.com/issuer",
+	ClientSecret:        "CLIENT_SECRET",
+	CodeResponseType:    true,
+	IDTokenResponseType: true,
 }
 
 var samlProviderConfig = &SAMLProviderConfig{
@@ -157,7 +165,11 @@ func TestCreateOIDCProviderConfig(t *testing.T) {
 		DisplayName(oidcProviderConfig.DisplayName).
 		Enabled(oidcProviderConfig.Enabled).
 		ClientID(oidcProviderConfig.ClientID).
-		Issuer(oidcProviderConfig.Issuer)
+		Issuer(oidcProviderConfig.Issuer).
+		ClientSecret(oidcProviderConfig.ClientSecret).
+		CodeResponseType(true).
+		IDTokenResponseType(true)
+
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -168,10 +180,15 @@ func TestCreateOIDCProviderConfig(t *testing.T) {
 	}
 
 	wantBody := map[string]interface{}{
-		"displayName": oidcProviderConfig.DisplayName,
-		"enabled":     oidcProviderConfig.Enabled,
-		"clientId":    oidcProviderConfig.ClientID,
-		"issuer":      oidcProviderConfig.Issuer,
+		"displayName":  oidcProviderConfig.DisplayName,
+		"enabled":      oidcProviderConfig.Enabled,
+		"clientId":     oidcProviderConfig.ClientID,
+		"issuer":       oidcProviderConfig.Issuer,
+		"clientSecret": oidcProviderConfig.ClientSecret,
+		"responseType": map[string]interface{}{
+			"code":    true,
+			"idToken": true,
+		},
 	}
 	if err := checkCreateOIDCConfigRequest(s, wantBody); err != nil {
 		t.Fatal(err)
@@ -215,7 +232,9 @@ func TestCreateOIDCProviderConfigZeroValues(t *testing.T) {
 		DisplayName("").
 		Enabled(false).
 		ClientID(oidcProviderConfig.ClientID).
-		Issuer(oidcProviderConfig.Issuer)
+		Issuer(oidcProviderConfig.Issuer).
+		CodeResponseType(false).
+		IDTokenResponseType(false)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -230,6 +249,10 @@ func TestCreateOIDCProviderConfigZeroValues(t *testing.T) {
 		"enabled":     false,
 		"clientId":    oidcProviderConfig.ClientID,
 		"issuer":      oidcProviderConfig.Issuer,
+		"responseType": map[string]interface{}{
+			"code":    false,
+			"idToken": false,
+		},
 	}
 	if err := checkCreateOIDCConfigRequest(s, wantBody); err != nil {
 		t.Fatal(err)
@@ -303,6 +326,15 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 				ClientID("CLIENT_ID").
 				Issuer("not a url"),
 		},
+		{
+			name: "MissingClientSecret",
+			want: "Client Secret must not be empty for Code Response Type",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer").
+				CodeResponseType(true),
+		},
 	}
 
 	client := &baseClient{}
@@ -323,7 +355,10 @@ func TestUpdateOIDCProviderConfig(t *testing.T) {
 		DisplayName(oidcProviderConfig.DisplayName).
 		Enabled(oidcProviderConfig.Enabled).
 		ClientID(oidcProviderConfig.ClientID).
-		Issuer(oidcProviderConfig.Issuer)
+		Issuer(oidcProviderConfig.Issuer).
+		ClientSecret(oidcProviderConfig.ClientSecret).
+		CodeResponseType(true).
+		IDTokenResponseType(true)
 	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
 	if err != nil {
 		t.Fatal(err)
@@ -334,16 +369,24 @@ func TestUpdateOIDCProviderConfig(t *testing.T) {
 	}
 
 	wantBody := map[string]interface{}{
-		"displayName": oidcProviderConfig.DisplayName,
-		"enabled":     oidcProviderConfig.Enabled,
-		"clientId":    oidcProviderConfig.ClientID,
-		"issuer":      oidcProviderConfig.Issuer,
+		"displayName":  oidcProviderConfig.DisplayName,
+		"enabled":      oidcProviderConfig.Enabled,
+		"clientId":     oidcProviderConfig.ClientID,
+		"issuer":       oidcProviderConfig.Issuer,
+		"clientSecret": oidcProviderConfig.ClientSecret,
+		"responseType": map[string]interface{}{
+			"code":    true,
+			"idToken": true,
+		},
 	}
 	wantMask := []string{
 		"clientId",
+		"clientSecret",
 		"displayName",
 		"enabled",
 		"issuer",
+		"responseType.code",
+		"responseType.idToken",
 	}
 	if err := checkUpdateOIDCConfigRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
@@ -384,7 +427,9 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 	client := s.Client
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("").
-		Enabled(false)
+		Enabled(false).
+		CodeResponseType(false).
+		IDTokenResponseType(false)
 	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
 	if err != nil {
 		t.Fatal(err)
@@ -397,10 +442,16 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 	wantBody := map[string]interface{}{
 		"displayName": nil,
 		"enabled":     false,
+		"responseType": map[string]interface{}{
+			"code":    false,
+			"idToken": false,
+		},
 	}
 	wantMask := []string{
 		"displayName",
 		"enabled",
+		"responseType.code",
+		"responseType.idToken",
 	}
 	if err := checkUpdateOIDCConfigRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
@@ -454,6 +505,13 @@ func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
 			want: "failed to parse Issuer: ",
 			conf: (&OIDCProviderConfigToUpdate{}).
 				Issuer("not a url"),
+		},
+		{
+			name: "MissingClientSecret",
+			want: "Client Secret must not be empty for Code Response Type",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				Issuer("https://oidc.com/issuer").
+				CodeResponseType(true),
 		},
 	}
 
