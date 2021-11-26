@@ -129,7 +129,7 @@ func TestChildQuery(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": "\"messages\""},
+			Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"messages\""}),
 		})
 	}
 
@@ -152,7 +152,7 @@ func TestNestedChildQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"messages/ratings\""},
+		Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"messages/ratings\""}),
 	})
 }
 
@@ -173,12 +173,12 @@ func TestChildQueryWithParams(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query: map[string]string{
+		Query: unionQueries(client.queries, map[string]string{
 			"orderBy":      "\"messages\"",
 			"startAt":      "\"m4\"",
 			"endAt":        "\"m50\"",
 			"limitToFirst": "10",
-		},
+		}),
 	})
 }
 
@@ -219,7 +219,7 @@ func TestKeyQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"$key\""},
+		Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"$key\""}),
 	})
 }
 
@@ -239,7 +239,7 @@ func TestValueQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"$value\""},
+		Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"$value\""}),
 	})
 }
 
@@ -259,7 +259,9 @@ func TestLimitFirstQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"limitToFirst": "10", "orderBy": "\"messages\""},
+		Query: unionQueries(client.queries, map[string]string{
+			"limitToFirst": "10", "orderBy": "\"messages\"",
+		}),
 	})
 }
 
@@ -279,7 +281,9 @@ func TestLimitLastQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"limitToLast": "10", "orderBy": "\"messages\""},
+		Query: unionQueries(client.queries, map[string]string{
+			"limitToLast": "10", "orderBy": "\"messages\"",
+		}),
 	})
 }
 
@@ -327,7 +331,7 @@ func TestStartAtQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"startAt": "10", "orderBy": "\"messages\""},
+		Query:  unionQueries(client.queries, map[string]string{"startAt": "10", "orderBy": "\"messages\""}),
 	})
 }
 
@@ -347,7 +351,7 @@ func TestEndAtQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"endAt": "10", "orderBy": "\"messages\""},
+		Query:  unionQueries(client.queries, map[string]string{"endAt": "10", "orderBy": "\"messages\""}),
 	})
 }
 
@@ -367,7 +371,7 @@ func TestEqualToQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"equalTo": "10", "orderBy": "\"messages\""},
+		Query:  unionQueries(client.queries, map[string]string{"equalTo": "10", "orderBy": "\"messages\""}),
 	})
 }
 
@@ -416,12 +420,12 @@ func TestAllParamsQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query: map[string]string{
+		Query: unionQueries(client.queries, map[string]string{
 			"limitToFirst": "100",
 			"startAt":      "\"bar\"",
 			"endAt":        "\"foo\"",
 			"orderBy":      "\"messages\"",
-		},
+		}),
 	})
 }
 
@@ -448,7 +452,9 @@ func TestChildQueryGetOrdered(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": fmt.Sprintf("%q", tc.child)},
+			Query: unionQueries(client.queries, map[string]string{
+				"orderBy": fmt.Sprintf("%q", tc.child),
+			}),
 		})
 
 		var gotKeys, gotVals []string
@@ -494,7 +500,7 @@ func TestImmediateChildQueryGetOrdered(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": "\"child\""},
+			Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"child\""}),
 		})
 
 		var gotKeys []string
@@ -545,7 +551,9 @@ func TestNestedChildQueryGetOrdered(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": "\"child/grandchild\""},
+			Query: unionQueries(client.queries, map[string]string{
+				"orderBy": "\"child/grandchild\"",
+			}),
 		})
 
 		var gotKeys []string
@@ -580,7 +588,7 @@ func TestKeyQueryGetOrdered(t *testing.T) {
 	req := &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"orderBy": "\"$key\""},
+		Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"$key\""}),
 	}
 
 	var gotKeys, gotVals []string
@@ -619,7 +627,7 @@ func TestValueQueryGetOrdered(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": "\"$value\""},
+			Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"$value\""}),
 		})
 
 		var gotKeys []string
@@ -701,7 +709,7 @@ func TestValueQueryGetOrderedWithList(t *testing.T) {
 		reqs = append(reqs, &testReq{
 			Method: "GET",
 			Path:   "/peter.json",
-			Query:  map[string]string{"orderBy": "\"$value\""},
+			Query:  unionQueries(client.queries, map[string]string{"orderBy": "\"$value\""}),
 		})
 
 		var gotKeys []string

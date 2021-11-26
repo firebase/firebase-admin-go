@@ -137,7 +137,7 @@ func TestGet(t *testing.T) {
 		if !reflect.DeepEqual(tc, got) {
 			t.Errorf("Get() = %v; want = %v", got, tc)
 		}
-		want = append(want, &testReq{Method: "GET", Path: "/peter.json"})
+		want = append(want, &testReq{Method: "GET", Path: "/peter.json", Query: client.queries})
 	}
 	checkAllRequests(t, mock.Reqs, want)
 }
@@ -152,7 +152,7 @@ func TestInvalidGet(t *testing.T) {
 	if err := testref.Get(context.Background(), &got); err == nil {
 		t.Errorf("Get(func) = nil; want error")
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json", Query: client.queries})
 }
 
 func TestGetWithStruct(t *testing.T) {
@@ -168,7 +168,7 @@ func TestGetWithStruct(t *testing.T) {
 	if want != got {
 		t.Errorf("Get(struct) = %v; want = %v", got, want)
 	}
-	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json"})
+	checkOnlyRequest(t, mock.Reqs, &testReq{Method: "GET", Path: "/peter.json", Query: client.queries})
 }
 
 func TestGetShallow(t *testing.T) {
@@ -192,7 +192,11 @@ func TestGetShallow(t *testing.T) {
 		if !reflect.DeepEqual(tc, got) {
 			t.Errorf("GetShallow() = %v; want = %v", got, tc)
 		}
-		want = append(want, &testReq{Method: "GET", Path: "/peter.json", Query: wantQuery})
+		want = append(want, &testReq{
+			Method: "GET",
+			Path:   "/peter.json",
+			Query:  unionQueries(client.queries, wantQuery),
+		})
 	}
 	checkAllRequests(t, mock.Reqs, want)
 }
@@ -221,6 +225,7 @@ func TestGetWithETag(t *testing.T) {
 		Method: "GET",
 		Path:   "/peter.json",
 		Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+		Query:  client.queries,
 	})
 }
 
@@ -270,11 +275,13 @@ func TestGetIfChanged(t *testing.T) {
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"If-None-Match": []string{"old-etag"}},
+			Query:  client.queries,
 		},
 		{
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"If-None-Match": []string{"new-etag"}},
+			Query:  client.queries,
 		},
 	})
 }
@@ -459,7 +466,7 @@ func TestSet(t *testing.T) {
 			Method: "PUT",
 			Path:   "/peter.json",
 			Body:   serialize(tc),
-			Query:  map[string]string{"print": "silent"},
+			Query:  unionQueries(client.queries, map[string]string{"print": "silent"}),
 		})
 	}
 	checkAllRequests(t, mock.Reqs, want)
@@ -502,6 +509,7 @@ func TestSetIfUnchanged(t *testing.T) {
 		Path:   "/peter.json",
 		Body:   serialize(want),
 		Header: http.Header{"If-Match": []string{"mock-etag"}},
+		Query:  client.queries,
 	})
 }
 
@@ -526,6 +534,7 @@ func TestSetIfUnchangedError(t *testing.T) {
 		Path:   "/peter.json",
 		Body:   serialize(want),
 		Header: http.Header{"If-Match": []string{"mock-etag"}},
+		Query:  client.queries,
 	})
 }
 
@@ -546,6 +555,7 @@ func TestPush(t *testing.T) {
 		Method: "POST",
 		Path:   "/peter.json",
 		Body:   serialize(""),
+		Query:  client.queries,
 	})
 }
 
@@ -567,6 +577,7 @@ func TestPushWithValue(t *testing.T) {
 		Method: "POST",
 		Path:   "/peter.json",
 		Body:   serialize(want),
+		Query:  client.queries,
 	})
 }
 
@@ -583,7 +594,7 @@ func TestUpdate(t *testing.T) {
 		Method: "PATCH",
 		Path:   "/peter.json",
 		Body:   serialize(want),
-		Query:  map[string]string{"print": "silent"},
+		Query:  unionQueries(client.queries, map[string]string{"print": "silent"}),
 	})
 }
 
@@ -624,6 +635,7 @@ func TestTransaction(t *testing.T) {
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+			Query:  client.queries,
 		},
 		{
 			Method: "PUT",
@@ -633,6 +645,7 @@ func TestTransaction(t *testing.T) {
 				"age":  18,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag"}},
+			Query:  client.queries,
 		},
 	})
 }
@@ -673,6 +686,7 @@ func TestTransactionRetry(t *testing.T) {
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+			Query:  client.queries,
 		},
 		{
 			Method: "PUT",
@@ -682,6 +696,7 @@ func TestTransactionRetry(t *testing.T) {
 				"age":  18,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag1"}},
+			Query:  client.queries,
 		},
 		{
 			Method: "PUT",
@@ -691,6 +706,7 @@ func TestTransactionRetry(t *testing.T) {
 				"age":  20,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag2"}},
+			Query:  client.queries,
 		},
 	})
 }
@@ -732,6 +748,7 @@ func TestTransactionError(t *testing.T) {
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+			Query:  client.queries,
 		},
 		{
 			Method: "PUT",
@@ -741,6 +758,7 @@ func TestTransactionError(t *testing.T) {
 				"age":  18,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag1"}},
+			Query:  client.queries,
 		},
 	})
 }
@@ -776,6 +794,7 @@ func TestTransactionAbort(t *testing.T) {
 			Method: "GET",
 			Path:   "/peter.json",
 			Header: http.Header{"X-Firebase-ETag": []string{"true"}},
+			Query:  client.queries,
 		},
 	}
 	for i := 0; i < txnRetries; i++ {
@@ -787,6 +806,7 @@ func TestTransactionAbort(t *testing.T) {
 				"age":  18,
 			}),
 			Header: http.Header{"If-Match": []string{"mock-etag1"}},
+			Query:  client.queries,
 		})
 	}
 	checkAllRequests(t, mock.Reqs, wanted)
@@ -839,5 +859,6 @@ func TestDelete(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "DELETE",
 		Path:   "/peter.json",
+		Query:  client.queries,
 	})
 }

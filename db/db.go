@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 
@@ -27,14 +28,18 @@ import (
 	"google.golang.org/api/option"
 )
 
-const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
-const invalidChars = "[].#$"
-const authVarOverride = "auth_variable_override"
+const (
+	userAgentFormat    = "Firebase/HTTP/%s/%s/AdminGo"
+	invalidChars       = "[].#$"
+	authVarOverride    = "auth_variable_override"
+	emulatorHostEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
+)
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
 	hc           *internal.HTTPClient
-	url          string
+	baseURL      string
+	queries      map[string]string
 	authOverride string
 }
 
@@ -43,11 +48,28 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // Database service through firebase.App.
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
-	p, err := url.ParseRequestURI(c.URL)
-	if err != nil {
-		return nil, err
-	} else if p.Scheme != "https" {
-		return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
+	var err error
+	var baseURL string
+	var queries = map[string]string{}
+	if c.URL != "" {
+		p, err := url.ParseRequestURI(c.URL)
+		if err != nil {
+			return nil, err
+		} else if p.Scheme != "https" {
+			return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
+		}
+		baseURL = fmt.Sprintf("https://%s", p.Host)
+	}
+	emulatorHost := os.Getenv(emulatorHostEnvVar)
+	if emulatorHost != "" {
+		baseURL, queries, err = parseEmulatorHost(emulatorHost)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if baseURL == "" {
+		return nil, fmt.Errorf("invalid empty database URL")
 	}
 
 	var ao []byte
@@ -69,7 +91,8 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	hc.CreateErrFn = handleRTDBError
 	return &Client{
 		hc:           hc,
-		url:          fmt.Sprintf("https://%s", p.Host),
+		baseURL:      baseURL,
+		queries:      queries,
 		authOverride: string(ao),
 	}, nil
 }
@@ -96,7 +119,10 @@ func (c *Client) sendAndUnmarshal(
 		return nil, fmt.Errorf("invalid path with illegal characters: %q", req.URL)
 	}
 
-	req.URL = fmt.Sprintf("%s%s.json", c.url, req.URL)
+	req.URL = fmt.Sprintf("%s%s.json", c.baseURL, req.URL)
+	for k, v := range c.queries {
+		req.Opts = append(req.Opts, internal.WithQueryParam(k, v))
+	}
 	if c.authOverride != "" {
 		req.Opts = append(req.Opts, internal.WithQueryParam(authVarOverride, c.authOverride))
 	}
@@ -125,4 +151,20 @@ func handleRTDBError(resp *internal.Response) error {
 	}
 
 	return err
+}
+
+func parseEmulatorHost(host string) (string, map[string]string, error) {
+	p, err := url.ParseRequestURI(host)
+	if err != nil {
+		return "", nil, err
+	}
+	baseURL := fmt.Sprintf("%s://%s", p.Scheme, p.Host)
+	queries := map[string]string{}
+	query := p.Query()
+	if query.Has("ns") {
+		queries["ns"] = query.Get("ns")
+	} else {
+		return "", nil, fmt.Errorf("invalid database URL, namespace is missing")
+	}
+	return baseURL, queries, nil
 }

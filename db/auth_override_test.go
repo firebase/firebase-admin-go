@@ -35,7 +35,9 @@ func TestAuthOverrideGet(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query:  map[string]string{"auth_variable_override": testAuthOverrides},
+		Query: unionQueries(aoClient.queries, map[string]string{
+			"auth_variable_override": testAuthOverrides,
+		}),
 	})
 }
 
@@ -53,7 +55,10 @@ func TestAuthOverrideSet(t *testing.T) {
 		Method: "PUT",
 		Body:   serialize(want),
 		Path:   "/peter.json",
-		Query:  map[string]string{"auth_variable_override": testAuthOverrides, "print": "silent"},
+		Query: unionQueries(aoClient.queries, map[string]string{
+			"auth_variable_override": testAuthOverrides,
+			"print":                  "silent",
+		}),
 	})
 }
 
@@ -73,10 +78,10 @@ func TestAuthOverrideQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query: map[string]string{
+		Query: unionQueries(aoClient.queries, map[string]string{
 			"auth_variable_override": testAuthOverrides,
 			"orderBy":                "\"foo\"",
-		},
+		}),
 	})
 }
 
@@ -96,11 +101,11 @@ func TestAuthOverrideRangeQuery(t *testing.T) {
 	checkOnlyRequest(t, mock.Reqs, &testReq{
 		Method: "GET",
 		Path:   "/peter.json",
-		Query: map[string]string{
+		Query: unionQueries(aoClient.queries, map[string]string{
 			"auth_variable_override": testAuthOverrides,
 			"orderBy":                "\"foo\"",
 			"startAt":                "1",
 			"endAt":                  "10",
-		},
+		}),
 	})
 }

@@ -95,8 +95,8 @@ func TestNewClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.url != testURL {
-		t.Errorf("NewClient().url = %q; want = %q", c.url, testURL)
+	if c.baseURL != getTestBaseURL() {
+		t.Errorf("NewClient().url = %q; want = %q", c.baseURL, testURL)
 	}
 	if c.hc == nil {
 		t.Errorf("NewClient().hc = nil; want non-nil")
@@ -120,8 +120,8 @@ func TestNewClientAuthOverrides(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.url != testURL {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		if c.baseURL != getTestBaseURL() {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.baseURL, testURL)
 		}
 		if c.hc == nil {
 			t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
@@ -133,6 +133,34 @@ func TestNewClientAuthOverrides(t *testing.T) {
 		if c.authOverride != string(b) {
 			t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.authOverride, string(b))
 		}
+	}
+}
+
+func TestNewClientEmulatorHostEnvVar(t *testing.T) {
+	testBaseURL := "http://localhost:9000"
+	testNamespace := "foo"
+	emulatorHost := fmt.Sprintf("%s?ns=%s", testBaseURL, testNamespace)
+	os.Setenv(emulatorHostEnvVar, emulatorHost)
+	defer os.Unsetenv(emulatorHostEnvVar)
+	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+		Opts:         testOpts,
+		URL:          testURL,
+		AuthOverride: make(map[string]interface{}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.baseURL != testBaseURL {
+		t.Errorf("NewClient().url = %q; want = %q", c.baseURL, testBaseURL)
+	}
+	if c.queries["ns"] != testNamespace {
+		t.Errorf("NewClient().queries[\"ns\"] = %q; want = %q", c.baseURL, testNamespace)
+	}
+	if c.hc == nil {
+		t.Errorf("NewClient().hc = nil; want non-nil")
+	}
+	if c.authOverride != "" {
+		t.Errorf("NewClient().ao = %q; want = %q", c.authOverride, "")
 	}
 }
 
@@ -149,8 +177,8 @@ func TestValidURLS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.url != tc {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		if c.baseURL != tc {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.baseURL, testURL)
 		}
 	}
 }
@@ -402,7 +430,7 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 		w.Write(b)
 	})
 	s.srv = httptest.NewServer(handler)
-	c.url = s.srv.URL
+	c.baseURL = s.srv.URL
 	return s.srv
 }
 
@@ -414,4 +442,23 @@ type person struct {
 func serialize(v interface{}) []byte {
 	b, _ := json.Marshal(v)
 	return b
+}
+
+func unionQueries(src, dest map[string]string) map[string]string {
+	for k, v := range src {
+		dest[k] = v
+	}
+	return dest
+}
+
+func getTestBaseURL() string {
+	emulatorHost := os.Getenv(emulatorHostEnvVar)
+	if emulatorHost != "" {
+		baseURL, _, err := parseEmulatorHost(emulatorHost)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		return baseURL
+	}
+	return testURL
 }
