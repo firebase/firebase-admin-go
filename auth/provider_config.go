@@ -159,14 +159,23 @@ func (config *OIDCProviderConfigToCreate) Enabled(enabled bool) *OIDCProviderCon
 	return config.set(enabledKey, enabled)
 }
 
+// ClientSecret sets the client secret for the new provider.
+// This is required for the code flow.
 func (config *OIDCProviderConfigToCreate) ClientSecret(secret string) *OIDCProviderConfigToCreate {
 	return config.set(clientSecretKey, secret)
 }
 
+// IDTokenResponseType sets whether to enable the ID token response flow for the new provider.
+// By default, this is enabled if no response type is specified.
+// Having both the code and ID token response flows is currently not supported.
 func (config *OIDCProviderConfigToCreate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToCreate {
 	return config.set(idTokenResponseTypeKey, enabled)
 }
 
+// CodeResponseType sets whether to enable the code response flow for the new provider.
+// By default, this is not enabled if no response type is specified.
+// A client secret must be set for this response type.
+// Having both the code and ID token response flows is currently not supported.
 func (config *OIDCProviderConfigToCreate) CodeResponseType(enabled bool) *OIDCProviderConfigToCreate {
 	return config.set(codeResponseTypeKey, enabled)
 }
@@ -238,14 +247,23 @@ func (config *OIDCProviderConfigToUpdate) Enabled(enabled bool) *OIDCProviderCon
 	return config.set(enabledKey, enabled)
 }
 
+// ClientSecret sets the client secret for the provider.
+// This is required for the code flow.
 func (config *OIDCProviderConfigToUpdate) ClientSecret(secret string) *OIDCProviderConfigToUpdate {
 	return config.set(clientSecretKey, secret)
 }
 
+// IDTokenResponseType sets whether to enable the ID token response flow for the provider.
+// By default, this is enabled if no response type is specified.
+// Having both the code and ID token response flows is currently not supported.
 func (config *OIDCProviderConfigToUpdate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToUpdate {
 	return config.set(idTokenResponseTypeKey, enabled)
 }
 
+// CodeResponseType sets whether to enable the code response flow for the new provider.
+// By default, this is not enabled if no response type is specified.
+// A client secret must be set for this response type.
+// Having both the code and ID token response flows is currently not supported.
 func (config *OIDCProviderConfigToUpdate) CodeResponseType(enabled bool) *OIDCProviderConfigToUpdate {
 	return config.set(codeResponseTypeKey, enabled)
 }
