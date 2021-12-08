@@ -335,6 +335,35 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 				Issuer("https://oidc.com/issuer").
 				CodeResponseType(true),
 		},
+		{
+			name: "TwoResponseTypes",
+			want: "Only one response type may be chosen",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer").
+				IdTokenResponseType(true).
+				CodeResponseType(true).
+				ClientSecret("secret"),
+		},
+		{
+			name: "ZeroResponseTypes",
+			want: "At least one response type must be returned",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer").
+				IdTokenResponseType(false).
+				CodeResponseType(false),
+		},
+		{
+			name: "ResponseTypesMissing",
+			want: "At least one response type must be returned",
+			conf: (&OIDCProviderConfigToCreate{}).
+				ID("oidc.provider").
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer"),
+		},
 	}
 
 	client := &baseClient{}
@@ -512,6 +541,32 @@ func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
 			conf: (&OIDCProviderConfigToUpdate{}).
 				Issuer("https://oidc.com/issuer").
 				CodeResponseType(true),
+		},
+		{
+			name: "TwoResponseTypes",
+			want: "Only one response type may be chosen",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer").
+				IdTokenResponseType(true).
+				CodeResponseType(true).
+				ClientSecret("secret"),
+		},
+		{
+			name: "ZeroResponseTypes",
+			want: "At least one response type must be returned",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer").
+				IdTokenResponseType(false).
+				CodeResponseType(false),
+		},
+		{
+			name: "ResponseTypesMissing",
+			want: "At least one response type must be returned",
+			conf: (&OIDCProviderConfigToUpdate{}).
+				ClientID("CLIENT_ID").
+				Issuer("https://oidc.com/issuer"),
 		},
 	}
 
