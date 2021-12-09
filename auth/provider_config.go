@@ -215,10 +215,8 @@ func (config *OIDCProviderConfigToCreate) buildRequest() (nestedMap, string, err
 		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && val.(bool) {
 			return nil, "", errors.New("Only one response type may be chosen")
 		}
-	} else {
-		if val, ok := config.params.Get(idTokenResponseTypeKey); !ok || !val.(bool) {
-			return nil, "", errors.New("At least one response type must be returned")
-		}
+	} else if val, ok := config.params.Get(idTokenResponseTypeKey); !ok || !val.(bool) {
+		return nil, "", errors.New("At least one response type must be returned")
 	}
 
 	return config.params, config.id, nil
@@ -309,9 +307,7 @@ func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && val.(bool) {
 			return nil, errors.New("Only one response type may be chosen")
 		}
-	}
-
-	if val, ok := config.params.Get(codeResponseTypeKey); ok && !val.(bool) {
+	} else if ok && !val.(bool) {
 		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && !val.(bool) {
 			return nil, errors.New("At least one response type must be returned")
 		}
