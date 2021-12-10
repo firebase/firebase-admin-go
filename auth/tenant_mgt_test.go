@@ -612,8 +612,7 @@ func TestTenantCreateOIDCProviderConfig(t *testing.T) {
 		DisplayName(oidcProviderConfig.DisplayName).
 		Enabled(oidcProviderConfig.Enabled).
 		ClientID(oidcProviderConfig.ClientID).
-		Issuer(oidcProviderConfig.Issuer).
-		IDTokenResponseType(true)
+		Issuer(oidcProviderConfig.Issuer)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -624,11 +623,10 @@ func TestTenantCreateOIDCProviderConfig(t *testing.T) {
 	}
 
 	wantBody := map[string]interface{}{
-		"displayName":  oidcProviderConfig.DisplayName,
-		"enabled":      oidcProviderConfig.Enabled,
-		"clientId":     oidcProviderConfig.ClientID,
-		"issuer":       oidcProviderConfig.Issuer,
-		"responseType": map[string]interface{}{"idToken": true},
+		"displayName": oidcProviderConfig.DisplayName,
+		"enabled":     oidcProviderConfig.Enabled,
+		"clientId":    oidcProviderConfig.ClientID,
+		"issuer":      oidcProviderConfig.Issuer,
 	}
 	wantURL := "/projects/mock-project-id/tenants/tenantID/oauthIdpConfigs"
 	if err := checkCreateOIDCConfigRequestWithURL(s, wantBody, wantURL); err != nil {

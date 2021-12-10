@@ -45,8 +45,8 @@ const (
 	displayNameKey = "displayName"
 	enabledKey     = "enabled"
 
-	idTokenResponseTypeKey = "responseType.idToken"
-	codeResponseTypeKey    = "responseType.code"
+	idTokenResponseEnabledKey = "responseType.idToken"
+	codeResponseEnabledKey    = "responseType.code"
 )
 
 type nestedMap map[string]interface{}
@@ -117,14 +117,14 @@ func buildMask(data map[string]interface{}) []string {
 // OIDCProviderConfig is the OIDC auth provider configuration.
 // See https://openid.net/specs/openid-connect-core-1_0-final.html.
 type OIDCProviderConfig struct {
-	ID                  string
-	DisplayName         string
-	Enabled             bool
-	ClientID            string
-	Issuer              string
-	ClientSecret        string
-	CodeResponseType    bool
-	IDTokenResponseType bool
+	ID                     string
+	DisplayName            string
+	Enabled                bool
+	ClientID               string
+	Issuer                 string
+	ClientSecret           string
+	CodeResponseEnabled    bool
+	IDTokenResponseEnabled bool
 }
 
 // OIDCProviderConfigToCreate represents the options used to create a new OIDCProviderConfig.
@@ -165,19 +165,19 @@ func (config *OIDCProviderConfigToCreate) ClientSecret(secret string) *OIDCProvi
 	return config.set(clientSecretKey, secret)
 }
 
-// IDTokenResponseType sets whether to enable the ID token response flow for the new provider.
+// IDTokenResponseEnabled sets whether to enable the ID token response flow for the new provider.
 // By default, this is enabled if no response type is specified.
 // Having both the code and ID token response flows is currently not supported.
-func (config *OIDCProviderConfigToCreate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToCreate {
-	return config.set(idTokenResponseTypeKey, enabled)
+func (config *OIDCProviderConfigToCreate) IDTokenResponseEnabled(enabled bool) *OIDCProviderConfigToCreate {
+	return config.set(idTokenResponseEnabledKey, enabled)
 }
 
-// CodeResponseType sets whether to enable the code response flow for the new provider.
+// CodeResponseEnabled sets whether to enable the code response flow for the new provider.
 // By default, this is not enabled if no response type is specified.
 // A client secret must be set for this response type.
 // Having both the code and ID token response flows is currently not supported.
-func (config *OIDCProviderConfigToCreate) CodeResponseType(enabled bool) *OIDCProviderConfigToCreate {
-	return config.set(codeResponseTypeKey, enabled)
+func (config *OIDCProviderConfigToCreate) CodeResponseEnabled(enabled bool) *OIDCProviderConfigToCreate {
+	return config.set(codeResponseEnabledKey, enabled)
 }
 
 func (config *OIDCProviderConfigToCreate) set(key string, value interface{}) *OIDCProviderConfigToCreate {
@@ -208,15 +208,17 @@ func (config *OIDCProviderConfigToCreate) buildRequest() (nestedMap, string, err
 		return nil, "", fmt.Errorf("failed to parse Issuer: %v", err)
 	}
 
-	if val, ok := config.params.Get(codeResponseTypeKey); ok && val.(bool) {
+	if val, ok := config.params.Get(codeResponseEnabledKey); ok && val.(bool) {
 		if val, ok := config.params.GetString(clientSecretKey); !ok || val == "" {
 			return nil, "", errors.New("Client Secret must not be empty for Code Response Type")
 		}
-		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && val.(bool) {
+		if val, ok := config.params.Get(idTokenResponseEnabledKey); ok && val.(bool) {
 			return nil, "", errors.New("Only one response type may be chosen")
 		}
-	} else if val, ok := config.params.Get(idTokenResponseTypeKey); !ok || !val.(bool) {
-		return nil, "", errors.New("At least one response type must be returned")
+	} else if ok && !val.(bool) {
+		if val, ok := config.params.Get(idTokenResponseEnabledKey); ok && !val.(bool) {
+			return nil, "", errors.New("At least one response type must be returned")
+		}
 	}
 
 	return config.params, config.id, nil
@@ -258,19 +260,19 @@ func (config *OIDCProviderConfigToUpdate) ClientSecret(secret string) *OIDCProvi
 	return config.set(clientSecretKey, secret)
 }
 
-// IDTokenResponseType sets whether to enable the ID token response flow for the provider.
+// IDTokenResponseEnabled sets whether to enable the ID token response flow for the provider.
 // By default, this is enabled if no response type is specified.
 // Having both the code and ID token response flows is currently not supported.
-func (config *OIDCProviderConfigToUpdate) IDTokenResponseType(enabled bool) *OIDCProviderConfigToUpdate {
-	return config.set(idTokenResponseTypeKey, enabled)
+func (config *OIDCProviderConfigToUpdate) IDTokenResponseEnabled(enabled bool) *OIDCProviderConfigToUpdate {
+	return config.set(idTokenResponseEnabledKey, enabled)
 }
 
-// CodeResponseType sets whether to enable the code response flow for the new provider.
+// CodeResponseEnabled sets whether to enable the code response flow for the new provider.
 // By default, this is not enabled if no response type is specified.
 // A client secret must be set for this response type.
 // Having both the code and ID token response flows is currently not supported.
-func (config *OIDCProviderConfigToUpdate) CodeResponseType(enabled bool) *OIDCProviderConfigToUpdate {
-	return config.set(codeResponseTypeKey, enabled)
+func (config *OIDCProviderConfigToUpdate) CodeResponseEnabled(enabled bool) *OIDCProviderConfigToUpdate {
+	return config.set(codeResponseEnabledKey, enabled)
 }
 
 func (config *OIDCProviderConfigToUpdate) set(key string, value interface{}) *OIDCProviderConfigToUpdate {
@@ -300,15 +302,15 @@ func (config *OIDCProviderConfigToUpdate) buildRequest() (nestedMap, error) {
 		}
 	}
 
-	if val, ok := config.params.Get(codeResponseTypeKey); ok && val.(bool) {
+	if val, ok := config.params.Get(codeResponseEnabledKey); ok && val.(bool) {
 		if val, ok := config.params.GetString(clientSecretKey); !ok || val == "" {
 			return nil, errors.New("Client Secret must not be empty for Code Response Type")
 		}
-		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && val.(bool) {
+		if val, ok := config.params.Get(idTokenResponseEnabledKey); ok && val.(bool) {
 			return nil, errors.New("Only one response type may be chosen")
 		}
 	} else if ok && !val.(bool) {
-		if val, ok := config.params.Get(idTokenResponseTypeKey); ok && !val.(bool) {
+		if val, ok := config.params.Get(idTokenResponseEnabledKey); ok && !val.(bool) {
 			return nil, errors.New("At least one response type must be returned")
 		}
 	}
@@ -899,13 +901,13 @@ func (c *baseClient) makeRequest(
 }
 
 type oidcProviderConfigDAO struct {
-	Name         string                   `json:"name"`
-	ClientID     string                   `json:"clientId"`
-	Issuer       string                   `json:"issuer"`
-	DisplayName  string                   `json:"displayName"`
-	Enabled      bool                     `json:"enabled"`
-	ClientSecret string                   `json:"clientSecret"`
-	ResponseType oidcProviderResponseType `json:"responseType"`
+	Name            string                   `json:"name"`
+	ClientID        string                   `json:"clientId"`
+	Issuer          string                   `json:"issuer"`
+	DisplayName     string                   `json:"displayName"`
+	Enabled         bool                     `json:"enabled"`
+	ClientSecret    string                   `json:"clientSecret"`
+	ResponseEnabled oidcProviderResponseType `json:"responseType"`
 }
 
 type oidcProviderResponseType struct {
@@ -915,14 +917,14 @@ type oidcProviderResponseType struct {
 
 func (dao *oidcProviderConfigDAO) toOIDCProviderConfig() *OIDCProviderConfig {
 	return &OIDCProviderConfig{
-		ID:                  extractResourceID(dao.Name),
-		DisplayName:         dao.DisplayName,
-		Enabled:             dao.Enabled,
-		ClientID:            dao.ClientID,
-		Issuer:              dao.Issuer,
-		ClientSecret:        dao.ClientSecret,
-		CodeResponseType:    dao.ResponseType.Code,
-		IDTokenResponseType: dao.ResponseType.IDToken,
+		ID:                     extractResourceID(dao.Name),
+		DisplayName:            dao.DisplayName,
+		Enabled:                dao.Enabled,
+		ClientID:               dao.ClientID,
+		Issuer:                 dao.Issuer,
+		ClientSecret:           dao.ClientSecret,
+		CodeResponseEnabled:    dao.ResponseEnabled.Code,
+		IDTokenResponseEnabled: dao.ResponseEnabled.IDToken,
 	}
 }
 

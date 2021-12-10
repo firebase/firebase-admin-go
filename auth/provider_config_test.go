@@ -72,14 +72,14 @@ var idpCertsMap = []interface{}{
 }
 
 var oidcProviderConfig = &OIDCProviderConfig{
-	ID:                  "oidc.provider",
-	DisplayName:         "oidcProviderName",
-	Enabled:             true,
-	ClientID:            "CLIENT_ID",
-	Issuer:              "https://oidc.com/issuer",
-	ClientSecret:        "CLIENT_SECRET",
-	CodeResponseType:    true,
-	IDTokenResponseType: true,
+	ID:                     "oidc.provider",
+	DisplayName:            "oidcProviderName",
+	Enabled:                true,
+	ClientID:               "CLIENT_ID",
+	Issuer:                 "https://oidc.com/issuer",
+	ClientSecret:           "CLIENT_SECRET",
+	CodeResponseEnabled:    true,
+	IDTokenResponseEnabled: true,
 }
 
 var samlProviderConfig = &SAMLProviderConfig{
@@ -167,8 +167,8 @@ func TestCreateOIDCProviderConfig(t *testing.T) {
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer).
 		ClientSecret(oidcProviderConfig.ClientSecret).
-		CodeResponseType(true).
-		IDTokenResponseType(false)
+		CodeResponseEnabled(true).
+		IDTokenResponseEnabled(false)
 
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
@@ -204,7 +204,7 @@ func TestCreateOIDCProviderConfigMinimal(t *testing.T) {
 		ID(oidcProviderConfig.ID).
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer).
-		IDTokenResponseType(true)
+		IDTokenResponseEnabled(true)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -235,8 +235,8 @@ func TestCreateOIDCProviderConfigZeroValues(t *testing.T) {
 		Enabled(false).
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer).
-		CodeResponseType(false).
-		IDTokenResponseType(true)
+		CodeResponseEnabled(false).
+		IDTokenResponseEnabled(true)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -272,7 +272,7 @@ func TestCreateOIDCProviderConfigError(t *testing.T) {
 		ID(oidcProviderConfig.ID).
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer).
-		IDTokenResponseType(true)
+		IDTokenResponseEnabled(true)
 	oidc, err := client.CreateOIDCProviderConfig(context.Background(), options)
 	if oidc != nil || !errorutils.IsInternal(err) {
 		t.Errorf("CreateOIDCProviderConfig() = (%v, %v); want = (nil, %q)", oidc, err, "internal-error")
@@ -336,7 +336,7 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 				ID("oidc.provider").
 				ClientID("CLIENT_ID").
 				Issuer("https://oidc.com/issuer").
-				CodeResponseType(true),
+				CodeResponseEnabled(true),
 		},
 		{
 			name: "TwoResponseTypes",
@@ -345,8 +345,8 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 				ID("oidc.provider").
 				ClientID("CLIENT_ID").
 				Issuer("https://oidc.com/issuer").
-				IDTokenResponseType(true).
-				CodeResponseType(true).
+				IDTokenResponseEnabled(true).
+				CodeResponseEnabled(true).
 				ClientSecret("secret"),
 		},
 		{
@@ -356,16 +356,8 @@ func TestCreateOIDCProviderConfigInvalidInput(t *testing.T) {
 				ID("oidc.provider").
 				ClientID("CLIENT_ID").
 				Issuer("https://oidc.com/issuer").
-				IDTokenResponseType(false).
-				CodeResponseType(false),
-		},
-		{
-			name: "ResponseTypesMissing",
-			want: "At least one response type must be returned",
-			conf: (&OIDCProviderConfigToCreate{}).
-				ID("oidc.provider").
-				ClientID("CLIENT_ID").
-				Issuer("https://oidc.com/issuer"),
+				IDTokenResponseEnabled(false).
+				CodeResponseEnabled(false),
 		},
 	}
 
@@ -389,8 +381,8 @@ func TestUpdateOIDCProviderConfig(t *testing.T) {
 		ClientID(oidcProviderConfig.ClientID).
 		Issuer(oidcProviderConfig.Issuer).
 		ClientSecret(oidcProviderConfig.ClientSecret).
-		CodeResponseType(true).
-		IDTokenResponseType(false)
+		CodeResponseEnabled(true).
+		IDTokenResponseEnabled(false)
 	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
 	if err != nil {
 		t.Fatal(err)
@@ -460,8 +452,8 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("").
 		Enabled(false).
-		CodeResponseType(false).
-		IDTokenResponseType(true)
+		CodeResponseEnabled(false).
+		IDTokenResponseEnabled(true)
 	oidc, err := client.UpdateOIDCProviderConfig(context.Background(), "oidc.provider", options)
 	if err != nil {
 		t.Fatal(err)
@@ -543,15 +535,15 @@ func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
 			want: "Client Secret must not be empty for Code Response Type",
 			conf: (&OIDCProviderConfigToUpdate{}).
 				Issuer("https://oidc.com/issuer").
-				CodeResponseType(true),
+				CodeResponseEnabled(true),
 		},
 		{
 			name: "TwoResponseTypes",
 			want: "Only one response type may be chosen",
 			conf: (&OIDCProviderConfigToUpdate{}).
 				Issuer("https://oidc.com/issuer").
-				IDTokenResponseType(true).
-				CodeResponseType(true).
+				IDTokenResponseEnabled(true).
+				CodeResponseEnabled(true).
 				ClientSecret("secret"),
 		},
 		{
@@ -559,8 +551,8 @@ func TestUpdateOIDCProviderConfigInvalidInput(t *testing.T) {
 			want: "At least one response type must be returned",
 			conf: (&OIDCProviderConfigToUpdate{}).
 				Issuer("https://oidc.com/issuer").
-				IDTokenResponseType(false).
-				CodeResponseType(false),
+				IDTokenResponseEnabled(false).
+				CodeResponseEnabled(false),
 		},
 	}
 
