@@ -901,13 +901,13 @@ func (c *baseClient) makeRequest(
 }
 
 type oidcProviderConfigDAO struct {
-	Name            string                   `json:"name"`
-	ClientID        string                   `json:"clientId"`
-	Issuer          string                   `json:"issuer"`
-	DisplayName     string                   `json:"displayName"`
-	Enabled         bool                     `json:"enabled"`
-	ClientSecret    string                   `json:"clientSecret"`
-	ResponseEnabled oidcProviderResponseType `json:"responseType"`
+	Name         string                   `json:"name"`
+	ClientID     string                   `json:"clientId"`
+	Issuer       string                   `json:"issuer"`
+	DisplayName  string                   `json:"displayName"`
+	Enabled      bool                     `json:"enabled"`
+	ClientSecret string                   `json:"clientSecret"`
+	ResponseType oidcProviderResponseType `json:"responseType"`
 }
 
 type oidcProviderResponseType struct {
@@ -923,8 +923,8 @@ func (dao *oidcProviderConfigDAO) toOIDCProviderConfig() *OIDCProviderConfig {
 		ClientID:               dao.ClientID,
 		Issuer:                 dao.Issuer,
 		ClientSecret:           dao.ClientSecret,
-		CodeResponseEnabled:    dao.ResponseEnabled.Code,
-		IDTokenResponseEnabled: dao.ResponseEnabled.IDToken,
+		CodeResponseEnabled:    dao.ResponseType.Code,
+		IDTokenResponseEnabled: dao.ResponseType.IDToken,
 	}
 }
 
