@@ -45,11 +45,12 @@ type oidcProviderClient interface {
 func testOIDCProviderConfig(t *testing.T, client oidcProviderClient) {
 	id := randomOIDCProviderID()
 	want := &auth.OIDCProviderConfig{
-		ID:          id,
-		DisplayName: "OIDC_DISPLAY_NAME",
-		Enabled:     true,
-		ClientID:    "OIDC_CLIENT_ID",
-		Issuer:      "https://oidc.com/issuer",
+		ID:                  id,
+		DisplayName:         "OIDC_DISPLAY_NAME",
+		Enabled:             true,
+		ClientID:            "OIDC_CLIENT_ID",
+		Issuer:              "https://oidc.com/issuer",
+		IDTokenResponseType: true,
 	}
 
 	req := (&auth.OIDCProviderConfigToCreate{}).
@@ -117,10 +118,11 @@ func testOIDCProviderConfig(t *testing.T, client oidcProviderClient) {
 
 	t.Run("UpdateOIDCProviderConfig()", func(t *testing.T) {
 		want = &auth.OIDCProviderConfig{
-			ID:          id,
-			DisplayName: "UPDATED_OIDC_DISPLAY_NAME",
-			ClientID:    "UPDATED_OIDC_CLIENT_ID",
-			Issuer:      "https://oidc.com/updated_issuer",
+			ID:                  id,
+			DisplayName:         "UPDATED_OIDC_DISPLAY_NAME",
+			ClientID:            "UPDATED_OIDC_CLIENT_ID",
+			Issuer:              "https://oidc.com/updated_issuer",
+			IDTokenResponseType: true,
 		}
 		req := (&auth.OIDCProviderConfigToUpdate{}).
 			DisplayName("UPDATED_OIDC_DISPLAY_NAME").
@@ -134,6 +136,49 @@ func testOIDCProviderConfig(t *testing.T, client oidcProviderClient) {
 
 		if !reflect.DeepEqual(oidc, want) {
 			t.Errorf("UpdateOIDCProviderConfig() = %#v; want = %#v", oidc, want)
+		}
+	})
+
+	t.Run("UpdateOIDCProviderConfig() should be rejected with invalid oauth response type", func(t *testing.T) {
+		req := (&auth.OIDCProviderConfigToUpdate{}).
+			DisplayName("UPDATED_OIDC_DISPLAY_NAME").
+			Enabled(false).
+			ClientID("UPDATED_OIDC_CLIENT_ID").
+			Issuer("https://oidc.com/updated_issuer").
+			IDTokenResponseType(false).
+			CodeResponseType(false).
+			ClientSecret("CLIENT_SECRET")
+		_, err := client.UpdateOIDCProviderConfig(context.Background(), id, req)
+		if err == nil {
+			t.Fatalf("UpdateOIDCProviderConfig(invalid_oauth_response_type) error nil; want not nil")
+		}
+
+		if err.Error() != "At least one response type must be returned" {
+			t.Errorf(
+				"UpdateOIDCProviderConfig(invalid_oauth_response_type) returned an error of '%s'; "+
+					"expected 'At least one response type must be returned'",
+				err.Error())
+		}
+	})
+
+	t.Run("UpdateOIDCProviderConfig() should be rejected code flow with no client secret", func(t *testing.T) {
+		req := (&auth.OIDCProviderConfigToUpdate{}).
+			DisplayName("UPDATED_OIDC_DISPLAY_NAME").
+			Enabled(false).
+			ClientID("UPDATED_OIDC_CLIENT_ID").
+			Issuer("https://oidc.com/updated_issuer").
+			IDTokenResponseType(false).
+			CodeResponseType(true)
+		_, err := client.UpdateOIDCProviderConfig(context.Background(), id, req)
+		if err == nil {
+			t.Fatalf("UpdateOIDCProviderConfig(code_flow_with_no_client_secret) error nil; want not nil")
+		}
+
+		if err.Error() != "Client Secret must not be empty for Code Response Type" {
+			t.Errorf(
+				"UpdateOIDCProviderConfig(code_flow_with_no_client_secret) returned an error of '%s'; "+
+					"expected 'Client Secret must not be empty for Code Response Type'",
+				err.Error())
 		}
 	})
 
