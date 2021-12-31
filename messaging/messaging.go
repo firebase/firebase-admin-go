@@ -675,16 +675,17 @@ func (p *APNSPayload) UnmarshalJSON(b []byte) error {
 // Alert may be specified as a string (via the AlertString field), or as a struct (via the Alert
 // field).
 type Aps struct {
-	AlertString      string                 `json:"-"`
-	Alert            *ApsAlert              `json:"-"`
-	Badge            *int                   `json:"badge,omitempty"`
-	Sound            string                 `json:"-"`
-	CriticalSound    *CriticalSound         `json:"-"`
-	ContentAvailable bool                   `json:"-"`
-	MutableContent   bool                   `json:"-"`
-	Category         string                 `json:"category,omitempty"`
-	ThreadID         string                 `json:"thread-id,omitempty"`
-	CustomData       map[string]interface{} `json:"-"`
+	AlertString       string                 `json:"-"`
+	Alert             *ApsAlert              `json:"-"`
+	Badge             *int                   `json:"badge,omitempty"`
+	Sound             string                 `json:"-"`
+	CriticalSound     *CriticalSound         `json:"-"`
+	ContentAvailable  bool                   `json:"-"`
+	MutableContent    bool                   `json:"-"`
+	Category          string                 `json:"category,omitempty"`
+	ThreadID          string                 `json:"thread-id,omitempty"`
+	InterruptionLevel string                 `json:"interruption-level,omitempty"`
+	CustomData        map[string]interface{} `json:"-"`
 }
 
 // standardFields creates a map containing all the fields except the custom data.
@@ -714,6 +715,9 @@ func (a *Aps) standardFields() map[string]interface{} {
 	}
 	if a.ThreadID != "" {
 		m["thread-id"] = a.ThreadID
+	}
+	if a.InterruptionLevel != "" {
+		m["interruption-level"] = a.InterruptionLevel
 	}
 	return m
 }
