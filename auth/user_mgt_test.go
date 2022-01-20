@@ -1134,6 +1134,62 @@ func TestSetCustomUserClaims(t *testing.T) {
 	}
 }
 
+func TestUserProvider(t *testing.T) {
+	cases := []struct {
+		provider *UserProvider
+		want     map[string]interface{}
+	}{
+		{
+			provider: &UserProvider{UID: "test", ProviderID: "google.com"},
+			want:     map[string]interface{}{"rawId": "test", "providerId": "google.com"},
+		},
+		{
+			provider: &UserProvider{
+				UID:         "test",
+				ProviderID:  "google.com",
+				DisplayName: "Test User",
+			},
+			want: map[string]interface{}{
+				"rawId":       "test",
+				"providerId":  "google.com",
+				"displayName": "Test User",
+			},
+		},
+		{
+			provider: &UserProvider{
+				UID:         "test",
+				ProviderID:  "google.com",
+				DisplayName: "Test User",
+				Email:       "test@example.com",
+				PhotoURL:    "https://test.com/user.png",
+			},
+			want: map[string]interface{}{
+				"rawId":       "test",
+				"providerId":  "google.com",
+				"displayName": "Test User",
+				"email":       "test@example.com",
+				"photoUrl":    "https://test.com/user.png",
+			},
+		},
+	}
+
+	for idx, tc := range cases {
+		b, err := json.Marshal(tc.provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var got map[string]interface{}
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("[%d] UserProvider = %#v; want = %#v", idx, got, tc.want)
+		}
+	}
+}
+
 func TestUserToImport(t *testing.T) {
 	cases := []struct {
 		user *UserToImport

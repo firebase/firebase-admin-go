@@ -195,9 +195,9 @@ func (u *UserToImport) set(key string, value interface{}) *UserToImport {
 type UserProvider struct {
 	UID         string `json:"rawId"`
 	ProviderID  string `json:"providerId"`
-	Email       string `json:"email"`
-	DisplayName string `json:"displayName"`
-	PhotoURL    string `json:"photoUrl"`
+	Email       string `json:"email,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	PhotoURL    string `json:"photoUrl,omitempty"`
 }
 
 // ProviderData setter.
