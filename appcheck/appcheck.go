@@ -10,7 +10,6 @@ import (
 	"github.com/MicahParks/keyfunc"
 	"github.com/golang-jwt/jwt/v4"
 
-	"firebase.google.com/go/v4/auth"
 	"firebase.google.com/go/v4/internal"
 )
 
@@ -20,9 +19,12 @@ const (
 )
 
 type VerifiedToken struct {
-	AppID string
-
-	Token auth.Token
+	Iss   string   `json:"iss"`
+	Sub   string   `json:"sub"`
+	Aud   []string `json:"aud"`
+	Exp   int64    `json:"exp"`
+	Iat   int64    `json:"iat"`
+	AppID string   `json:"app_id"`
 }
 
 type Client struct {
@@ -33,8 +35,10 @@ type Client struct {
 
 // NewClient creates a new AppCheck client.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
-	// TODO: Consider passing a context.Context or http.Client.
-	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{})
+	// TODO: Add support for overriding the HTTP client using the app one.
+	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
+		Ctx: ctx,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +76,7 @@ func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
 	for _, v := range rawAud {
 		aud = append(aud, v.(string))
 	}
+
 	if !contains(aud, "projects/"+c.projectID) {
 		return nil, errors.New("app check token has incorrect audience")
 	}
@@ -89,7 +94,12 @@ func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
 	}
 
 	return &VerifiedToken{
-		AppID: decodedToken.Claims.(jwt.MapClaims)["sub"].(string),
+		Iss:   claims["iss"].(string),
+		Sub:   claims["sub"].(string),
+		Aud:   aud,
+		Exp:   int64(claims["exp"].(float64)),
+		Iat:   int64(claims["iat"].(float64)),
+		AppID: claims["sub"].(string),
 	}, nil
 }
 
