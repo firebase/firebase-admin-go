@@ -2,6 +2,7 @@ package appcheck
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -17,24 +18,16 @@ import (
 )
 
 func TestVerifyTokenHasValidClaims(t *testing.T) {
-	pk, err := ioutil.ReadFile("../testdata/appcheck_pk.pem")
+	ts, err := setupFakeJWKS()
 	if err != nil {
-		t.Fatalf("Failed to read private key: %v", err)
+		t.Fatalf("Error setting up fake JWKS server: %v", err)
 	}
-	block, _ := pem.Decode(pk)
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		t.Fatalf("Failed to parse private key: %v", err)
-	}
-
-	jwks, err := ioutil.ReadFile("../testdata/mock.jwks.json")
-	if err != nil {
-		t.Fatalf("Failed to read JWKS: %v", err)
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(jwks)
-	}))
 	defer ts.Close()
+
+	privateKey, err := loadPrivateKey()
+	if err != nil {
+		t.Fatalf("Error loading private key: %v", err)
+	}
 
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
@@ -126,9 +119,14 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	}
 
 	for _, tc := range tokenTests {
-		// Create an App Check token.
+		// Create an App Check-style token.
 		jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, tc.claims)
+
+		// kid matches the key ID in testdata/mock.jwks.json,
+		// which is the public key matching to the private key
+		// in testdata/appcheck_pk.pem.
 		jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+
 		token, err := jwtToken.SignedString(privateKey)
 		if err != nil {
 			t.Fatalf("error generating JWT: %v", err)
@@ -147,13 +145,10 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 }
 
 func TestVerifyTokenMustExist(t *testing.T) {
-	jwks, err := ioutil.ReadFile("../testdata/mock.jwks.json")
+	ts, err := setupFakeJWKS()
 	if err != nil {
-		t.Fatalf("Failed to read JWKS: %v", err)
+		t.Fatalf("Error setting up fake JWK server: %v", err)
 	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(jwks)
-	}))
 	defer ts.Close()
 
 	conf := &internal.AppCheckConfig{
@@ -166,11 +161,105 @@ func TestVerifyTokenMustExist(t *testing.T) {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
 
-	gotToken, gotErr := client.VerifyToken("")
-	if gotErr == nil {
-		t.Errorf("Expected error, got nil")
+	for _, token := range []string{"", "-", "."} {
+		gotToken, gotErr := client.VerifyToken(token)
+		if gotErr == nil {
+			t.Errorf("VerifyToken(%s) expected error, got nil", token)
+		}
+		if gotToken != nil {
+			t.Errorf("Expected nil, got token %v", gotToken)
+		}
 	}
-	if gotToken != nil {
-		t.Errorf("Expected nil, got token %v", gotToken)
+}
+
+func TestVerifyTokenNotExpired(t *testing.T) {
+	ts, err := setupFakeJWKS()
+	if err != nil {
+		t.Fatalf("Error setting up fake JWKS server: %v", err)
 	}
+	defer ts.Close()
+
+	privateKey, err := loadPrivateKey()
+	if err != nil {
+		t.Fatalf("Error loading private key: %v", err)
+	}
+
+	conf := &internal.AppCheckConfig{
+		ProjectID: "project_id",
+		JWKSUrl:   ts.URL,
+	}
+
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Errorf("Error creating NewClient: %v", err)
+	}
+
+	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	jwt.TimeFunc = func() time.Time {
+		return mockTime
+	}
+
+	tokenTests := []struct {
+		expiresAt time.Time
+		wantErr   bool
+	}{
+		// Expire in the future is OK.
+		{mockTime.Add(time.Hour), false},
+		// Expire in the past is not OK.
+		{mockTime.Add(-1 * time.Hour), true},
+	}
+
+	for _, tc := range tokenTests {
+		claims := struct {
+			Aud []string `json:"aud"`
+			jwt.RegisteredClaims
+		}{
+			[]string{"projects/12345678", "projects/project_id"},
+			jwt.RegisteredClaims{
+				Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
+				Subject:   "12345678:app:ID",
+				ExpiresAt: jwt.NewNumericDate(tc.expiresAt),
+				IssuedAt:  jwt.NewNumericDate(mockTime),
+			},
+		}
+
+		jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+		jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+
+		token, err := jwtToken.SignedString(privateKey)
+		if err != nil {
+			t.Fatalf("error generating JWT: %v", err)
+		}
+
+		_, gotErr := client.VerifyToken(token)
+		if tc.wantErr && gotErr == nil {
+			t.Errorf("Expected an error, got none")
+		} else if !tc.wantErr && gotErr != nil {
+			t.Errorf("Expected no error, got %v", gotErr)
+		}
+	}
+}
+
+func setupFakeJWKS() (*httptest.Server, error) {
+	jwks, err := ioutil.ReadFile("../testdata/mock.jwks.json")
+	if err != nil {
+		return nil, err
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(jwks)
+	}))
+	return ts, nil
+}
+
+func loadPrivateKey() (*rsa.PrivateKey, error) {
+	pk, err := ioutil.ReadFile("../testdata/appcheck_pk.pem")
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(pk)
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return privateKey, nil
 }
