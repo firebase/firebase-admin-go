@@ -45,7 +45,7 @@ type Client struct {
 // NewClient creates a new App Check client.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
-	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
+	jwks, err := keyfunc.Get(conf.JWKSUrl, keyfunc.Options{
 		Ctx: ctx,
 	})
 	if err != nil {
