@@ -13,20 +13,27 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
-const (
-	AppCheckIssuer = "https://firebaseappcheck.googleapis.com/"
-	JWKSUrl        = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
-)
+// JWKSUrl is the URL of the JWKS used to verify App Check tokens.
+const JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
+
+const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
 var (
+	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
-	ErrTokenType          = errors.New("token has incorrect type")
-	ErrTokenClaims        = errors.New("token has incorrect claims")
-	ErrTokenAudience      = errors.New("token has incorrect audience")
-	ErrTokenIssuer        = errors.New("token has incorrect issuer")
-	ErrTokenSubject       = errors.New("token has empty or missing subject")
+	// ErrTokenType is returned when the token is not a JWT.
+	ErrTokenType = errors.New("token has incorrect type")
+	// ErrTokenClaims is returned when the token claims cannot be decoded.
+	ErrTokenClaims = errors.New("token has incorrect claims")
+	// ErrTokenAudience is returned when the token audience does not match the current project.
+	ErrTokenAudience = errors.New("token has incorrect audience")
+	// ErrTokenIssuer is returned when the token issuer does not match Firebase's App Check service.
+	ErrTokenIssuer = errors.New("token has incorrect issuer")
+	// ErrTokenSubject is returned when the token subject is empty or missing.
+	ErrTokenSubject = errors.New("token has empty or missing subject")
 )
 
+// VerifiedToken represents a verified App Check token.
 type VerifiedToken struct {
 	Iss   string
 	Sub   string
@@ -36,6 +43,7 @@ type VerifiedToken struct {
 	AppID string
 }
 
+// Client is the interface for the Firebase App Check service.
 type Client struct {
 	projectID string
 
