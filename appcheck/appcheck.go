@@ -108,7 +108,7 @@ func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
 	// Project Number suffix because the Golang SDK only has project ID.
 	//
 	// This is consistent with the Firebase Admin Node SDK.
-	if !strings.HasPrefix(claims["iss"].(string), AppCheckIssuer) {
+	if !strings.HasPrefix(claims["iss"].(string), appCheckIssuer) {
 		return nil, ErrTokenIssuer
 	}
 
