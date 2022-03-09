@@ -1,3 +1,4 @@
+//go:build appengine
 // +build appengine
 
 // Copyright 2017 Google Inc. All Rights Reserved.
