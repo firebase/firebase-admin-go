@@ -1107,7 +1107,7 @@ var testTenant = &Tenant{
 	DisplayName:           "Test Tenant",
 	AllowPasswordSignUp:   true,
 	EnableEmailLinkSignIn: true,
-	EnableAnonymousUser:   true,
+	EnableAnonymousUsers:  true,
 }
 
 var testTenant2 = &Tenant{
@@ -1115,7 +1115,7 @@ var testTenant2 = &Tenant{
 	DisplayName:           "Test Tenant 2",
 	AllowPasswordSignUp:   true,
 	EnableEmailLinkSignIn: true,
-	EnableAnonymousUser:   true,
+	EnableAnonymousUsers:  true,
 }
 
 func TestTenant(t *testing.T) {
@@ -1182,7 +1182,7 @@ func TestCreateTenant(t *testing.T) {
 		DisplayName(testTenant.DisplayName).
 		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
 		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn).
-		EnableAnonymousUser(testTenant.EnableAnonymousUser)
+		EnableAnonymousUsers(testTenant.EnableAnonymousUsers)
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -1196,7 +1196,7 @@ func TestCreateTenant(t *testing.T) {
 		"displayName":           testTenant.DisplayName,
 		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
-		"enableAnonymousUser":   testTenant.EnableAnonymousUser,
+		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
 	}
 	if err := checkCreateTenantRequest(s, wantBody); err != nil {
 		t.Fatal(err)
@@ -1232,7 +1232,7 @@ func TestCreateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUser(false)
+		EnableAnonymousUsers(false)
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -1283,7 +1283,7 @@ func TestUpdateTenant(t *testing.T) {
 		DisplayName(testTenant.DisplayName).
 		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
 		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn).
-		EnableAnonymousUser(testTenant.EnableAnonymousUser)
+		EnableAnonymousUsers(testTenant.EnableAnonymousUsers)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)
@@ -1297,7 +1297,7 @@ func TestUpdateTenant(t *testing.T) {
 		"displayName":           testTenant.DisplayName,
 		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
-		"enableAnonymousUser":   testTenant.EnableAnonymousUser,
+		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
 	}
 	wantMask := []string{"allowPasswordSignup", "displayName", "enableAnonymousUser", "enableEmailLinkSignin"}
 	if err := checkUpdateTenantRequest(s, wantBody, wantMask); err != nil {
@@ -1338,7 +1338,7 @@ func TestUpdateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUser(false)
+		EnableAnonymousUsers(false)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)

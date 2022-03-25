@@ -31,14 +31,14 @@ func TestTenantManager(t *testing.T) {
 		DisplayName:           "admin-go-tenant",
 		AllowPasswordSignUp:   true,
 		EnableEmailLinkSignIn: true,
-		EnableAnonymousUser:   true,
+		EnableAnonymousUsers:  true,
 	}
 
 	req := (&auth.TenantToCreate{}).
 		DisplayName("admin-go-tenant").
 		AllowPasswordSignUp(true).
 		EnableEmailLinkSignIn(true).
-		EnableAnonymousUser(true)
+		EnableAnonymousUsers(true)
 	created, err := client.TenantManager.CreateTenant(context.Background(), req)
 	if err != nil {
 		t.Fatalf("CreateTenant() = %v", err)
@@ -131,13 +131,13 @@ func TestTenantManager(t *testing.T) {
 			DisplayName:           "updated-go-tenant",
 			AllowPasswordSignUp:   false,
 			EnableEmailLinkSignIn: false,
-			EnableAnonymousUser:   false,
+			EnableAnonymousUsers:  false,
 		}
 		req := (&auth.TenantToUpdate{}).
 			DisplayName("updated-go-tenant").
 			AllowPasswordSignUp(false).
 			EnableEmailLinkSignIn(false).
-			EnableAnonymousUser(false)
+			EnableAnonymousUsers(false)
 		tenant, err := client.TenantManager.UpdateTenant(context.Background(), id, req)
 		if err != nil {
 			t.Fatalf("UpdateTenant() = %v", err)

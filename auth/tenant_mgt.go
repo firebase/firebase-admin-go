@@ -47,7 +47,7 @@ type Tenant struct {
 	DisplayName           string `json:"displayName"`
 	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
 	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
-	EnableAnonymousUser   bool   `json:"enableAnonymousUser"`
+	EnableAnonymousUsers  bool   `json:"enableAnonymousUser"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -242,8 +242,8 @@ func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
-// EnableAnonymousUser enables or disables anonymous user.
-func (t *TenantToCreate) EnableAnonymousUser(enable bool) *TenantToCreate {
+// EnableAnonymousUsers enables or disables anonymous user.
+func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
 	return t.set(enableAnonymousUser, enable)
 }
 
@@ -282,8 +282,8 @@ func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
-// EnableAnonymousUser enables or disables anonymous user.
-func (t *TenantToUpdate) EnableAnonymousUser(enable bool) *TenantToUpdate {
+// EnableAnonymousUsers enables or disables anonymous user.
+func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
 
