@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	credEnvVar                      = "GOOGLE_APPLICATION_CREDENTIALS"
-	testProjectID                   = "mock-project-id"
-	testVersion                     = "test-version"
+	credEnvVar                 = "GOOGLE_APPLICATION_CREDENTIALS"
+	testProjectID              = "mock-project-id"
+	testVersion                = "test-version"
 	defaultIDToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 	defaultIDToolkitV2Endpoint = "https://identitytoolkit.googleapis.com/v2"
 )
