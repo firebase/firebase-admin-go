@@ -282,7 +282,7 @@ func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
-// EnableAnonymousUsers enables or disables anonymous user.
+// EnableAnonymousUsers enables or disables anonymous authentication.
 func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
