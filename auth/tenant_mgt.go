@@ -242,7 +242,7 @@ func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
-// EnableAnonymousUsers enables or disables anonymous user.
+// EnableAnonymousUsers enables or disables anonymous authentication.
 func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
 	return t.set(enableAnonymousUser, enable)
 }
