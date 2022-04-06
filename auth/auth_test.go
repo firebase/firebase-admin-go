@@ -36,11 +36,11 @@ import (
 )
 
 const (
-	credEnvVar                      = "GOOGLE_APPLICATION_CREDENTIALS"
-	testProjectID                   = "mock-project-id"
-	testVersion                     = "test-version"
-	defaultIDToolkitV1Endpoint      = "https://identitytoolkit.googleapis.com/v1"
-	defaultIDToolkitV2Beta1Endpoint = "https://identitytoolkit.googleapis.com/v2beta1"
+	credEnvVar                 = "GOOGLE_APPLICATION_CREDENTIALS"
+	testProjectID              = "mock-project-id"
+	testVersion                = "test-version"
+	defaultIDToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
+	defaultIDToolkitV2Endpoint = "https://identitytoolkit.googleapis.com/v2"
 )
 
 var (
@@ -291,7 +291,7 @@ func TestNewClientExplicitNoAuth(t *testing.T) {
 func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	emulatorHost := "localhost:9099"
 	idToolkitV1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v1"
-	idToolkitV2Beta1Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v2beta1"
+	idToolkitV2Endpoint := "http://localhost:9099/identitytoolkit.googleapis.com/v2"
 
 	os.Setenv(emulatorHostEnvVar, emulatorHost)
 	defer os.Unsetenv(emulatorHostEnvVar)
@@ -305,11 +305,11 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
 	}
-	if baseClient.providerConfigEndpoint != idToolkitV2Beta1Endpoint {
-		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Beta1Endpoint)
+	if baseClient.providerConfigEndpoint != idToolkitV2Endpoint {
+		t.Errorf("baseClient.providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, idToolkitV2Endpoint)
 	}
-	if baseClient.tenantMgtEndpoint != idToolkitV2Beta1Endpoint {
-		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Beta1Endpoint)
+	if baseClient.tenantMgtEndpoint != idToolkitV2Endpoint {
+		t.Errorf("baseClient.tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, idToolkitV2Endpoint)
 	}
 	if _, ok := baseClient.signer.(emulatedSigner); !ok {
 		t.Errorf("baseClient.signer = %#v; want = %#v", baseClient.signer, emulatedSigner{})
@@ -1427,11 +1427,11 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 	if baseClient.userManagementEndpoint != defaultIDToolkitV1Endpoint {
 		return fmt.Errorf("userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, defaultIDToolkitV1Endpoint)
 	}
-	if baseClient.providerConfigEndpoint != defaultIDToolkitV2Beta1Endpoint {
-		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
+	if baseClient.providerConfigEndpoint != defaultIDToolkitV2Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Endpoint)
 	}
-	if baseClient.tenantMgtEndpoint != defaultIDToolkitV2Beta1Endpoint {
-		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Beta1Endpoint)
+	if baseClient.tenantMgtEndpoint != defaultIDToolkitV2Endpoint {
+		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Endpoint)
 	}
 	if baseClient.projectID != wantProjectID {
 		return fmt.Errorf("projectID = %q; want = %q", baseClient.projectID, wantProjectID)

@@ -553,26 +553,35 @@ func importWithBcrypt(ctx context.Context, client *auth.Client) {
 
 func importWithScrypt(ctx context.Context, client *auth.Client) {
 	// [START import_with_scrypt]
-	users := []*auth.UserToImport{
-		(&auth.UserToImport{}).
-			UID("some-uid").
-			Email("user@example.com").
-			PasswordHash([]byte("password-hash")).
-			PasswordSalt([]byte("salt")),
+	b64URLdecode := func(s string) []byte {
+		b, err := base64.URLEncoding.DecodeString(s)
+		if err != nil {
+			log.Fatalln("Failed to decode string", err)
+		}
+
+		return b
 	}
-	b64decode := func(s string) []byte {
+	b64Stddecode := func(s string) []byte {
 		b, err := base64.StdEncoding.DecodeString(s)
 		if err != nil {
 			log.Fatalln("Failed to decode string", err)
 		}
 		return b
 	}
+	// Users retrieved from Firebase Auth's backend need to be base64URL decoded
+	users := []*auth.UserToImport{
+		(&auth.UserToImport{}).
+			UID("some-uid").
+			Email("user@example.com").
+			PasswordHash(b64URLdecode("password-hash")).
+			PasswordSalt(b64URLdecode("salt")),
+	}
 
 	// All the parameters below can be obtained from the Firebase Console's "Users"
 	// section. Base64 encoded parameters must be decoded into raw bytes.
 	h := hash.Scrypt{
-		Key:           b64decode("base64-secret"),
-		SaltSeparator: b64decode("base64-salt-separator"),
+		Key:           b64Stddecode("base64-secret"),
+		SaltSeparator: b64Stddecode("base64-salt-separator"),
 		Rounds:        8,
 		MemoryCost:    14,
 	}

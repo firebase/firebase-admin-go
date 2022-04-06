@@ -47,6 +47,7 @@ type Tenant struct {
 	DisplayName           string `json:"displayName"`
 	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
 	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
+	EnableAnonymousUsers  bool   `json:"enableAnonymousUser"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -216,6 +217,7 @@ const (
 	tenantDisplayNameKey     = "displayName"
 	allowPasswordSignUpKey   = "allowPasswordSignup"
 	enableEmailLinkSignInKey = "enableEmailLinkSignin"
+	enableAnonymousUser      = "enableAnonymousUser"
 )
 
 // TenantToCreate represents the options used to create a new tenant.
@@ -238,6 +240,11 @@ func (t *TenantToCreate) AllowPasswordSignUp(allow bool) *TenantToCreate {
 // Disabling this makes the password required for email sign-in.
 func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
 	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+// EnableAnonymousUsers enables or disables anonymous authentication.
+func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
+	return t.set(enableAnonymousUser, enable)
 }
 
 func (t *TenantToCreate) set(key string, value interface{}) *TenantToCreate {
@@ -273,6 +280,11 @@ func (t *TenantToUpdate) AllowPasswordSignUp(allow bool) *TenantToUpdate {
 // Disabling this makes the password required for email sign-in.
 func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
 	return t.set(enableEmailLinkSignInKey, enable)
+}
+
+// EnableAnonymousUsers enables or disables anonymous authentication.
+func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
+	return t.set(enableAnonymousUser, enable)
 }
 
 func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
