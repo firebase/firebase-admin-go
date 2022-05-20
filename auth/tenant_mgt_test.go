@@ -569,6 +569,34 @@ func TestTenantEmailSignInLink(t *testing.T) {
 	}
 }
 
+func TestTenantVerifyAndChangeEmail(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.VerifyAndChangeEmailLink(context.Background(), testEmail, testNewEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("VerifyAndChangeEmailLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_AND_CHANGE_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+		"newEmail":      testNewEmail,
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("VerifyAndChangeEmailLink() %v", err)
+	}
+}
+
 func TestTenantOIDCProviderConfig(t *testing.T) {
 	s := echoServer([]byte(oidcConfigResponse), t)
 	defer s.Close()
