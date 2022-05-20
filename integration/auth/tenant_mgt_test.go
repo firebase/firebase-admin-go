@@ -372,6 +372,23 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 	})
 
+	t.Run("VerifyAndChangeEmailLink()", func(t *testing.T) {
+		newEmail := "new-" + want.Email
+		link, err := tenantClient.VerifyAndChangeEmailLink(context.Background(), want.Email, newEmail)
+		if err != nil {
+			t.Fatalf("VerifyAndChangeEmailLink() = %v", err)
+		}
+
+		tenant, err := extractTenantID(link)
+		if err != nil {
+			t.Fatalf("VerifyAndChangeEmailLink() = %v", err)
+		}
+
+		if id != tenant {
+			t.Fatalf("VerifyAndChangeEmailLink() TenantID = %q; want = %q", tenant, id)
+		}
+	})
+
 	t.Run("RevokeRefreshTokens()", func(t *testing.T) {
 		validSinceMillis := time.Now().Unix() * 1000
 		time.Sleep(1 * time.Second)
