@@ -8,7 +8,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.15, 1.16, 1.17]
+        go:
+          - "1.15"
+          - "1.16"
+          - "1.17"
+          - "1.18"
 
     steps:
     - name: Set up Go ${{ matrix.go }}
@@ -17,15 +21,14 @@ jobs:
         go-version: ${{ matrix.go }}
 
     - name: Install golint
-      run: go get golang.org/x/lint/golint
+      run: go install golang.org/x/lint/golint@latest
 
     - name: Check out code
       uses: actions/checkout@v2
 
     - name: Run Linter
       run: |
-        GOLINT=`go list -f {{.Target}} golang.org/x/lint/golint`
-        $GOLINT -set_exit_status ./...
+        golint -set_exit_status ./...
 
     - name: Run Unit Tests
       if: success() || failure()
