@@ -357,7 +357,7 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 
 		tenant, err := extractTenantID(link)
 		if err != nil {
-			t.Fatalf("VerifyAndChangeEmailLink() = %v", err)
+			t.Fatalf("extractTenantID(%s) = %v", link, err)
 		}
 
 		if id != tenant {

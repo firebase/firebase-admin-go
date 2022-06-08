@@ -593,7 +593,7 @@ func TestTenantVerifyAndChangeEmail(t *testing.T) {
 		"newEmail":      testNewEmail,
 	}
 	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
-		t.Fatalf("VerifyAndChangeEmailLink() %v", err)
+		t.Fatalf("checkActionLinkRequestWithURL() = %v", err)
 	}
 }
 
