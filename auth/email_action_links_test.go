@@ -355,7 +355,7 @@ func TestVerifyAndChangeEmailLinkWithSettings(t *testing.T) {
 		want[k] = v
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("VerifyAndChangeEmailLinkWithSettings() %v", err)
+		t.Fatalf("checkActionLinkRequest() = %v", err)
 	}
 }
 
