@@ -40,6 +40,7 @@ var testActionCodeSettings = &ActionCodeSettings{
 	AndroidPackageName:    "com.example.android",
 	AndroidInstallApp:     true,
 	AndroidMinimumVersion: "6",
+	ReturnOobLink:         true,
 }
 var testActionCodeSettingsMap = map[string]interface{}{
 	"continueUrl":           "https://example.dynamic.link",
@@ -49,6 +50,7 @@ var testActionCodeSettingsMap = map[string]interface{}{
 	"androidPackageName":    "com.example.android",
 	"androidInstallApp":     true,
 	"androidMinimumVersion": "6",
+	"returnOobLink":         true,
 }
 var invalidActionCodeSettings = []struct {
 	name     string
@@ -306,6 +308,35 @@ func TestEmailVerificationLinkError(t *testing.T) {
 		if err == nil || !check(err) {
 			t.Errorf("EmailVerificationLink(%q) = %v; want = %q", code, err, serverError[code])
 		}
+	}
+}
+
+func TestEmailVerificationSendEmail(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	testActionCodeSettingsNoReturn := testActionCodeSettings
+	testActionCodeSettingsNoReturn.ReturnOobLink = false
+	testActionCodeSettingsMapNoReturn := testActionCodeSettingsMap
+	testActionCodeSettingsMapNoReturn["returnOobLink"] = false
+	link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsNoReturn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "EMAIL_SIGNIN",
+		"email":         testEmail,
+		"returnOobLink": false,
+	}
+	for k, v := range testActionCodeSettingsMapNoReturn {
+		want[k] = v
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatalf("EmailSignInLink() %v", err)
 	}
 }
 
