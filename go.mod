@@ -1,6 +1,6 @@
 module firebase.google.com/go/v4
 
-go 1.15
+go 1.16
 
 require (
 	cloud.google.com/go/firestore v1.6.1
