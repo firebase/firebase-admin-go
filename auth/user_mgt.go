@@ -39,6 +39,9 @@ const (
 
 	// Maximum number of users allowed to batch delete at a time.
 	maxDeleteAccountsBatchSize = 1000
+	createUserMethod           = "createUser"
+	updateUserMethod           = "updateUser"
+	phoneMultiFactor           = "phone"
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -66,7 +69,8 @@ type multiFactorInfoResponse struct {
 }
 
 // MultiFactorInfo describes a user enrolled second phone factor.
-type MultiFactorInfo struct { //phone multi factor info
+// TODO : convert PhoneNumber to PhoneMultiFactorInfo struct
+type MultiFactorInfo struct {
 	UID                 string
 	DisplayName         string
 	EnrollmentTimestamp int64
@@ -162,13 +166,11 @@ func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
 // MFA Info setter.
 func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorInfoResponse, error) {
 	var authFactorInfo multiFactorInfoResponse
-	if mfaInfo.EnrollmentTimestamp != 0 {
-		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
-	}
-	if mfaInfo.FactorID == "phone" {
+	authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
+	if mfaInfo.FactorID == phoneMultiFactor {
+		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
 		authFactorInfo.DisplayName = mfaInfo.DisplayName
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
-		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
 		return authFactorInfo, nil
 	} else {
 		out, _ := json.Marshal(mfaInfo)
@@ -180,9 +182,14 @@ func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
 	req := make(map[string]interface{})
 	for k, v := range u.params {
 		if k == "mfaSettings" {
-			continue
+			mfaInfo, err := validateAndFormatMfaSettings(v.(MultiFactorSettings), createUserMethod)
+			if err != nil {
+				return nil, err
+			}
+			req["mfaInfo"] = mfaInfo
+		} else {
+			req[k] = v
 		}
-		req[k] = v
 	}
 
 	if uid, ok := req["localId"]; ok {
@@ -215,20 +222,6 @@ func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
 			return nil, err
 		}
 	}
-
-	if mfaSettings, ok := u.params["mfaSettings"]; ok {
-		mfaInfo, err := validateMfaSettings(mfaSettings.(MultiFactorSettings), "createUser")
-		if err != nil {
-			return nil, err
-		}
-		for _, enrolledFactor := range mfaInfo {
-			if err := validateCreateUserMfaInfoResponse(*enrolledFactor); err != nil {
-				return nil, err
-			}
-		}
-		req["mfaInfo"] = mfaInfo
-	}
-
 	return req, nil
 }
 
@@ -334,9 +327,14 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 	req := make(map[string]interface{})
 	for k, v := range u.params {
 		if k == "mfaSettings" {
-			continue
+			mfaInfo, err := validateAndFormatMfaSettings(v.(MultiFactorSettings), updateUserMethod)
+			if err != nil {
+				return nil, err
+			}
+			req["mfaInfo"] = mfaInfo
+		} else {
+			req[k] = v
 		}
-		req[k] = v
 	}
 
 	if email, ok := req["email"]; ok {
@@ -392,19 +390,6 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 		if err := validatePassword(pw.(string)); err != nil {
 			return nil, err
 		}
-	}
-
-	if mfaSettings, ok := u.params["mfaSettings"]; ok {
-		mfaInfo, err := validateMfaSettings(mfaSettings.(MultiFactorSettings), "updateUser")
-		if err != nil {
-			return nil, err
-		}
-		for _, enrolledFactor := range mfaInfo {
-			if err := validateUpdateUserMfaInfoResponse(*enrolledFactor); err != nil {
-				return nil, err
-			}
-		}
-		req["mfaInfo"] = mfaInfo
 	}
 
 	if linkProviderUserInfo, ok := req["linkProviderUserInfo"]; ok {
@@ -662,20 +647,27 @@ func validateProvider(providerID string, providerUID string) error {
 	return nil
 }
 
-func validateMfaSettings(mfaSettings MultiFactorSettings, methodType string) ([]*multiFactorInfoResponse, error) {
+func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType string) ([]*multiFactorInfoResponse, error) {
 	var mfaInfo []*multiFactorInfoResponse
 	if len(mfaSettings.EnrolledFactors) != 0 {
 		for _, multiFactorInfo := range mfaSettings.EnrolledFactors {
 			if multiFactorInfo.FactorID == "" {
 				return nil, fmt.Errorf("no factor id specified")
 			}
-			if methodType == "createUser" {
+			if multiFactorInfo.FactorID == phoneMultiFactor {
+				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
+					return nil, err
+				}
+			}
+			if methodType == createUserMethod {
 				if multiFactorInfo.EnrollmentTimestamp != 0 {
 					return nil, fmt.Errorf("\"EnrollmentTimeStamp\" is not supported when adding second factors via \"createUser()\"")
 				}
 				if multiFactorInfo.UID != "" {
 					return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
 				}
+			} else if multiFactorInfo.UID == "" {
+				return nil, fmt.Errorf("The second factor \"uid\" must be a valid non-empty string.")
 			}
 			if obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo); err != nil {
 				return nil, err
@@ -685,40 +677,6 @@ func validateMfaSettings(mfaSettings MultiFactorSettings, methodType string) ([]
 		}
 	}
 	return mfaInfo, nil
-}
-
-func validateCreateUserMfaInfoResponse(mfaInfo multiFactorInfoResponse) error {
-	if mfaInfo.PhoneInfo != "" {
-		if validatePhone(mfaInfo.PhoneInfo) != nil {
-			return fmt.Errorf("The second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string.", mfaInfo.PhoneInfo)
-		}
-		if _, err := time.Parse("2006-01-02T15:04:05Z07:00Z", mfaInfo.EnrolledAt); err != nil {
-			return fmt.Errorf("The second factor \"enrollmentTime\" for \"%s\" must be a valid UTC date string.", mfaInfo.PhoneInfo)
-		} else {
-			return nil
-		}
-	} else {
-		return fmt.Errorf("MFAInfo object provided is invalid")
-	}
-}
-
-func validateUpdateUserMfaInfoResponse(mfaInfo multiFactorInfoResponse) error {
-	if mfaInfo.PhoneInfo != "" {
-		if validatePhone(mfaInfo.PhoneInfo) != nil {
-			return fmt.Errorf("The second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string.", mfaInfo.MFAEnrollmentID)
-		}
-		if mfaInfo.EnrolledAt != "" {
-			if _, err := time.Parse("2006-01-02T15:04:05Z07:00Z", mfaInfo.EnrolledAt); err != nil {
-				return fmt.Errorf("The second factor \"enrollmentTime\" for \"%s\" must be a valid UTC date string.", mfaInfo.PhoneInfo)
-			} else {
-				return nil
-			}
-		} else {
-			return nil
-		}
-	} else {
-		return fmt.Errorf("MFAInfo object provided is invalid")
-	}
 }
 
 // End of validators
@@ -1116,7 +1074,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			UID:                 factor.MFAEnrollmentID,
 			DisplayName:         factor.DisplayName,
 			EnrollmentTimestamp: enrollmentTimestamp,
-			FactorID:            "phone",
+			FactorID:            phoneMultiFactor,
 			PhoneNumber:         factor.PhoneInfo,
 		})
 	}
