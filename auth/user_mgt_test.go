@@ -865,6 +865,29 @@ func TestInvalidUpdateUser(t *testing.T) {
 			}),
 			`The second factor "phoneNumber" for "enrolledSecondFactor1" must be a non-empty E.164 standard compliant identifier string.`,
 		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+16505557348",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`The second factor "uid" must be a valid non-empty string.`,
+		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						UID:                 "enrolledSecondFactor1",
+						PhoneNumber:         "invalid",
+						DisplayName:         "Spouse's phone number",
+						FactorID:            "phone",
+						EnrollmentTimestamp: -2,
+					},
+				},
+			}),
+			`The second factor "phoneNumber" for "enrolledSecondFactor1" must be a non-empty E.164 standard compliant identifier string.`,
+		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
 		}, {
@@ -1017,9 +1040,6 @@ var updateUserCases = []struct {
 					UID:         "enrolledSecondFactor2",
 					PhoneNumber: "+16505557348",
 					FactorID:    "phone",
-				}, {
-					PhoneNumber: "+16505557348",
-					FactorID:    "phone",
 				},
 			},
 		}),
@@ -1034,11 +1054,12 @@ var updateUserCases = []struct {
 				MFAEnrollmentID: "enrolledSecondFactor2",
 				PhoneInfo:       "+16505557348",
 			},
-			{
-				PhoneInfo: "+16505557348",
-			},
 		},
 		},
+	},
+	{
+		(&UserToUpdate{}).MFASettings(MultiFactorSettings{}),
+		map[string]interface{}{"mfaInfo": nil},
 	},
 	{
 		(&UserToUpdate{}).ProviderToLink(&UserProvider{
