@@ -664,7 +664,7 @@ func TestInvalidCreateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string.`,
+			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
 		}, {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -697,7 +697,7 @@ func TestInvalidCreateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "displayName" for "+16505557348" must be a valid non-empty string.`,
+			`the second factor "displayName" for "+16505557348" must be a valid non-empty string`,
 		},
 	}
 	client := &Client{
@@ -856,7 +856,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "displayName" for "+16505557348" must be a valid non-empty string.`,
+			`the second factor "displayName" for "+16505557348" must be a valid non-empty string`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -868,7 +868,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string.`,
+			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -879,7 +879,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "uid" must be a valid non-empty string.`,
+			`the second factor "uid" must be a valid non-empty string`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",

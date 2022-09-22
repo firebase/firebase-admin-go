@@ -151,7 +151,7 @@ func (u *UserToCreate) UID(uid string) *UserToCreate {
 	return u.set("localId", uid)
 }
 
-// MFA setter.
+// MFASettings setter.
 func (u *UserToCreate) MFASettings(mfaSettings MultiFactorSettings) *UserToCreate {
 	return u.set("mfaSettings", mfaSettings)
 }
@@ -175,10 +175,9 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 		authFactorInfo.DisplayName = mfaInfo.DisplayName
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 		return authFactorInfo, nil
-	} else {
-		out, _ := json.Marshal(mfaInfo)
-		return multiFactorInfoResponse{}, fmt.Errorf("Unsupported second factor %s provided", string(out))
 	}
+	out, _ := json.Marshal(mfaInfo)
+	return multiFactorInfoResponse{}, fmt.Errorf("Unsupported second factor %s provided", string(out))
 }
 
 func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
@@ -274,7 +273,7 @@ func (u *UserToUpdate) PhotoURL(url string) *UserToUpdate {
 	return u.set("photoUrl", url)
 }
 
-// Updating MFA Settings
+// MFASettings setter.
 func (u *UserToUpdate) MFASettings(mfaSettings MultiFactorSettings) *UserToUpdate {
 	return u.set("mfaSettings", mfaSettings)
 }
@@ -665,21 +664,21 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 					return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
 				}
 			} else if multiFactorInfo.UID == "" {
-				return nil, fmt.Errorf("The second factor \"uid\" must be a valid non-empty string.")
+				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string")
 			}
 			if multiFactorInfo.FactorID == phoneMultiFactor {
 				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
-					return nil, fmt.Errorf("The second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string.", multiFactorInfo.PhoneNumber)
+					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
 				}
 				if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
-					return nil, fmt.Errorf("The second factor \"displayName\" for \"%s\" must be a valid non-empty string.", multiFactorInfo.PhoneNumber)
+					return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.PhoneNumber)
 				}
 			}
-			if obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo); err != nil {
+			obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
+			if err != nil {
 				return nil, err
-			} else {
-				mfaInfo = append(mfaInfo, &obj)
 			}
+			mfaInfo = append(mfaInfo, &obj)
 		}
 	}
 	return mfaInfo, nil
