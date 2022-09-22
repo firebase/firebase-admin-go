@@ -688,6 +688,16 @@ func TestInvalidCreateUser(t *testing.T) {
 				},
 			}),
 			`no factor id specified`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+16505557348",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`The second factor "displayName" for "+16505557348" must be a valid non-empty string.`,
 		},
 	}
 	client := &Client{
@@ -766,9 +776,6 @@ var createUserCases = []struct {
 					PhoneNumber: "+16505557348",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
-				}, {
-					PhoneNumber: "+16505551000",
-					FactorID:    "phone",
 				},
 			},
 		}),
@@ -776,8 +783,6 @@ var createUserCases = []struct {
 			{
 				PhoneInfo:   "+16505557348",
 				DisplayName: "Spouse's phone number",
-			}, {
-				PhoneInfo: "+16505551000",
 			},
 		},
 		},
@@ -851,7 +856,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "displayName" for "enrolledSecondFactor1" must be a valid string.`,
+			`The second factor "displayName" for "+16505557348" must be a valid non-empty string.`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -863,30 +868,18 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`The second factor "phoneNumber" for "enrolledSecondFactor1" must be a non-empty E.164 standard compliant identifier string.`,
+			`The second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string.`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						PhoneNumber: "+16505557348",
 						FactorID:    "phone",
+						DisplayName: "Spouse's phone number",
 					},
 				},
 			}),
 			`The second factor "uid" must be a valid non-empty string.`,
-		}, {
-			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
-				EnrolledFactors: []*MultiFactorInfo{
-					{
-						UID:                 "enrolledSecondFactor1",
-						PhoneNumber:         "invalid",
-						DisplayName:         "Spouse's phone number",
-						FactorID:            "phone",
-						EnrollmentTimestamp: -2,
-					},
-				},
-			}),
-			`The second factor "phoneNumber" for "enrolledSecondFactor1" must be a non-empty E.164 standard compliant identifier string.`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
@@ -1039,6 +1032,7 @@ var updateUserCases = []struct {
 				}, {
 					UID:         "enrolledSecondFactor2",
 					PhoneNumber: "+16505557348",
+					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				},
 			},
@@ -1052,6 +1046,7 @@ var updateUserCases = []struct {
 			},
 			{
 				MFAEnrollmentID: "enrolledSecondFactor2",
+				DisplayName:     "Spouse's phone number",
 				PhoneInfo:       "+16505557348",
 			},
 		},
