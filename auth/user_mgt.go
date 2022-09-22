@@ -151,6 +151,7 @@ func (u *UserToCreate) UID(uid string) *UserToCreate {
 	return u.set("localId", uid)
 }
 
+// MFA setter.
 func (u *UserToCreate) MFASettings(mfaSettings MultiFactorSettings) *UserToCreate {
 	return u.set("mfaSettings", mfaSettings)
 }
@@ -166,7 +167,9 @@ func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
 // MFA Info setter.
 func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorInfoResponse, error) {
 	var authFactorInfo multiFactorInfoResponse
-	authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
+	if mfaInfo.EnrollmentTimestamp != 0 {
+		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
+	}
 	if mfaInfo.FactorID == phoneMultiFactor {
 		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
 		authFactorInfo.DisplayName = mfaInfo.DisplayName
@@ -654,11 +657,6 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			if multiFactorInfo.FactorID == "" {
 				return nil, fmt.Errorf("no factor id specified")
 			}
-			if multiFactorInfo.FactorID == phoneMultiFactor {
-				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
-					return nil, err
-				}
-			}
 			if methodType == createUserMethod {
 				if multiFactorInfo.EnrollmentTimestamp != 0 {
 					return nil, fmt.Errorf("\"EnrollmentTimeStamp\" is not supported when adding second factors via \"createUser()\"")
@@ -668,6 +666,14 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 				}
 			} else if multiFactorInfo.UID == "" {
 				return nil, fmt.Errorf("The second factor \"uid\" must be a valid non-empty string.")
+			}
+			if multiFactorInfo.FactorID == phoneMultiFactor {
+				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
+					return nil, fmt.Errorf("The second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string.", multiFactorInfo.PhoneNumber)
+				}
+				if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
+					return nil, fmt.Errorf("The second factor \"displayName\" for \"%s\" must be a valid non-empty string.", multiFactorInfo.PhoneNumber)
+				}
 			}
 			if obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo); err != nil {
 				return nil, err
