@@ -48,7 +48,7 @@ var validHashes = []struct {
 			"blockSize":       1,
 			"dkLen":           2,
 			"parallelization": 3,
-			"memoryCost":      4,
+			"cpuMemCost":      4,
 		},
 	},
 	{
