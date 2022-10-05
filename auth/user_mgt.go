@@ -164,7 +164,7 @@ func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
 	return u
 }
 
-// MFA Info setter.
+// Converts a client format second factor object to server format.
 func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorInfoResponse, error) {
 	var authFactorInfo multiFactorInfoResponse
 	if mfaInfo.EnrollmentTimestamp != 0 {
@@ -651,35 +651,39 @@ func validateProvider(providerID string, providerUID string) error {
 
 func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType string) ([]*multiFactorInfoResponse, error) {
 	var mfaInfo []*multiFactorInfoResponse
-	if len(mfaSettings.EnrolledFactors) != 0 {
-		for _, multiFactorInfo := range mfaSettings.EnrolledFactors {
-			if multiFactorInfo.FactorID == "" {
-				return nil, fmt.Errorf("no factor id specified")
+	for _, multiFactorInfo := range mfaSettings.EnrolledFactors {
+		if multiFactorInfo.FactorID == "" {
+			return nil, fmt.Errorf("no factor id specified")
+		}
+		switch methodType {
+		case createUserMethod:
+			// Enrollment time and uid are not allowed for signupNewUser endpoint. They will automatically be provisioned server side.
+			if multiFactorInfo.EnrollmentTimestamp != 0 {
+				return nil, fmt.Errorf("\"EnrollmentTimeStamp\" is not supported when adding second factors via \"createUser()\"")
 			}
-			if methodType == createUserMethod {
-				if multiFactorInfo.EnrollmentTimestamp != 0 {
-					return nil, fmt.Errorf("\"EnrollmentTimeStamp\" is not supported when adding second factors via \"createUser()\"")
-				}
-				if multiFactorInfo.UID != "" {
-					return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
-				}
-			} else if multiFactorInfo.UID == "" {
+			if multiFactorInfo.UID != "" {
+				return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
+			}
+		case updateUserMethod:
+			if multiFactorInfo.UID == "" {
 				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string")
 			}
-			if multiFactorInfo.FactorID == phoneMultiFactor {
-				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
-					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
-				}
-				if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
-					return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.PhoneNumber)
-				}
-			}
-			obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
-			if err != nil {
-				return nil, err
-			}
-			mfaInfo = append(mfaInfo, &obj)
+		default:
+			return nil, fmt.Errorf("unsupported method")
 		}
+		if multiFactorInfo.FactorID == phoneMultiFactor {
+			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
+				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
+			}
+			if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
+				return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.PhoneNumber)
+			}
+		}
+		obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
+		if err != nil {
+			return nil, err
+		}
+		mfaInfo = append(mfaInfo, &obj)
 	}
 	return mfaInfo, nil
 }
