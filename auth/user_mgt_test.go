@@ -786,6 +786,32 @@ var createUserCases = []struct {
 			},
 		},
 		},
+	}, {
+		(&UserToCreate{}).MFASettings(MultiFactorSettings{
+			EnrolledFactors: []*MultiFactorInfo{
+				{
+					PhoneNumber: "+16505557348",
+					DisplayName: "number1",
+					FactorID:    "phone",
+				},
+				{
+					PhoneNumber: "+16505557348",
+					DisplayName: "number2",
+					FactorID:    "phone",
+				},
+			},
+		}),
+		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+			{
+				PhoneInfo:   "+16505557348",
+				DisplayName: "number1",
+			},
+			{
+				PhoneInfo:   "+16505557348",
+				DisplayName: "number2",
+			},
+		},
+		},
 	},
 }
 
@@ -851,7 +877,6 @@ func TestInvalidUpdateUser(t *testing.T) {
 					{
 						UID:         "enrolledSecondFactor1",
 						PhoneNumber: "+16505557348",
-						DisplayName: "",
 						FactorID:    "phone",
 					},
 				},
