@@ -64,7 +64,7 @@ func (s StandardScrypt) Config() (internal.HashConfig, error) {
 		"dkLen":           s.DerivedKeyLength,
 		"blockSize":       s.BlockSize,
 		"parallelization": s.Parallelization,
-		"memoryCost":      s.MemoryCost,
+		"cpuMemCost":      s.MemoryCost,
 	}, nil
 }
 
