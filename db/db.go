@@ -51,11 +51,11 @@ type Client struct {
 type dbURLConfig struct {
 	// BaseURL can be either:
 	//	- a production url (https://foo-bar.firebaseio.com/)
-	//	- an emulator url (http://localhost:8080)
+	//	- an emulator url (http://localhost:9000)
 	BaseURL string
 
 	// Namespace is used in for the emulator to specify the databaseName
-	// To specify a namespace on your url, pass ns=<database_name> (localhost:8080/?ns=foo-bar)
+	// To specify a namespace on your url, pass ns=<database_name> (localhost:9000/?ns=foo-bar)
 	Namespace string
 }
 
@@ -156,7 +156,7 @@ func handleRTDBError(resp *internal.Response) error {
 // parseURLConfig returns the dbURLConfig for the database
 // dbURL may be either:
 //   - a production url (https://foo-bar.firebaseio.com/)
-//   - an emulator URL (localhost:8080/?ns=foo-bar)
+//   - an emulator URL (localhost:9000/?ns=foo-bar)
 //
 // The following rules will apply for determining the output:
 //   - If the url has no scheme it will be assumed to be an emulator url and be used.
