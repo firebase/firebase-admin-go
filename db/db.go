@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 
@@ -30,6 +31,18 @@ import (
 const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
 const invalidChars = "[].#$"
 const authVarOverride = "auth_variable_override"
+const emulatorHostEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
+
+/** TODO:
+ * Using https://github.com/firebase/firebase-admin-python/pull/313/files as the example
+ * Validate // is not in the url
+ * Include ?ns={namespace} query parameter
+ * Use emulator admin credentials
+ * Fill in parseDatabaseURL
+ * Make a set of credentials that correspond to the emulator
+ * Additional tests for parsing the url
+ * Ensure the parameters are passed on the url
+ */
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
@@ -43,14 +56,22 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // Database service through firebase.App.
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
-	p, err := url.ParseRequestURI(c.URL)
-	if err != nil {
-		return nil, err
-	} else if p.Scheme != "https" {
-		return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
+	var databaseURL string
+	emulatorHost := os.Getenv(emulatorHostEnvVar)
+	if emulatorHost == "" {
+		p, err := url.ParseRequestURI(c.URL)
+		if err != nil {
+			return nil, err
+		} else if p.Scheme != "https" {
+			return nil, fmt.Errorf("invalid database URL: %q; want scheme: %q", c.URL, "https")
+		}
+		databaseURL = fmt.Sprintf("https://%s", p.Host)
+	} else {
+		databaseURL = emulatorHost
 	}
 
 	var ao []byte
+	var err error
 	if c.AuthOverride == nil || len(c.AuthOverride) > 0 {
 		ao, err = json.Marshal(c.AuthOverride)
 		if err != nil {
@@ -69,7 +90,7 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	hc.CreateErrFn = handleRTDBError
 	return &Client{
 		hc:           hc,
-		url:          fmt.Sprintf("https://%s", p.Host),
+		url:          databaseURL,
 		authOverride: string(ao),
 	}, nil
 }
@@ -125,4 +146,17 @@ func handleRTDBError(resp *internal.Response) error {
 	}
 
 	return err
+}
+
+// parseDatabaseURL returns the baseURL for the database
+// The input can be either be:
+// - a production URL (https://foo-bar.firebaseio.com/)
+// - an Emulator URL (http://localhost:8080/?ns=foo-bar)
+// In case of Emulator URL, the caller should ensure the namespace is extracted from the query param ns.
+// The resulting base_url never includes query params.
+// If url is a production URL and emulator_host is specified, the resulting base URL will use the emulator_host
+//
+//	emulator_host is ignored if url is already an emulator URL.
+func parseDatabaseURL() string {
+	return ""
 }
