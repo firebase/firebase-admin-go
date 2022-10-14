@@ -179,14 +179,19 @@ func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (
 		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorDatabaseEnvVar, rawEmulatorHostURL, ErrInvalidURL)
 	}
 
-	baseURL := parsedEmulatorHost.Host
+	baseURL := strings.Replace(rawEmulatorHostURL, fmt.Sprintf("?%s", parsedEmulatorHost.RawQuery), "", -1)
 	if parsedEmulatorHost.Scheme != "http" {
-		baseURL = "http://" + baseURL
+		baseURL = fmt.Sprintf("http://%s", baseURL)
 	}
 
 	namespace := parsedEmulatorHost.Query().Get(emulatorNamespaceParam)
 	if namespace == "" {
-		return nil, fmt.Errorf(`invalid database URL: "%s". Database URL must be a valid URL to a Firebase Realtime Database instance (include ?ns=<db-name> query param)`, parsedEmulatorHost)
+		if strings.Contains(rawEmulatorHostURL, ".") {
+			namespace = strings.Split(rawEmulatorHostURL, ".")[0]
+		}
+		if namespace == "" {
+			return nil, fmt.Errorf(`invalid database URL: "%s". Database URL must be a valid URL to a Firebase Realtime Database instance (include ?ns=<db-name> query param)`, parsedEmulatorHost)
+		}
 	}
 
 	return &dbURLConfig{
