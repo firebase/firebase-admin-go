@@ -154,7 +154,10 @@ func handleRTDBError(resp *internal.Response) error {
 }
 
 // parseURLConfig returns the dbURLConfig for the database
-// dbURL may be a production url (https://foo-bar.firebaseio.com/) or an emulator URL (localhost:8080/?ns=foo-bar)
+// dbURL may be either:
+//   - a production url (https://foo-bar.firebaseio.com/)
+//   - an emulator URL (localhost:8080/?ns=foo-bar)
+//
 // The following rules will apply for determining the output:
 //   - If the url has no scheme it will be assumed to be an emulator url and be used.
 //   - else If the FIREBASE_DATABASE_EMULATOR_HOST environment variable is set it will be used.
