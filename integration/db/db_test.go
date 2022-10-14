@@ -784,7 +784,7 @@ func getDatabaseURL() (string, error) {
 func getProductionURL() (string, error) {
 	pid, err := internal.ProjectID()
 	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 
 	return fmt.Sprintf("https://%s.firebaseio.com", pid), nil
