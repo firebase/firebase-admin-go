@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 
@@ -164,17 +165,29 @@ func handleRTDBError(resp *internal.Response) error {
 //   - else the url will be assumed to be a production url and be used.
 func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 	parsedURL, err := url.ParseRequestURI(dbURL)
-	if err != nil {
-		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
-	}
-	if parsedURL.Scheme != "https" {
+	if err == nil && parsedURL.Scheme != "https" {
 		cfg, err := parseEmulatorHost(dbURL, parsedURL)
 		return cfg, true, err
 	}
-	return &dbURLConfig{
-		BaseURL:   dbURL,
-		Namespace: "",
-	}, false, nil
+
+	fromEnvironment := os.Getenv(emulatorDatabaseEnvVar)
+	if fromEnvironment == "" && err != nil {
+		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
+	}
+
+	if fromEnvironment == "" && err == nil {
+		return &dbURLConfig{
+			BaseURL:   dbURL,
+			Namespace: "",
+		}, false, nil
+	}
+
+	parsedURL, err = url.ParseRequestURI(fromEnvironment)
+	if err != nil {
+		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
+	}
+	cfg, err := parseEmulatorHost(fromEnvironment, parsedURL)
+	return cfg, true, err
 }
 
 func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (*dbURLConfig, error) {

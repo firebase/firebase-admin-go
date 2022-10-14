@@ -93,6 +93,7 @@ func TestNewClient(t *testing.T) {
 	cases := []*struct {
 		Name              string
 		URL               string
+		EnvURL            string
 		ExpectedBaseURL   string
 		ExpectedNamespace string
 		ExpectError       bool
@@ -101,9 +102,13 @@ func TestNewClient(t *testing.T) {
 		{Name: "emulator - success", URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
 		{Name: "emulator - missing namespace should error", URL: "localhost:9000", ExpectError: true},
 		{Name: "emulator - if url contains hostname it uses the primary domain", URL: "rtdb-go.emulator:9000", ExpectedBaseURL: "http://rtdb-go.emulator:9000", ExpectedNamespace: "rtdb-go"},
+		{Name: "emulator env - success", EnvURL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
 	}
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
+			t.Setenv(emulatorDatabaseEnvVar, tc.EnvURL)
+			fromEnv := os.Getenv(emulatorDatabaseEnvVar)
+			fmt.Printf(fromEnv)
 			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
 				Opts:         testOpts,
 				URL:          tc.URL,
