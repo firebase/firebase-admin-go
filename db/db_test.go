@@ -95,8 +95,8 @@ func TestNewClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.url != testURL {
-		t.Errorf("NewClient().url = %q; want = %q", c.url, testURL)
+	if c.dbURLConfig.BaseURL != testURL {
+		t.Errorf("NewClient().url = %q; want = %q", c.dbURLConfig.BaseURL, testURL)
 	}
 	if c.hc == nil {
 		t.Errorf("NewClient().hc = nil; want non-nil")
@@ -120,8 +120,8 @@ func TestNewClientAuthOverrides(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.url != testURL {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		if c.dbURLConfig.BaseURL != testURL {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.dbURLConfig.BaseURL, testURL)
 		}
 		if c.hc == nil {
 			t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
@@ -149,8 +149,8 @@ func TestValidURLS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.url != tc {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		if c.dbURLConfig.BaseURL != tc {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.dbURLConfig.BaseURL, testURL)
 		}
 	}
 }
@@ -402,7 +402,7 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 		w.Write(b)
 	})
 	s.srv = httptest.NewServer(handler)
-	c.url = s.srv.URL
+	c.dbURLConfig.BaseURL = s.srv.URL
 	return s.srv
 }
 
