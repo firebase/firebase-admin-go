@@ -170,23 +170,23 @@ func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 		return cfg, true, err
 	}
 
-	fromEnvironment := os.Getenv(emulatorDatabaseEnvVar)
-	if fromEnvironment == "" && err != nil {
+	environmentEmulatorURL := os.Getenv(emulatorDatabaseEnvVar)
+	if environmentEmulatorURL == "" && err != nil {
 		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
 	}
 
-	if fromEnvironment == "" && err == nil {
+	if environmentEmulatorURL == "" && err == nil {
 		return &dbURLConfig{
 			BaseURL:   dbURL,
 			Namespace: "",
 		}, false, nil
 	}
 
-	parsedURL, err = url.ParseRequestURI(fromEnvironment)
+	parsedURL, err = url.ParseRequestURI(environmentEmulatorURL)
 	if err != nil {
-		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
+		return nil, false, fmt.Errorf("%s: %w", environmentEmulatorURL, ErrInvalidURL)
 	}
-	cfg, err := parseEmulatorHost(fromEnvironment, parsedURL)
+	cfg, err := parseEmulatorHost(environmentEmulatorURL, parsedURL)
 	return cfg, true, err
 }
 
