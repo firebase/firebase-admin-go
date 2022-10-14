@@ -25,27 +25,21 @@ import (
 	"strings"
 
 	"firebase.google.com/go/v4/internal"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
 
 const userAgentFormat = "Firebase/HTTP/%s/%s/AdminGo"
 const invalidChars = "[].#$"
 const authVarOverride = "auth_variable_override"
-const emulatorHostEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
+const emulatorDatabaseEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
 const emulatorNamespaceParam = "ns"
 
-var ErrInvalidURL error = errors.New("invalid database url")
+var ErrInvalidURL = errors.New("invalid database url")
 
-/** TODO:
- * Using https://github.com/firebase/firebase-admin-python/pull/313/files as the example
- * Validate // is not in the url
- * Include ?ns={namespace} query parameter
- * Use emulator admin credentials
- * Fill in parseURLConfig
- * Make a set of credentials that correspond to the emulator
- * Additional tests for parsing the url
- * Ensure the parameters are passed on the url
- */
+var emulatorToken = &oauth2.Token{
+	AccessToken: "owner",
+}
 
 // Client is the interface for the Firebase Realtime Database service.
 type Client struct {
@@ -70,7 +64,7 @@ type dbURLConfig struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // Database service through firebase.App.
 func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
-	urlConfig, err := parseURLConfig(c.URL)
+	urlConfig, isEmulator, err := parseURLConfig(c.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +78,10 @@ func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error)
 	}
 
 	opts := append([]option.ClientOption{}, c.Opts...)
+	if isEmulator {
+		ts := oauth2.StaticTokenSource(emulatorToken)
+		opts = append(opts, option.WithTokenSource(ts))
+	}
 	ua := fmt.Sprintf(userAgentFormat, c.Version, runtime.Version())
 	opts = append(opts, option.WithUserAgent(ua))
 	hc, _, err := internal.NewHTTPClient(ctx, opts...)
@@ -161,23 +159,24 @@ func handleRTDBError(resp *internal.Response) error {
 //   - If the url has no scheme it will be assumed to be an emulator url and be used.
 //   - else If the FIREBASE_DATABASE_EMULATOR_HOST environment variable is set it will be used.
 //   - else the url will be assumed to be a production url and be used.
-func parseURLConfig(dbURL string) (*dbURLConfig, error) {
+func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 	parsedURL, err := url.ParseRequestURI(dbURL)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
+		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
 	}
 	if parsedURL.Scheme != "https" {
-		return parseEmulatorHost(dbURL, parsedURL)
+		cfg, err := parseEmulatorHost(dbURL, parsedURL)
+		return cfg, true, err
 	}
 	return &dbURLConfig{
 		BaseURL:   dbURL,
 		Namespace: "",
-	}, nil
+	}, false, nil
 }
 
 func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (*dbURLConfig, error) {
 	if strings.Contains(rawEmulatorHostURL, "//") {
-		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorHostEnvVar, rawEmulatorHostURL, ErrInvalidURL)
+		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorDatabaseEnvVar, rawEmulatorHostURL, ErrInvalidURL)
 	}
 
 	baseURL := parsedEmulatorHost.Host
@@ -195,16 +194,3 @@ func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (
 		Namespace: namespace,
 	}, nil
 }
-
-/**
-"""Parses emulator URL like http://localhost:8080/?ns=foo-bar"""
-        query_ns = parse.parse_qs(parsed_url.query).get('ns')
-        if parsed_url.scheme != 'http' or (not query_ns or len(query_ns) != 1 or not query_ns[0]):
-            raise ValueError(
-                'Invalid database URL: "{0}". Database URL must be a valid URL to a '
-                'Firebase Realtime Database instance.'.format(parsed_url.geturl()))
-
-        namespace = query_ns[0]
-        base_url = '{0}://{1}'.format(parsed_url.scheme, parsed_url.netloc)
-        return base_url, namespace
-*/
