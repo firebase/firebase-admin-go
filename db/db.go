@@ -160,7 +160,7 @@ func handleRTDBError(resp *internal.Response) error {
 //   - an emulator URL (localhost:9000/?ns=foo-bar)
 //
 // The following rules will apply for determining the output:
-//   - If the url has no scheme it will be assumed to be an emulator url and be used.
+//   - If the url does not use an https scheme it will be assumed to be an emulator url and be used.
 //   - else If the FIREBASE_DATABASE_EMULATOR_HOST environment variable is set it will be used.
 //   - else the url will be assumed to be a production url and be used.
 func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
