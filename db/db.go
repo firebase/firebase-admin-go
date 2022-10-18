@@ -36,6 +36,8 @@ const authVarOverride = "auth_variable_override"
 const emulatorDatabaseEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
 const emulatorNamespaceParam = "ns"
 
+// ErrInvalidURL tells whether the given database url is invalid
+// It is invalid if it is malformed, or not of the format "host:port"
 var ErrInvalidURL = errors.New("invalid database url")
 
 var emulatorToken = &oauth2.Token{
