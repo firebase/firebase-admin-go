@@ -36,9 +36,9 @@ const authVarOverride = "auth_variable_override"
 const emulatorDatabaseEnvVar = "FIREBASE_DATABASE_EMULATOR_HOST"
 const emulatorNamespaceParam = "ns"
 
-// ErrInvalidURL tells whether the given database url is invalid
+// errInvalidURL tells whether the given database url is invalid
 // It is invalid if it is malformed, or not of the format "host:port"
-var ErrInvalidURL = errors.New("invalid database url")
+var errInvalidURL = errors.New("invalid database url")
 
 var emulatorToken = &oauth2.Token{
 	AccessToken: "owner",
@@ -176,14 +176,14 @@ func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 	if environmentEmulatorURL != "" {
 		parsedURL, err = url.ParseRequestURI(environmentEmulatorURL)
 		if err != nil {
-			return nil, false, fmt.Errorf("%s: %w", environmentEmulatorURL, ErrInvalidURL)
+			return nil, false, fmt.Errorf("%s: %w", environmentEmulatorURL, errInvalidURL)
 		}
 		cfg, err := parseEmulatorHost(environmentEmulatorURL, parsedURL)
 		return cfg, true, err
 	}
 
 	if err != nil {
-		return nil, false, fmt.Errorf("%s: %w", dbURL, ErrInvalidURL)
+		return nil, false, fmt.Errorf("%s: %w", dbURL, errInvalidURL)
 	}
 
 	return &dbURLConfig{
@@ -194,7 +194,7 @@ func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 
 func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (*dbURLConfig, error) {
 	if strings.Contains(rawEmulatorHostURL, "//") {
-		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorDatabaseEnvVar, rawEmulatorHostURL, ErrInvalidURL)
+		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorDatabaseEnvVar, rawEmulatorHostURL, errInvalidURL)
 	}
 
 	baseURL := strings.Replace(rawEmulatorHostURL, fmt.Sprintf("?%s", parsedEmulatorHost.RawQuery), "", -1)
