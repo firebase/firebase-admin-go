@@ -6,9 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -241,7 +241,7 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 }
 
 func setupFakeJWKS() (*httptest.Server, error) {
-	jwks, err := ioutil.ReadFile("../testdata/mock.jwks.json")
+	jwks, err := os.ReadFile("../testdata/mock.jwks.json")
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func setupFakeJWKS() (*httptest.Server, error) {
 }
 
 func loadPrivateKey() (*rsa.PrivateKey, error) {
-	pk, err := ioutil.ReadFile("../testdata/appcheck_pk.pem")
+	pk, err := os.ReadFile("../testdata/appcheck_pk.pem")
 	if err != nil {
 		return nil, err
 	}
