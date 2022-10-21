@@ -49,17 +49,17 @@ var (
 
 // DecodedAppCheckToken represents a verified App Check token.
 //
-// DecodedAppCheckToken provides typed accessors to the common JWT fields such as Audience (aud) // and ExpiresAt (exp).
-// Additionally it provides an AppID field, which indicates the application ID to which this
-// token belongs. Any additional JWT claims can be accessed via the Claims map of Token.
+// DecodedAppCheckToken provides typed accessors to the common JWT fields such as Audience (aud)
+// and ExpiresAt (exp). Additionally it provides an AppID field, which indicates the application ID to which this
+// token belongs. Any additional JWT claims can be accessed via the Claims map of DecodedAppCheckToken.
 type DecodedAppCheckToken struct {
-	Issuer   string
-	Subject  string
-	Audience []string
-	Expires  time.Time
-	IssuedAt time.Time
-	AppID    string
-	Claims   map[string]interface{}
+	Issuer    string
+	Subject   string
+	Audience  []string
+	ExpiresAt time.Time
+	IssuedAt  time.Time
+	AppID     string
+	Claims    map[string]interface{}
 }
 
 // Client is the interface for the Firebase App Check service.
@@ -149,12 +149,12 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	}
 
 	appCheckToken := DecodedAppCheckToken{
-		Issuer:   claims["iss"].(string),
-		Subject:  claims["sub"].(string),
-		Audience: aud,
-		Expires:  time.Unix(int64(claims["exp"].(float64)), 0),
-		IssuedAt: time.Unix(int64(claims["iat"].(float64)), 0),
-		AppID:    claims["sub"].(string),
+		Issuer:    claims["iss"].(string),
+		Subject:   claims["sub"].(string),
+		Audience:  aud,
+		ExpiresAt: time.Unix(int64(claims["exp"].(float64)), 0),
+		IssuedAt:  time.Unix(int64(claims["iat"].(float64)), 0),
+		AppID:     claims["sub"].(string),
 	}
 
 	// Remove all the claims we've already parsed.
