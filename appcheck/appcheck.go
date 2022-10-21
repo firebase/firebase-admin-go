@@ -1,3 +1,17 @@
+// Copyright 2022 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package appcheck provides functionality for verifying App Check tokens.
 package appcheck
 
@@ -46,11 +60,13 @@ type VerifiedToken struct {
 // Client is the interface for the Firebase App Check service.
 type Client struct {
 	projectID string
-
-	jwks *keyfunc.JWKS
+	jwks      *keyfunc.JWKS
 }
 
-// NewClient creates a new App Check client.
+// NewClient creates a new instance of the Firebase App Check Client.
+//
+// This function can only be invoked from within the SDK. Client applications should access the
+// the App Check service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
 	jwks, err := keyfunc.Get(conf.JWKSUrl, keyfunc.Options{
@@ -66,8 +82,18 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	}, nil
 }
 
-// VerifyToken verifies the given App Check token.
-// It returns a VerifiedToken if valid and an error if invalid.
+// VerifyToken Verifies the given App Check token.
+//
+// VerifyToken considers an App Check token string to be valid if all the following conditions are met:
+//   - The token string is a valid RS256 JWT.
+//   - The JWT contains valid issuer (iss) and audience (aud) claims that match the issuerPrefix
+//     and projectID of the tokenVerifier.
+//   - The JWT contains a valid subject (sub) claim.
+//   - The JWT is not expired, and it has been issued some time in the past.
+//   - The JWT is signed by a Firebase App Check backend server as determined by the keySource.
+//
+// If any of the above conditions are not met, an error is returned. Otherwise a pointer to a
+// decoded App Check token is returned.
 func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
 	// References for checks:
 	// https://firebase.googleblog.com/2021/10/protecting-backends-with-app-check.html
