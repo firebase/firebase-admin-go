@@ -697,7 +697,7 @@ func TestInvalidCreateUser(t *testing.T) {
 					},
 				},
 			}),
-			`the second factor "displayName" for "+16505557348" must be a valid non-empty string`,
+			`the second factor "displayName" for "" must be a valid non-empty string`,
 		},
 	}
 	client := &Client{
@@ -881,7 +881,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`the second factor "displayName" for "+16505557348" must be a valid non-empty string`,
+			`the second factor "displayName" for "" must be a valid non-empty string`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -904,7 +904,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 					},
 				},
 			}),
-			`the second factor "uid" must be a valid non-empty string`,
+			`the second factor "uid" must be a valid non-empty string when adding second factors via "updateUser()"`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
