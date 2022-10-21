@@ -70,7 +70,8 @@ type Client struct {
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
 	jwks, err := keyfunc.Get(conf.JWKSUrl, keyfunc.Options{
-		Ctx: ctx,
+		Ctx:             ctx,
+		RefreshInterval: 6 * time.Hour,
 	})
 	if err != nil {
 		return nil, err
