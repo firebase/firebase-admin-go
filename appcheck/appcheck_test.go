@@ -29,9 +29,9 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 		t.Fatalf("Error loading private key: %v", err)
 	}
 
+	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
-		JWKSUrl:   ts.URL,
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -175,9 +175,9 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	}
 	defer ts.Close()
 
+	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
-		JWKSUrl:   ts.URL,
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -208,9 +208,9 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 		t.Fatalf("Error loading private key: %v", err)
 	}
 
+	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
-		JWKSUrl:   ts.URL,
 	}
 
 	client, err := NewClient(context.Background(), conf)

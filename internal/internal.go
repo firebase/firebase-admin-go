@@ -76,7 +76,6 @@ type MessagingConfig struct {
 // AppCheckConfig represents the configuration of App Check service.
 type AppCheckConfig struct {
 	ProjectID string
-	JWKSUrl   string
 }
 
 // MockTokenSource is a TokenSource implementation that can be used for testing.

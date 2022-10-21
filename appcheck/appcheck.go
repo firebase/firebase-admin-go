@@ -28,7 +28,7 @@ import (
 )
 
 // JWKSUrl is the URL of the JWKS used to verify App Check tokens.
-const JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
+var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
@@ -74,7 +74,7 @@ type Client struct {
 // the App Check service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
-	jwks, err := keyfunc.Get(conf.JWKSUrl, keyfunc.Options{
+	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
 		Ctx:             ctx,
 		RefreshInterval: 6 * time.Hour,
 	})
