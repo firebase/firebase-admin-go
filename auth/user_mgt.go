@@ -666,17 +666,17 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			}
 		case updateUserMethod:
 			if multiFactorInfo.UID == "" {
-				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string")
+				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string when adding second factors via \"updateUser()\"")
 			}
 		default:
-			return nil, fmt.Errorf("unsupported method")
+			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
+		}
+		if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
+			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactor {
 			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
 				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
-			}
-			if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
-				return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.PhoneNumber)
 			}
 		}
 		obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
