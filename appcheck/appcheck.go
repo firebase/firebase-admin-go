@@ -47,14 +47,19 @@ var (
 	ErrTokenSubject = errors.New("token has empty or missing subject")
 )
 
-// VerifiedToken represents a verified App Check token.
-type VerifiedToken struct {
-	Iss   string
-	Sub   string
-	Aud   []string
-	Exp   time.Time
-	Iat   time.Time
-	AppID string
+// DecodedAppCheckToken represents a verified App Check token.
+//
+// DecodedAppCheckToken provides typed accessors to the common JWT fields such as Audience (aud) // and ExpiresAt (exp).
+// Additionally it provides an AppID field, which indicates the application ID to which this
+// token belongs. Any additional JWT claims can be accessed via the Claims map of Token.
+type DecodedAppCheckToken struct {
+	Issuer   string
+	Subject  string
+	Audience []string
+	Expires  time.Time
+	IssuedAt time.Time
+	AppID    string
+	Claims   map[string]interface{}
 }
 
 // Client is the interface for the Firebase App Check service.
@@ -95,7 +100,7 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 //
 // If any of the above conditions are not met, an error is returned. Otherwise a pointer to a
 // decoded App Check token is returned.
-func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
+func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	// References for checks:
 	// https://firebase.googleblog.com/2021/10/protecting-backends-with-app-check.html
 	// https://github.com/firebase/firebase-admin-node/blob/master/src/app-check/token-verifier.ts#L106
@@ -143,14 +148,22 @@ func (c *Client) VerifyToken(token string) (*VerifiedToken, error) {
 		return nil, ErrTokenSubject
 	}
 
-	return &VerifiedToken{
-		Iss:   claims["iss"].(string),
-		Sub:   claims["sub"].(string),
-		Aud:   aud,
-		Exp:   time.Unix(int64(claims["exp"].(float64)), 0),
-		Iat:   time.Unix(int64(claims["iat"].(float64)), 0),
-		AppID: claims["sub"].(string),
-	}, nil
+	appCheckToken := DecodedAppCheckToken{
+		Issuer:   claims["iss"].(string),
+		Subject:  claims["sub"].(string),
+		Audience: aud,
+		Expires:  time.Unix(int64(claims["exp"].(float64)), 0),
+		IssuedAt: time.Unix(int64(claims["iat"].(float64)), 0),
+		AppID:    claims["sub"].(string),
+	}
+
+	// Remove all the claims we've already parsed.
+	for _, usedClaim := range []string{"iss", "sub", "aud", "exp", "iat", "sub"} {
+		delete(claims, usedClaim)
+	}
+	appCheckToken.Claims = claims
+
+	return &appCheckToken, nil
 }
 
 func contains(s []string, str string) bool {

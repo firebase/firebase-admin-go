@@ -52,7 +52,7 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	tokenTests := []struct {
 		claims    *appCheckClaims
 		wantErr   error
-		wantToken *VerifiedToken
+		wantToken *DecodedAppCheckToken
 	}{
 		{
 			&appCheckClaims{
@@ -64,13 +64,37 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
 			nil,
-			&VerifiedToken{
-				Iss:   "https://firebaseappcheck.googleapis.com/12345678",
-				Sub:   "12345678:app:ID",
-				Aud:   []string{"projects/12345678", "projects/project_id"},
-				Exp:   mockTime.Add(time.Hour),
-				Iat:   mockTime,
-				AppID: "12345678:app:ID",
+			&DecodedAppCheckToken{
+				Issuer:   "https://firebaseappcheck.googleapis.com/12345678",
+				Subject:  "12345678:app:ID",
+				Audience: []string{"projects/12345678", "projects/project_id"},
+				Expires:  mockTime.Add(time.Hour),
+				IssuedAt: mockTime,
+				AppID:    "12345678:app:ID",
+				Claims:   map[string]interface{}{},
+			},
+		}, {
+			&appCheckClaims{
+				[]string{"projects/12345678", "projects/project_id"},
+				jwt.RegisteredClaims{
+					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
+					Subject:   "12345678:app:ID",
+					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
+					IssuedAt:  jwt.NewNumericDate(mockTime),
+					// A field our AppCheckToken does not use.
+					NotBefore: jwt.NewNumericDate(mockTime.Add(-1 * time.Hour)),
+				}},
+			nil,
+			&DecodedAppCheckToken{
+				Issuer:   "https://firebaseappcheck.googleapis.com/12345678",
+				Subject:  "12345678:app:ID",
+				Audience: []string{"projects/12345678", "projects/project_id"},
+				Expires:  mockTime.Add(time.Hour),
+				IssuedAt: mockTime,
+				AppID:    "12345678:app:ID",
+				Claims: map[string]interface{}{
+					"nbf": float64(mockTime.Add(-1 * time.Hour).Unix()),
+				},
 			},
 		}, {
 			&appCheckClaims{
