@@ -647,7 +647,7 @@ func TestInvalidCreateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID:         "EnrollmentID",
-						PhoneNumber: "+16505557348",
+						PhoneNumber: "+11234567890",
 						DisplayName: "Spouse's phone number",
 						FactorID:    "phone",
 					},
@@ -669,7 +669,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber:         "+16505557348",
+						PhoneNumber:         "+11234567890",
 						DisplayName:         "Spouse's phone number",
 						FactorID:            "phone",
 						EnrollmentTimestamp: time.Now().UTC().Unix(),
@@ -681,7 +681,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "+16505557348",
+						PhoneNumber: "+11234567890",
 						DisplayName: "Spouse's phone number",
 						FactorID:    "",
 					},
@@ -692,7 +692,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "+16505557348",
+						PhoneNumber: "+11234567890",
 						FactorID:    "phone",
 					},
 				},
@@ -773,7 +773,7 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					PhoneNumber: "+16505557348",
+					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				},
@@ -781,7 +781,7 @@ var createUserCases = []struct {
 		}),
 		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
 			{
-				PhoneInfo:   "+16505557348",
+				PhoneInfo:   "+11234567890",
 				DisplayName: "Spouse's phone number",
 			},
 		},
@@ -790,12 +790,12 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					PhoneNumber: "+16505557348",
+					PhoneNumber: "+11234567890",
 					DisplayName: "number1",
 					FactorID:    "phone",
 				},
 				{
-					PhoneNumber: "+16505557348",
+					PhoneNumber: "+11234567890",
 					DisplayName: "number2",
 					FactorID:    "phone",
 				},
@@ -803,11 +803,11 @@ var createUserCases = []struct {
 		}),
 		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
 			{
-				PhoneInfo:   "+16505557348",
+				PhoneInfo:   "+11234567890",
 				DisplayName: "number1",
 			},
 			{
-				PhoneInfo:   "+16505557348",
+				PhoneInfo:   "+11234567890",
 				DisplayName: "number2",
 			},
 		},
@@ -876,7 +876,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID:         "enrolledSecondFactor1",
-						PhoneNumber: "+16505557348",
+						PhoneNumber: "+11234567890",
 						FactorID:    "phone",
 					},
 				},
@@ -898,7 +898,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "+16505557348",
+						PhoneNumber: "+11234567890",
 						FactorID:    "phone",
 						DisplayName: "Spouse's phone number",
 					},
@@ -1050,13 +1050,13 @@ var updateUserCases = []struct {
 			EnrolledFactors: []*MultiFactorInfo{
 				{
 					UID:                 "enrolledSecondFactor1",
-					PhoneNumber:         "+16505557348",
+					PhoneNumber:         "+11234567890",
 					DisplayName:         "Spouse's phone number",
 					FactorID:            "phone",
 					EnrollmentTimestamp: time.Now().Unix(),
 				}, {
 					UID:         "enrolledSecondFactor2",
-					PhoneNumber: "+16505557348",
+					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				},
@@ -1065,14 +1065,14 @@ var updateUserCases = []struct {
 		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
 			{
 				MFAEnrollmentID: "enrolledSecondFactor1",
-				PhoneInfo:       "+16505557348",
+				PhoneInfo:       "+11234567890",
 				DisplayName:     "Spouse's phone number",
 				EnrolledAt:      time.Now().Format("2006-01-02T15:04:05Z07:00Z"),
 			},
 			{
 				MFAEnrollmentID: "enrolledSecondFactor2",
 				DisplayName:     "Spouse's phone number",
-				PhoneInfo:       "+16505557348",
+				PhoneInfo:       "+11234567890",
 			},
 		},
 		},

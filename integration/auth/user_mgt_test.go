@@ -434,7 +434,7 @@ func TestCreateUserMFA(t *testing.T) {
 	tc.MFASettings(auth.MultiFactorSettings{
 		EnrolledFactors: []*auth.MultiFactorInfo{
 			{
-				PhoneNumber: "+16505557348",
+				PhoneNumber: "+11234567890",
 				DisplayName: "Spouse's phone number",
 				FactorID:    "phone",
 			},
@@ -451,7 +451,7 @@ func TestCreateUserMFA(t *testing.T) {
 			UID:                 user.MultiFactor.EnrolledFactors[0].UID,
 			DisplayName:         "Spouse's phone number",
 			FactorID:            "phone",
-			PhoneNumber:         "+16505557348",
+			PhoneNumber:         "+11234567890",
 			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
 		},
 	}

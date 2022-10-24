@@ -41,7 +41,7 @@ const (
 	maxDeleteAccountsBatchSize = 1000
 	createUserMethod           = "createUser"
 	updateUserMethod           = "updateUser"
-	phoneMultiFactor           = "phone"
+	phoneMultiFactorID         = "phone"
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -170,7 +170,7 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	if mfaInfo.EnrollmentTimestamp != 0 {
 		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
 	}
-	if mfaInfo.FactorID == phoneMultiFactor {
+	if mfaInfo.FactorID == phoneMultiFactorID {
 		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
 		authFactorInfo.DisplayName = mfaInfo.DisplayName
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
@@ -674,7 +674,7 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 		if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
 			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
-		if multiFactorInfo.FactorID == phoneMultiFactor {
+		if multiFactorInfo.FactorID == phoneMultiFactorID {
 			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
 				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
 			}
@@ -1083,7 +1083,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			UID:                 factor.MFAEnrollmentID,
 			DisplayName:         factor.DisplayName,
 			EnrollmentTimestamp: enrollmentTimestamp,
-			FactorID:            phoneMultiFactor,
+			FactorID:            phoneMultiFactorID,
 			PhoneNumber:         factor.PhoneInfo,
 		})
 	}
