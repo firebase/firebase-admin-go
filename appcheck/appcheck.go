@@ -88,7 +88,7 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	}, nil
 }
 
-// VerifyToken Verifies the given App Check token.
+// VerifyToken verifies the given App Check token.
 //
 // VerifyToken considers an App Check token string to be valid if all the following conditions are met:
 //   - The token string is a valid RS256 JWT.
