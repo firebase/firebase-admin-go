@@ -444,8 +444,7 @@ func TestCreateUserMFA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser() = %v; want = nil", err)
 	}
-	uidToDelete := user.UID
-	defer deleteUser(uidToDelete)
+	defer deleteUser(user.UID)
 	var factor []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
 		{
 			UID:                 user.MultiFactor.EnrolledFactors[0].UID,
@@ -472,24 +471,6 @@ func TestCreateUserMFA(t *testing.T) {
 	}
 	if !reflect.DeepEqual(*user, want) {
 		t.Errorf("CreateUser() = %#v; want = %#v", *user, want)
-	}
-	factor = []*auth.MultiFactorInfo{}
-	user, err = client.CreateUser(context.Background(), (&auth.UserToCreate{}).UID(user.UID))
-	want = auth.UserRecord{
-		UserInfo: &auth.UserInfo{
-			UID:        user.UID,
-			ProviderID: "firebase",
-		},
-		UserMetadata: &auth.UserMetadata{
-			CreationTimestamp: user.UserMetadata.CreationTimestamp,
-		},
-		TokensValidAfterMillis: user.TokensValidAfterMillis,
-		MultiFactor: &auth.MultiFactorSettings{
-			EnrolledFactors: factor,
-		},
-	}
-	if err == nil || user != nil || !auth.IsUIDAlreadyExists(err) {
-		t.Errorf("CreateUser(existing-uid) = (%#v, %v); want = (%#v, error)", user, err, want)
 	}
 }
 
