@@ -33,8 +33,11 @@ import (
 )
 
 const (
-	testURL           = "https://test-db.firebaseio.com"
-	defaultMaxRetries = 1
+	testURL               = "https://test-db.firebaseio.com"
+	testEmulatorNamespace = "test-db"
+	testEmulatorBaseURL   = "http://localhost:9000"
+	testEmulatorURL       = "localhost:9000?ns=test-db"
+	defaultMaxRetries     = 1
 )
 
 var (
@@ -87,52 +90,96 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewClient(t *testing.T) {
-	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:         testOpts,
-		URL:          testURL,
-		AuthOverride: make(map[string]interface{}),
-	})
-	if err != nil {
-		t.Fatal(err)
+	cases := []*struct {
+		Name              string
+		URL               string
+		EnvURL            string
+		ExpectedBaseURL   string
+		ExpectedNamespace string
+		ExpectError       bool
+	}{
+		{Name: "production url", URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "emulator - success", URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator - missing namespace should error", URL: "localhost:9000", ExpectError: true},
+		{Name: "emulator - if url contains hostname it uses the primary domain", URL: "rtdb-go.emulator:9000", ExpectedBaseURL: "http://rtdb-go.emulator:9000", ExpectedNamespace: "rtdb-go"},
+		{Name: "emulator env - success", EnvURL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
 	}
-	if c.url != testURL {
-		t.Errorf("NewClient().url = %q; want = %q", c.url, testURL)
-	}
-	if c.hc == nil {
-		t.Errorf("NewClient().hc = nil; want non-nil")
-	}
-	if c.authOverride != "" {
-		t.Errorf("NewClient().ao = %q; want = %q", c.authOverride, "")
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Setenv(emulatorDatabaseEnvVar, tc.EnvURL)
+			fromEnv := os.Getenv(emulatorDatabaseEnvVar)
+			fmt.Printf(fromEnv)
+			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+				Opts:         testOpts,
+				URL:          tc.URL,
+				AuthOverride: make(map[string]interface{}),
+			})
+			if err != nil && tc.ExpectError {
+				return
+			}
+			if err != nil && !tc.ExpectError {
+				t.Fatal(err)
+			}
+			if err == nil && tc.ExpectError {
+				t.Fatal("expected error")
+			}
+			if c.dbURLConfig.BaseURL != tc.ExpectedBaseURL {
+				t.Errorf("NewClient().dbURLConfig.BaseURL = %q; want = %q", c.dbURLConfig.BaseURL, tc.ExpectedBaseURL)
+			}
+			if c.dbURLConfig.Namespace != tc.ExpectedNamespace {
+				t.Errorf("NewClient(%v).Namespace = %q; want = %q", tc, c.dbURLConfig.Namespace, tc.ExpectedNamespace)
+			}
+			if c.hc == nil {
+				t.Errorf("NewClient().hc = nil; want non-nil")
+			}
+			if c.authOverride != "" {
+				t.Errorf("NewClient().ao = %q; want = %q", c.authOverride, "")
+			}
+		})
 	}
 }
 
 func TestNewClientAuthOverrides(t *testing.T) {
-	cases := []map[string]interface{}{
-		nil,
-		{"uid": "user1"},
+	cases := []*struct {
+		Name              string
+		Params            map[string]interface{}
+		URL               string
+		ExpectedBaseURL   string
+		ExpectedNamespace string
+	}{
+		{Name: "production - without override", Params: nil, URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "production - with override", Params: map[string]interface{}{"uid": "user1"}, URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+
+		{Name: "emulator - with no query params", Params: nil, URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator - with override", Params: map[string]interface{}{"uid": "user1"}, URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
 	}
 	for _, tc := range cases {
-		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts:         testOpts,
-			URL:          testURL,
-			AuthOverride: tc,
+		t.Run(tc.Name, func(t *testing.T) {
+			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
+				Opts:         testOpts,
+				URL:          tc.URL,
+				AuthOverride: tc.Params,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.dbURLConfig.BaseURL != tc.ExpectedBaseURL {
+				t.Errorf("NewClient(%v).baseURL = %q; want = %q", tc, c.dbURLConfig.BaseURL, tc.ExpectedBaseURL)
+			}
+			if c.dbURLConfig.Namespace != tc.ExpectedNamespace {
+				t.Errorf("NewClient(%v).Namespace = %q; want = %q", tc, c.dbURLConfig.Namespace, tc.ExpectedNamespace)
+			}
+			if c.hc == nil {
+				t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
+			}
+			b, err := json.Marshal(tc.Params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.authOverride != string(b) {
+				t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.authOverride, string(b))
+			}
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if c.url != testURL {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
-		}
-		if c.hc == nil {
-			t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
-		}
-		b, err := json.Marshal(tc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if c.authOverride != string(b) {
-			t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.authOverride, string(b))
-		}
 	}
 }
 
@@ -149,8 +196,8 @@ func TestValidURLS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.url != tc {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.url, testURL)
+		if c.dbURLConfig.BaseURL != tc {
+			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.dbURLConfig.BaseURL, testURL)
 		}
 	}
 }
@@ -161,6 +208,7 @@ func TestInvalidURL(t *testing.T) {
 		"foo",
 		"http://db.firebaseio.com",
 		"http://firebase.google.com",
+		"http://localhost:9000",
 	}
 	for _, tc := range cases {
 		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
@@ -402,7 +450,7 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 		w.Write(b)
 	})
 	s.srv = httptest.NewServer(handler)
-	c.url = s.srv.URL
+	c.dbURLConfig.BaseURL = s.srv.URL
 	return s.srv
 }
 
