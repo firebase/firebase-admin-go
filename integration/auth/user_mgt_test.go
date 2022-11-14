@@ -427,6 +427,53 @@ func TestCreateUser(t *testing.T) {
 	}
 }
 
+func TestCreateUserMFA(t *testing.T) {
+	var tc *auth.UserToCreate = &auth.UserToCreate{}
+	tc.Email("testuser@example.com")
+	tc.EmailVerified(true)
+	tc.MFASettings(auth.MultiFactorSettings{
+		EnrolledFactors: []*auth.MultiFactorInfo{
+			{
+				PhoneNumber: "+11234567890",
+				DisplayName: "Spouse's phone number",
+				FactorID:    "phone",
+			},
+		},
+	})
+	user, err := client.CreateUser(context.Background(), tc)
+	if err != nil {
+		t.Fatalf("CreateUser() = %v; want = nil", err)
+	}
+	defer deleteUser(user.UID)
+	var factor []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
+		{
+			UID:                 user.MultiFactor.EnrolledFactors[0].UID,
+			DisplayName:         "Spouse's phone number",
+			FactorID:            "phone",
+			PhoneNumber:         "+11234567890",
+			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
+		},
+	}
+	want := auth.UserRecord{
+		EmailVerified: true,
+		UserInfo: &auth.UserInfo{
+			Email:      "testuser@example.com",
+			UID:        user.UID,
+			ProviderID: "firebase",
+		},
+		UserMetadata: &auth.UserMetadata{
+			CreationTimestamp: user.UserMetadata.CreationTimestamp,
+		},
+		TokensValidAfterMillis: user.TokensValidAfterMillis,
+		MultiFactor: &auth.MultiFactorSettings{
+			EnrolledFactors: factor,
+		},
+	}
+	if !reflect.DeepEqual(*user, want) {
+		t.Errorf("CreateUser() = %#v; want = %#v", *user, want)
+	}
+}
+
 func TestUpdateUser(t *testing.T) {
 	// Creates a new user for testing purposes. The user's uid will be
 	// '$name_$tenRandomChars' and email will be
