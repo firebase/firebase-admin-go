@@ -40,7 +40,6 @@ var testActionCodeSettings = &ActionCodeSettings{
 	AndroidPackageName:    "com.example.android",
 	AndroidInstallApp:     true,
 	AndroidMinimumVersion: "6",
-	ReturnOobLink:         true,
 }
 var testActionCodeSettingsMap = map[string]interface{}{
 	"continueUrl":           "https://example.dynamic.link",
@@ -50,7 +49,6 @@ var testActionCodeSettingsMap = map[string]interface{}{
 	"androidPackageName":    "com.example.android",
 	"androidInstallApp":     true,
 	"androidMinimumVersion": "6",
-	"returnOobLink":         true,
 }
 var invalidActionCodeSettings = []struct {
 	name     string
@@ -113,24 +111,30 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailVerificationLinkWithSettings() = %q; want = %q", link, testActionLink)
-	}
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("EmailVerificationLinkWithSettings() = %q; want = %q", link, testActionLink)
+		}
 
-	want := map[string]interface{}{
-		"requestType":   "VERIFY_EMAIL",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("EmailVerificationLinkWithSettings() %v", err)
+		want := map[string]interface{}{
+			"requestType": "VERIFY_EMAIL",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("EmailVerificationLinkWithSettings() %v", err)
+		}
 	}
 }
 
@@ -160,24 +164,30 @@ func TestPasswordResetLinkWithSettings(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("PasswordResetLinkWithSettings() = %q; want = %q", link, testActionLink)
-	}
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("PasswordResetLinkWithSettings() = %q; want = %q", link, testActionLink)
+		}
 
-	want := map[string]interface{}{
-		"requestType":   "PASSWORD_RESET",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("PasswordResetLinkWithSettings() %v", err)
+		want := map[string]interface{}{
+			"requestType": "PASSWORD_RESET",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("PasswordResetLinkWithSettings() %v", err)
+		}
 	}
 }
 
@@ -206,24 +216,29 @@ func TestEmailSignInLink(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
-	}
-
-	want := map[string]interface{}{
-		"requestType":   "EMAIL_SIGNIN",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("EmailSignInLink() %v", err)
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+		}
+		want := map[string]interface{}{
+			"requestType": "EMAIL_SIGNIN",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("EmailSignInLink() %v", err)
+		}
 	}
 }
 
@@ -311,35 +326,6 @@ func TestEmailVerificationLinkError(t *testing.T) {
 	}
 }
 
-func TestEmailVerificationSendEmail(t *testing.T) {
-	s := echoServer(testActionLinkResponse, t)
-	defer s.Close()
-
-	testActionCodeSettingsNoReturn := testActionCodeSettings
-	testActionCodeSettingsNoReturn.ReturnOobLink = false
-	testActionCodeSettingsMapNoReturn := testActionCodeSettingsMap
-	testActionCodeSettingsMapNoReturn["returnOobLink"] = false
-	link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsNoReturn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
-	}
-
-	want := map[string]interface{}{
-		"requestType":   "EMAIL_SIGNIN",
-		"email":         testEmail,
-		"returnOobLink": false,
-	}
-	for k, v := range testActionCodeSettingsMapNoReturn {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("EmailSignInLink() %v", err)
-	}
-}
-
 func checkActionLinkRequest(want map[string]interface{}, s *mockAuthServer) error {
 	wantURL := "/projects/mock-project-id/accounts:sendOobCode"
 	return checkActionLinkRequestWithURL(want, wantURL, s)
@@ -363,4 +349,23 @@ func checkActionLinkRequestWithURL(want map[string]interface{}, wantURL string, 
 		return fmt.Errorf("Body = %#v; want = %#v", got, want)
 	}
 	return nil
+}
+
+func getCopiesOfTestSettings(testSettings *ActionCodeSettings,
+	testSettingsMap map[string]interface{}) (*ActionCodeSettings, map[string]interface{}) {
+	testActionCodeSettingsCustom := &ActionCodeSettings{
+		URL:                   testSettings.URL,
+		HandleCodeInApp:       testSettings.HandleCodeInApp,
+		IOSBundleID:           testSettings.IOSBundleID,
+		AndroidPackageName:    testSettings.AndroidPackageName,
+		AndroidMinimumVersion: testSettings.AndroidMinimumVersion,
+		AndroidInstallApp:     testSettings.AndroidInstallApp,
+		DynamicLinkDomain:     testSettings.DynamicLinkDomain,
+		ReturnOobLink:         testSettings.ReturnOobLink,
+	}
+	testActionCodeSettingsMapCustom := map[string]interface{}{}
+	for k, v := range testSettingsMap {
+		testActionCodeSettingsMapCustom[k] = v
+	}
+	return testActionCodeSettingsCustom, testActionCodeSettingsMapCustom
 }

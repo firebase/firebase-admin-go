@@ -548,24 +548,30 @@ func TestTenantEmailSignInLink(t *testing.T) {
 		t.Fatalf("AuthForTenant() = %v", err)
 	}
 
-	link, err := client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
-	}
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+		}
 
-	want := map[string]interface{}{
-		"requestType":   "EMAIL_SIGNIN",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
-		t.Fatalf("EmailSignInLink() %v", err)
+		want := map[string]interface{}{
+			"requestType": "EMAIL_SIGNIN",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+			t.Fatalf("EmailSignInLink() %v", err)
+		}
 	}
 }
 
