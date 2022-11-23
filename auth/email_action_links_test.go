@@ -115,7 +115,7 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
 		testActionCodeSettingsMap)
 	for _, returnOobLink := range cases {
-		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
 		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
 		link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
 		if err != nil {
@@ -168,7 +168,7 @@ func TestPasswordResetLinkWithSettings(t *testing.T) {
 	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
 		testActionCodeSettingsMap)
 	for _, returnOobLink := range cases {
-		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
 		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
 		link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
 		if err != nil {
@@ -220,7 +220,7 @@ func TestEmailSignInLink(t *testing.T) {
 	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
 		testActionCodeSettingsMap)
 	for _, returnOobLink := range cases {
-		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
 		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
 		link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsCustom)
 		if err != nil {
@@ -361,7 +361,7 @@ func getCopiesOfTestSettings(testSettings *ActionCodeSettings,
 		AndroidMinimumVersion: testSettings.AndroidMinimumVersion,
 		AndroidInstallApp:     testSettings.AndroidInstallApp,
 		DynamicLinkDomain:     testSettings.DynamicLinkDomain,
-		ReturnOobLink:         testSettings.ReturnOobLink,
+		SendEmailLink:         testSettings.SendEmailLink,
 	}
 	testActionCodeSettingsMapCustom := map[string]interface{}{}
 	for k, v := range testSettingsMap {

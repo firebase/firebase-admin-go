@@ -32,7 +32,7 @@ type ActionCodeSettings struct {
 	AndroidMinimumVersion string `json:"androidMinimumVersion,omitempty"`
 	AndroidInstallApp     bool   `json:"androidInstallApp,omitempty"`
 	DynamicLinkDomain     string `json:"dynamicLinkDomain,omitempty"`
-	ReturnOobLink         bool   `json:"returnOobLink"`
+	SendEmailLink         bool   `json:"-"`
 }
 
 func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
@@ -59,6 +59,7 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 	if err := json.Unmarshal(b, &result); err != nil {
 		return nil, err
 	}
+	result["returnOobLink"] = !settings.SendEmailLink
 	return result, nil
 }
 

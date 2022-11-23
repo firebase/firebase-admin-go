@@ -552,7 +552,7 @@ func TestTenantEmailSignInLink(t *testing.T) {
 	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
 		testActionCodeSettingsMap)
 	for _, returnOobLink := range cases {
-		testActionCodeSettingsCustom.ReturnOobLink = returnOobLink
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
 		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
 		link, err := client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsCustom)
 		if err != nil {
