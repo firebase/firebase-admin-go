@@ -40,8 +40,8 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 		return nil, errors.New("URL must not be empty")
 	}
 
-	url, err := url.Parse(settings.URL)
-	if err != nil || url.Scheme == "" || url.Host == "" {
+	parsedURL, err := url.Parse(settings.URL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return nil, fmt.Errorf("malformed url string: %q", settings.URL)
 	}
 
