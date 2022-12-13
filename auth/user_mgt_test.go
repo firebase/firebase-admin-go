@@ -688,16 +688,6 @@ func TestInvalidCreateUser(t *testing.T) {
 				},
 			}),
 			`no factor id specified`,
-		}, {
-			(&UserToCreate{}).MFASettings(MultiFactorSettings{
-				EnrolledFactors: []*MultiFactorInfo{
-					{
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
-					},
-				},
-			}),
-			`the second factor "displayName" for "" must be a valid non-empty string`,
 		},
 	}
 	client := &Client{
@@ -876,17 +866,6 @@ func TestInvalidUpdateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID:         "enrolledSecondFactor1",
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
-					},
-				},
-			}),
-			`the second factor "displayName" for "" must be a valid non-empty string`,
-		}, {
-			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
-				EnrolledFactors: []*MultiFactorInfo{
-					{
-						UID:         "enrolledSecondFactor1",
 						PhoneNumber: "invalid",
 						DisplayName: "Spouse's phone number",
 						FactorID:    "phone",
@@ -894,17 +873,6 @@ func TestInvalidUpdateUser(t *testing.T) {
 				},
 			}),
 			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
-		}, {
-			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
-				EnrolledFactors: []*MultiFactorInfo{
-					{
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
-						DisplayName: "Spouse's phone number",
-					},
-				},
-			}),
-			`the second factor "uid" must be a valid non-empty string when adding second factors via "updateUser()"`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
@@ -1059,10 +1027,14 @@ var updateUserCases = []struct {
 					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
+				}, {
+					PhoneNumber: "+11234567890",
+					DisplayName: "Spouse's phone number",
+					FactorID:    "phone",
 				},
 			},
 		}),
-		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+		map[string]interface{}{"mfa": multiFactorEnrollments{Enrollments: []*multiFactorInfoResponse{
 			{
 				MFAEnrollmentID: "enrolledSecondFactor1",
 				PhoneInfo:       "+11234567890",
@@ -1074,12 +1046,16 @@ var updateUserCases = []struct {
 				DisplayName:     "Spouse's phone number",
 				PhoneInfo:       "+11234567890",
 			},
-		},
+			{
+				DisplayName: "Spouse's phone number",
+				PhoneInfo:   "+11234567890",
+			},
+		}},
 		},
 	},
 	{
 		(&UserToUpdate{}).MFASettings(MultiFactorSettings{}),
-		map[string]interface{}{"mfaInfo": nil},
+		map[string]interface{}{"mfa": multiFactorEnrollments{Enrollments: nil}},
 	},
 	{
 		(&UserToUpdate{}).ProviderToLink(&UserProvider{
