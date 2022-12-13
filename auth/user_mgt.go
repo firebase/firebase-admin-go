@@ -170,14 +170,16 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	if mfaInfo.EnrollmentTimestamp != 0 {
 		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
 	}
+	if mfaInfo.UID != "" {
+		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
+	}
 	if mfaInfo.FactorID == phoneMultiFactorID {
 		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
 		authFactorInfo.DisplayName = mfaInfo.DisplayName
-		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 		return authFactorInfo, nil
 	}
 	out, _ := json.Marshal(mfaInfo)
-	return multiFactorInfoResponse{}, fmt.Errorf("Unsupported second factor %s provided", string(out))
+	return multiFactorInfoResponse{}, fmt.Errorf("unsupported second factor %s provided", string(out))
 }
 
 func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
@@ -663,10 +665,6 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			}
 			if multiFactorInfo.UID != "" {
 				return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
-			}
-		case updateUserMethod:
-			if multiFactorInfo.UID == "" {
-				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string when adding second factors via \"updateUser()\"")
 			}
 		default:
 			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
