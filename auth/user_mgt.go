@@ -68,6 +68,10 @@ type multiFactorInfoResponse struct {
 	EnrolledAt      string `json:"enrolledAt,omitempty"`
 }
 
+type multiFactorEnrollments struct {
+	Enrollments []*multiFactorInfoResponse `json:"enrollments"`
+}
+
 // MultiFactorInfo describes a user enrolled second phone factor.
 // TODO : convert PhoneNumber to PhoneMultiFactorInfo struct
 type MultiFactorInfo struct {
@@ -335,7 +339,7 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			req["mfaInfo"] = mfaInfo
+			req["mfa"] = multiFactorEnrollments{mfaInfo}
 		} else {
 			req[k] = v
 		}
@@ -666,11 +670,9 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			if multiFactorInfo.UID != "" {
 				return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
 			}
+		case updateUserMethod:
 		default:
 			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
-		}
-		if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
-			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
 			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
