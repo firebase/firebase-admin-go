@@ -688,6 +688,16 @@ func TestInvalidCreateUser(t *testing.T) {
 				},
 			}),
 			`no factor id specified`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+11234567890",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "displayName" for "" must be a valid non-empty string`,
 		},
 	}
 	client := &Client{
@@ -861,6 +871,17 @@ func TestInvalidUpdateUser(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).Password("short"),
 			"password must be a string at least 6 characters long",
+		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						UID:         "enrolledSecondFactor1",
+						PhoneNumber: "+11234567890",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "displayName" for "" must be a valid non-empty string`,
 		}, {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{

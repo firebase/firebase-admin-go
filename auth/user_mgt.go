@@ -170,7 +170,7 @@ func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
 
 // Converts a client format second factor object to server format.
 func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorInfoResponse, error) {
-	var authFactorInfo multiFactorInfoResponse
+	authFactorInfo := multiFactorInfoResponse{DisplayName: mfaInfo.DisplayName}
 	if mfaInfo.EnrollmentTimestamp != 0 {
 		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
 	}
@@ -179,7 +179,6 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	}
 	if mfaInfo.FactorID == phoneMultiFactorID {
 		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
-		authFactorInfo.DisplayName = mfaInfo.DisplayName
 		return authFactorInfo, nil
 	}
 	out, _ := json.Marshal(mfaInfo)
@@ -673,6 +672,9 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 		case updateUserMethod:
 		default:
 			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
+		}
+		if err := validateDisplayName(multiFactorInfo.DisplayName); err != nil {
+			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
 			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
