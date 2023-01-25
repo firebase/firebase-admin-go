@@ -1085,7 +1085,19 @@ const tenantResponse = `{
     "displayName": "Test Tenant",
     "allowPasswordSignup": true,
     "enableEmailLinkSignin": true,
-    "enableAnonymousUser": true
+    "enableAnonymousUser": true,
+	"mfaConfig": {
+		"state":"ENABLED",
+		"enabledProviders": ["PHONE_SMS"],
+		"providerConfigs": [
+			{
+				"state":"ENABLED",
+				"totpProviderConfig":{
+					"adjacentIntervals":5
+				}
+			}
+		]
+	}
 }`
 
 const tenantResponse2 = `{
@@ -1108,6 +1120,18 @@ var testTenant = &Tenant{
 	AllowPasswordSignUp:   true,
 	EnableEmailLinkSignIn: true,
 	EnableAnonymousUsers:  true,
+	MultiFactorConfig: &MultiFactorConfig{
+		State:            "ENABLED",
+		EnabledProviders: []string{"PHONE_SMS"},
+		ProviderConfigs: []*ProviderConfig{
+			{
+				State: "ENABLED",
+				TotpProviderConfig: &TotpMfaProviderConfig{
+					AdjacentIntervals: 5,
+				},
+			},
+		},
+	},
 }
 
 var testTenant2 = &Tenant{
@@ -1182,7 +1206,8 @@ func TestCreateTenant(t *testing.T) {
 		DisplayName(testTenant.DisplayName).
 		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
 		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn).
-		EnableAnonymousUsers(testTenant.EnableAnonymousUsers)
+		EnableAnonymousUsers(testTenant.EnableAnonymousUsers).
+		MultiFactorConfig(*testTenant.MultiFactorConfig)
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -1191,13 +1216,28 @@ func TestCreateTenant(t *testing.T) {
 	if !reflect.DeepEqual(tenant, testTenant) {
 		t.Errorf("CreateTenant() = %#v; want = %#v", tenant, testTenant)
 	}
-
+	var wantEnabledProviders []interface{}
+	for _, p := range testTenant.MultiFactorConfig.EnabledProviders {
+		wantEnabledProviders = append(wantEnabledProviders, p)
+	}
+	wantProviderConfigs := map[string]interface{}{
+		"state": testTenant.MultiFactorConfig.ProviderConfigs[0].State,
+		"totpProviderConfig": map[string]interface{}{
+			"adjacentIntervals": testTenant.MultiFactorConfig.ProviderConfigs[0].TotpProviderConfig.AdjacentIntervals,
+		},
+	}
 	wantBody := map[string]interface{}{
 		"displayName":           testTenant.DisplayName,
 		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
 		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
+		"mfaConfig": map[string]interface{}{
+			"state":            testTenant.MultiFactorConfig.State,
+			"enabledProviders": wantEnabledProviders,
+			"providerConfigs":  []interface{}{wantProviderConfigs},
+		},
 	}
+
 	if err := checkCreateTenantRequest(s, wantBody); err != nil {
 		t.Fatal(err)
 	}
@@ -1232,7 +1272,8 @@ func TestCreateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUsers(false)
+		EnableAnonymousUsers(false).
+		MultiFactorConfig(MultiFactorConfig{})
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -1247,6 +1288,7 @@ func TestCreateTenantZeroValues(t *testing.T) {
 		"allowPasswordSignup":   false,
 		"enableEmailLinkSignin": false,
 		"enableAnonymousUser":   false,
+		"multiFactorConfig":     nil,
 	}
 	if err := checkCreateTenantRequest(s, wantBody); err != nil {
 		t.Fatal(err)

@@ -43,11 +43,12 @@ import (
 // All other settings of a tenant will also be inherited. These will need to be managed from the
 // Cloud Console UI.
 type Tenant struct {
-	ID                    string `json:"name"`
-	DisplayName           string `json:"displayName"`
-	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
-	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
-	EnableAnonymousUsers  bool   `json:"enableAnonymousUser"`
+	ID                    string             `json:"name"`
+	DisplayName           string             `json:"displayName"`
+	AllowPasswordSignUp   bool               `json:"allowPasswordSignup"`
+	EnableEmailLinkSignIn bool               `json:"enableEmailLinkSignin"`
+	EnableAnonymousUsers  bool               `json:"enableAnonymousUser"`
+	MultiFactorConfig     *MultiFactorConfig `json:"mfaConfig,omitEmpty"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -126,11 +127,14 @@ func (tm *TenantManager) CreateTenant(ctx context.Context, tenant *TenantToCreat
 	if tenant == nil {
 		return nil, errors.New("tenant must not be nil")
 	}
-
+	request, err := tenant.validatedRequest()
+	if err != nil {
+		return nil, err
+	}
 	req := &internal.Request{
 		Method: http.MethodPost,
 		URL:    "/tenants",
-		Body:   internal.NewJSONEntity(tenant.ensureParams()),
+		Body:   internal.NewJSONEntity(request),
 	}
 	var result Tenant
 	if _, err := tm.makeRequest(ctx, req, &result); err != nil {
@@ -218,6 +222,7 @@ const (
 	allowPasswordSignUpKey   = "allowPasswordSignup"
 	enableEmailLinkSignInKey = "enableEmailLinkSignin"
 	enableAnonymousUser      = "enableAnonymousUser"
+	multiFactorConfig        = "multiFactorConfig"
 )
 
 // TenantToCreate represents the options used to create a new tenant.
@@ -247,17 +252,71 @@ func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+func (t *TenantToCreate) MultiFactorConfig(mfaSettings MultiFactorConfig) *TenantToCreate {
+	mfaConfig := make(map[string]interface{})
+	mfaConfig["state"] = mfaSettings.State
+	mfaConfig["factorIds"] = mfaSettings.EnabledProviders
+	if mfaSettings.ProviderConfigs != nil {
+		var providerConfigs [](map[string]interface{})
+		for _, providerConfig := range mfaSettings.ProviderConfigs {
+			providerConfigTemp := make(map[string]interface{})
+			providerConfigTemp["state"] = providerConfig.State
+			totpProviderConfig := make(map[string]interface{})
+			totpProviderConfig["adjacentIntervals"] = providerConfig.TotpProviderConfig.AdjacentIntervals
+			providerConfigTemp["totpProviderConfig"] = totpProviderConfig
+			providerConfigs = append(providerConfigs, providerConfigTemp)
+		}
+		mfaConfig["providerConfigs"] = providerConfigs
+	}
+	return t.set(multiFactorConfig, mfaConfig)
+}
+
 func (t *TenantToCreate) set(key string, value interface{}) *TenantToCreate {
-	t.ensureParams().Set(key, value)
+	if t.params == nil {
+		t.params = make(map[string]interface{})
+	}
+	t.params[key] = value
 	return t
 }
 
-func (t *TenantToCreate) ensureParams() nestedMap {
-	if t.params == nil {
-		t.params = make(nestedMap)
+func (t *TenantToCreate) validatedRequest() (nestedMap, error) {
+	req := make(map[string]interface{})
+	for k, v := range t.params {
+		req[k] = v
 	}
-
-	return t.params
+	if displayName, ok := req["displayName"]; ok {
+		if err := validateDisplayName(displayName.(string)); err != nil {
+			return nil, err
+		}
+	}
+	val, ok := req[allowPasswordSignUpKey]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for allowPasswordSignUp: %s", req[allowPasswordSignUpKey])
+		}
+	}
+	val, ok = req[enableEmailLinkSignInKey]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for enableEmailLinkSignIn: %s", req[enableEmailLinkSignInKey])
+		}
+	}
+	val, ok = req[enableAnonymousUser]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for enableAnonymousUser: %s", req[enableAnonymousUser])
+		}
+	}
+	if mfaConfig, ok := req[multiFactorConfig]; ok {
+		mfaConfigAuthReq, err := validateAndConvertMultiFactorConfig(mfaConfig)
+		if err != nil {
+			return nil, err
+		}
+		//converting to auth type
+		req["mfaConfig"] = mfaConfigAuthReq
+		delete(req, multiFactorConfig)
+	}
+	return req, nil
 }
 
 // TenantToUpdate represents the options used to update an existing tenant.
@@ -287,12 +346,30 @@ func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+func (t *TenantToUpdate) MultiFactorConfig(mfaSettings MultiFactorConfig) *TenantToUpdate {
+	mfaConfig := make(map[string]interface{})
+	mfaConfig["state"] = mfaSettings.State
+	mfaConfig["factorIds"] = mfaSettings.EnabledProviders
+	if mfaSettings.ProviderConfigs != nil {
+		var providerConfigs [](map[string]interface{})
+		for _, providerConfig := range mfaSettings.ProviderConfigs {
+			providerConfigTemp := make(map[string]interface{})
+			providerConfigTemp["state"] = providerConfig.State
+			totpProviderConfig := make(map[string]interface{})
+			totpProviderConfig["adjacentIntervals"] = providerConfig.TotpProviderConfig.AdjacentIntervals
+			providerConfigTemp["totpProviderConfig"] = totpProviderConfig
+			providerConfigs = append(providerConfigs, providerConfigTemp)
+		}
+		mfaConfig["providerConfigs"] = providerConfigs
+	}
+	return t.set(multiFactorConfig, mfaConfig)
+}
+
 func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
 	if t.params == nil {
-		t.params = make(nestedMap)
+		t.params = make(map[string]interface{})
 	}
-
-	t.params.Set(key, value)
+	t.params[key] = value
 	return t
 }
 
