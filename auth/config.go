@@ -59,23 +59,21 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 
 	//validate mfa.factorIds
 	factorIds, ok := mfaMap["factorIds"]
-	if mfaMap["state"].(string) == "ENABLED" {
-		if !ok {
-			return nil, fmt.Errorf("multiFactorConfig.factorIds must be defined")
-		}
-		var authFactorIds []string
-		fi, ok := factorIds.([]string)
-		if !ok || len(fi) == 0 {
-			return nil, fmt.Errorf(`multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`)
-		}
-		for _, f := range fi {
-			if _, ok := validAuthFactors[f]; !ok {
-				return nil, fmt.Errorf(`factorId must be a valid AuthFactor type string`)
-			}
-			authFactorIds = append(authFactorIds, f)
-		}
-		req["enabledProviders"] = authFactorIds
+	if !ok {
+		return nil, fmt.Errorf("multiFactorConfig.factorIds must be defined")
 	}
+	var authFactorIds []string
+	fi, ok := factorIds.([]string)
+	if !ok || len(fi) == 0 {
+		return nil, fmt.Errorf(`multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`)
+	}
+	for _, f := range fi {
+		if _, ok := validAuthFactors[f]; !ok {
+			return nil, fmt.Errorf(`factorId must be a valid AuthFactor type string`)
+		}
+		authFactorIds = append(authFactorIds, f)
+	}
+	req["enabledProviders"] = authFactorIds
 
 	//validate provider configs
 	providerConfigs, ok := mfaMap["providerConfigs"]
