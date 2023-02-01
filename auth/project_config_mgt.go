@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"firebase.google.com/go/v4/internal"
 )
 
 type Project struct {
-	Name              string            `json:"name"`
-	MultiFactorConfig MultiFactorConfig `json:"mfa,omitEmpty"`
+	MultiFactorConfig *MultiFactorConfig `json:"mfa,omitEmpty"`
 }
 
 func (base *baseClient) Project(ctx context.Context) (*Project, error) {
@@ -34,10 +34,17 @@ func (base *baseClient) UpdateProjectConfig(ctx context.Context, project *Projec
 	if err != nil {
 		return nil, err
 	}
+	mask := request.UpdateMask()
+	if len(mask) == 0 {
+		return nil, errors.New("no parameters specified in the update request")
+	}
 	req := &internal.Request{
-		Method: http.MethodPost,
+		Method: http.MethodPatch,
 		URL:    base.projectMgtEndpoint,
 		Body:   internal.NewJSONEntity(request),
+		Opts: []internal.HTTPOption{
+			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
+		},
 	}
 	var result Project
 	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &result); err != nil {
