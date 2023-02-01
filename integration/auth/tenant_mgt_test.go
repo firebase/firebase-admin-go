@@ -32,13 +32,37 @@ func TestTenantManager(t *testing.T) {
 		AllowPasswordSignUp:   true,
 		EnableEmailLinkSignIn: true,
 		EnableAnonymousUsers:  true,
+		MultiFactorConfig: &auth.MultiFactorConfig{
+			State:            "ENABLED",
+			EnabledProviders: []string{"PHONE_SMS"},
+			ProviderConfigs: []*auth.ProviderConfig{
+				{
+					State: "ENABLED",
+					TotpProviderConfig: &auth.TotpMfaProviderConfig{
+						AdjacentIntervals: 5,
+					},
+				},
+			},
+		},
 	}
-
+	mfaConfigReq := auth.MultiFactorConfig{
+		State:            "ENABLED",
+		EnabledProviders: []string{"PHONE_SMS"},
+		ProviderConfigs: []*auth.ProviderConfig{
+			{
+				State: "ENABLED",
+				TotpProviderConfig: &auth.TotpMfaProviderConfig{
+					AdjacentIntervals: 5,
+				},
+			},
+		},
+	}
 	req := (&auth.TenantToCreate{}).
 		DisplayName("admin-go-tenant").
 		AllowPasswordSignUp(true).
 		EnableEmailLinkSignIn(true).
-		EnableAnonymousUsers(true)
+		EnableAnonymousUsers(true).
+		MultiFactorConfig(mfaConfigReq)
 	created, err := client.TenantManager.CreateTenant(context.Background(), req)
 	if err != nil {
 		t.Fatalf("CreateTenant() = %v", err)

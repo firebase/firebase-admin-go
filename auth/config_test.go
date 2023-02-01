@@ -213,7 +213,7 @@ func TestMfaConfigInvalidProviderConfigState(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `providerConfig.state should be "ENABLED" or "DISABLED"`
+	want := `providerConfig.state must be either "ENABLED" or "DISABLED"`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidProviderConfigState() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
