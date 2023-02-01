@@ -154,15 +154,18 @@ func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tena
 		return nil, errors.New("tenant must not be nil")
 	}
 
-	mask := tenant.params.UpdateMask()
+	request, err := tenant.validatedRequest()
+	if err != nil {
+		return nil, err
+	}
+	mask := request.UpdateMask()
 	if len(mask) == 0 {
 		return nil, errors.New("no parameters specified in the update request")
 	}
-
 	req := &internal.Request{
 		Method: http.MethodPatch,
 		URL:    fmt.Sprintf("/tenants/%s", tenantID),
-		Body:   internal.NewJSONEntity(tenant.params),
+		Body:   internal.NewJSONEntity(request),
 		Opts: []internal.HTTPOption{
 			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
 		},
@@ -284,12 +287,13 @@ func (t *TenantToCreate) validatedRequest() (nestedMap, error) {
 	for k, v := range t.params {
 		req[k] = v
 	}
-	if displayName, ok := req["displayName"]; ok {
-		if err := validateDisplayName(displayName.(string)); err != nil {
-			return nil, err
+	val, ok := req[displayNameKey]
+	if ok {
+		if _, ok := val.(string); !ok {
+			return nil, fmt.Errorf("invalid type for displayName: %s", req[displayNameKey])
 		}
 	}
-	val, ok := req[allowPasswordSignUpKey]
+	val, ok = req[allowPasswordSignUpKey]
 	if ok {
 		if _, ok := val.(bool); !ok {
 			return nil, fmt.Errorf("invalid type for allowPasswordSignUp: %s", req[allowPasswordSignUpKey])
@@ -371,6 +375,47 @@ func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
 	}
 	t.params[key] = value
 	return t
+}
+
+func (t *TenantToUpdate) validatedRequest() (nestedMap, error) {
+	req := make(map[string]interface{})
+	for k, v := range t.params {
+		req[k] = v
+	}
+	val, ok := req[displayNameKey]
+	if ok {
+		if _, ok := val.(string); !ok {
+			return nil, fmt.Errorf("invalid type for displayName: %s", req[displayNameKey])
+		}
+	}
+	val, ok = req[allowPasswordSignUpKey]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for allowPasswordSignUp: %s", req[allowPasswordSignUpKey])
+		}
+	}
+	val, ok = req[enableEmailLinkSignInKey]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for enableEmailLinkSignIn: %s", req[enableEmailLinkSignInKey])
+		}
+	}
+	val, ok = req[enableAnonymousUser]
+	if ok {
+		if _, ok := val.(bool); !ok {
+			return nil, fmt.Errorf("invalid type for enableAnonymousUser: %s", req[enableAnonymousUser])
+		}
+	}
+	if mfaConfig, ok := req[multiFactorConfig]; ok {
+		mfaConfigAuthReq, err := validateAndConvertMultiFactorConfig(mfaConfig)
+		if err != nil {
+			return nil, err
+		}
+		//converting to auth type
+		req["mfaConfig"] = mfaConfigAuthReq
+		delete(req, multiFactorConfig)
+	}
+	return req, nil
 }
 
 // TenantIterator is an iterator over tenants.

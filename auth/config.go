@@ -19,7 +19,7 @@ type ProviderConfig struct {
 }
 
 type TotpMfaProviderConfig struct {
-	AdjacentIntervals int32 `json:"adjacentIntervals,omitEmpty"`
+	AdjacentIntervals int `json:"adjacentIntervals,omitEmpty"`
 }
 
 type MultiFactorConfig struct {
@@ -42,7 +42,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 	validMfaKeys["providerConfigs"] = true
 	for k := range mfaMap {
 		if !validMfaKeys[k] {
-			return nil, fmt.Errorf(`%s is not a valid MultiFactorConfig parameter`, k)
+			return nil, fmt.Errorf(`"%s" is not a valid MultiFactorConfig parameter`, k)
 		}
 	}
 
@@ -52,28 +52,29 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 		return nil, fmt.Errorf(`multiFactorConfig.state should be defined`)
 	}
 	s, ok := state.(string)
-	if !ok || (s != "ENABLED" && s != "DISABLED") {
+	if !ok || (s != enabled && s != disabled) {
 		return nil, fmt.Errorf(`multiFactorConfig.state must be either "ENABLED" or "DISABLED"`)
 	}
 	req["state"] = s
 
 	//validate mfa.factorIds
 	factorIds, ok := mfaMap["factorIds"]
-	if !ok {
-		return nil, fmt.Errorf("multiFactorConfig.factorIds must be defined")
-	}
-	var authFactorIds []string
-	fi, ok := factorIds.([]string)
-	if !ok || len(fi) == 0 {
-		return nil, fmt.Errorf(`multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`)
-	}
-	for _, f := range fi {
-		if _, ok := validAuthFactors[f]; !ok {
-			return nil, fmt.Errorf(`factorId must be a valid AuthFactor type string`)
+	if ok {
+		fmt.Println(factorIds)
+		var authFactorIds []string
+		fi, ok := factorIds.([]string)
+		if !ok {
+			return nil, fmt.Errorf(`multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`)
 		}
-		authFactorIds = append(authFactorIds, f)
+		for _, f := range fi {
+			if !validAuthFactors[f] {
+				return nil, fmt.Errorf(`factorId must be a valid AuthFactor type string`)
+			}
+			authFactorIds = append(authFactorIds, f)
+		}
+		req["enabledProviders"] = make([]string, len(authFactorIds))
+		copy(req["enabledProviders"].([]string), authFactorIds)
 	}
-	req["enabledProviders"] = authFactorIds
 
 	//validate provider configs
 	providerConfigs, ok := mfaMap["providerConfigs"]
@@ -92,7 +93,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 			validConfigKeys["totpProviderConfig"] = true
 			for k := range providerConfig {
 				if !validConfigKeys[k] {
-					return nil, fmt.Errorf(`%s is not a valid providerConfig parameter`, k)
+					return nil, fmt.Errorf(`"%s" is not a valid providerConfig parameter`, k)
 				}
 			}
 
@@ -102,7 +103,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 				return nil, fmt.Errorf(`providerConfig.state should be defined`)
 			}
 			s, ok := state.(string)
-			if !ok || (s != "ENABLED" && s != "DISABLED") {
+			if !ok || (s != enabled && s != disabled) {
 				return nil, fmt.Errorf(`providerConfig.state must be either "ENABLED" or "DISABLED"`)
 			}
 			reqProviderConfig["state"] = s
@@ -122,7 +123,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 			validTotpConfigKeys["adjacentIntervals"] = true
 			for k := range tpc {
 				if !validTotpConfigKeys[k] {
-					return nil, fmt.Errorf(`%s is not a valid totpProviderConfig parameter`, k)
+					return nil, fmt.Errorf(`"%s" is not a valid totpProviderConfig parameter`, k)
 				}
 			}
 			reqTotpProviderConfig := make(map[string]interface{})
@@ -130,7 +131,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 			//validate adjacentIntervals if present
 			adjacentIntervals, ok := tpc["adjacentIntervals"]
 			if ok {
-				ai, ok := adjacentIntervals.(int32)
+				ai, ok := adjacentIntervals.(int)
 				if !ok || !(0 <= ai && ai <= 10) {
 					return nil, fmt.Errorf(`adjacentIntervals must be a valid number between 0 and 10 (both inclusive)`)
 				}

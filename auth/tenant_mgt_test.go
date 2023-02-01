@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/errorutils"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/iterator"
 )
 
@@ -1223,7 +1224,7 @@ func TestCreateTenant(t *testing.T) {
 	wantProviderConfigs := map[string]interface{}{
 		"state": testTenant.MultiFactorConfig.ProviderConfigs[0].State,
 		"totpProviderConfig": map[string]interface{}{
-			"adjacentIntervals": testTenant.MultiFactorConfig.ProviderConfigs[0].TotpProviderConfig.AdjacentIntervals,
+			"adjacentIntervals": float64(testTenant.MultiFactorConfig.ProviderConfigs[0].TotpProviderConfig.AdjacentIntervals),
 		},
 	}
 	wantBody := map[string]interface{}{
@@ -1272,8 +1273,7 @@ func TestCreateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUsers(false).
-		MultiFactorConfig(MultiFactorConfig{})
+		EnableAnonymousUsers(false)
 	tenant, err := client.TenantManager.CreateTenant(context.Background(), options)
 	if err != nil {
 		t.Fatal(err)
@@ -1288,7 +1288,6 @@ func TestCreateTenantZeroValues(t *testing.T) {
 		"allowPasswordSignup":   false,
 		"enableEmailLinkSignin": false,
 		"enableAnonymousUser":   false,
-		"multiFactorConfig":     nil,
 	}
 	if err := checkCreateTenantRequest(s, wantBody); err != nil {
 		t.Fatal(err)
@@ -1325,7 +1324,8 @@ func TestUpdateTenant(t *testing.T) {
 		DisplayName(testTenant.DisplayName).
 		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
 		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn).
-		EnableAnonymousUsers(testTenant.EnableAnonymousUsers)
+		EnableAnonymousUsers(testTenant.EnableAnonymousUsers).
+		MultiFactorConfig(*testTenant.MultiFactorConfig)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)
@@ -1334,14 +1334,28 @@ func TestUpdateTenant(t *testing.T) {
 	if !reflect.DeepEqual(tenant, testTenant) {
 		t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, testTenant)
 	}
-
+	var wantEnabledProviders []interface{}
+	for _, p := range testTenant.MultiFactorConfig.EnabledProviders {
+		wantEnabledProviders = append(wantEnabledProviders, p)
+	}
+	wantProviderConfigs := map[string]interface{}{
+		"state": testTenant.MultiFactorConfig.ProviderConfigs[0].State,
+		"totpProviderConfig": map[string]interface{}{
+			"adjacentIntervals": float64(testTenant.MultiFactorConfig.ProviderConfigs[0].TotpProviderConfig.AdjacentIntervals),
+		},
+	}
 	wantBody := map[string]interface{}{
 		"displayName":           testTenant.DisplayName,
 		"allowPasswordSignup":   testTenant.AllowPasswordSignUp,
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
 		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
+		"mfaConfig": map[string]interface{}{
+			"state":            testTenant.MultiFactorConfig.State,
+			"enabledProviders": wantEnabledProviders,
+			"providerConfigs":  []interface{}{wantProviderConfigs},
+		},
 	}
-	wantMask := []string{"allowPasswordSignup", "displayName", "enableAnonymousUser", "enableEmailLinkSignin"}
+	wantMask := []string{"allowPasswordSignup", "displayName", "enableAnonymousUser", "enableEmailLinkSignin", "mfaConfig"}
 	if err := checkUpdateTenantRequest(s, wantBody, wantMask); err != nil {
 		t.Fatal(err)
 	}
@@ -1578,6 +1592,10 @@ func checkCreateTenantRequest(s *mockAuthServer, wantBody interface{}) error {
 		return err
 	}
 
+	if diff := cmp.Diff(body, wantBody); diff != "" {
+		fmt.Printf("CreateTenant() diff = %s", diff)
+	}
+
 	if !reflect.DeepEqual(body, wantBody) {
 		return fmt.Errorf("CreateTenant() Body = %#v; want = %#v", body, wantBody)
 	}
@@ -1606,6 +1624,10 @@ func checkUpdateTenantRequest(s *mockAuthServer, wantBody interface{}, wantMask 
 	var body map[string]interface{}
 	if err := json.Unmarshal(s.Rbody, &body); err != nil {
 		return err
+	}
+
+	if diff := cmp.Diff(body, wantBody); diff != "" {
+		fmt.Printf("UpdateTenant() diff = %s", diff)
 	}
 
 	if !reflect.DeepEqual(body, wantBody) {
