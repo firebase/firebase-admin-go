@@ -13,7 +13,7 @@ var validAuthFactors = map[string]bool{
 	"PHONE_SMS": true,
 }
 
-// Struct representing Multi Factor Provider configuration.
+// ProviderConfig represents Multi Factor Provider configuration.
 // This config is used to set second factor auth except for SMS.
 // Currently, only TOTP is supported.
 type ProviderConfig struct {
@@ -21,12 +21,12 @@ type ProviderConfig struct {
 	TotpProviderConfig *TotpMfaProviderConfig `json:"totpProviderConfig,omitEmpty"`
 }
 
-// Struct representing configuration settings for TOTP second factor auth.
+// TotpMfaProviderConfig represents configuration settings for TOTP second factor auth.
 type TotpMfaProviderConfig struct {
 	AdjacentIntervals int `json:"adjacentIntervals,omitEmpty"`
 }
 
-// Struct representing a multi-factor configuration.
+// MultiFactorConfig represents a multi-factor configuration for Tenant/Project.
 // This can be used to define whether multi-factor authentication is enabled
 // or disabled and the list of second factor challenges that are supported.
 type MultiFactorConfig struct {

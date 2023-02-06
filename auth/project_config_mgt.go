@@ -9,6 +9,7 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
+// ProjectConfig represents the properties to update on the provided project config.
 type ProjectConfig struct {
 	MultiFactorConfig *MultiFactorConfig `json:"mfa,omitEmpty"`
 }
@@ -57,6 +58,7 @@ const (
 	multiFactorConfigKey = "multiFactorConfig"
 )
 
+// ProjectToUpdate represents the options used to update the current project.
 type ProjectToUpdate struct {
 	params nestedMap
 }
@@ -69,6 +71,7 @@ func (p *ProjectToUpdate) set(key string, value interface{}) *ProjectToUpdate {
 	return p
 }
 
+// MultiFactorConfig configures the desired MFA settings
 func (p *ProjectToUpdate) MultiFactorConfig(mfaSettings MultiFactorConfig) *ProjectToUpdate {
 	mfaConfig := make(map[string]interface{})
 	mfaConfig["state"] = mfaSettings.State

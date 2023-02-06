@@ -256,6 +256,7 @@ func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+// MultiFactorConfig configures the desired MFA settings
 func (t *TenantToCreate) MultiFactorConfig(mfaSettings MultiFactorConfig) *TenantToCreate {
 	mfaConfig := make(map[string]interface{})
 	mfaConfig["state"] = mfaSettings.State
@@ -351,6 +352,7 @@ func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+// MultiFactorConfig configures the desired MFA settings
 func (t *TenantToUpdate) MultiFactorConfig(mfaSettings *MultiFactorConfig) *TenantToUpdate {
 	if mfaSettings == nil {
 		return t.set(multiFactorConfig, nil)
