@@ -9,16 +9,16 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
-type Project struct {
+type ProjectConfig struct {
 	MultiFactorConfig *MultiFactorConfig `json:"mfa,omitEmpty"`
 }
 
-func (base *baseClient) Project(ctx context.Context) (*Project, error) {
+func (base *baseClient) ProjectConfig(ctx context.Context) (*ProjectConfig, error) {
 	req := &internal.Request{
 		Method: http.MethodGet,
 		URL:    base.projectMgtEndpoint,
 	}
-	var project Project
+	var project ProjectConfig
 	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &project); err != nil {
 		return nil, err
 	}
@@ -26,7 +26,7 @@ func (base *baseClient) Project(ctx context.Context) (*Project, error) {
 	return &project, nil
 }
 
-func (base *baseClient) UpdateProjectConfig(ctx context.Context, project *ProjectToUpdate) (*Project, error) {
+func (base *baseClient) UpdateProjectConfig(ctx context.Context, project *ProjectToUpdate) (*ProjectConfig, error) {
 	if project == nil {
 		return nil, errors.New("project must not be nil")
 	}
@@ -46,7 +46,7 @@ func (base *baseClient) UpdateProjectConfig(ctx context.Context, project *Projec
 			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
 		},
 	}
-	var result Project
+	var result ProjectConfig
 	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &result); err != nil {
 		return nil, err
 	}

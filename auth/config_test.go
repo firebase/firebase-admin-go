@@ -132,12 +132,12 @@ func TestMfaConfigInvalidFactorIds(t *testing.T) {
 
 // test for invalid Factor ID string
 func TestMfaConfigInvalidFactorIdsString(t *testing.T) {
-	invalidFactorId := []string{
+	invalidFactorID := []string{
 		"invalid",
 	}
 	body, err := validateAndConvertMultiFactorConfig(map[string]interface{}{
 		"state":     "ENABLED",
-		"factorIds": invalidFactorId,
+		"factorIds": invalidFactorID,
 	})
 	want := `factorId must be a valid AuthFactor type string`
 	if body != nil || want != err.Error() {

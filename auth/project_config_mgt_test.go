@@ -28,7 +28,7 @@ const projectResponse = `{
 	}
 }`
 
-var testProject = &Project{
+var testProject = &ProjectConfig{
 	MultiFactorConfig: &MultiFactorConfig{
 		State:            "ENABLED",
 		EnabledProviders: []string{"PHONE_SMS"},
