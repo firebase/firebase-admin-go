@@ -310,3 +310,11 @@ func TestMfaConfigInvalidTotpProviderConfigAdjacentIntervals(t *testing.T) {
 		}
 	}
 }
+
+func TestMfaConfigNil(t *testing.T) {
+	body, err := validateAndConvertMultiFactorConfig(nil)
+	want := `multiFactorConfig must be defined`
+	if body != nil || err.Error() != want {
+		t.Errorf("TestMfaConfigNil() = (%v, %q), want = (nil, %q)", body, err, want)
+	}
+}

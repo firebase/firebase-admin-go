@@ -29,6 +29,9 @@ type MultiFactorConfig struct {
 }
 
 func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedMap, error) {
+	if multiFactorConfig == nil {
+		return nil, fmt.Errorf(`multiFactorConfig must be defined`)
+	}
 	req := make(map[string]interface{})
 	mfaMap, ok := multiFactorConfig.(map[string]interface{})
 	if !ok {

@@ -1325,7 +1325,7 @@ func TestUpdateTenant(t *testing.T) {
 		AllowPasswordSignUp(testTenant.AllowPasswordSignUp).
 		EnableEmailLinkSignIn(testTenant.EnableEmailLinkSignIn).
 		EnableAnonymousUsers(testTenant.EnableAnonymousUsers).
-		MultiFactorConfig(*testTenant.MultiFactorConfig)
+		MultiFactorConfig(testTenant.MultiFactorConfig)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)
@@ -1394,7 +1394,8 @@ func TestUpdateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUsers(false)
+		EnableAnonymousUsers(false).
+		MultiFactorConfig(nil)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)

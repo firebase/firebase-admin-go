@@ -162,6 +162,7 @@ func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tena
 	if len(mask) == 0 {
 		return nil, errors.New("no parameters specified in the update request")
 	}
+
 	req := &internal.Request{
 		Method: http.MethodPatch,
 		URL:    fmt.Sprintf("/tenants/%s", tenantID),
@@ -350,7 +351,10 @@ func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
 
-func (t *TenantToUpdate) MultiFactorConfig(mfaSettings MultiFactorConfig) *TenantToUpdate {
+func (t *TenantToUpdate) MultiFactorConfig(mfaSettings *MultiFactorConfig) *TenantToUpdate {
+	if mfaSettings == nil {
+		return t.set(multiFactorConfig, nil)
+	}
 	mfaConfig := make(map[string]interface{})
 	mfaConfig["state"] = mfaSettings.State
 	mfaConfig["factorIds"] = mfaSettings.EnabledProviders
