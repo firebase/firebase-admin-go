@@ -16,7 +16,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/url"
 	"reflect"
@@ -24,7 +23,6 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/auth"
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/iterator"
 )
 
@@ -158,20 +156,20 @@ func TestTenantManager(t *testing.T) {
 			AllowPasswordSignUp:   false,
 			EnableEmailLinkSignIn: false,
 			EnableAnonymousUsers:  false,
-			MultiFactorConfig:     nil,
+			MultiFactorConfig: &auth.MultiFactorConfig{
+				State: "DISABLED",
+			},
 		}
 		req := (&auth.TenantToUpdate{}).
 			DisplayName("updated-go-tenant").
 			AllowPasswordSignUp(false).
 			EnableEmailLinkSignIn(false).
 			EnableAnonymousUsers(false).
-			MultiFactorConfig(nil)
+			MultiFactorConfig(&auth.MultiFactorConfig{State: "DISABLED"})
 		tenant, err := client.TenantManager.UpdateTenant(context.Background(), id, req)
 		if err != nil {
 			t.Fatalf("UpdateTenant() = %v", err)
 		}
-
-		fmt.Println("DIFF==", cmp.Diff(tenant, want))
 
 		if !reflect.DeepEqual(tenant, want) {
 			t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, want)
