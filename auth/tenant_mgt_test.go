@@ -1394,8 +1394,7 @@ func TestUpdateTenantZeroValues(t *testing.T) {
 		DisplayName("").
 		AllowPasswordSignUp(false).
 		EnableEmailLinkSignIn(false).
-		EnableAnonymousUsers(false).
-		MultiFactorConfig(nil)
+		EnableAnonymousUsers(false)
 	tenant, err := client.TenantManager.UpdateTenant(context.Background(), "tenantID", options)
 	if err != nil {
 		t.Fatal(err)
