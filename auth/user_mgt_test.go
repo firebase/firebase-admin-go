@@ -642,6 +642,62 @@ func TestInvalidCreateUser(t *testing.T) {
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
 			`malformed email string: "a@a@a"`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						UID:         "EnrollmentID",
+						PhoneNumber: "+11234567890",
+						DisplayName: "Spouse's phone number",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`"uid" is not supported when adding second factors via "createUser()"`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "invalid",
+						DisplayName: "Spouse's phone number",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber:         "+11234567890",
+						DisplayName:         "Spouse's phone number",
+						FactorID:            "phone",
+						EnrollmentTimestamp: time.Now().UTC().Unix(),
+					},
+				},
+			}),
+			`"EnrollmentTimeStamp" is not supported when adding second factors via "createUser()"`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+11234567890",
+						DisplayName: "Spouse's phone number",
+						FactorID:    "",
+					},
+				},
+			}),
+			`no factor id specified`,
+		}, {
+			(&UserToCreate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+11234567890",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "displayName" for "" must be a valid non-empty string`,
 		},
 	}
 	client := &Client{
@@ -713,6 +769,49 @@ var createUserCases = []struct {
 	{
 		(&UserToCreate{}).PhotoURL("http://some.url"),
 		map[string]interface{}{"photoUrl": "http://some.url"},
+	}, {
+		(&UserToCreate{}).MFASettings(MultiFactorSettings{
+			EnrolledFactors: []*MultiFactorInfo{
+				{
+					PhoneNumber: "+11234567890",
+					DisplayName: "Spouse's phone number",
+					FactorID:    "phone",
+				},
+			},
+		}),
+		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+			{
+				PhoneInfo:   "+11234567890",
+				DisplayName: "Spouse's phone number",
+			},
+		},
+		},
+	}, {
+		(&UserToCreate{}).MFASettings(MultiFactorSettings{
+			EnrolledFactors: []*MultiFactorInfo{
+				{
+					PhoneNumber: "+11234567890",
+					DisplayName: "number1",
+					FactorID:    "phone",
+				},
+				{
+					PhoneNumber: "+11234567890",
+					DisplayName: "number2",
+					FactorID:    "phone",
+				},
+			},
+		}),
+		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+			{
+				PhoneInfo:   "+11234567890",
+				DisplayName: "number1",
+			},
+			{
+				PhoneInfo:   "+11234567890",
+				DisplayName: "number2",
+			},
+		},
+		},
 	},
 }
 
@@ -772,6 +871,40 @@ func TestInvalidUpdateUser(t *testing.T) {
 		}, {
 			(&UserToUpdate{}).Password("short"),
 			"password must be a string at least 6 characters long",
+		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						UID:         "enrolledSecondFactor1",
+						PhoneNumber: "+11234567890",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "displayName" for "" must be a valid non-empty string`,
+		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						UID:         "enrolledSecondFactor1",
+						PhoneNumber: "invalid",
+						DisplayName: "Spouse's phone number",
+						FactorID:    "phone",
+					},
+				},
+			}),
+			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
+		}, {
+			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+				EnrolledFactors: []*MultiFactorInfo{
+					{
+						PhoneNumber: "+11234567890",
+						FactorID:    "phone",
+						DisplayName: "Spouse's phone number",
+					},
+				},
+			}),
+			`the second factor "uid" must be a valid non-empty string when adding second factors via "updateUser()"`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
@@ -911,6 +1044,42 @@ var updateUserCases = []struct {
 			"deleteAttribute": []string{"DISPLAY_NAME", "PHOTO_URL"},
 			"deleteProvider":  []string{"phone"},
 		},
+	},
+	{
+		(&UserToUpdate{}).MFASettings(MultiFactorSettings{
+			EnrolledFactors: []*MultiFactorInfo{
+				{
+					UID:                 "enrolledSecondFactor1",
+					PhoneNumber:         "+11234567890",
+					DisplayName:         "Spouse's phone number",
+					FactorID:            "phone",
+					EnrollmentTimestamp: time.Now().Unix(),
+				}, {
+					UID:         "enrolledSecondFactor2",
+					PhoneNumber: "+11234567890",
+					DisplayName: "Spouse's phone number",
+					FactorID:    "phone",
+				},
+			},
+		}),
+		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+			{
+				MFAEnrollmentID: "enrolledSecondFactor1",
+				PhoneInfo:       "+11234567890",
+				DisplayName:     "Spouse's phone number",
+				EnrolledAt:      time.Now().Format("2006-01-02T15:04:05Z07:00Z"),
+			},
+			{
+				MFAEnrollmentID: "enrolledSecondFactor2",
+				DisplayName:     "Spouse's phone number",
+				PhoneInfo:       "+11234567890",
+			},
+		},
+		},
+	},
+	{
+		(&UserToUpdate{}).MFASettings(MultiFactorSettings{}),
+		map[string]interface{}{"mfaInfo": nil},
 	},
 	{
 		(&UserToUpdate{}).ProviderToLink(&UserProvider{
@@ -2051,9 +2220,10 @@ type mockAuthServer struct {
 // echoServer takes either a []byte or a string filename, or an object.
 //
 // echoServer returns a server whose client will reply with depending on the input type:
-//   * []byte: the []byte it got
-//   * object: the marshalled object, in []byte form
-//   * nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
+//   - []byte: the []byte it got
+//   - object: the marshalled object, in []byte form
+//   - nil: "{}" empty json, in case we aren't interested in the returned value, just the marshalled request
+//
 // The marshalled request is available through s.rbody, s being the retuned server.
 // It also returns a closing functions that has to be defer closed.
 func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
