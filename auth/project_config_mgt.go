@@ -27,6 +27,19 @@ func (base *baseClient) ProjectConfig(ctx context.Context) (*ProjectConfig, erro
 	return &project, nil
 }
 
+func (base *baseClient) GetProjectConfig(ctx context.Context) (*ProjectConfig, error) {
+
+	req := &internal.Request{
+		Method: http.MethodGet,
+		URL:    base.projectMgtEndpoint,
+	}
+	var result ProjectConfig
+	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (base *baseClient) UpdateProjectConfig(ctx context.Context, project *ProjectToUpdate) (*ProjectConfig, error) {
 	if project == nil {
 		return nil, errors.New("project must not be nil")

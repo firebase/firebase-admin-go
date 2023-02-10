@@ -43,7 +43,22 @@ var testProject = &ProjectConfig{
 	},
 }
 
-func TestUpdatProject(t *testing.T) {
+func TestGetProjectConfig(t *testing.T) {
+	s := echoServer([]byte(projectResponse), t)
+	defer s.Close()
+
+	client := s.Client
+	project, err := client.GetProjectConfig(context.Background())
+
+	if err != nil {
+		t.Errorf("GetProjectConfig() = %v", err)
+	}
+	if !reflect.DeepEqual(project, testProject) {
+		t.Errorf("GetProjectConfig() = %#v, want = %#v", project, testProject)
+	}
+}
+
+func TestUpdateProject(t *testing.T) {
 	s := echoServer([]byte(projectResponse), t)
 	defer s.Close()
 
