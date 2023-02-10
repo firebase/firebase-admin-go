@@ -26,7 +26,7 @@ type TotpMfaProviderConfig struct {
 	AdjacentIntervals int `json:"adjacentIntervals,omitEmpty"`
 }
 
-// MultiFactorConfig represents a multi-factor configuration for Tenant/Project.
+// MultiFactorConfig represents a multi-factor configuration for Tenant/Project .
 // This can be used to define whether multi-factor authentication is enabled
 // or disabled and the list of second factor challenges that are supported.
 type MultiFactorConfig struct {
@@ -121,7 +121,7 @@ func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedM
 			//validate providerConfig.totpProviderConfig
 			totpProviderConfig, ok := providerConfig["totpProviderConfig"]
 			if !ok {
-				return nil, fmt.Errorf(`providerConfig.totpProviderConfig should be instantiated`)
+				return nil, fmt.Errorf(`providerConfig.totpProviderConfig should be present`)
 			}
 			tpc, ok := totpProviderConfig.(map[string]interface{})
 			if !ok {

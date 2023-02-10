@@ -230,7 +230,7 @@ func TestMfaConfigUndefinedTotpProviderConfig(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `providerConfig.totpProviderConfig should be instantiated`
+	want := `providerConfig.totpProviderConfig should be present`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigUndefinedTotpProviderConfig() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
