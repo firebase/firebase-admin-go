@@ -256,7 +256,7 @@ func TestMfaConfigInvalidTotpProviderConfig(t *testing.T) {
 			},
 		}
 		body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-		want := `totpProviderConfig must be of type TotpMfaProviderConfig`
+		want := `totpProviderConfig must be of type TotpProviderConfig`
 		if body != nil || want != err.Error() {
 			t.Errorf("TestMfaConfigInvalidTotpProviderConfig() = (%v, %q), want = (nil, %q)", body, err, want)
 		}
