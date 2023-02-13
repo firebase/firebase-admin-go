@@ -2,15 +2,30 @@ package auth
 
 import (
 	"fmt"
+	"strings"
 )
 
 const (
-	enabled  = "ENABLED"
-	disabled = "DISABLED"
+	ConstMfa                      = "mfa"
+	ConstMultiFactorConfig        = "multiFactorConfig"
+	ConstProviderConfigs          = "providerConfigs"
+	ConstTotpProviderConfig       = "totpProviderConfig"
+	ConstAdjacentIntervals        = "adjacentIntervals"
+	ConstMfaObject                = "MultiFactorConfig"
+	ConstProviderConfigObject     = "ProviderConfig"
+	ConstTotpProviderConfigObject = "TotpProviderConfig"
+	ConstState                    = "state"
+	ConstEnabledProviders         = "enabledProviders"
+	ConstFactorIds                = "factorIds"
 )
 
 var validAuthFactors = map[string]bool{
 	"PHONE_SMS": true,
+}
+
+var validStates = map[string]bool{
+	"ENABLED":  true,
+	"DISABLED": true,
 }
 
 // ProviderConfig represents Multi Factor Provider configuration.
@@ -35,122 +50,119 @@ type MultiFactorConfig struct {
 	ProviderConfigs  []*ProviderConfig `json:"providerConfigs,omitEmpty"`
 }
 
+func validateConfigKeys(inputReq *map[string]interface{}, validKeys map[string]bool, configName string) error {
+	for key := range *inputReq {
+		if !validKeys[key] {
+			return fmt.Errorf(`"%s" is not a valid %s parameter`, key, configName)
+		}
+	}
+	return nil
+}
+
+func stringKeys(m *map[string]bool) string {
+	var keys []string
+	for key := range *m {
+		keys = append(keys, key)
+	}
+	return fmt.Sprintf(`{%s}`, strings.Join(keys, ","))
+}
+
 func validateAndConvertMultiFactorConfig(multiFactorConfig interface{}) (nestedMap, error) {
 	if multiFactorConfig == nil {
-		return nil, fmt.Errorf(`multiFactorConfig must be defined`)
+		return nil, fmt.Errorf(`%s must be defined`, ConstMultiFactorConfig)
 	}
 	req := make(map[string]interface{})
+	//validate mfa config keys
 	mfaMap, ok := multiFactorConfig.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf(`multiFactorConfig must be a valid MultiFactorConfig type`)
+		return nil, fmt.Errorf(`%s must be a valid %s type`, ConstMultiFactorConfig, ConstMfaObject)
 	}
-
-	//validate mfa config keys
-	validMfaKeys := make(map[string]bool)
-	validMfaKeys["state"] = true
-	validMfaKeys["factorIds"] = true
-	validMfaKeys["providerConfigs"] = true
-	for k := range mfaMap {
-		if !validMfaKeys[k] {
-			return nil, fmt.Errorf(`"%s" is not a valid MultiFactorConfig parameter`, k)
-		}
+	if err := validateConfigKeys(&mfaMap, map[string]bool{ConstState: true, ConstFactorIds: true, ConstProviderConfigs: true}, ConstMfaObject); err != nil {
+		return nil, err
 	}
 
 	//validate mfa.state
-	state, ok := mfaMap["state"]
+	state, ok := mfaMap[ConstState]
 	if !ok {
-		return nil, fmt.Errorf(`multiFactorConfig.state should be defined`)
+		return nil, fmt.Errorf(`%s.%s should be defined`, ConstMultiFactorConfig, ConstState)
 	}
 	s, ok := state.(string)
-	if !ok || (s != enabled && s != disabled) {
-		return nil, fmt.Errorf(`multiFactorConfig.state must be either "ENABLED" or "DISABLED"`)
+	if !ok || !validStates[s] {
+		return nil, fmt.Errorf(`%s.%s must be in %s`, ConstMultiFactorConfig, ConstState, stringKeys(&validStates))
 	}
-	req["state"] = s
+	req[ConstState] = s
 
 	//validate mfa.factorIds
-	factorIds, ok := mfaMap["factorIds"]
+	factorIds, ok := mfaMap[ConstFactorIds]
 	if ok {
-		fmt.Println(factorIds)
 		var authFactorIds []string
 		fi, ok := factorIds.([]string)
 		if !ok {
-			return nil, fmt.Errorf(`multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`)
+			return nil, fmt.Errorf(`%s.%s must be a list of strings in %s`, ConstMultiFactorConfig, ConstFactorIds, stringKeys(&validAuthFactors))
 		}
 		for _, f := range fi {
 			if !validAuthFactors[f] {
-				return nil, fmt.Errorf(`factorId must be a valid AuthFactor type string`)
+				return nil, fmt.Errorf(`%s.%s must be a list of strings in %s`, ConstMultiFactorConfig, ConstFactorIds, stringKeys(&validAuthFactors))
 			}
 			authFactorIds = append(authFactorIds, f)
 		}
-		req["enabledProviders"] = make([]string, len(authFactorIds))
-		copy(req["enabledProviders"].([]string), authFactorIds)
+		req[ConstEnabledProviders] = make([]string, len(authFactorIds))
+		copy(req[ConstEnabledProviders].([]string), authFactorIds)
 	}
 
 	//validate provider configs
-	providerConfigs, ok := mfaMap["providerConfigs"]
+	providerConfigs, ok := mfaMap[ConstProviderConfigs]
 	if ok {
 		pc, ok := providerConfigs.([]map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf(`multiFactorConfig.providerConfigs must be a list of ProviderConfigs`)
+			return nil, fmt.Errorf(`%s.%s must be a list of %ss`, ConstMultiFactorConfig, ConstProviderConfigs, ConstProviderConfigObject)
 		}
 		var reqProviderConfigsList []map[string]interface{}
 		for _, providerConfig := range pc {
 			reqProviderConfig := make(map[string]interface{})
 
 			//validate providerConfig struct keys
-			validConfigKeys := make(map[string]bool)
-			validConfigKeys["state"] = true
-			validConfigKeys["totpProviderConfig"] = true
-			for k := range providerConfig {
-				if !validConfigKeys[k] {
-					return nil, fmt.Errorf(`"%s" is not a valid providerConfig parameter`, k)
-				}
+			if err := validateConfigKeys(&providerConfig, map[string]bool{ConstState: true, ConstTotpProviderConfig: true}, ConstProviderConfigObject); err != nil {
+				return nil, err
 			}
 
 			//validate providerConfig.state
-			state, ok := providerConfig["state"]
+			state, ok := providerConfig[ConstState]
 			if !ok {
-				return nil, fmt.Errorf(`providerConfig.state should be defined`)
+				return nil, fmt.Errorf(`%s.%s should be defined`, ConstProviderConfigObject, ConstState)
 			}
 			s, ok := state.(string)
-			if !ok || (s != enabled && s != disabled) {
-				return nil, fmt.Errorf(`providerConfig.state must be either "ENABLED" or "DISABLED"`)
+			if !ok || !validStates[s] {
+				return nil, fmt.Errorf(`%s.%s must be in %s`, ConstProviderConfigObject, ConstState, stringKeys(&validStates))
 			}
-			reqProviderConfig["state"] = s
+			reqProviderConfig[ConstState] = s
 
 			//validate providerConfig.totpProviderConfig
-			totpProviderConfig, ok := providerConfig["totpProviderConfig"]
+			totpProviderConfig, ok := providerConfig[ConstTotpProviderConfig]
 			if !ok {
-				return nil, fmt.Errorf(`providerConfig.totpProviderConfig should be present`)
+				return nil, fmt.Errorf(`%s.%s should be present`, ConstProviderConfigObject, ConstTotpProviderConfig)
 			}
 			tpc, ok := totpProviderConfig.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf(`totpProviderConfig must be of type TotpProviderConfig`)
+				return nil, fmt.Errorf(`%s must be of type %s`, ConstTotpProviderConfig, ConstTotpProviderConfigObject)
 			}
 
 			//validate totpProviderConfig keys
-			validTotpConfigKeys := make(map[string]bool)
-			validTotpConfigKeys["adjacentIntervals"] = true
-			for k := range tpc {
-				if !validTotpConfigKeys[k] {
-					return nil, fmt.Errorf(`"%s" is not a valid totpProviderConfig parameter`, k)
-				}
+			if err := validateConfigKeys(&tpc, map[string]bool{ConstAdjacentIntervals: true}, ConstTotpProviderConfigObject); err != nil {
+				return nil, err
 			}
 			reqTotpProviderConfig := make(map[string]interface{})
 
 			//validate adjacentIntervals if present
-			adjacentIntervals, ok := tpc["adjacentIntervals"]
-			if ok {
-				ai, ok := adjacentIntervals.(int)
-				if !ok || !(0 <= ai && ai <= 10) {
-					return nil, fmt.Errorf(`adjacentIntervals must be a valid number between 0 and 10 (both inclusive)`)
-				}
-				reqTotpProviderConfig["adjacentIntervals"] = ai
+			ai, ok := tpc[ConstAdjacentIntervals].(int)
+			if !ok || !(0 <= ai && ai <= 10) {
+				return nil, fmt.Errorf(`%s must be a valid number between 0 and 10 (both inclusive)`, ConstAdjacentIntervals)
 			}
-			reqProviderConfig["totpProviderConfig"] = reqTotpProviderConfig
+			reqTotpProviderConfig[ConstAdjacentIntervals] = ai
+			reqProviderConfig[ConstTotpProviderConfig] = reqTotpProviderConfig
 			reqProviderConfigsList = append(reqProviderConfigsList, reqProviderConfig)
 		}
-		req["providerConfigs"] = reqProviderConfigsList
+		req[ConstProviderConfigs] = reqProviderConfigsList
 	}
 
 	//return validated multi factor config auth request

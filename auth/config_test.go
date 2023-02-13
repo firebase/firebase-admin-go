@@ -103,7 +103,7 @@ func TestMfaConfigInvalidStates(t *testing.T) {
 	body, err := validateAndConvertMultiFactorConfig(map[string]interface{}{
 		"state": "INVALID_STATE",
 	})
-	want := `multiFactorConfig.state must be either "ENABLED" or "DISABLED"`
+	want := `multiFactorConfig.state must be in {ENABLED,DISABLED}`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidStates() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -123,7 +123,7 @@ func TestMfaConfigInvalidFactorIds(t *testing.T) {
 			"state":     "ENABLED",
 			"factorIds": factorIds,
 		})
-		want := `multiFactorConfig.factorIds must be a defined list of AuthFactor type strings`
+		want := `multiFactorConfig.factorIds must be a list of strings in {PHONE_SMS}`
 		if body != nil || want != err.Error() {
 			t.Errorf("TestMfaConfigInvalidFactorIds() = (%v, %q), want = (nil, %q)", body, err, want)
 		}
@@ -139,7 +139,7 @@ func TestMfaConfigInvalidFactorIdsString(t *testing.T) {
 		"state":     "ENABLED",
 		"factorIds": invalidFactorID,
 	})
-	want := `factorId must be a valid AuthFactor type string`
+	want := `multiFactorConfig.factorIds must be a list of strings in {PHONE_SMS}`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidFactorIdsString() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -178,7 +178,7 @@ func TestMfaConfigInvalidProviderConfigParams(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `"invalid" is not a valid providerConfig parameter`
+	want := `"invalid" is not a valid ProviderConfig parameter`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidProviderConfigParams() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -195,7 +195,7 @@ func TestMfaConfigUndefinedProviderConfigState(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `providerConfig.state should be defined`
+	want := `ProviderConfig.state should be defined`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigUndefinedProviderConfigState() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -213,7 +213,7 @@ func TestMfaConfigInvalidProviderConfigState(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `providerConfig.state must be either "ENABLED" or "DISABLED"`
+	want := `ProviderConfig.state must be in {ENABLED,DISABLED}`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidProviderConfigState() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -230,7 +230,7 @@ func TestMfaConfigUndefinedTotpProviderConfig(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `providerConfig.totpProviderConfig should be present`
+	want := `ProviderConfig.totpProviderConfig should be present`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigUndefinedTotpProviderConfig() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -256,7 +256,7 @@ func TestMfaConfigInvalidTotpProviderConfig(t *testing.T) {
 			},
 		}
 		body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-		want := `totpProviderConfig must be of type TotpProviderConfig`
+		want := `totpProviderConfig must be of type TotpMfaProviderConfig`
 		if body != nil || want != err.Error() {
 			t.Errorf("TestMfaConfigInvalidTotpProviderConfig() = (%v, %q), want = (nil, %q)", body, err, want)
 		}
@@ -277,7 +277,7 @@ func TestMfaConfigInvalidTotpProviderConfigParams(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `"invalid" is not a valid totpProviderConfig parameter`
+	want := `"invalid" is not a valid TotpProviderConfig parameter`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidTotpProviderConfigParams() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
