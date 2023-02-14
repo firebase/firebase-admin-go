@@ -14,19 +14,6 @@ type ProjectConfig struct {
 	MultiFactorConfig *MultiFactorConfig `json:"mfa,omitEmpty"`
 }
 
-func (base *baseClient) ProjectConfig(ctx context.Context) (*ProjectConfig, error) {
-	req := &internal.Request{
-		Method: http.MethodGet,
-		URL:    base.projectMgtEndpoint,
-	}
-	var project ProjectConfig
-	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &project); err != nil {
-		return nil, err
-	}
-
-	return &project, nil
-}
-
 func (base *baseClient) GetProjectConfig(ctx context.Context) (*ProjectConfig, error) {
 
 	req := &internal.Request{
