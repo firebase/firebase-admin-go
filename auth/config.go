@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -64,6 +65,7 @@ func stringKeys(m *map[string]bool) string {
 	for key := range *m {
 		keys = append(keys, key)
 	}
+	sort.Strings(keys)
 	return fmt.Sprintf(`{%s}`, strings.Join(keys, ","))
 }
 
