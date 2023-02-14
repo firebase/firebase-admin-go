@@ -103,7 +103,7 @@ func TestMfaConfigInvalidStates(t *testing.T) {
 	body, err := validateAndConvertMultiFactorConfig(map[string]interface{}{
 		"state": "INVALID_STATE",
 	})
-	want := `multiFactorConfig.state must be in {ENABLED,DISABLED}`
+	want := `multiFactorConfig.state must be in {DISABLED,ENABLED}`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidStates() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
@@ -213,7 +213,7 @@ func TestMfaConfigInvalidProviderConfigState(t *testing.T) {
 		},
 	}
 	body, err := validateAndConvertMultiFactorConfig(mfaConfig)
-	want := `ProviderConfig.state must be in {ENABLED,DISABLED}`
+	want := `ProviderConfig.state must be in {DISABLED,ENABLED}`
 	if body != nil || want != err.Error() {
 		t.Errorf("TestMfaConfigInvalidProviderConfigState() = (%v, %q), want = (nil, %q)", body, err, want)
 	}
