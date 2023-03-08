@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"firebase.google.com/go/v4/errorutils"
@@ -111,12 +112,14 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	cases := []bool{true, false}
+	cases := []string{"true", "false", ""}
 	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
 		testActionCodeSettingsMap)
-	for _, returnOobLink := range cases {
-		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
-		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+	for _, caseStr := range cases {
+		if returnOobLink, err := strconv.ParseBool(caseStr); err == nil {
+			testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
+			testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		}
 		link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
 		if err != nil {
 			t.Fatal(err)
