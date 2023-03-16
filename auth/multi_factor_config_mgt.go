@@ -54,10 +54,16 @@ type MultiFactorConfig struct {
 }
 
 func (mfa *MultiFactorConfig) validate() error {
-	if mfa == nil || len(mfa.ProviderConfigs) == 0 {
-		return fmt.Errorf("providerConfigs must be a valid array of type \"ProviderConfig\"s")
+	if mfa == nil {
+		return nil
+	}
+	if len(mfa.ProviderConfigs) == 0 {
+		return fmt.Errorf("\"ProviderConfigs\" must be a non-empty array of type \"ProviderConfig\"s")
 	}
 	for _, providerConfig := range mfa.ProviderConfigs {
+		if providerConfig == nil {
+			return fmt.Errorf("\"ProviderConfigs\" must be a non-empty array of type \"ProviderConfig\"s")
+		}
 		if err := providerConfig.validate(); err != nil {
 			return err
 		}
@@ -66,8 +72,8 @@ func (mfa *MultiFactorConfig) validate() error {
 }
 
 func (pvc *ProviderConfig) validate() error {
-	if pvc == nil || pvc == (&ProviderConfig{}) {
-		return fmt.Errorf("providerConfig must be defined")
+	if pvc.State == "" && pvc.TOTPProviderConfig == nil {
+		return fmt.Errorf("\"ProviderConfig\" must be defined")
 	}
 	state := string(pvc.State)
 	if state != string(Enabled) && state != string(Disabled) {
