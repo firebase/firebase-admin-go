@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -56,7 +55,7 @@ type MultiFactorConfig struct {
 
 func (mfa *MultiFactorConfig) validate() error {
 	if mfa == nil || len(mfa.ProviderConfigs) == 0 {
-		return errors.New("ProviderConfigs must be a valid array of type \"ProviderConfig\"s.")
+		return fmt.Errorf("providerConfigs must be a valid array of type \"ProviderConfig\"s")
 	}
 	for _, providerConfig := range mfa.ProviderConfigs {
 		if err := providerConfig.validate(); err != nil {
@@ -68,21 +67,21 @@ func (mfa *MultiFactorConfig) validate() error {
 
 func (pvc *ProviderConfig) validate() error {
 	if pvc == nil || pvc == (&ProviderConfig{}) {
-		return errors.New("ProviderConfig must be defined.")
+		return fmt.Errorf("providerConfig must be defined")
 	}
 	state := string(pvc.State)
 	if state != string(Enabled) && state != string(Disabled) {
-		return errors.New("ProviderConfig.State, must be 'Enabled' or 'Disabled'")
+		return fmt.Errorf("\"ProviderConfig.State\" must be 'Enabled' or 'Disabled'")
 	}
 	return pvc.TOTPProviderConfig.validate()
 }
 
 func (tpvc *TOTPProviderConfig) validate() error {
 	if tpvc == nil {
-		return fmt.Errorf("TOTPProviderConfig must be defined.")
+		return fmt.Errorf("\"TOTPProviderConfig\" must be defined")
 	}
 	if !(tpvc.AdjacentIntervals >= 1 && tpvc.AdjacentIntervals <= 10) {
-		return fmt.Errorf("AdjacentIntervals must be an integer between 1 and 10 (inclusive).")
+		return fmt.Errorf("\"AdjacentIntervals\" must be an integer between 1 and 10 (inclusive)")
 	}
 	return nil
 }
