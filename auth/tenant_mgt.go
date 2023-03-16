@@ -43,10 +43,12 @@ import (
 // All other settings of a tenant will also be inherited. These will need to be managed from the
 // Cloud Console UI.
 type Tenant struct {
-	ID                    string `json:"name"`
-	DisplayName           string `json:"displayName"`
-	AllowPasswordSignUp   bool   `json:"allowPasswordSignup"`
-	EnableEmailLinkSignIn bool   `json:"enableEmailLinkSignin"`
+	ID                    string             `json:"name"`
+	DisplayName           string             `json:"displayName"`
+	AllowPasswordSignUp   bool               `json:"allowPasswordSignup"`
+	EnableEmailLinkSignIn bool               `json:"enableEmailLinkSignin"`
+	EnableAnonymousUsers  bool               `json:"enableAnonymousUser"`
+	MultiFactorConfig     *MultiFactorConfig `json:"mfaConfig"`
 }
 
 // TenantClient is used for managing users, configuring SAML/OIDC providers, and generating email
@@ -125,7 +127,9 @@ func (tm *TenantManager) CreateTenant(ctx context.Context, tenant *TenantToCreat
 	if tenant == nil {
 		return nil, errors.New("tenant must not be nil")
 	}
-
+	if err := tenant.validate(); err != nil {
+		return nil, err
+	}
 	req := &internal.Request{
 		Method: http.MethodPost,
 		URL:    "/tenants",
@@ -148,7 +152,9 @@ func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tena
 	if tenant == nil {
 		return nil, errors.New("tenant must not be nil")
 	}
-
+	if err := tenant.validate(); err != nil {
+		return nil, err
+	}
 	mask := tenant.params.UpdateMask()
 	if len(mask) == 0 {
 		return nil, errors.New("no parameters specified in the update request")
@@ -213,9 +219,11 @@ func (tm *TenantManager) makeRequest(ctx context.Context, req *internal.Request,
 }
 
 const (
-	tenantDisplayNameKey     = "displayName"
-	allowPasswordSignUpKey   = "allowPasswordSignup"
-	enableEmailLinkSignInKey = "enableEmailLinkSignin"
+	tenantDisplayNameKey       = "displayName"
+	allowPasswordSignUpKey     = "allowPasswordSignup"
+	enableEmailLinkSignInKey   = "enableEmailLinkSignin"
+	enableAnonymousUser        = "enableAnonymousUser"
+	multiFactorConfigTenantKey = "mfaConfig"
 )
 
 // TenantToCreate represents the options used to create a new tenant.
@@ -240,6 +248,15 @@ func (t *TenantToCreate) EnableEmailLinkSignIn(enable bool) *TenantToCreate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
+// EnableAnonymousUsers enables or disables anonymous authentication.
+func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
+	return t.set(enableAnonymousUser, enable)
+}
+
+func (t *TenantToCreate) MultiFactorConfig(multiFactorConfig MultiFactorConfig) *TenantToCreate {
+	return t.set(multiFactorConfigTenantKey, multiFactorConfig)
+}
+
 func (t *TenantToCreate) set(key string, value interface{}) *TenantToCreate {
 	t.ensureParams().Set(key, value)
 	return t
@@ -251,6 +268,23 @@ func (t *TenantToCreate) ensureParams() nestedMap {
 	}
 
 	return t.params
+}
+func (t *TenantToCreate) validate() error {
+	req := make(map[string]interface{})
+	for k, v := range t.params {
+		req[k] = v
+	}
+	val, ok := req[multiFactorConfigTenantKey]
+	if ok {
+		multiFactorConfig, ok := val.(MultiFactorConfig)
+		if !ok {
+			return fmt.Errorf("invalid type for MultiFactorConfig: %s", req[multiFactorConfigProjectKey])
+		}
+		if err := multiFactorConfig.validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TenantToUpdate represents the options used to update an existing tenant.
@@ -275,6 +309,15 @@ func (t *TenantToUpdate) EnableEmailLinkSignIn(enable bool) *TenantToUpdate {
 	return t.set(enableEmailLinkSignInKey, enable)
 }
 
+// EnableAnonymousUsers enables or disables anonymous authentication.
+func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
+	return t.set(enableAnonymousUser, enable)
+}
+
+func (t *TenantToUpdate) MultiFactorConfig(multiFactorConfig MultiFactorConfig) *TenantToUpdate {
+	return t.set(multiFactorConfigTenantKey, multiFactorConfig)
+}
+
 func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
 	if t.params == nil {
 		t.params = make(nestedMap)
@@ -282,6 +325,24 @@ func (t *TenantToUpdate) set(key string, value interface{}) *TenantToUpdate {
 
 	t.params.Set(key, value)
 	return t
+}
+
+func (t *TenantToUpdate) validate() error {
+	req := make(map[string]interface{})
+	for k, v := range t.params {
+		req[k] = v
+	}
+	val, ok := req[multiFactorConfigTenantKey]
+	if ok {
+		multiFactorConfig, ok := val.(MultiFactorConfig)
+		if !ok {
+			return fmt.Errorf("invalid type for MultiFactorConfig: %s", req[multiFactorConfigProjectKey])
+		}
+		if err := multiFactorConfig.validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TenantIterator is an iterator over tenants.
