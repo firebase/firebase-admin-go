@@ -15,12 +15,10 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 
 	"firebase.google.com/go/v4/auth"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestProjectConfig(t *testing.T) {
@@ -45,7 +43,6 @@ func TestProjectConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("UpdateProjectConfig() = %v", err)
 		}
-		fmt.Printf(cmp.Diff(projectConfig, want))
 		if !reflect.DeepEqual(projectConfig, want) {
 			t.Errorf("UpdateProjectConfig() = %#v; want = %#v", projectConfig, want)
 		}
