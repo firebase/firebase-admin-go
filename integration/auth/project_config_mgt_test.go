@@ -42,13 +42,13 @@ func TestProjectConfig(t *testing.T) {
 		mfaConfigReq := *want.MultiFactorConfig
 		req := (&auth.ProjectConfigToUpdate{}).
 			MultiFactorConfig(mfaConfigReq)
-		project, err := client.UpdateProjectConfig(context.Background(), req)
+		projectConfig, err := client.UpdateProjectConfig(context.Background(), req)
 		if err != nil {
 			t.Fatalf("UpdateProjectConfig() = %v", err)
 		}
-		fmt.Printf(cmp.Diff(project, want))
-		if !reflect.DeepEqual(project, want) {
-			t.Errorf("UpdateProjectConfig() = %#v; want = %#v", project, want)
+		fmt.Printf(cmp.Diff(projectConfig, want))
+		if !reflect.DeepEqual(projectConfig, want) {
+			t.Errorf("UpdateProjectConfig() = %#v; want = %#v", projectConfig, want)
 		}
 	})
 
