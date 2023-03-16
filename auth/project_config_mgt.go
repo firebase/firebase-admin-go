@@ -78,7 +78,7 @@ const (
 	multiFactorConfigProjectKey = "mfa"
 )
 
-// EnableAnonymousUsers enables or disables anonymous authentication.
+// MultiFactorConfig configures the project's multi-factor settings
 func (pc *ProjectConfigToUpdate) MultiFactorConfig(multiFactorConfig MultiFactorConfig) *ProjectConfigToUpdate {
 	return pc.set(multiFactorConfigProjectKey, multiFactorConfig)
 }

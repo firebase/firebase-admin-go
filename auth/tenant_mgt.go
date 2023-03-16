@@ -253,6 +253,7 @@ func (t *TenantToCreate) EnableAnonymousUsers(enable bool) *TenantToCreate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+// MultiFactorConfig configures the tenant's multi-factor settings
 func (t *TenantToCreate) MultiFactorConfig(multiFactorConfig MultiFactorConfig) *TenantToCreate {
 	return t.set(multiFactorConfigTenantKey, multiFactorConfig)
 }
@@ -314,6 +315,7 @@ func (t *TenantToUpdate) EnableAnonymousUsers(enable bool) *TenantToUpdate {
 	return t.set(enableAnonymousUser, enable)
 }
 
+// MultiFactorConfig configures the tenant's multi-factor settings
 func (t *TenantToUpdate) MultiFactorConfig(multiFactorConfig MultiFactorConfig) *TenantToUpdate {
 	return t.set(multiFactorConfigTenantKey, multiFactorConfig)
 }
