@@ -44,20 +44,19 @@ func (base *baseClient) GetProjectConfig(ctx context.Context) (*ProjectConfig, e
 
 func (base *baseClient) UpdateProjectConfig(ctx context.Context, projectConfig *ProjectConfigToUpdate) (*ProjectConfig, error) {
 	if projectConfig == nil {
-		return nil, errors.New("project must not be nil")
+		return nil, errors.New("project config must not be nil")
 	}
 	if err := projectConfig.validate(); err != nil {
 		return nil, err
 	}
-	request := projectConfig.params
-	mask := request.UpdateMask()
+	mask := projectConfig.params.UpdateMask()
 	if len(mask) == 0 {
 		return nil, errors.New("no parameters specified in the update request")
 	}
 	req := &internal.Request{
 		Method: http.MethodPatch,
 		URL:    base.projectMgtEndpoint,
-		Body:   internal.NewJSONEntity(request),
+		Body:   internal.NewJSONEntity(projectConfig.params),
 		Opts: []internal.HTTPOption{
 			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
 		},
