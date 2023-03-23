@@ -144,7 +144,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
 	}
 	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
-	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	idToolkitV2Endpoint := fmt.Sprintf("%s/v2", baseURL)
 	userManagementEndpoint := idToolkitV1Endpoint
 	providerConfigEndpoint := idToolkitV2Endpoint
 	tenantMgtEndpoint := idToolkitV2Endpoint

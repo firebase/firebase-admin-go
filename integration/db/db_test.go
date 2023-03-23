@@ -86,8 +86,12 @@ func TestMain(m *testing.M) {
 
 func initClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
+	url, err := getDatabaseURL()
+	if err != nil {
+		return nil, err
+	}
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL: fmt.Sprintf("https://%s.firebaseio.com", pid),
+		DatabaseURL: url,
 	})
 	if err != nil {
 		return nil, err
@@ -99,8 +103,12 @@ func initClient(pid string) (*db.Client, error) {
 func initOverrideClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	ao := map[string]interface{}{"uid": "user1"}
+	url, err := getDatabaseURL()
+	if err != nil {
+		return nil, err
+	}
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL:  fmt.Sprintf("https://%s.firebaseio.com", pid),
+		DatabaseURL:  url,
 		AuthOverride: &ao,
 	})
 	if err != nil {
@@ -113,8 +121,12 @@ func initOverrideClient(pid string) (*db.Client, error) {
 func initGuestClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	var nullMap map[string]interface{}
+	url, err := getDatabaseURL()
+	if err != nil {
+		return nil, err
+	}
 	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL:  fmt.Sprintf("https://%s.firebaseio.com", pid),
+		DatabaseURL:  url,
 		AuthOverride: &nullMap,
 	})
 	if err != nil {
@@ -130,12 +142,10 @@ func initRules() {
 		log.Fatalln(err)
 	}
 
-	pid, err := internal.ProjectID()
+	url, err := getDatabaseRulesURL()
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	url := fmt.Sprintf("https://%s.firebaseio.com/.settings/rules.json", pid)
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(b))
 	if err != nil {
 		log.Fatalln(err)
@@ -749,4 +759,33 @@ type Ratings struct {
 type User struct {
 	Name  string `json:"name"`
 	Since int    `json:"since"`
+}
+
+func getDatabaseRulesURL() (string, error) {
+	emulatorHost := os.Getenv("FIREBASE_DATABASE_EMULATOR_HOST")
+	if emulatorHost != "" {
+		return fmt.Sprintf("http://%s/.settings/rules.json?ns=%s", emulatorHost, os.Getenv("FIREBASE_DATABASE_EMULATOR_NAMESPACE")), nil
+	}
+	prodURL, err := getProductionURL()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/.settings/rules.json", prodURL), nil
+}
+
+func getDatabaseURL() (string, error) {
+	emulatorHost := os.Getenv("FIREBASE_DATABASE_EMULATOR_HOST")
+	if emulatorHost != "" {
+		return fmt.Sprintf("%s?ns=%s", emulatorHost, os.Getenv("FIREBASE_DATABASE_EMULATOR_NAMESPACE")), nil
+	}
+	return getProductionURL()
+}
+
+func getProductionURL() (string, error) {
+	pid, err := internal.ProjectID()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://%s.firebaseio.com", pid), nil
 }

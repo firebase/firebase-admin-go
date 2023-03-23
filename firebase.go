@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/firestore"
+	"firebase.google.com/go/v4/appcheck"
 	"firebase.google.com/go/v4/auth"
 	"firebase.google.com/go/v4/db"
 	"firebase.google.com/go/v4/iid"
@@ -38,7 +39,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "4.7.0"
+const Version = "4.10.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -126,6 +127,14 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 		Version:   Version,
 	}
 	return messaging.NewClient(ctx, conf)
+}
+
+// AppCheck returns an instance of appcheck.Client.
+func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
+	conf := &internal.AppCheckConfig{
+		ProjectID: a.projectID,
+	}
+	return appcheck.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.

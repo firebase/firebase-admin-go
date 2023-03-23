@@ -8,24 +8,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.12, 1.16]
+        go: [1.17, 1.18, 1.19]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ matrix.go }}
 
     - name: Install golint
-      run: go get golang.org/x/lint/golint
+      run: go install golang.org/x/lint/golint@latest
 
     - name: Check out code
       uses: actions/checkout@v2
 
     - name: Run Linter
       run: |
-        GOLINT=`go list -f {{.Target}} golang.org/x/lint/golint`
-        $GOLINT -set_exit_status ./...
+        golint -set_exit_status ./...
 
     - name: Run Unit Tests
       if: success() || failure()
@@ -41,27 +40,3 @@ jobs:
 
     - name: Run Static Analyzer
       run: go vet -v ./...
-
-  gopath:
-    name: Gopath build
-    runs-on: ubuntu-latest
-    env:
-      GOPATH: ${{ github.workspace }}/go
-      GO111MODULE: off
-
-    steps:
-    - name: Set up Go 1.16
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.16
-
-    - name: Check out code into GOPATH
-      uses: actions/checkout@v2
-      with:
-        path: go/src/firebase.google.com/go
-
-    - name: Get dependencies
-      run: go get -t -v $(go list ./... | grep -v integration)
-
-    - name: Run Unit Tests
-      run: go test -v -race -test.short firebase.google.com/go/...
