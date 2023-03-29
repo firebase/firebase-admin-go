@@ -30,13 +30,12 @@ type ProjectConfig struct {
 }
 
 func (base *baseClient) GetProjectConfig(ctx context.Context) (*ProjectConfig, error) {
-
 	req := &internal.Request{
 		Method: http.MethodGet,
-		URL:    base.projectMgtEndpoint,
+		URL:    "/config",
 	}
 	var result ProjectConfig
-	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &result); err != nil {
+	if _, err := base.makeRequest(ctx, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -55,14 +54,14 @@ func (base *baseClient) UpdateProjectConfig(ctx context.Context, projectConfig *
 	}
 	req := &internal.Request{
 		Method: http.MethodPatch,
-		URL:    base.projectMgtEndpoint,
+		URL:    "/config",
 		Body:   internal.NewJSONEntity(projectConfig.params),
 		Opts: []internal.HTTPOption{
 			internal.WithQueryParam("updateMask", strings.Join(mask, ",")),
 		},
 	}
 	var result ProjectConfig
-	if _, err := base.httpClient.DoAndUnmarshal(ctx, req, &result); err != nil {
+	if _, err := base.makeRequest(ctx, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

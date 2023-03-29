@@ -154,7 +154,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
 		tenantMgtEndpoint:      tenantMgtEndpoint,
-		projectMgtEndpoint:     fmt.Sprintf("%s/projects/%s/config", projectMgtEndpoint, conf.ProjectID),
+		projectMgtEndpoint:     projectMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,

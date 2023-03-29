@@ -21,17 +21,14 @@ import (
 // ProviderConfig represents a multi-factor auth provider configuration.
 // Currently, only TOTP is supported.
 type ProviderConfig struct {
-
 	// The state of multi-factor configuration, whether it's enabled or disabled.
 	State MultiFactorConfigState `json:"state"`
-
 	// TOTPProviderConfig holds the TOTP (time-based one-time password) configuration that is used in second factor authentication.
 	TOTPProviderConfig *TOTPProviderConfig `json:"totpProviderConfig,omitempty"`
 }
 
 // TOTPProviderConfig represents configuration settings for TOTP second factor auth.
 type TOTPProviderConfig struct {
-
 	// The number of adjacent intervals used by TOTP.
 	AdjacentIntervals int `json:"adjacentIntervals,omitempty"`
 }
@@ -48,7 +45,6 @@ const (
 // MultiFactorConfig represents a multi-factor configuration for a tenant or project.
 // This can be used to define whether multi-factor authentication is enabled or disabled and the list of second factor challenges that are supported.
 type MultiFactorConfig struct {
-
 	// A slice of pointers to ProviderConfig structs, each outlining the specific second factor authorization method.
 	ProviderConfigs []*ProviderConfig `json:"providerConfigs,omitempty"`
 }
