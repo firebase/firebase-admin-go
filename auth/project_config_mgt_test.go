@@ -114,7 +114,7 @@ func checkUpdateProjectConfigRequest(s *mockAuthServer, wantBody interface{}, wa
 		return fmt.Errorf("UpdateProjectConfig() Method = %q; want = %q", req.Method, http.MethodPatch)
 	}
 
-	wantURL := "/"
+	wantURL := "/projects/mock-project-id/config"
 	if req.URL.Path != wantURL {
 		return fmt.Errorf("UpdateProjectConfig() URL = %q; want = %q", req.URL.Path, wantURL)
 	}
