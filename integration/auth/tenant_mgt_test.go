@@ -27,18 +27,30 @@ import (
 )
 
 func TestTenantManager(t *testing.T) {
+	mfaObject := &auth.MultiFactorConfig{
+		ProviderConfigs: []*auth.ProviderConfig{
+			{
+				State: auth.Enabled,
+				TOTPProviderConfig: &auth.TOTPProviderConfig{
+					AdjacentIntervals: 5,
+				},
+			},
+		},
+	}
 	want := &auth.Tenant{
 		DisplayName:           "admin-go-tenant",
 		AllowPasswordSignUp:   true,
 		EnableEmailLinkSignIn: true,
 		EnableAnonymousUsers:  true,
+		MultiFactorConfig:     mfaObject,
 	}
 
 	req := (&auth.TenantToCreate{}).
 		DisplayName("admin-go-tenant").
 		AllowPasswordSignUp(true).
 		EnableEmailLinkSignIn(true).
-		EnableAnonymousUsers(true)
+		EnableAnonymousUsers(true).
+		MultiFactorConfig(*mfaObject)
 	created, err := client.TenantManager.CreateTenant(context.Background(), req)
 	if err != nil {
 		t.Fatalf("CreateTenant() = %v", err)
@@ -126,18 +138,30 @@ func TestTenantManager(t *testing.T) {
 	})
 
 	t.Run("UpdateTenant()", func(t *testing.T) {
+		mfaObject := &auth.MultiFactorConfig{
+			ProviderConfigs: []*auth.ProviderConfig{
+				{
+					State: auth.Enabled,
+					TOTPProviderConfig: &auth.TOTPProviderConfig{
+						AdjacentIntervals: 5,
+					},
+				},
+			},
+		}
 		want = &auth.Tenant{
 			ID:                    id,
 			DisplayName:           "updated-go-tenant",
 			AllowPasswordSignUp:   false,
 			EnableEmailLinkSignIn: false,
 			EnableAnonymousUsers:  false,
+			MultiFactorConfig:     mfaObject,
 		}
 		req := (&auth.TenantToUpdate{}).
 			DisplayName("updated-go-tenant").
 			AllowPasswordSignUp(false).
 			EnableEmailLinkSignIn(false).
-			EnableAnonymousUsers(false)
+			EnableAnonymousUsers(false).
+			MultiFactorConfig(*mfaObject)
 		tenant, err := client.TenantManager.UpdateTenant(context.Background(), id, req)
 		if err != nil {
 			t.Fatalf("UpdateTenant() = %v", err)

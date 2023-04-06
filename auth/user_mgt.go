@@ -521,7 +521,7 @@ func IsEmailNotFound(err error) bool {
 
 // IsInsufficientPermission checks if the given error was due to insufficient permissions.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsInsufficientPermission(err error) bool {
 	return false
 }
@@ -533,7 +533,7 @@ func IsInvalidDynamicLinkDomain(err error) bool {
 
 // IsInvalidEmail checks if the given error was due to an invalid email.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsInvalidEmail(err error) bool {
 	return false
 }
@@ -545,7 +545,7 @@ func IsPhoneNumberAlreadyExists(err error) bool {
 
 // IsProjectNotFound checks if the given error was due to a non-existing project.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsProjectNotFound(err error) bool {
 	return false
 }
@@ -567,7 +567,7 @@ func IsUnauthorizedContinueURI(err error) bool {
 
 // IsUnknown checks if the given error was due to a unknown server error.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsUnknown(err error) bool {
 	return false
 }
@@ -724,7 +724,7 @@ func (c *baseClient) GetUserByPhoneNumber(ctx context.Context, phone string) (*U
 
 // GetUserByProviderID is an alias for GetUserByProviderUID.
 //
-// Deprecated. Use GetUserByProviderUID instead.
+// Deprecated: Use GetUserByProviderUID instead.
 func (c *baseClient) GetUserByProviderID(ctx context.Context, providerID string, providerUID string) (*UserRecord, error) {
 	return c.GetUserByProviderUID(ctx, providerID, providerUID)
 }
