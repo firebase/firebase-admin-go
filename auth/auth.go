@@ -148,11 +148,13 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	userManagementEndpoint := idToolkitV1Endpoint
 	providerConfigEndpoint := idToolkitV2Endpoint
 	tenantMgtEndpoint := idToolkitV2Endpoint
+	projectMgtEndpoint := idToolkitV2Endpoint
 
 	base := &baseClient{
 		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
 		tenantMgtEndpoint:      tenantMgtEndpoint,
+		projectMgtEndpoint:     projectMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
@@ -274,6 +276,7 @@ type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
 	tenantMgtEndpoint      string
+	projectMgtEndpoint     string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
