@@ -41,7 +41,7 @@ var errorMessages = map[int]string{
 
 // IsInvalidArgument checks if the given error was due to an invalid instance ID argument.
 //
-// Deprecated. Use errorutils.IsInvalidArgument() function instead.
+// Deprecated: Use errorutils.IsInvalidArgument() function instead.
 func IsInvalidArgument(err error) bool {
 	return errorutils.IsInvalidArgument(err)
 }
@@ -50,7 +50,7 @@ func IsInvalidArgument(err error) bool {
 // required authorization. This could be due to the client not having the required permission
 // or the specified instance ID not matching the target Firebase project.
 //
-// Deprecated. Use errorutils.IsUnauthenticated() or errorutils.IsPermissionDenied() instead.
+// Deprecated: Use errorutils.IsUnauthenticated() or errorutils.IsPermissionDenied() instead.
 func IsInsufficientPermission(err error) bool {
 	return errorutils.IsUnauthenticated(err) || errorutils.IsPermissionDenied(err)
 }
@@ -63,7 +63,7 @@ func IsNotFound(err error) bool {
 // IsAlreadyDeleted checks if the given error was due to the instance ID being already deleted from
 // the project.
 //
-// Deprecated. Use errorutils.IsConflict() function instead.
+// Deprecated: Use errorutils.IsConflict() function instead.
 func IsAlreadyDeleted(err error) bool {
 	return errorutils.IsConflict(err)
 }
@@ -71,14 +71,14 @@ func IsAlreadyDeleted(err error) bool {
 // IsTooManyRequests checks if the given error was due to the client sending too many requests
 // causing a server quota to exceed.
 //
-// Deprecated. Use errorutils.IsResourceExhausted() function instead.
+// Deprecated: Use errorutils.IsResourceExhausted() function instead.
 func IsTooManyRequests(err error) bool {
 	return errorutils.IsResourceExhausted(err)
 }
 
 // IsInternal checks if the given error was due to an internal server error.
 //
-// Deprecated. Use errorutils.IsInternal() function instead.
+// Deprecated: Use errorutils.IsInternal() function instead.
 func IsInternal(err error) bool {
 	return errorutils.IsInternal(err)
 }
@@ -86,14 +86,14 @@ func IsInternal(err error) bool {
 // IsServerUnavailable checks if the given error was due to the backend server being temporarily
 // unavailable.
 //
-// Deprecated. Use errorutils.IsUnavailable() function instead.
+// Deprecated: Use errorutils.IsUnavailable() function instead.
 func IsServerUnavailable(err error) bool {
 	return errorutils.IsUnavailable(err)
 }
 
 // IsUnknown checks if the given error was due to unknown error returned by the backend server.
 //
-// Deprecated. Use errorutils.IsUnknown() function instead.
+// Deprecated: Use errorutils.IsUnknown() function instead.
 func IsUnknown(err error) bool {
 	return errorutils.IsUnknown(err)
 }
