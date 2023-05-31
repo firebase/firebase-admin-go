@@ -42,6 +42,7 @@ const (
 	createUserMethod           = "createUser"
 	updateUserMethod           = "updateUser"
 	phoneMultiFactorID         = "phone"
+	totpMultiFactorID          = "totp"
 )
 
 // 'REDACTED', encoded as a base64 string.
@@ -62,20 +63,29 @@ type UserInfo struct {
 
 // multiFactorInfoResponse describes the `mfaInfo` of the user record API response
 type multiFactorInfoResponse struct {
-	MFAEnrollmentID string `json:"mfaEnrollmentId,omitempty"`
-	DisplayName     string `json:"displayName,omitempty"`
-	PhoneInfo       string `json:"phoneInfo,omitempty"`
-	EnrolledAt      string `json:"enrolledAt,omitempty"`
+	MFAEnrollmentID string    `json:"mfaEnrollmentId,omitempty"`
+	DisplayName     string    `json:"displayName,omitempty"`
+	PhoneInfo       string    `json:"phoneInfo,omitempty"`
+	TOTPInfo        *TOTPInfo `json:"totpInfo,omitempty"`
+	EnrolledAt      string    `json:"enrolledAt,omitempty"`
+}
+
+// TOTPInfo describes a user enrolled second totp factor.
+type TOTPInfo struct{}
+
+// PhoneMultiFactorInfo describes a user enrolled second phone factor.
+type PhoneMultiFactorInfo struct {
+	PhoneNumber string
 }
 
 // MultiFactorInfo describes a user enrolled second phone factor.
-// TODO : convert PhoneNumber to PhoneMultiFactorInfo struct
 type MultiFactorInfo struct {
-	UID                 string
-	DisplayName         string
-	EnrollmentTimestamp int64
-	FactorID            string
-	PhoneNumber         string
+	UID                  string
+	DisplayName          string
+	EnrollmentTimestamp  int64
+	FactorID             string
+	PhoneMultiFactorInfo *PhoneMultiFactorInfo
+	TOTPMultiFactorInfo  *TOTPInfo
 }
 
 // MultiFactorSettings describes the multi-factor related user settings.
@@ -170,12 +180,18 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	if mfaInfo.EnrollmentTimestamp != 0 {
 		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
 	}
-	if mfaInfo.FactorID == phoneMultiFactorID {
-		authFactorInfo.PhoneInfo = mfaInfo.PhoneNumber
-		authFactorInfo.DisplayName = mfaInfo.DisplayName
-		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
+	authFactorInfo.DisplayName = mfaInfo.DisplayName
+	authFactorInfo.MFAEnrollmentID = mfaInfo.UID
+
+	switch mfaInfo.FactorID {
+	case phoneMultiFactorID:
+		authFactorInfo.PhoneInfo = mfaInfo.PhoneMultiFactorInfo.PhoneNumber
+		return authFactorInfo, nil
+	case totpMultiFactorID:
+		authFactorInfo.TOTPInfo = (*TOTPInfo)(mfaInfo.TOTPMultiFactorInfo)
 		return authFactorInfo, nil
 	}
+
 	out, _ := json.Marshal(mfaInfo)
 	return multiFactorInfoResponse{}, fmt.Errorf("Unsupported second factor %s provided", string(out))
 }
@@ -675,8 +691,8 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
-			if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
-				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
+			if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
+				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
 			}
 		}
 		obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
@@ -1075,17 +1091,27 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 			enrollmentTimestamp = t.Unix() * 1000
 		}
 
-		if factor.PhoneInfo == "" {
+		if factor.PhoneInfo != "" {
+			enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
+				UID:                 factor.MFAEnrollmentID,
+				DisplayName:         factor.DisplayName,
+				EnrollmentTimestamp: enrollmentTimestamp,
+				FactorID:            phoneMultiFactorID,
+				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					PhoneNumber: factor.PhoneInfo,
+				},
+			})
+		} else if factor.TOTPInfo != nil {
+			enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
+				UID:                 factor.MFAEnrollmentID,
+				DisplayName:         factor.DisplayName,
+				EnrollmentTimestamp: enrollmentTimestamp,
+				FactorID:            totpMultiFactorID,
+				TOTPMultiFactorInfo: &TOTPInfo{},
+			})
+		} else {
 			return nil, fmt.Errorf("unsupported multi-factor auth response: %#v", factor)
 		}
-
-		enrolledFactors = append(enrolledFactors, &MultiFactorInfo{
-			UID:                 factor.MFAEnrollmentID,
-			DisplayName:         factor.DisplayName,
-			EnrollmentTimestamp: enrollmentTimestamp,
-			FactorID:            phoneMultiFactorID,
-			PhoneNumber:         factor.PhoneInfo,
-		})
 	}
 
 	return &ExportedUserRecord{
