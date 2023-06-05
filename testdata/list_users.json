@@ -35,13 +35,13 @@
             "mfaInfo": [
                 {
                     "phoneInfo": "+1234567890",
-                    "mfaEnrollmentId": "enrolledFactor1",
+                    "mfaEnrollmentId": "enrolledPhoneFactor",
                     "displayName": "My MFA Phone",
                     "enrolledAt": "2021-03-03T13:06:20.542896Z"
                 },
                 {
                     "totpInfo": {},
-                    "mfaEnrollmentId": "enrolledFactor2",
+                    "mfaEnrollmentId": "enrolledTOTPFactor",
                     "displayName": "My MFA TOTP",
                     "enrolledAt": "2021-03-03T13:06:20.542896Z"
                 }
@@ -81,13 +81,13 @@
             "mfaInfo": [
                 {
                     "phoneInfo": "+1234567890",
-                    "mfaEnrollmentId": "enrolledFactor1",
+                    "mfaEnrollmentId": "enrolledPhoneFactor",
                     "displayName": "My MFA Phone",
                     "enrolledAt": "2021-03-03T13:06:20.542896Z"
                 },
                 {
                     "totpInfo": {},
-                    "mfaEnrollmentId": "enrolledFactor2",
+                    "mfaEnrollmentId": "enrolledTOTPFactor",
                     "displayName": "My MFA TOTP",
                     "enrolledAt": "2021-03-03T13:06:20.542896Z"
                 }

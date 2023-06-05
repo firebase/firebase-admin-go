@@ -356,7 +356,7 @@ func (u *UserToUpdate) validatedRequest() (map[string]interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			// https://cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/update
+			// Request body ref: https://cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/update
 			req["mfa"] = multiFactorEnrollments{mfaInfo}
 		} else {
 			req[k] = v

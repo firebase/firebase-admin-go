@@ -69,7 +69,7 @@ var testUser = &UserRecord{
 	MultiFactor: &MultiFactorSettings{
 		EnrolledFactors: []*MultiFactorInfo{
 			{
-				UID:                 "enrolledFactor1",
+				UID:                 "enrolledPhoneFactor",
 				FactorID:            "phone",
 				EnrollmentTimestamp: 1614776780000,
 				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
@@ -78,7 +78,7 @@ var testUser = &UserRecord{
 				DisplayName: "My MFA Phone",
 			},
 			{
-				UID:                 "enrolledFactor2",
+				UID:                 "enrolledTOTPFactor",
 				FactorID:            "totp",
 				EnrollmentTimestamp: 1614776780000,
 				TOTPMultiFactorInfo: &TOTPInfo{},
@@ -1918,13 +1918,13 @@ func TestMakeExportedUser(t *testing.T) {
 		MFAInfo: []*multiFactorInfoResponse{
 			{
 				PhoneInfo:       "+1234567890",
-				MFAEnrollmentID: "enrolledFactor1",
+				MFAEnrollmentID: "enrolledPhoneFactor",
 				DisplayName:     "My MFA Phone",
 				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
 			},
 			{
 				TOTPInfo:        &TOTPInfo{},
-				MFAEnrollmentID: "enrolledFactor2",
+				MFAEnrollmentID: "enrolledTOTPFactor",
 				DisplayName:     "My MFA TOTP",
 				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
 			},
