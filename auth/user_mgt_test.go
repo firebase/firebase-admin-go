@@ -81,7 +81,7 @@ var testUser = &UserRecord{
 				UID:                 "enrolledTOTPFactor",
 				FactorID:            "totp",
 				EnrollmentTimestamp: 1614776780000,
-				TOTPMultiFactorInfo: &TOTPInfo{},
+				TOTPMultiFactorInfo: &TOTPMultiFactorInfo{},
 				DisplayName:         "My MFA TOTP",
 			},
 		},

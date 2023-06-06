@@ -70,13 +70,16 @@ type multiFactorInfoResponse struct {
 	EnrolledAt      string    `json:"enrolledAt,omitempty"`
 }
 
-// TOTPInfo describes a user enrolled second totp factor.
+// TOTPInfo describes a server side user enrolled second totp factor.
 type TOTPInfo struct{}
 
 // PhoneMultiFactorInfo describes a user enrolled second phone factor.
 type PhoneMultiFactorInfo struct {
 	PhoneNumber string
 }
+
+// TOTPMultiFactorInfo describes a user enrolled second totp factor.
+type TOTPMultiFactorInfo struct{}
 
 type multiFactorEnrollments struct {
 	Enrollments []*multiFactorInfoResponse `json:"enrollments"`
@@ -89,7 +92,7 @@ type MultiFactorInfo struct {
 	EnrollmentTimestamp  int64
 	FactorID             string
 	PhoneMultiFactorInfo *PhoneMultiFactorInfo
-	TOTPMultiFactorInfo  *TOTPInfo
+	TOTPMultiFactorInfo  *TOTPMultiFactorInfo
 }
 
 // MultiFactorSettings describes the multi-factor related user settings.
@@ -1112,7 +1115,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				DisplayName:         factor.DisplayName,
 				EnrollmentTimestamp: enrollmentTimestamp,
 				FactorID:            totpMultiFactorID,
-				TOTPMultiFactorInfo: &TOTPInfo{},
+				TOTPMultiFactorInfo: &TOTPMultiFactorInfo{},
 			})
 		} else {
 			return nil, fmt.Errorf("unsupported multi-factor auth response: %#v", factor)
