@@ -690,9 +690,6 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 				return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
 			}
 		case updateUserMethod:
-			if multiFactorInfo.UID == "" {
-				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string when adding second factors via \"updateUser()\"")
-			}
 		default:
 			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
 		}
