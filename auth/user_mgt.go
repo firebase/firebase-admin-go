@@ -190,20 +190,18 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	if mfaInfo.UID != "" {
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 	}
-	authFactorInfo.DisplayName = mfaInfo.DisplayName
 	authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 
 	switch mfaInfo.FactorID {
 	case phoneMultiFactorID:
 		authFactorInfo.PhoneInfo = mfaInfo.PhoneMultiFactorInfo.PhoneNumber
-		return authFactorInfo, nil
 	case totpMultiFactorID:
 		authFactorInfo.TOTPInfo = (*TOTPInfo)(mfaInfo.TOTPMultiFactorInfo)
-		return authFactorInfo, nil
+	default:
+		out, _ := json.Marshal(mfaInfo)
+		return multiFactorInfoResponse{}, fmt.Errorf("unsupported second factor %s provided", string(out))
 	}
-
-	out, _ := json.Marshal(mfaInfo)
-	return multiFactorInfoResponse{}, fmt.Errorf("unsupported second factor %s provided", string(out))
+	return authFactorInfo, nil
 }
 
 func (u *UserToCreate) validatedRequest() (map[string]interface{}, error) {
@@ -692,6 +690,9 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 				return nil, fmt.Errorf("\"uid\" is not supported when adding second factors via \"createUser()\"")
 			}
 		case updateUserMethod:
+			if multiFactorInfo.UID == "" {
+				return nil, fmt.Errorf("the second factor \"uid\" must be a valid non-empty string when adding second factors via \"updateUser()\"")
+			}
 		default:
 			return nil, fmt.Errorf("unsupported methodType: %s", methodType)
 		}
@@ -699,8 +700,12 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
-			if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
-				return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
+			if multiFactorInfo.PhoneMultiFactorInfo != nil {
+				if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
+					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
+				}
+			} else {
+				return nil, fmt.Errorf("\"PhoneMultiFactorInfo\" must be defined")
 			}
 		}
 		obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
