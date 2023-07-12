@@ -105,6 +105,130 @@ func TestSendInvalidToken(t *testing.T) {
 	}
 }
 
+func TestSendEach(t *testing.T) {
+	messages := []*messaging.Message{
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 1",
+				Body:  "Body 1",
+			},
+			Topic: "foo-bar",
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 2",
+				Body:  "Body 2",
+			},
+			Topic: "foo-bar",
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Title 3",
+				Body:  "Body 3",
+			},
+			Token: "INVALID_TOKEN",
+		},
+	}
+
+	br, err := client.SendEachDryRun(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 3 {
+		t.Errorf("len(Responses) = %d; want = 3", len(br.Responses))
+	}
+	if br.SuccessCount != 2 {
+		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 1 {
+		t.Errorf("FailureCount = %d; want = 1", br.FailureCount)
+	}
+
+	for i := 0; i < 2; i++ {
+		sr := br.Responses[i]
+		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+
+	sr := br.Responses[2]
+	if sr.Success {
+		t.Errorf("Responses[2]: Success = true; want = false")
+	}
+	if sr.MessageID != "" {
+		t.Errorf("Responses[2]: MessageID = %q; want = %q", sr.MessageID, "")
+	}
+	if sr.Error == nil || !messaging.IsInvalidArgument(sr.Error) {
+		t.Errorf("Responses[2]: Error = %v; want = InvalidArgumentError", sr.Error)
+	}
+}
+
+func TestSendEachFiveHundred(t *testing.T) {
+	var messages []*messaging.Message
+	const limit = 500
+	for i := 0; i < limit; i++ {
+		m := &messaging.Message{
+			Topic: fmt.Sprintf("foo-bar-%d", i%10),
+		}
+		messages = append(messages, m)
+	}
+
+	br, err := client.SendEachDryRun(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != limit {
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), limit)
+	}
+	if br.SuccessCount != limit {
+		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, limit)
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+
+	for i := 0; i < limit; i++ {
+		sr := br.Responses[i]
+		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+}
+
+func TestSendEachForMulticast(t *testing.T) {
+	message := &messaging.MulticastMessage{
+		Notification: &messaging.Notification{
+			Title: "title",
+			Body:  "body",
+		},
+		Tokens: []string{"INVALID_TOKEN", "ANOTHER_INVALID_TOKEN"},
+	}
+
+	br, err := client.SendEachForMulticastDryRun(context.Background(), message)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+	if br.SuccessCount != 0 {
+		t.Errorf("SuccessCount = %d; want = 0", br.SuccessCount)
+	}
+	if br.FailureCount != 2 {
+		t.Errorf("FailureCount = %d; want = 2", br.FailureCount)
+	}
+
+	for i := 0; i < 2; i++ {
+		sr := br.Responses[i]
+		if err := checkErrorSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+}
+
 func TestSendAll(t *testing.T) {
 	messages := []*messaging.Message{
 		{
