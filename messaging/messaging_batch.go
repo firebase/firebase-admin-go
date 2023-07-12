@@ -27,6 +27,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"sync"
 
 	"firebase.google.com/go/v4/internal"
 )
@@ -80,21 +81,145 @@ type SendResponse struct {
 	Error     error
 }
 
-// BatchResponse represents the response from the `SendAll()` and `SendMulticast()` APIs.
+// BatchResponse represents the response from the SendAll() and SendMulticast() APIs.
 type BatchResponse struct {
 	SuccessCount int
 	FailureCount int
 	Responses    []*SendResponse
 }
 
+// SendEach sends the messages in the given array via Firebase Cloud Messaging.
+//
+// The messages array may contain up to 500 messages. Unlike SendAll(), SendEach sends the entire
+// array of messages by making a single HTTP call for each message. The responses list
+// obtained from the return value corresponds to the order of the input messages. An error
+// from SendEach or a BatchResponse with all failures indicates a total failure, meaning that
+// none of the messages in the list could be sent. Partial failures or no failures are only
+// indicated by a BatchResponse return value.
+func (c *fcmClient) SendEach(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+	return c.sendEachInBatch(ctx, messages, false)
+}
+
+// SendEachDryRun sends the messages in the given array via Firebase Cloud Messaging in the
+// dry run (validation only) mode.
+//
+// This function does not actually deliver any messages to target devices. Instead, it performs all
+// the SDK-level and backend validations on the messages, and emulates the send operation.
+//
+// The messages array may contain up to 500 messages. Unlike SendAllDryRun(), SendEachDryRun sends
+// the entire array of messages by making a single HTTP call for each message. The responses list
+// obtained from the return value corresponds to the order of the input messages. An error
+// from SendEachDryRun or a BatchResponse with all failures indicates a total failure, meaning
+// that none of the messages in the list could be sent. Partial failures or no failures are only
+// indicated by a BatchResponse return value.
+func (c *fcmClient) SendEachDryRun(ctx context.Context, messages []*Message) (*BatchResponse, error) {
+	return c.sendEachInBatch(ctx, messages, true)
+}
+
+// SendMulticast sends the given multicast message to all the FCM registration tokens specified.
+//
+// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticast uses the
+// SendEach() function to send the given message to all the target recipients. The
+// responses list obtained from the return value corresponds to the order of the input tokens. An error
+// from SendEachForMulticast or a BatchResponse with all failures indicates a total failure, meaning
+// that none of the messages in the list could be sent. Partial failures or no failures are only
+// indicated by a BatchResponse return value.
+func (c *fcmClient) SendEachForMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+	messages, err := toMessages(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.SendEach(ctx, messages)
+}
+
+// SendEachForMulticastDryRun sends the given multicast message to all the specified FCM registration
+// tokens in the dry run (validation only) mode.
+//
+// This function does not actually deliver any messages to target devices. Instead, it performs all
+// the SDK-level and backend validations on the messages, and emulates the send operation.
+//
+// The tokens array in MulticastMessage may contain up to 500 tokens. SendEachForMulticastDryRunn uses the
+// SendEachDryRun() function to send the given message. The responses list obtained from
+// the return value corresponds to the order of the input tokens. An error from SendEachForMulticastDryRun
+// or a BatchResponse with all failures indicates a total failure, meaning that of the messages in the
+// list could be sent. Partial failures or no failures are only
+// indicated by a BatchResponse return value.
+func (c *fcmClient) SendEachForMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
+	messages, err := toMessages(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.SendEachDryRun(ctx, messages)
+}
+
+func (c *fcmClient) sendEachInBatch(ctx context.Context, messages []*Message, dryRun bool) (*BatchResponse, error) {
+	if len(messages) == 0 {
+		return nil, errors.New("messages must not be nil or empty")
+	}
+
+	if len(messages) > maxMessages {
+		return nil, fmt.Errorf("messages must not contain more than %d elements", maxMessages)
+	}
+
+	var responses []*SendResponse = make([]*SendResponse, len(messages))
+	var wg sync.WaitGroup
+
+	for idx, m := range messages {
+		if err := validateMessage(m); err != nil {
+			return nil, fmt.Errorf("invalid message at index %d: %v", idx, err)
+		}
+		wg.Add(1)
+		go func(idx int, m *Message, dryRun bool, responses []*SendResponse) {
+			defer wg.Done()
+			var resp string
+			var err error
+			if dryRun {
+				resp, err = c.SendDryRun(ctx, m)
+			} else {
+				resp, err = c.Send(ctx, m)
+			}
+			if err == nil {
+				responses[idx] = &SendResponse{
+					Success:   true,
+					MessageID: resp,
+				}
+			} else {
+				responses[idx] = &SendResponse{
+					Success: false,
+					Error:   err,
+				}
+			}
+		}(idx, m, dryRun, responses)
+	}
+	// Wait for all SendDryRun/Send calls to finish
+	wg.Wait()
+
+	successCount := 0
+	for _, r := range responses {
+		if r.Success {
+			successCount++
+		}
+	}
+
+	return &BatchResponse{
+		Responses:    responses,
+		SuccessCount: successCount,
+		FailureCount: len(responses) - successCount,
+	}, nil
+}
+
 // SendAll sends the messages in the given array via Firebase Cloud Messaging.
 //
 // The messages array may contain up to 500 messages. SendAll employs batching to send the entire
-// array of mssages as a single RPC call. Compared to the `Send()` function,
+// array of messages as a single RPC call. Compared to the Send() function,
 // this is a significantly more efficient way to send multiple messages. The responses list
 // obtained from the return value corresponds to the order of the input messages. An error from
-// SendAll indicates a total failure -- i.e. none of the messages in the array could be sent.
-// Partial failures are indicated by a `BatchResponse` return value.
+// SendAll indicates a total failure, meaning that none of the messages in the array could be
+// sent. Partial failures are indicated by a BatchResponse return value.
+//
+// Deprecated: Use SendEach instead.
 func (c *fcmClient) SendAll(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, false)
 }
@@ -106,11 +231,13 @@ func (c *fcmClient) SendAll(ctx context.Context, messages []*Message) (*BatchRes
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
 // The messages array may contain up to 500 messages. SendAllDryRun employs batching to send the
-// entire array of mssages as a single RPC call. Compared to the `SendDryRun()` function, this
+// entire array of messages as a single RPC call. Compared to the SendDryRun() function, this
 // is a significantly more efficient way to validate sending multiple messages. The responses list
 // obtained from the return value corresponds to the order of the input messages. An error from
-// SendAllDryRun indicates a total failure -- i.e. none of the messages in the array could be sent
-// for validation. Partial failures are indicated by a `BatchResponse` return value.
+// SendAllDryRun indicates a total failure, meaning that none of the messages in the array could
+// be sent for validation. Partial failures are indicated by a BatchResponse return value.
+//
+// Deprecated: Use SendEachDryRun instead.
 func (c *fcmClient) SendAllDryRun(ctx context.Context, messages []*Message) (*BatchResponse, error) {
 	return c.sendBatch(ctx, messages, true)
 }
@@ -118,10 +245,12 @@ func (c *fcmClient) SendAllDryRun(ctx context.Context, messages []*Message) (*Ba
 // SendMulticast sends the given multicast message to all the FCM registration tokens specified.
 //
 // The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticast uses the
-// `SendAll()` function to send the given message to all the target recipients. The
+// SendAll() function to send the given message to all the target recipients. The
 // responses list obtained from the return value corresponds to the order of the input tokens. An
-// error from SendMulticast indicates a total failure -- i.e. the message could not be sent to any
-// of the recipients. Partial failures are indicated by a `BatchResponse` return value.
+// error from SendMulticast indicates a total failure, meaning that the message could not be sent
+// to any of the recipients. Partial failures are indicated by a BatchResponse return value.
+//
+// Deprecated: Use SendEachForMulticast instead.
 func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
 	messages, err := toMessages(message)
 	if err != nil {
@@ -138,10 +267,12 @@ func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
 // The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticastDryRun uses the
-// `SendAllDryRun()` function to send the given message. The responses list obtained from
+// SendAllDryRun() function to send the given message. The responses list obtained from
 // the return value corresponds to the order of the input tokens. An error from SendMulticastDryRun
-// indicates a total failure -- i.e. none of the messages were sent to FCM for validation. Partial
-// failures are indicated by a `BatchResponse` return value.
+// indicates a total failure, meaning that none of the messages were sent to FCM for validation.
+// Partial failures are indicated by a BatchResponse return value.
+//
+// Deprecated: Use SendEachForMulticastDryRun instead.
 func (c *fcmClient) SendMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
 	messages, err := toMessages(message)
 	if err != nil {
