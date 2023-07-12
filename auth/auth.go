@@ -77,6 +77,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	if authEmulatorHost != "" {
 		isEmulator = true
 		signer = emulatedSigner{}
+		conf = &internal.AuthConfig{}
 	}
 
 	if signer == nil {
