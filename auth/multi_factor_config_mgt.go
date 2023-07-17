@@ -45,6 +45,8 @@ const (
 // MultiFactorConfig represents a multi-factor configuration for a tenant or project.
 // This can be used to define whether multi-factor authentication is enabled or disabled and the list of second factor challenges that are supported.
 type MultiFactorConfig struct {
+	// The multi-factor config state.
+	State MultiFactorConfigState `json:"state,omitempty"`
 	// A slice of pointers to ProviderConfig structs, each outlining the specific second factor authorization method.
 	ProviderConfigs []*ProviderConfig `json:"providerConfigs,omitempty"`
 }
@@ -53,8 +55,12 @@ func (mfa *MultiFactorConfig) validate() error {
 	if mfa == nil {
 		return nil
 	}
-	if len(mfa.ProviderConfigs) == 0 {
-		return fmt.Errorf("\"ProviderConfigs\" must be a non-empty array of type \"ProviderConfig\"s")
+	if mfa.State == "" && len(mfa.ProviderConfigs) == 0 {
+		return fmt.Errorf("\"State\" or \"ProviderConfigs\" must be a non-empty")
+	}
+	state := string(mfa.State)
+	if state != "" && state != string(Enabled) && state != string(Disabled) {
+		return fmt.Errorf("\"MultiFactorConfig.State\" must be 'Enabled' or 'Disabled'")
 	}
 	for _, providerConfig := range mfa.ProviderConfigs {
 		if providerConfig == nil {

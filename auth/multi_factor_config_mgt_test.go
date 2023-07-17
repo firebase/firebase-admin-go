@@ -20,6 +20,7 @@ import (
 
 func TestMultiFactorConfig(t *testing.T) {
 	mfa := MultiFactorConfig{
+		State: Enabled,
 		ProviderConfigs: []*ProviderConfig{{
 			State: Disabled,
 			TOTPProviderConfig: &TOTPProviderConfig{
@@ -31,9 +32,20 @@ func TestMultiFactorConfig(t *testing.T) {
 		t.Errorf("MultiFactorConfig not valid")
 	}
 }
-func TestMultiFactorConfigNoProviderConfigs(t *testing.T) {
+
+func TestMultiFactorConfigNoStateNoProviderConfigs(t *testing.T) {
 	mfa := MultiFactorConfig{}
-	want := "\"ProviderConfigs\" must be a non-empty array of type \"ProviderConfig\"s"
+	want := "\"State\" or \"ProviderConfigs\" must be a non-empty"
+	if err := mfa.validate(); err.Error() != want {
+		t.Errorf("MultiFactorConfig.validate(nil) = %v, want = %q", err, want)
+	}
+}
+
+func TestMultiFactorConfigInvalidState(t *testing.T) {
+	mfa := MultiFactorConfig{
+		State: "invalid",
+	}
+	want := "\"MultiFactorConfig.State\" must be 'Enabled' or 'Disabled'"
 	if err := mfa.validate(); err.Error() != want {
 		t.Errorf("MultiFactorConfig.validate(nil) = %v, want = %q", err, want)
 	}
@@ -43,7 +55,7 @@ func TestMultiFactorConfigNilProviderConfigs(t *testing.T) {
 	mfa := MultiFactorConfig{
 		ProviderConfigs: nil,
 	}
-	want := "\"ProviderConfigs\" must be a non-empty array of type \"ProviderConfig\"s"
+	want := "\"State\" or \"ProviderConfigs\" must be a non-empty"
 	if err := mfa.validate(); err.Error() != want {
 		t.Errorf("MultiFactorConfig.validate(nil) = %v, want = %q", err, want)
 	}
