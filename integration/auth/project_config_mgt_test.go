@@ -23,6 +23,7 @@ import (
 
 func TestProjectConfig(t *testing.T) {
 	mfaObject := &auth.MultiFactorConfig{
+		State: auth.Enabled,
 		ProviderConfigs: []*auth.ProviderConfig{
 			{
 				State: auth.Enabled,
@@ -35,6 +36,7 @@ func TestProjectConfig(t *testing.T) {
 	want := &auth.ProjectConfig{
 		MultiFactorConfig: mfaObject,
 	}
+
 	t.Run("UpdateProjectConfig()", func(t *testing.T) {
 		mfaConfigReq := *want.MultiFactorConfig
 		req := (&auth.ProjectConfigToUpdate{}).
