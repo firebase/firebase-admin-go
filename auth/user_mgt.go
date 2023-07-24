@@ -91,7 +91,7 @@ type MultiFactorInfo struct {
 	DisplayName          string
 	EnrollmentTimestamp  int64
 	FactorID             string
-	PhoneNumber          string `Deprecated:"Use PhoneMultiFactorInfo instead"`
+	PhoneNumber          string // Deprecated: Use PhoneMultiFactorInfo instead
 	PhoneMultiFactorInfo *PhoneMultiFactorInfo
 	TOTPMultiFactorInfo  *TOTPMultiFactorInfo
 }
