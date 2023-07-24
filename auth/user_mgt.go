@@ -699,18 +699,26 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
 			if multiFactorInfo.PhoneMultiFactorInfo != nil {
+				// If PhoneMultiFactorInfo is provided, validate its PhoneNumber field
 				if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
 					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
 				}
-			} else if multiFactorInfo.PhoneNumber != "" {
-				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
-					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
-				} else {
-					multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber = multiFactorInfo.PhoneNumber
-					fmt.Println("`PhoneNumber` is deprecated, use `PhoneMultiFactorInfo` instead")
-				}
 			} else {
-				return nil, fmt.Errorf("\"PhoneMultiFactorInfo\" must be defined")
+				// PhoneMultiFactorInfo is nil, check the deprecated PhoneNumber field
+				if multiFactorInfo.PhoneNumber != "" {
+					if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
+						return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
+					} else {
+						// The PhoneNumber field is deprecated, set it in PhoneMultiFactorInfo and inform about the deprecation.
+						multiFactorInfo.PhoneMultiFactorInfo = &PhoneMultiFactorInfo{
+							PhoneNumber: multiFactorInfo.PhoneNumber,
+						}
+						fmt.Println("`PhoneNumber` is deprecated, use `PhoneMultiFactorInfo` instead")
+					}
+				} else {
+					// Both PhoneMultiFactorInfo and deprecated PhoneNumber are missing.
+					return nil, fmt.Errorf("\"PhoneMultiFactorInfo\" must be defined")
+				}
 			}
 		}
 		obj, err := convertMultiFactorInfoToServerFormat(*multiFactorInfo)
