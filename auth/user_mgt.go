@@ -91,7 +91,7 @@ type MultiFactorInfo struct {
 	DisplayName          string
 	EnrollmentTimestamp  int64
 	FactorID             string
-	PhoneNumber          string `deprecated:"Use PhoneMultiFactorInfo instead"`
+	PhoneNumber          string `Deprecated:"Use PhoneMultiFactorInfo instead"`
 	PhoneMultiFactorInfo *PhoneMultiFactorInfo
 	TOTPMultiFactorInfo  *TOTPMultiFactorInfo
 }
@@ -701,6 +701,13 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			if multiFactorInfo.PhoneMultiFactorInfo != nil {
 				if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
 					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
+				}
+			} else if multiFactorInfo.PhoneNumber != "" {
+				if err := validatePhone(multiFactorInfo.PhoneNumber); err != nil {
+					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
+				} else {
+					multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber = multiFactorInfo.PhoneNumber
+					fmt.Println("`PhoneNumber` is deprecated, use `PhoneMultiFactorInfo` instead")
 				}
 			} else {
 				return nil, fmt.Errorf("\"PhoneMultiFactorInfo\" must be defined")
