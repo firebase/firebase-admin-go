@@ -434,7 +434,9 @@ func TestCreateUserMFA(t *testing.T) {
 	tc.MFASettings(auth.MultiFactorSettings{
 		EnrolledFactors: []*auth.MultiFactorInfo{
 			{
-				PhoneNumber: "+11234567890",
+				PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+					PhoneNumber: "+11234567890",
+				},
 				DisplayName: "Spouse's phone number",
 				FactorID:    "phone",
 			},
@@ -447,10 +449,12 @@ func TestCreateUserMFA(t *testing.T) {
 	defer deleteUser(user.UID)
 	var factor []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
 		{
-			UID:                 user.MultiFactor.EnrolledFactors[0].UID,
-			DisplayName:         "Spouse's phone number",
-			FactorID:            "phone",
-			PhoneNumber:         "+11234567890",
+			UID:         user.MultiFactor.EnrolledFactors[0].UID,
+			DisplayName: "Spouse's phone number",
+			FactorID:    "phone",
+			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+				PhoneNumber: "+11234567890",
+			},
 			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
 		},
 	}
