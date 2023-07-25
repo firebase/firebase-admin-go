@@ -30,6 +30,7 @@ import (
 
 	"firebase.google.com/go/v4/auth"
 	"firebase.google.com/go/v4/auth/hash"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/iterator"
 )
 
@@ -434,10 +435,15 @@ func TestCreateUserMFA(t *testing.T) {
 	tc.MFASettings(auth.MultiFactorSettings{
 		EnrolledFactors: []*auth.MultiFactorInfo{
 			{
+				PhoneNumber: "+11234567890",
+				DisplayName: "Phone Number deprecated",
+				FactorID:    "phone",
+			},
+			{
 				PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
-					PhoneNumber: "+11234567890",
+					PhoneNumber: "+19876543210",
 				},
-				DisplayName: "Spouse's phone number",
+				DisplayName: "Phone Number active",
 				FactorID:    "phone",
 			},
 		},
@@ -447,15 +453,24 @@ func TestCreateUserMFA(t *testing.T) {
 		t.Fatalf("CreateUser() = %v; want = nil", err)
 	}
 	defer deleteUser(user.UID)
-	var factor []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
+	var factors []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
 		{
 			UID:         user.MultiFactor.EnrolledFactors[0].UID,
-			DisplayName: "Spouse's phone number",
+			DisplayName: "Phone Number deprecated",
 			FactorID:    "phone",
 			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
 				PhoneNumber: "+11234567890",
 			},
 			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
+		},
+		{
+			UID:         user.MultiFactor.EnrolledFactors[1].UID,
+			DisplayName: "Phone Number active",
+			FactorID:    "phone",
+			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+				PhoneNumber: "+19876543210",
+			},
+			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[1].EnrollmentTimestamp,
 		},
 	}
 	want := auth.UserRecord{
@@ -470,10 +485,11 @@ func TestCreateUserMFA(t *testing.T) {
 		},
 		TokensValidAfterMillis: user.TokensValidAfterMillis,
 		MultiFactor: &auth.MultiFactorSettings{
-			EnrolledFactors: factor,
+			EnrolledFactors: factors,
 		},
 	}
 	if !reflect.DeepEqual(*user, want) {
+		fmt.Println(cmp.Diff(*user, want))
 		t.Errorf("CreateUser() = %#v; want = %#v", *user, want)
 	}
 }

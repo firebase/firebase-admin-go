@@ -795,7 +795,12 @@ var createUserCases = []struct {
 					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
-					DisplayName: "Spouse's phone number",
+					DisplayName: "Phone Number active",
+					FactorID:    "phone",
+				},
+				{
+					PhoneNumber: "+11234567890",
+					DisplayName: "Phone Number deprecated",
 					FactorID:    "phone",
 				},
 			},
@@ -803,7 +808,11 @@ var createUserCases = []struct {
 		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
 			{
 				PhoneInfo:   "+11234567890",
-				DisplayName: "Spouse's phone number",
+				DisplayName: "Phone Number active",
+			},
+			{
+				PhoneInfo:   "+11234567890",
+				DisplayName: "Phone Number deprecated",
 			},
 		},
 		},
