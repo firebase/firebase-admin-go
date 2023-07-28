@@ -771,7 +771,6 @@ func TestUpdateUserMFA(t *testing.T) {
 	// Define the updated MFA factors
 	updatedFactors := []*auth.MultiFactorInfo{
 		{
-			UID:         user.MultiFactor.EnrolledFactors[0].UID,
 			DisplayName: "Phone Number active updated",
 			FactorID:    "phone",
 			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
@@ -779,7 +778,6 @@ func TestUpdateUserMFA(t *testing.T) {
 			},
 		},
 		{
-			UID:         user.MultiFactor.EnrolledFactors[1].UID,
 			DisplayName: "Phone Number deprecated updated",
 			FactorID:    "phone",
 			PhoneNumber: "+19876543210",
@@ -799,35 +797,35 @@ func TestUpdateUserMFA(t *testing.T) {
 	want := auth.UserRecord{
 		EmailVerified: true,
 		UserInfo: &auth.UserInfo{
-			Email:      user.Email,
-			UID:        user.UID,
+			Email:      updatedUser.Email,
+			UID:        updatedUser.UID,
 			ProviderID: "firebase",
 		},
 		UserMetadata: &auth.UserMetadata{
-			CreationTimestamp: user.UserMetadata.CreationTimestamp,
+			CreationTimestamp: updatedUser.UserMetadata.CreationTimestamp,
 		},
-		TokensValidAfterMillis: user.TokensValidAfterMillis,
+		TokensValidAfterMillis: updatedUser.TokensValidAfterMillis,
 		MultiFactor: &auth.MultiFactorSettings{
 			EnrolledFactors: []*auth.MultiFactorInfo{
 				{
-					UID: user.MultiFactor.EnrolledFactors[0].UID,
+					UID: updatedUser.MultiFactor.EnrolledFactors[0].UID,
 					PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					PhoneNumber:         "+11234567890",
 					DisplayName:         "Phone Number active updated",
 					FactorID:            "phone",
-					EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
+					EnrollmentTimestamp: updatedUser.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
 				},
 				{
-					UID: user.MultiFactor.EnrolledFactors[1].UID,
+					UID: updatedUser.MultiFactor.EnrolledFactors[1].UID,
 					PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
 						PhoneNumber: "+19876543210",
 					},
 					PhoneNumber:         "+19876543210",
 					DisplayName:         "Phone Number deprecated updated",
 					FactorID:            "phone",
-					EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[1].EnrollmentTimestamp,
+					EnrollmentTimestamp: updatedUser.MultiFactor.EnrolledFactors[1].EnrollmentTimestamp,
 				},
 			},
 		},
