@@ -75,6 +75,7 @@ var testUser = &UserRecord{
 				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
 					PhoneNumber: "+1234567890",
 				},
+				PhoneNumber: "+1234567890",
 				DisplayName: "My MFA Phone",
 			},
 			{
@@ -1088,12 +1089,14 @@ var updateUserCases = []struct {
 					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
+					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				}, {
 					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
+					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				},

@@ -713,7 +713,6 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 				multiFactorInfo.PhoneMultiFactorInfo = &PhoneMultiFactorInfo{
 					PhoneNumber: multiFactorInfo.PhoneNumber,
 				}
-				fmt.Println("`PhoneNumber` is deprecated, use `PhoneMultiFactorInfo` instead")
 			} else {
 				// Both PhoneMultiFactorInfo and deprecated PhoneNumber are missing.
 				return nil, fmt.Errorf("\"PhoneMultiFactorInfo\" must be defined")
@@ -1121,6 +1120,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				DisplayName:         factor.DisplayName,
 				EnrollmentTimestamp: enrollmentTimestamp,
 				FactorID:            phoneMultiFactorID,
+				PhoneNumber:         factor.PhoneInfo,
 				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
 					PhoneNumber: factor.PhoneInfo,
 				},
