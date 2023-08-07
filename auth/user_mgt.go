@@ -87,13 +87,13 @@ type multiFactorEnrollments struct {
 
 // MultiFactorInfo describes a user enrolled second phone factor.
 type MultiFactorInfo struct {
-	UID                  string
-	DisplayName          string
-	EnrollmentTimestamp  int64
-	FactorID             string
-	PhoneNumber          string // Deprecated: Use PhoneMultiFactorInfo instead
-	PhoneMultiFactorInfo *PhoneMultiFactorInfo
-	TOTPMultiFactorInfo  *TOTPMultiFactorInfo
+	UID                 string
+	DisplayName         string
+	EnrollmentTimestamp int64
+	FactorID            string
+	PhoneNumber         string // Deprecated: Use PhoneMultiFactorInfo instead
+	Phone               *PhoneMultiFactorInfo
+	TOTP                *TOTPMultiFactorInfo
 }
 
 // MultiFactorSettings describes the multi-factor related user settings.
@@ -195,9 +195,9 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 
 	switch mfaInfo.FactorID {
 	case phoneMultiFactorID:
-		authFactorInfo.PhoneInfo = mfaInfo.PhoneMultiFactorInfo.PhoneNumber
+		authFactorInfo.PhoneInfo = mfaInfo.Phone.PhoneNumber
 	case totpMultiFactorID:
-		authFactorInfo.TOTPInfo = (*TOTPInfo)(mfaInfo.TOTPMultiFactorInfo)
+		authFactorInfo.TOTPInfo = (*TOTPInfo)(mfaInfo.TOTP)
 	default:
 		out, _ := json.Marshal(mfaInfo)
 		return multiFactorInfoResponse{}, fmt.Errorf("unsupported second factor %s provided", string(out))
@@ -698,10 +698,10 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 			return nil, fmt.Errorf("the second factor \"displayName\" for \"%s\" must be a valid non-empty string", multiFactorInfo.DisplayName)
 		}
 		if multiFactorInfo.FactorID == phoneMultiFactorID {
-			if multiFactorInfo.PhoneMultiFactorInfo != nil {
+			if multiFactorInfo.Phone != nil {
 				// If PhoneMultiFactorInfo is provided, validate its PhoneNumber field
-				if err := validatePhone(multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber); err != nil {
-					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneMultiFactorInfo.PhoneNumber)
+				if err := validatePhone(multiFactorInfo.Phone.PhoneNumber); err != nil {
+					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.Phone.PhoneNumber)
 				}
 				// No need for the else here since we are returning from the function
 			} else if multiFactorInfo.PhoneNumber != "" {
@@ -710,7 +710,7 @@ func validateAndFormatMfaSettings(mfaSettings MultiFactorSettings, methodType st
 					return nil, fmt.Errorf("the second factor \"phoneNumber\" for \"%s\" must be a non-empty E.164 standard compliant identifier string", multiFactorInfo.PhoneNumber)
 				}
 				// The PhoneNumber field is deprecated, set it in PhoneMultiFactorInfo and inform about the deprecation.
-				multiFactorInfo.PhoneMultiFactorInfo = &PhoneMultiFactorInfo{
+				multiFactorInfo.Phone = &PhoneMultiFactorInfo{
 					PhoneNumber: multiFactorInfo.PhoneNumber,
 				}
 			} else {
@@ -1121,7 +1121,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				EnrollmentTimestamp: enrollmentTimestamp,
 				FactorID:            phoneMultiFactorID,
 				PhoneNumber:         factor.PhoneInfo,
-				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+				Phone: &PhoneMultiFactorInfo{
 					PhoneNumber: factor.PhoneInfo,
 				},
 			})
@@ -1131,7 +1131,7 @@ func (r *userQueryResponse) makeExportedUserRecord() (*ExportedUserRecord, error
 				DisplayName:         factor.DisplayName,
 				EnrollmentTimestamp: enrollmentTimestamp,
 				FactorID:            totpMultiFactorID,
-				TOTPMultiFactorInfo: &TOTPMultiFactorInfo{},
+				TOTP:                &TOTPMultiFactorInfo{},
 			})
 		} else {
 			return nil, fmt.Errorf("unsupported multi-factor auth response: %#v", factor)

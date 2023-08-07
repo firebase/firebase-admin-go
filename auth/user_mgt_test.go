@@ -72,7 +72,7 @@ var testUser = &UserRecord{
 				UID:                 "enrolledPhoneFactor",
 				FactorID:            "phone",
 				EnrollmentTimestamp: 1614776780000,
-				PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+				Phone: &PhoneMultiFactorInfo{
 					PhoneNumber: "+1234567890",
 				},
 				PhoneNumber: "+1234567890",
@@ -82,7 +82,7 @@ var testUser = &UserRecord{
 				UID:                 "enrolledTOTPFactor",
 				FactorID:            "totp",
 				EnrollmentTimestamp: 1614776780000,
-				TOTPMultiFactorInfo: &TOTPMultiFactorInfo{},
+				TOTP:                &TOTPMultiFactorInfo{},
 				DisplayName:         "My MFA TOTP",
 			},
 		},
@@ -657,7 +657,7 @@ func TestInvalidCreateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID: "EnrollmentID",
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "+11234567890",
 						},
 						DisplayName: "Spouse's phone number",
@@ -670,7 +670,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "invalid",
 						},
 						DisplayName: "Spouse's phone number",
@@ -683,7 +683,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "+11234567890",
 						},
 						DisplayName:         "Spouse's phone number",
@@ -697,7 +697,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "+11234567890",
 						},
 						DisplayName: "Spouse's phone number",
@@ -710,7 +710,7 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "+11234567890",
 						},
 						FactorID: "phone",
@@ -793,7 +793,7 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					DisplayName: "Phone Number active",
@@ -821,14 +821,14 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					DisplayName: "number1",
 					FactorID:    "phone",
 				},
 				{
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					DisplayName: "number2",
@@ -911,7 +911,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID: "enrolledSecondFactor1",
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "+11234567890",
 						},
 						FactorID: "phone",
@@ -924,7 +924,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 				EnrolledFactors: []*MultiFactorInfo{
 					{
 						UID: "enrolledSecondFactor1",
-						PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+						Phone: &PhoneMultiFactorInfo{
 							PhoneNumber: "invalid",
 						},
 						DisplayName: "Spouse's phone number",
@@ -1078,7 +1078,7 @@ var updateUserCases = []struct {
 			EnrolledFactors: []*MultiFactorInfo{
 				{
 					UID: "enrolledSecondFactor1",
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					DisplayName:         "Spouse's phone number",
@@ -1086,14 +1086,14 @@ var updateUserCases = []struct {
 					EnrollmentTimestamp: time.Now().Unix(),
 				}, {
 					UID: "enrolledSecondFactor2",
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				}, {
-					PhoneMultiFactorInfo: &PhoneMultiFactorInfo{
+					Phone: &PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					PhoneNumber: "+11234567890",

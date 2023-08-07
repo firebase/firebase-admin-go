@@ -439,7 +439,7 @@ func TestCreateUserMFA(t *testing.T) {
 				FactorID:    "phone",
 			},
 			{
-				PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+				Phone: &auth.PhoneMultiFactorInfo{
 					PhoneNumber: "+19876543210",
 				},
 				DisplayName: "Phone Number active",
@@ -457,7 +457,7 @@ func TestCreateUserMFA(t *testing.T) {
 			UID:         user.MultiFactor.EnrolledFactors[0].UID,
 			DisplayName: "Phone Number deprecated",
 			FactorID:    "phone",
-			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+			Phone: &auth.PhoneMultiFactorInfo{
 				PhoneNumber: "+11234567890",
 			},
 			PhoneNumber:         "+11234567890",
@@ -467,7 +467,7 @@ func TestCreateUserMFA(t *testing.T) {
 			UID:         user.MultiFactor.EnrolledFactors[1].UID,
 			DisplayName: "Phone Number active",
 			FactorID:    "phone",
-			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+			Phone: &auth.PhoneMultiFactorInfo{
 				PhoneNumber: "+19876543210",
 			},
 			PhoneNumber:         "+19876543210",
@@ -745,7 +745,7 @@ func TestUpdateUserMFA(t *testing.T) {
 				MFASettings(auth.MultiFactorSettings{
 					EnrolledFactors: []*auth.MultiFactorInfo{
 						{
-							PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+							Phone: &auth.PhoneMultiFactorInfo{
 								PhoneNumber: "+11234567890",
 							},
 							DisplayName: "Phone Number active",
@@ -773,7 +773,7 @@ func TestUpdateUserMFA(t *testing.T) {
 		{
 			DisplayName: "Phone Number active updated",
 			FactorID:    "phone",
-			PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+			Phone: &auth.PhoneMultiFactorInfo{
 				PhoneNumber: "+11234567890",
 			},
 		},
@@ -809,7 +809,7 @@ func TestUpdateUserMFA(t *testing.T) {
 			EnrolledFactors: []*auth.MultiFactorInfo{
 				{
 					UID: updatedUser.MultiFactor.EnrolledFactors[0].UID,
-					PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+					Phone: &auth.PhoneMultiFactorInfo{
 						PhoneNumber: "+11234567890",
 					},
 					PhoneNumber:         "+11234567890",
@@ -819,7 +819,7 @@ func TestUpdateUserMFA(t *testing.T) {
 				},
 				{
 					UID: updatedUser.MultiFactor.EnrolledFactors[1].UID,
-					PhoneMultiFactorInfo: &auth.PhoneMultiFactorInfo{
+					Phone: &auth.PhoneMultiFactorInfo{
 						PhoneNumber: "+19876543210",
 					},
 					PhoneNumber:         "+19876543210",
