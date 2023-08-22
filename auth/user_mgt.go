@@ -70,15 +70,15 @@ type multiFactorInfoResponse struct {
 	EnrolledAt      string    `json:"enrolledAt,omitempty"`
 }
 
-// TOTPInfo describes a server side user enrolled second totp factor.
+// TOTPInfo describes a user enrolled second TOTP factor.
 type TOTPInfo struct{}
 
-// PhoneMultiFactorInfo describes a user enrolled second phone factor.
+// PhoneMultiFactorInfo describes a user enrolled in SMS second factor.
 type PhoneMultiFactorInfo struct {
 	PhoneNumber string
 }
 
-// TOTPMultiFactorInfo describes a user enrolled second totp factor.
+// TOTPMultiFactorInfo describes a user enrolled in TOTP second factor.
 type TOTPMultiFactorInfo struct{}
 
 type multiFactorEnrollments struct {
