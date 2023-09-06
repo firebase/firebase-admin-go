@@ -85,6 +85,10 @@ type multiFactorEnrollments struct {
 	Enrollments []*multiFactorInfoResponse `json:"enrollments"`
 }
 
+type multiFactorEnrollments struct {
+	Enrollments []*multiFactorInfoResponse `json:"enrollments"`
+}
+
 // MultiFactorInfo describes a user enrolled second phone factor.
 type MultiFactorInfo struct {
 	UID                 string
