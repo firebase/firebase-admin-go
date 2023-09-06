@@ -1099,10 +1099,6 @@ var updateUserCases = []struct {
 					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
-				}, {
-					PhoneNumber: "+11234567890",
-					DisplayName: "Spouse's phone number",
-					FactorID:    "phone",
 				},
 			},
 		}),
