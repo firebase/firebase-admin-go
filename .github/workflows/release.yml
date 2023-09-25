@@ -79,8 +79,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checking the branch
+    - name: github.ref
       run: echo ${{ github.ref }}
+
+    - name: github.event.pull_request.merged
+      run: echo ${{ github.event.pull_request.merged }}
+
+    - name: contains(github.event.pull_request.labels.*.name, 'release:publish')
+      run: echo ${{ contains(github.event.pull_request.labels.*.name, 'release:publish') }}
+
+    - name: startsWith(github.event.pull_request.title, '[chore] Release ')
+      run: echo ${{ startsWith(github.event.pull_request.title, '[chore] Release ') }}
+
+    - name: check all conditions
+      run: echo 'all true'
+      if: github.event.pull_request.merged &&
+        github.ref == 'dev' &&
+        contains(github.event.pull_request.labels.*.name, 'release:publish') &&
+        startsWith(github.event.pull_request.title, '[chore] Release ')
 
 #    steps:
 #    - name: Checkout source for publish
