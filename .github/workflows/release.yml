@@ -74,6 +74,7 @@ jobs:
 #      github.ref == 'dev' &&
 #      contains(github.event.pull_request.labels.*.name, 'release:publish') &&
 #      startsWith(github.event.pull_request.title, '[chore] Release ')
+#
 
     runs-on: ubuntu-latest
 
