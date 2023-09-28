@@ -395,7 +395,7 @@ func TestGetUsersInvalidEmail(t *testing.T) {
 	getUsersResult, err := client.GetUsers(
 		context.Background(),
 		[]UserIdentifier{EmailIdentifier{"invalid email addr"}})
-	want := `malformed email string: "invalid email addr"`
+	want := `malformed email string`
 	if getUsersResult != nil || err == nil || err.Error() != want {
 		t.Errorf("GetUsers() = (%v, %q); want = (nil, %q)", getUsersResult, err, want)
 	}
@@ -632,16 +632,16 @@ func TestInvalidCreateUser(t *testing.T) {
 			"email must be a non-empty string",
 		}, {
 			(&UserToCreate{}).Email("a"),
-			`malformed email string: "a"`,
+			`malformed email string`,
 		}, {
 			(&UserToCreate{}).Email("a@"),
-			`malformed email string: "a@"`,
+			`malformed email string`,
 		}, {
 			(&UserToCreate{}).Email("@a"),
-			`malformed email string: "@a"`,
+			`malformed email string`,
 		}, {
 			(&UserToCreate{}).Email("a@a@a"),
-			`malformed email string: "a@a@a"`,
+			`malformed email string`,
 		}, {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
@@ -861,7 +861,7 @@ func TestInvalidUpdateUser(t *testing.T) {
 			"email must be a non-empty string",
 		}, {
 			(&UserToUpdate{}).Email("invalid"),
-			`malformed email string: "invalid"`,
+			`malformed email string`,
 		}, {
 			(&UserToUpdate{}).PhoneNumber("1"),
 			"phone number must be a valid, E.164 compliant identifier",
@@ -1528,7 +1528,7 @@ func TestUserToImportError(t *testing.T) {
 		},
 		{
 			(&UserToImport{}).UID("test").Email("not-an-email"),
-			`malformed email string: "not-an-email"`,
+			`malformed email string`,
 		},
 		{
 			(&UserToImport{}).UID("test").PhoneNumber("not-a-phone"),
