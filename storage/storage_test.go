@@ -43,6 +43,7 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	emulatorHost := "localhost:9099"
 	os.Setenv("FIREBASE_STORAGE_EMULATOR_HOST", emulatorHost)
 	defer os.Unsetenv("FIREBASE_STORAGE_EMULATOR_HOST")
+	defer os.Unsetenv("STORAGE_EMULATOR_HOST")
 
 	_, err := NewClient(context.Background(), &internal.StorageConfig{
 		Opts: opts,
