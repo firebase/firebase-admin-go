@@ -174,7 +174,7 @@ func (tv *tokenVerifier) VerifyToken(ctx context.Context, token string, isEmulat
 		return payload, nil
 	}
 
-	// Verifying the signature requires syncronized access to a key cache and
+	// Verifying the signature requires synchronized access to a key cache and
 	// potentially issues an http request. Therefore we do it last.
 	if err := tv.verifySignature(ctx, token); err != nil {
 		return nil, err

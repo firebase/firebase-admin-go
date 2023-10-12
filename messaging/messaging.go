@@ -955,7 +955,7 @@ func IsInternal(err error) bool {
 // IsInvalidAPNSCredentials checks if the given error was due to invalid APNS certificate or auth
 // key.
 //
-// Deprecated. Use IsThirdPartyAuthError().
+// Deprecated: Use IsThirdPartyAuthError().
 func IsInvalidAPNSCredentials(err error) bool {
 	return IsThirdPartyAuthError(err)
 }
@@ -973,7 +973,7 @@ func IsInvalidArgument(err error) bool {
 
 // IsMessageRateExceeded checks if the given error was due to the client exceeding a quota.
 //
-// Deprecated. Use IsQuotaExceeded().
+// Deprecated: Use IsQuotaExceeded().
 func IsMessageRateExceeded(err error) bool {
 	return IsQuotaExceeded(err)
 }
@@ -986,7 +986,7 @@ func IsQuotaExceeded(err error) bool {
 // IsMismatchedCredential checks if the given error was due to an invalid credential or permission
 // error.
 //
-// Deprecated. Use IsSenderIDMismatch().
+// Deprecated: Use IsSenderIDMismatch().
 func IsMismatchedCredential(err error) bool {
 	return IsSenderIDMismatch(err)
 }
@@ -1000,7 +1000,7 @@ func IsSenderIDMismatch(err error) bool {
 // IsRegistrationTokenNotRegistered checks if the given error was due to a registration token that
 // became invalid.
 //
-// Deprecated. Use IsUnregistered().
+// Deprecated: Use IsUnregistered().
 func IsRegistrationTokenNotRegistered(err error) bool {
 	return IsUnregistered(err)
 }
@@ -1014,7 +1014,7 @@ func IsUnregistered(err error) bool {
 // IsServerUnavailable checks if the given error was due to the backend server being temporarily
 // unavailable.
 //
-// Deprecated. Use IsUnavailable().
+// Deprecated: Use IsUnavailable().
 func IsServerUnavailable(err error) bool {
 	return IsUnavailable(err)
 }
@@ -1028,14 +1028,14 @@ func IsUnavailable(err error) bool {
 // IsTooManyTopics checks if the given error was due to the client exceeding the allowed number
 // of topics.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsTooManyTopics(err error) bool {
 	return false
 }
 
 // IsUnknown checks if the given error was due to unknown error returned by the backend server.
 //
-// Deprecated. Always returns false.
+// Deprecated: Always returns false.
 func IsUnknown(err error) bool {
 	return false
 }
