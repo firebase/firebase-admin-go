@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"testing"
 
 	"google.golang.org/api/option"
@@ -161,6 +162,412 @@ func TestMultipartEntityError(t *testing.T) {
 	b, err := entity.Bytes()
 	if b != nil || err == nil {
 		t.Errorf("Bytes() = (%v, %v); want = (nil, error)", b, nil)
+	}
+}
+
+func TestSendEachEmptyArray(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "messages must not be nil or empty"
+	br, err := client.SendEach(ctx, nil)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEach(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	br, err = client.SendEach(ctx, []*Message{})
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEach(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachTooManyMessages(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var messages []*Message
+	for i := 0; i < 501; i++ {
+		messages = append(messages, &Message{Topic: "test-topic"})
+	}
+
+	want := "messages must not contain more than 500 elements"
+	br, err := client.SendEach(ctx, messages)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEach() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachInvalidMessage(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "invalid message at index 0: message must not be nil"
+	br, err := client.SendEach(ctx, []*Message{nil})
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEach() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEach(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, testMessage := range testMessages {
+			if strings.Contains(string(req), testMessage.Topic) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEach(ctx, testMessages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEach() = %v", err)
+	}
+}
+
+func TestSendEachDryRun(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, testMessage := range testMessages {
+			if strings.Contains(string(req), testMessage.Topic) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEachDryRun(ctx, testMessages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, true); err != nil {
+		t.Errorf("SendEach() = %v", err)
+	}
+}
+
+func TestSendEachPartialFailure(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+	}
+
+	var failures []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+
+		for idx, testMessage := range testMessages {
+			// Write success for topic1 and error for topic2
+			if strings.Contains(string(req), testMessage.Topic) {
+				if idx%2 == 0 {
+					w.Header().Set("Content-Type", wantMime)
+					w.Write([]byte("{ \"name\":\"" + success[0].Name + "\" }"))
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Header().Set("Content-Type", wantMime)
+					w.Write([]byte(failures[0]))
+				}
+			}
+		}
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	for idx, tc := range httpErrors {
+		failures = []string{tc.resp}
+
+		br, err := client.SendEach(ctx, testMessages)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
+			t.Errorf("[%d] SendEach() = %v", idx, err)
+		}
+	}
+}
+
+func TestSendEachTotalFailure(t *testing.T) {
+	var resp string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(resp))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+	client.fcmClient.httpClient.RetryConfig = nil
+
+	for idx, tc := range httpErrors {
+		resp = tc.resp
+		br, err := client.SendEach(ctx, testMessages)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := checkTotalErrorBatchResponse(br, tc); err != nil {
+			t.Errorf("[%d] SendEach() = %v", idx, err)
+		}
+	}
+}
+
+func TestSendEachForMulticastNil(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "message must not be nil"
+	br, err := client.SendEachForMulticast(ctx, nil)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	br, err = client.SendEachForMulticastDryRun(ctx, nil)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast(nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachForMulticastEmptyArray(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "tokens must not be nil or empty"
+	mm := &MulticastMessage{}
+	br, err := client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast(Tokens: nil) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	var tokens []string
+	mm = &MulticastMessage{
+		Tokens: tokens,
+	}
+	br, err = client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast(Tokens: []) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachForMulticastTooManyTokens(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var tokens []string
+	for i := 0; i < 501; i++ {
+		tokens = append(tokens, fmt.Sprintf("token%d", i))
+	}
+
+	want := "tokens must not contain more than 500 elements"
+	mm := &MulticastMessage{Tokens: tokens}
+	br, err := client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachForMulticastInvalidMessage(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "invalid message at index 0: priority must be 'normal' or 'high'"
+	mm := &MulticastMessage{
+		Tokens: []string{"token1"},
+		Android: &AndroidConfig{
+			Priority: "invalid",
+		},
+	}
+	br, err := client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+}
+
+func TestSendEachForMulticast(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, token := range testMulticastMessage.Tokens {
+			if strings.Contains(string(req), token) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEachForMulticast(ctx, testMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEachForMulticast() = %v", err)
+	}
+}
+
+func TestSendEachForMulticastWithCustomEndpoint(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, token := range testMulticastMessage.Tokens {
+			if strings.Contains(string(req), token) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+
+	conf := *testMessagingConfig
+	optEndpoint := option.WithEndpoint(ts.URL)
+	conf.Opts = append(conf.Opts, optEndpoint)
+
+	client, err := NewClient(ctx, &conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ts.URL != client.fcmEndpoint {
+		t.Errorf("client.fcmEndpoint = %q; want = %q", client.fcmEndpoint, ts.URL)
+	}
+
+	br, err := client.SendEachForMulticast(ctx, testMulticastMessage)
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEachForMulticast() = %v", err)
+	}
+}
+
+func TestSendEachForMulticastDryRun(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, token := range testMulticastMessage.Tokens {
+			if strings.Contains(string(req), token) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEachForMulticastDryRun(ctx, testMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, true); err != nil {
+		t.Errorf("SendEachForMulticastDryRun() = %v", err)
+	}
+}
+
+func TestSendEachForMulticastPartialFailure(t *testing.T) {
+	success := []fcmResponse{
+		{
+			Name: "projects/test-project/messages/1",
+		},
+	}
+
+	var failures []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := ioutil.ReadAll(r.Body)
+
+		for idx, token := range testMulticastMessage.Tokens {
+			if strings.Contains(string(req), token) {
+				// Write success for token1 and error for token2
+				if idx%2 == 0 {
+					w.Header().Set("Content-Type", wantMime)
+					w.Write([]byte("{ \"name\":\"" + success[0].Name + "\" }"))
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Header().Set("Content-Type", wantMime)
+					w.Write([]byte(failures[0]))
+				}
+			}
+		}
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	for idx, tc := range httpErrors {
+		failures = []string{tc.resp}
+
+		br, err := client.SendEachForMulticast(ctx, testMulticastMessage)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
+			t.Errorf("[%d] SendEachForMulticast() = %v", idx, err)
+		}
 	}
 }
 
@@ -630,6 +1037,26 @@ func TestSendMulticastPartialFailure(t *testing.T) {
 	}
 }
 
+func checkSuccessfulBatchResponseForSendEach(br *BatchResponse, dryRun bool) error {
+	if br.SuccessCount != 2 {
+		return fmt.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	}
+	if br.FailureCount != 0 {
+		return fmt.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		return fmt.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for idx, r := range br.Responses {
+		if err := checkSuccessfulSendResponse(r, testSuccessResponse[idx].Name); err != nil {
+			return fmt.Errorf("Responses[%d]: %v", idx, err)
+		}
+	}
+
+	return nil
+}
+
 func checkSuccessfulBatchResponse(br *BatchResponse, req []byte, dryRun bool) error {
 	if br.SuccessCount != 2 {
 		return fmt.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
@@ -649,6 +1076,35 @@ func checkSuccessfulBatchResponse(br *BatchResponse, req []byte, dryRun bool) er
 
 	if err := checkMultipartRequest(req, dryRun); err != nil {
 		return fmt.Errorf("MultipartRequest: %v", err)
+	}
+
+	return nil
+}
+
+func checkTotalErrorBatchResponse(br *BatchResponse, tc struct {
+	resp, want string
+	check      func(error) bool
+}) error {
+	if br.SuccessCount != 0 {
+		return fmt.Errorf("SuccessCount = %d; want = 0", br.SuccessCount)
+	}
+	if br.FailureCount != 2 {
+		return fmt.Errorf("FailureCount = %d; want = 2", br.FailureCount)
+	}
+	if len(br.Responses) != 2 {
+		return fmt.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+
+	for i, r := range br.Responses {
+		if r.Success {
+			return fmt.Errorf("Responses[%d]: Success = true; want = false", i)
+		}
+		if r.Error == nil || r.Error.Error() != tc.want || !tc.check(r.Error) {
+			return fmt.Errorf("Responses[%d]: Error = %v; want = %q", i, r.Error, tc.want)
+		}
+		if r.MessageID != "" {
+			return fmt.Errorf("Responses[%d]: MessageID = %q; want = %q", i, r.MessageID, "")
+		}
 	}
 
 	return nil
