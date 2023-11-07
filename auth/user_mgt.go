@@ -191,7 +191,6 @@ func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorI
 	if mfaInfo.UID != "" {
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 	}
-	authFactorInfo.MFAEnrollmentID = mfaInfo.UID
 
 	switch mfaInfo.FactorID {
 	case phoneMultiFactorID:
