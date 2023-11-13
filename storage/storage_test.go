@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"firebase.google.com/go/v4/internal"
@@ -35,6 +36,25 @@ func TestNewClientError(t *testing.T) {
 	})
 	if client != nil || err == nil {
 		t.Errorf("NewClient() = (%v, %v); want (nil, error)", client, err)
+	}
+}
+
+func TestNewClientEmulatorHostEnvVar(t *testing.T) {
+	emulatorHost := "localhost:9099"
+	os.Setenv("FIREBASE_STORAGE_EMULATOR_HOST", emulatorHost)
+	defer os.Unsetenv("FIREBASE_STORAGE_EMULATOR_HOST")
+	os.Unsetenv("STORAGE_EMULATOR_HOST")
+	defer os.Unsetenv("STORAGE_EMULATOR_HOST")
+
+	_, err := NewClient(context.Background(), &internal.StorageConfig{
+		Opts: opts,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if host := os.Getenv("STORAGE_EMULATOR_HOST"); host != emulatorHost {
+		t.Errorf("emulator host: %q; want: %q", host, emulatorHost)
 	}
 }
 
