@@ -435,7 +435,14 @@ func TestCreateUserMFA(t *testing.T) {
 		EnrolledFactors: []*auth.MultiFactorInfo{
 			{
 				PhoneNumber: "+11234567890",
-				DisplayName: "Spouse's phone number",
+				DisplayName: "Phone Number deprecated",
+				FactorID:    "phone",
+			},
+			{
+				Phone: &auth.PhoneMultiFactorInfo{
+					PhoneNumber: "+19876543210",
+				},
+				DisplayName: "Phone Number active",
 				FactorID:    "phone",
 			},
 		},
@@ -445,13 +452,26 @@ func TestCreateUserMFA(t *testing.T) {
 		t.Fatalf("CreateUser() = %v; want = nil", err)
 	}
 	defer deleteUser(user.UID)
-	var factor []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
+	var factors []*auth.MultiFactorInfo = []*auth.MultiFactorInfo{
 		{
-			UID:                 user.MultiFactor.EnrolledFactors[0].UID,
-			DisplayName:         "Spouse's phone number",
-			FactorID:            "phone",
+			UID:         user.MultiFactor.EnrolledFactors[0].UID,
+			DisplayName: "Phone Number deprecated",
+			FactorID:    "phone",
+			Phone: &auth.PhoneMultiFactorInfo{
+				PhoneNumber: "+11234567890",
+			},
 			PhoneNumber:         "+11234567890",
 			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
+		},
+		{
+			UID:         user.MultiFactor.EnrolledFactors[1].UID,
+			DisplayName: "Phone Number active",
+			FactorID:    "phone",
+			Phone: &auth.PhoneMultiFactorInfo{
+				PhoneNumber: "+19876543210",
+			},
+			PhoneNumber:         "+19876543210",
+			EnrollmentTimestamp: user.MultiFactor.EnrolledFactors[1].EnrollmentTimestamp,
 		},
 	}
 	want := auth.UserRecord{
@@ -466,7 +486,7 @@ func TestCreateUserMFA(t *testing.T) {
 		},
 		TokensValidAfterMillis: user.TokensValidAfterMillis,
 		MultiFactor: &auth.MultiFactorSettings{
-			EnrolledFactors: factor,
+			EnrolledFactors: factors,
 		},
 	}
 	if !reflect.DeepEqual(*user, want) {
@@ -708,6 +728,113 @@ func TestUpdateUser(t *testing.T) {
 			t.Errorf("UpdateUser() = (%#v, nil); want (nil, error)", gotUserRecord)
 		}
 	})
+}
+
+func TestUpdateUserMFA(t *testing.T) {
+	// Creates a new user for testing purposes. The user's uid will be
+	// '$name_$tenRandomChars' and email will be
+	// '$name_$tenRandomChars@example.com'.
+	createTestUserWithMFA := func(name string) *auth.UserRecord {
+		// TODO(rsgowman: This function could usefully be employed throughout
+		// this file.
+		tenRandomChars := generateRandomAlphaNumericString(10)
+		userRecord, err := client.CreateUser(context.Background(),
+			(&auth.UserToCreate{}).
+				Email(name+"_"+tenRandomChars+"@example.com").
+				EmailVerified(true).
+				MFASettings(auth.MultiFactorSettings{
+					EnrolledFactors: []*auth.MultiFactorInfo{
+						{
+							Phone: &auth.PhoneMultiFactorInfo{
+								PhoneNumber: "+11234567890",
+							},
+							DisplayName: "Phone Number active",
+							FactorID:    "phone",
+						},
+						{
+							PhoneNumber: "+19876543210",
+							DisplayName: "Phone Number deprecated",
+							FactorID:    "phone",
+						},
+					},
+				}),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return userRecord
+	}
+	// Create a test user with MFA settings for testing
+	user := createTestUserWithMFA("UpdateUserMFA")
+	defer deleteUser(user.UID)
+
+	// Define the updated MFA factors
+	updatedFactors := []*auth.MultiFactorInfo{
+		{
+			DisplayName: "Phone Number active updated",
+			FactorID:    "phone",
+			Phone: &auth.PhoneMultiFactorInfo{
+				PhoneNumber: "+11234567890",
+			},
+		},
+		{
+			DisplayName: "Phone Number deprecated updated",
+			FactorID:    "phone",
+			PhoneNumber: "+19876543210",
+		},
+	}
+
+	// Update the MFA settings
+	params := (&auth.UserToUpdate{}).MFASettings(auth.MultiFactorSettings{
+		EnrolledFactors: updatedFactors,
+	})
+
+	updatedUser, err := client.UpdateUser(context.Background(), user.UID, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := auth.UserRecord{
+		EmailVerified: true,
+		UserInfo: &auth.UserInfo{
+			Email:      updatedUser.Email,
+			UID:        updatedUser.UID,
+			ProviderID: "firebase",
+		},
+		UserMetadata: &auth.UserMetadata{
+			CreationTimestamp: updatedUser.UserMetadata.CreationTimestamp,
+		},
+		TokensValidAfterMillis: updatedUser.TokensValidAfterMillis,
+		MultiFactor: &auth.MultiFactorSettings{
+			EnrolledFactors: []*auth.MultiFactorInfo{
+				{
+					UID: updatedUser.MultiFactor.EnrolledFactors[0].UID,
+					Phone: &auth.PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
+					PhoneNumber:         "+11234567890",
+					DisplayName:         "Phone Number active updated",
+					FactorID:            "phone",
+					EnrollmentTimestamp: updatedUser.MultiFactor.EnrolledFactors[0].EnrollmentTimestamp,
+				},
+				{
+					UID: updatedUser.MultiFactor.EnrolledFactors[1].UID,
+					Phone: &auth.PhoneMultiFactorInfo{
+						PhoneNumber: "+19876543210",
+					},
+					PhoneNumber:         "+19876543210",
+					DisplayName:         "Phone Number deprecated updated",
+					FactorID:            "phone",
+					EnrollmentTimestamp: updatedUser.MultiFactor.EnrolledFactors[1].EnrollmentTimestamp,
+				},
+			},
+		},
+	}
+
+	// Compare the updated user with the expected user record
+	if !reflect.DeepEqual(*updatedUser, want) {
+		t.Errorf("UpdateUser() = %#v; want = %#v", *updatedUser, want)
+	}
 }
 
 func TestDisableUser(t *testing.T) {

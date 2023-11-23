@@ -35,8 +35,14 @@
       "mfaInfo": [
         {
           "phoneInfo": "+1234567890",
-          "mfaEnrollmentId": "0aaded3f-5e73-461d-aef9-37b48e3769be",
+          "mfaEnrollmentId": "enrolledPhoneFactor",
           "displayName": "My MFA Phone",
+          "enrolledAt": "2021-03-03T13:06:20.542896Z"
+        },
+        {
+          "totpInfo": {},
+          "mfaEnrollmentId": "enrolledTOTPFactor",
+          "displayName": "My MFA TOTP",
           "enrolledAt": "2021-03-03T13:06:20.542896Z"
         }
       ]

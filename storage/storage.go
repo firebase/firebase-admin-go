@@ -18,6 +18,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"os"
 
 	"cloud.google.com/go/storage"
 	"firebase.google.com/go/v4/internal"
@@ -34,6 +35,9 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the Storage service through firebase.App.
 func NewClient(ctx context.Context, c *internal.StorageConfig) (*Client, error) {
+	if os.Getenv("STORAGE_EMULATOR_HOST") == "" && os.Getenv("FIREBASE_STORAGE_EMULATOR_HOST") != "" {
+		os.Setenv("STORAGE_EMULATOR_HOST", os.Getenv("FIREBASE_STORAGE_EMULATOR_HOST"))
+	}
 	client, err := storage.NewClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
