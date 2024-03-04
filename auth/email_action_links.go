@@ -59,7 +59,7 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 	if err := json.Unmarshal(b, &result); err != nil {
 		return nil, err
 	}
-	// Since SendEmailLink defaults to true, we will always set "returnOobLink" to false by default.
+	// Since SendEmailLink defaults to false, we will always set "returnOobLink" to true by default.
 	// This means no email is sent out in the default case
 	result["returnOobLink"] = !settings.SendEmailLink
 	return result, nil
