@@ -11,16 +11,16 @@ jobs:
         go: [1.17, 1.18, 1.19]
 
     steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
     - name: Set up Go ${{ matrix.go }}
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go }}
 
     - name: Install golint
       run: go install golang.org/x/lint/golint@latest
-
-    - name: Check out code
-      uses: actions/checkout@v2
 
     - name: Run Linter
       run: |
