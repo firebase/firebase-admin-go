@@ -69,11 +69,21 @@ var testUser = &UserRecord{
 	MultiFactor: &MultiFactorSettings{
 		EnrolledFactors: []*MultiFactorInfo{
 			{
-				UID:                 "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				UID:                 "enrolledPhoneFactor",
 				FactorID:            "phone",
 				EnrollmentTimestamp: 1614776780000,
-				PhoneNumber:         "+1234567890",
-				DisplayName:         "My MFA Phone",
+				Phone: &PhoneMultiFactorInfo{
+					PhoneNumber: "+1234567890",
+				},
+				PhoneNumber: "+1234567890",
+				DisplayName: "My MFA Phone",
+			},
+			{
+				UID:                 "enrolledTOTPFactor",
+				FactorID:            "totp",
+				EnrollmentTimestamp: 1614776780000,
+				TOTP:                &TOTPMultiFactorInfo{},
+				DisplayName:         "My MFA TOTP",
 			},
 		},
 	},
@@ -646,8 +656,10 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						UID:         "EnrollmentID",
-						PhoneNumber: "+11234567890",
+						UID: "EnrollmentID",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "+11234567890",
+						},
 						DisplayName: "Spouse's phone number",
 						FactorID:    "phone",
 					},
@@ -658,7 +670,9 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "invalid",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "invalid",
+						},
 						DisplayName: "Spouse's phone number",
 						FactorID:    "phone",
 					},
@@ -669,7 +683,9 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber:         "+11234567890",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "+11234567890",
+						},
 						DisplayName:         "Spouse's phone number",
 						FactorID:            "phone",
 						EnrollmentTimestamp: time.Now().UTC().Unix(),
@@ -681,7 +697,9 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "+11234567890",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "+11234567890",
+						},
 						DisplayName: "Spouse's phone number",
 						FactorID:    "",
 					},
@@ -692,8 +710,10 @@ func TestInvalidCreateUser(t *testing.T) {
 			(&UserToCreate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "+11234567890",
+						},
+						FactorID: "phone",
 					},
 				},
 			}),
@@ -773,8 +793,15 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
+					DisplayName: "Phone Number active",
+					FactorID:    "phone",
+				},
+				{
 					PhoneNumber: "+11234567890",
-					DisplayName: "Spouse's phone number",
+					DisplayName: "Phone Number deprecated",
 					FactorID:    "phone",
 				},
 			},
@@ -782,7 +809,11 @@ var createUserCases = []struct {
 		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
 			{
 				PhoneInfo:   "+11234567890",
-				DisplayName: "Spouse's phone number",
+				DisplayName: "Phone Number active",
+			},
+			{
+				PhoneInfo:   "+11234567890",
+				DisplayName: "Phone Number deprecated",
 			},
 		},
 		},
@@ -790,12 +821,16 @@ var createUserCases = []struct {
 		(&UserToCreate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					PhoneNumber: "+11234567890",
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
 					DisplayName: "number1",
 					FactorID:    "phone",
 				},
 				{
-					PhoneNumber: "+11234567890",
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
 					DisplayName: "number2",
 					FactorID:    "phone",
 				},
@@ -875,9 +910,11 @@ func TestInvalidUpdateUser(t *testing.T) {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						UID:         "enrolledSecondFactor1",
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
+						UID: "enrolledSecondFactor1",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "+11234567890",
+						},
+						FactorID: "phone",
 					},
 				},
 			}),
@@ -886,25 +923,16 @@ func TestInvalidUpdateUser(t *testing.T) {
 			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 				EnrolledFactors: []*MultiFactorInfo{
 					{
-						UID:         "enrolledSecondFactor1",
-						PhoneNumber: "invalid",
+						UID: "enrolledSecondFactor1",
+						Phone: &PhoneMultiFactorInfo{
+							PhoneNumber: "invalid",
+						},
 						DisplayName: "Spouse's phone number",
 						FactorID:    "phone",
 					},
 				},
 			}),
 			`the second factor "phoneNumber" for "invalid" must be a non-empty E.164 standard compliant identifier string`,
-		}, {
-			(&UserToUpdate{}).MFASettings(MultiFactorSettings{
-				EnrolledFactors: []*MultiFactorInfo{
-					{
-						PhoneNumber: "+11234567890",
-						FactorID:    "phone",
-						DisplayName: "Spouse's phone number",
-					},
-				},
-			}),
-			`the second factor "uid" must be a valid non-empty string when adding second factors via "updateUser()"`,
 		}, {
 			(&UserToUpdate{}).ProviderToLink(&UserProvider{UID: "google_uid"}),
 			"user provider must specify a provider ID",
@@ -1049,20 +1077,32 @@ var updateUserCases = []struct {
 		(&UserToUpdate{}).MFASettings(MultiFactorSettings{
 			EnrolledFactors: []*MultiFactorInfo{
 				{
-					UID:                 "enrolledSecondFactor1",
-					PhoneNumber:         "+11234567890",
+					UID: "enrolledSecondFactor1",
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
 					DisplayName:         "Spouse's phone number",
 					FactorID:            "phone",
 					EnrollmentTimestamp: time.Now().Unix(),
 				}, {
-					UID:         "enrolledSecondFactor2",
+					UID: "enrolledSecondFactor2",
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
+					PhoneNumber: "+11234567890",
+					DisplayName: "Spouse's phone number",
+					FactorID:    "phone",
+				}, {
+					Phone: &PhoneMultiFactorInfo{
+						PhoneNumber: "+11234567890",
+					},
 					PhoneNumber: "+11234567890",
 					DisplayName: "Spouse's phone number",
 					FactorID:    "phone",
 				},
 			},
 		}),
-		map[string]interface{}{"mfaInfo": []*multiFactorInfoResponse{
+		map[string]interface{}{"mfa": multiFactorEnrollments{Enrollments: []*multiFactorInfoResponse{
 			{
 				MFAEnrollmentID: "enrolledSecondFactor1",
 				PhoneInfo:       "+11234567890",
@@ -1074,12 +1114,16 @@ var updateUserCases = []struct {
 				DisplayName:     "Spouse's phone number",
 				PhoneInfo:       "+11234567890",
 			},
-		},
+			{
+				DisplayName: "Spouse's phone number",
+				PhoneInfo:   "+11234567890",
+			},
+		}},
 		},
 	},
 	{
 		(&UserToUpdate{}).MFASettings(MultiFactorSettings{}),
-		map[string]interface{}{"mfaInfo": nil},
+		map[string]interface{}{"mfa": multiFactorEnrollments{Enrollments: nil}},
 	},
 	{
 		(&UserToUpdate{}).ProviderToLink(&UserProvider{
@@ -1886,8 +1930,14 @@ func TestMakeExportedUser(t *testing.T) {
 		MFAInfo: []*multiFactorInfoResponse{
 			{
 				PhoneInfo:       "+1234567890",
-				MFAEnrollmentID: "0aaded3f-5e73-461d-aef9-37b48e3769be",
+				MFAEnrollmentID: "enrolledPhoneFactor",
 				DisplayName:     "My MFA Phone",
+				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
+			},
+			{
+				TOTPInfo:        &TOTPInfo{},
+				MFAEnrollmentID: "enrolledTOTPFactor",
+				DisplayName:     "My MFA TOTP",
 				EnrolledAt:      "2021-03-03T13:06:20.542896Z",
 			},
 		},
