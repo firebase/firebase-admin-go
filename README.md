@@ -26,14 +26,14 @@ For more information, visit the
 
 ## Installation
 
-The Firebase Admin Go SDK can be installed using the `go install` utility:
+The Firebase Admin Go SDK can be installed using the `go get` utility:
 
 ```
 # Install the latest version:
-go install firebase.google.com/go/v4@latest
+go get firebase.google.com/go/v4@latest
 
 # Or install a specific version:
-go install firebase.google.com/go/v4@4.x.x
+go get firebase.google.com/go/v4@4.x.x
 ```
 
 ## Contributing
