@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -231,6 +232,51 @@ func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devC
 		},
 	}
 	return info.Token(ctx, c.signer)
+}
+
+// SignInWithCustomTokenResponse represents a result of exchanging a custom Auth token.
+type SignInWithCustomTokenResponse struct {
+	// An Identity Platform ID token for the authenticated user.
+	IdToken string `json:"idToken"`
+
+	// An Identity Platform refresh token for the authenticated user.
+	RefreshToken string `json:"refreshToken"`
+
+	// The number of seconds until the ID token expires.
+	ExpiresIn string `json:"expiresIn"`
+
+	// Whether the authenticated user was created by this request.
+	IsNewUser bool `json:"isNewUser"`
+}
+
+// SignInWithCustomToken signs in or signs up a user by exchanging a custom Auth token.
+// Upon a successful sign-in or sign-up, a new Identity Platform ID token and refresh token are
+// issued for the user.
+func (c *baseClient) SignInWithCustomToken(ctx context.Context, token string, tenantId string) (resp *SignInWithCustomTokenResponse, err error) {
+	if token == "" {
+		err = errors.New("custom token must not be empty")
+		return
+	}
+
+	payload := map[string]interface{}{
+		"token":             token,
+		"returnSecureToken": true,
+	}
+	if tenantId != "" {
+		payload["tenantId"] = tenantId
+	}
+
+	resp = &SignInWithCustomTokenResponse{}
+	req := &internal.Request{
+		Method: http.MethodPost,
+		URL:    fmt.Sprintf("%s/accounts:signInWithCustomToken", c.userManagementEndpoint),
+		Body:   internal.NewJSONEntity(payload),
+	}
+	if _, err = c.httpClient.DoAndUnmarshal(ctx, req, resp); err != nil {
+		resp = nil
+		return
+	}
+	return
 }
 
 // SessionCookie creates a new Firebase session cookie from the given ID token and expiry
