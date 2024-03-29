@@ -99,9 +99,8 @@ func TestEmailVerificationLink(t *testing.T) {
 	}
 
 	want := map[string]interface{}{
-		"requestType":   "VERIFY_EMAIL",
-		"email":         testEmail,
-		"returnOobLink": true,
+		"requestType": "VERIFY_EMAIL",
+		"email":       testEmail,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
 		t.Fatalf("EmailVerificationLink() %v", err)
@@ -154,9 +153,8 @@ func TestPasswordResetLink(t *testing.T) {
 	}
 
 	want := map[string]interface{}{
-		"requestType":   "PASSWORD_RESET",
-		"email":         testEmail,
-		"returnOobLink": true,
+		"requestType": "PASSWORD_RESET",
+		"email":       testEmail,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
 		t.Fatalf("PasswordResetLink() %v", err)
