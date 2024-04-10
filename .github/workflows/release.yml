@@ -93,7 +93,7 @@ jobs:
       with:
         github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
         script: |
-            github.repos.merge({
+            github.rest.repos.merge({
               owner: context.repo.owner,
               repo: context.repo.repo,
               base: 'master',
