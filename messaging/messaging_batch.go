@@ -47,6 +47,7 @@ type MulticastMessage struct {
 	Android      *AndroidConfig
 	Webpush      *WebpushConfig
 	APNS         *APNSConfig
+	FCMOptions   *FCMOptions
 }
 
 func (mm *MulticastMessage) toMessages() ([]*Message, error) {
@@ -66,6 +67,7 @@ func (mm *MulticastMessage) toMessages() ([]*Message, error) {
 			Android:      mm.Android,
 			Webpush:      mm.Webpush,
 			APNS:         mm.APNS,
+			FCMOptions:   mm.FCMOptions,
 		}
 		messages = append(messages, temp)
 	}
