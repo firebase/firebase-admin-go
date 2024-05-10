@@ -78,6 +78,12 @@ type AppCheckConfig struct {
 	ProjectID string
 }
 
+// ProjectManagementConfig represents the configuration of Firebase Management service.
+type ProjectManagementConfig struct {
+	Opts      []option.ClientOption
+	ProjectID string
+}
+
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string
