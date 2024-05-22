@@ -140,34 +140,21 @@ func TestFindMaxAge(t *testing.T) {
 		{"max-age=100", 100},
 		{"public, max-age=100", 100},
 		{"public,max-age=100", 100},
+		{"public, max-age=100, must-revalidate, no-transform", 100},
+		{"", 0},
+		{"max-age 100", 0},
+		{"max-age: 100", 0},
+		{"max-age2=100", 0},
+		{"max-age=foo", 0},
+		{"private,", 0},
 	}
 	for _, tc := range cases {
 		resp := &http.Response{
 			Header: http.Header{"Cache-Control": {tc.cc}},
 		}
-		age, err := findMaxAge(resp)
-		if err != nil {
-			t.Errorf("findMaxAge(%q) = %v", tc.cc, err)
-		} else if *age != (time.Duration(tc.want) * time.Second) {
+		age := findMaxAge(resp)
+		if *age != (time.Duration(tc.want) * time.Second) {
 			t.Errorf("findMaxAge(%q) = %v; want = %v", tc.cc, *age, tc.want)
-		}
-	}
-}
-
-func TestFindMaxAgeError(t *testing.T) {
-	cases := []string{
-		"",
-		"max-age 100",
-		"max-age: 100",
-		"max-age2=100",
-		"max-age=foo",
-	}
-	for _, tc := range cases {
-		resp := &http.Response{
-			Header: http.Header{"Cache-Control": []string{tc}},
-		}
-		if age, err := findMaxAge(resp); age != nil || err == nil {
-			t.Errorf("findMaxAge(%q) = (%v, %v); want = (nil, err)", tc, age, err)
 		}
 	}
 }
