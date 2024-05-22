@@ -474,7 +474,6 @@ func parsePublicKey(kid string, key []byte) (*publicKey, error) {
 }
 
 func findMaxAge(resp *http.Response) *time.Duration {
-	duration := time.Duration(0) * time.Second
 	cc := resp.Header.Get("cache-control")
 	for _, value := range strings.Split(cc, ",") {
 		value = strings.TrimSpace(value)
@@ -484,9 +483,10 @@ func findMaxAge(resp *http.Response) *time.Duration {
 			if err != nil {
 				seconds = 0
 			}
-			duration = time.Duration(seconds) * time.Second
+			duration := time.Duration(seconds) * time.Second
 			return &duration
 		}
 	}
-	return &duration
+	defaultDuration := time.Duration(0) * time.Second
+	return &defaultDuration
 }
