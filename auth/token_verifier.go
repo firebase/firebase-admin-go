@@ -432,10 +432,7 @@ func (k *httpKeySource) refreshKeys(ctx context.Context) error {
 		return err
 	}
 
-	maxAge, err := findMaxAge(resp)
-	if err != nil {
-		return err
-	}
+	maxAge := findMaxAge(resp)
 
 	k.CachedKeys = append([]*publicKey(nil), newKeys...)
 	k.ExpiryTime = k.Clock.Now().Add(*maxAge)
@@ -476,7 +473,7 @@ func parsePublicKey(kid string, key []byte) (*publicKey, error) {
 	return &publicKey{kid, pk}, nil
 }
 
-func findMaxAge(resp *http.Response) (*time.Duration, error) {
+func findMaxAge(resp *http.Response) *time.Duration {
 	cc := resp.Header.Get("cache-control")
 	for _, value := range strings.Split(cc, ",") {
 		value = strings.TrimSpace(value)
@@ -484,11 +481,12 @@ func findMaxAge(resp *http.Response) (*time.Duration, error) {
 			sep := strings.Index(value, "=")
 			seconds, err := strconv.ParseInt(value[sep+1:], 10, 64)
 			if err != nil {
-				return nil, err
+				seconds = 0
 			}
 			duration := time.Duration(seconds) * time.Second
-			return &duration, nil
+			return &duration
 		}
 	}
-	return nil, errors.New("Could not find expiry time from HTTP headers")
+	defaultDuration := time.Duration(0) * time.Second
+	return &defaultDuration
 }
