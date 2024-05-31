@@ -80,6 +80,7 @@ func WithDefaultRetryConfig(hc *http.Client) *HTTPClient {
 			MaxRetries: 4,
 			CheckForRetry: retryNetworkAndHTTPErrors(
 				http.StatusServiceUnavailable,
+				http.StatusTooManyRequests,
 			),
 			ExpBackoffFactor: 0.5,
 			MaxDelay:         &twoMinutes,
