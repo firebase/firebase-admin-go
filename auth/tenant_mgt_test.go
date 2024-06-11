@@ -1087,6 +1087,7 @@ const tenantResponse = `{
     "enableEmailLinkSignin": true,
     "enableAnonymousUser": true,
 	"mfaConfig": {
+		"state": "ENABLED",
 		"providerConfigs": [
 			{
 				"state":"ENABLED",
@@ -1105,6 +1106,7 @@ const tenantResponse2 = `{
     "enableEmailLinkSignin": true,
     "enableAnonymousUser": true,
 	"mfaConfig": {
+		"state": "ENABLED",
 		"providerConfigs": [
 			{
 				"state":"ENABLED",
@@ -1129,6 +1131,7 @@ var testTenant = &Tenant{
 	EnableEmailLinkSignIn: true,
 	EnableAnonymousUsers:  true,
 	MultiFactorConfig: &MultiFactorConfig{
+		State: Enabled,
 		ProviderConfigs: []*ProviderConfig{
 			{
 				State: Enabled,
@@ -1147,6 +1150,7 @@ var testTenant2 = &Tenant{
 	EnableEmailLinkSignIn: true,
 	EnableAnonymousUsers:  true,
 	MultiFactorConfig: &MultiFactorConfig{
+		State: Enabled,
 		ProviderConfigs: []*ProviderConfig{
 			{
 				State: Enabled,
@@ -1239,6 +1243,7 @@ func TestCreateTenant(t *testing.T) {
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
 		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
 		"mfaConfig": map[string]interface{}{
+			"state": "ENABLED",
 			"providerConfigs": []interface{}{
 				map[string]interface{}{
 					"state": "ENABLED",
@@ -1351,6 +1356,7 @@ func TestUpdateTenant(t *testing.T) {
 		"enableEmailLinkSignin": testTenant.EnableEmailLinkSignIn,
 		"enableAnonymousUser":   testTenant.EnableAnonymousUsers,
 		"mfaConfig": map[string]interface{}{
+			"state": "ENABLED",
 			"providerConfigs": []interface{}{
 				map[string]interface{}{
 					"state": "ENABLED",
