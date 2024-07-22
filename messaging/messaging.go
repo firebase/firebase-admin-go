@@ -121,6 +121,7 @@ type AndroidConfig struct {
 	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
 	Notification          *AndroidNotification `json:"notification,omitempty"`
 	FCMOptions            *AndroidFCMOptions   `json:"fcm_options,omitempty"`
+	DirectBootOk          bool                 `json:"direct_boot_ok,omitempty"`
 }
 
 // MarshalJSON marshals an AndroidConfig into JSON (for internal use only).
