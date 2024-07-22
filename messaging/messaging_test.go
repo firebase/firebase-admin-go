@@ -145,6 +145,35 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "AndroidConfigWithDirectBootMode",
+		req: &Message{
+			Android: &AndroidConfig{
+				CollapseKey: "ck",
+				Data: map[string]string{
+					"k1": "v1",
+					"k2": "v2",
+				},
+				Priority:     "normal",
+				TTL:          &ttl,
+				DirectBootOk: true,
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"direct_boot_ok": true,
+				"collapse_key":   "ck",
+				"data": map[string]interface{}{
+					"k1": "v1",
+					"k2": "v2",
+				},
+				"priority": "normal",
+				"ttl":      "10s",
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
 		name: "AndroidNotificationMessage",
 		req: &Message{
 			Android: &AndroidConfig{
