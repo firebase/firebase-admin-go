@@ -16,8 +16,12 @@
 package appcheck
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -45,6 +49,8 @@ var (
 	ErrTokenIssuer = errors.New("token has incorrect issuer")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
 	ErrTokenSubject = errors.New("token has empty or missing subject")
+	// ErrTokenAlreadyConsumed is returned when the token is already consumed
+	ErrTokenAlreadyConsumed = errors.New("token already consumed")
 )
 
 // DecodedAppCheckToken represents a verified App Check token.
@@ -64,8 +70,9 @@ type DecodedAppCheckToken struct {
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
-	projectID string
-	jwks      *keyfunc.JWKS
+	projectID              string
+	jwks                   *keyfunc.JWKS
+	verifyAppCheckTokenURL string
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -83,8 +90,9 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	}
 
 	return &Client{
-		projectID: conf.ProjectID,
-		jwks:      jwks,
+		projectID:              conf.ProjectID,
+		jwks:                   jwks,
+		verifyAppCheckTokenURL: fmt.Sprintf("%sv1beta/projects/%s:verifyAppCheckToken", appCheckIssuer, conf.ProjectID),
 	}, nil
 }
 
@@ -164,6 +172,38 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	appCheckToken.Claims = claims
 
 	return &appCheckToken, nil
+}
+
+func (c *Client) VerifyTokenWithReplayProtection(token string) (*DecodedAppCheckToken, error) {
+	decodedAppCheckToken, err := c.VerifyToken(token)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify token: %v", err)
+	}
+
+	bodyReader := bytes.NewReader([]byte(fmt.Sprintf(`{"app_check_token":%s}`, token)))
+
+	resp, err := http.Post(c.verifyAppCheckTokenURL, "application/json", bodyReader)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var rb struct {
+		AlreadyConsumed bool `json:"alreadyConsumed"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&rb); err != nil {
+		return nil, err
+	}
+
+	if rb.AlreadyConsumed {
+		return decodedAppCheckToken, ErrTokenAlreadyConsumed
+	}
+
+	return decodedAppCheckToken, nil
 }
 
 func contains(s []string, str string) bool {

@@ -17,6 +17,80 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestVerifyTokenWithReplayProtection(t *testing.T) {
+
+	projectID := "project_id"
+
+	ts, err := setupFakeJWKS()
+	if err != nil {
+		t.Fatalf("error setting up fake JWKS server: %v", err)
+	}
+	defer ts.Close()
+
+	privateKey, err := loadPrivateKey()
+	if err != nil {
+		t.Fatalf("error loading private key: %v", err)
+	}
+
+	JWKSUrl = ts.URL
+	mockTime := time.Now()
+
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
+		Issuer:    appCheckIssuer,
+		Audience:  jwt.ClaimStrings([]string{"projects/" + projectID}),
+		Subject:   "12345678:app:ID",
+		ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(mockTime),
+		NotBefore: jwt.NewNumericDate(mockTime.Add(-1 * time.Hour)),
+	})
+
+	// kid matches the key ID in testdata/mock.jwks.json,
+	// which is the public key matching to the private key
+	// in testdata/appcheck_pk.pem.
+	jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+
+	token, err := jwtToken.SignedString(privateKey)
+
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	appCheckVerifyTestsTable := []struct {
+		label              string
+		mockServerResponse string
+		expectedError      error
+	}{
+		{label: "testWhenAlreadyConsumedResponseIsTrue", mockServerResponse: `{"alreadyConsumed": true}`, expectedError: ErrTokenAlreadyConsumed},
+		{label: "testWhenAlreadyConsumedResponseIsFalse", mockServerResponse: `{"alreadyConsumed": false}`, expectedError: nil},
+	}
+
+	for _, tt := range appCheckVerifyTestsTable {
+
+		t.Run(tt.label, func(t *testing.T) {
+			appCheckVerifyMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(tt.mockServerResponse))
+			}))
+
+			client, err := NewClient(context.Background(), &internal.AppCheckConfig{
+				ProjectID: projectID,
+			})
+
+			if err != nil {
+				t.Fatalf("error creating new client: %v", err)
+			}
+
+			client.verifyAppCheckTokenURL = appCheckVerifyMockServer.URL
+
+			_, err = client.VerifyTokenWithReplayProtection(token)
+
+			if !errors.Is(err, tt.expectedError) {
+				t.Errorf("failed to verify token; Expected: %v, but got: %v", tt.expectedError, err)
+			}
+		})
+
+	}
+}
+
 func TestVerifyTokenHasValidClaims(t *testing.T) {
 	ts, err := setupFakeJWKS()
 	if err != nil {
