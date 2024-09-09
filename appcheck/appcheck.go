@@ -174,11 +174,14 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	return &appCheckToken, nil
 }
 
+// VerifyTokenWithReplayProtection checks the given App Check token as follows:
+// - Uses VerifyToken to validate the given token as described. if verification failed, appropriate error will be returned.
+// - Checks if the token token has been consumed. if already consumed the pointer to decoded token is returned with ErrTokenAlreadyConsumed.
 func (c *Client) VerifyTokenWithReplayProtection(token string) (*DecodedAppCheckToken, error) {
 	decodedAppCheckToken, err := c.VerifyToken(token)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %v", err)
+		return nil, err
 	}
 
 	bodyReader := bytes.NewReader([]byte(fmt.Sprintf(`{"app_check_token":%s}`, token)))
