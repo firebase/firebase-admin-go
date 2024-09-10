@@ -17,7 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestVerifyTokenWithReplayProtection(t *testing.T) {
+func TestVerifyOneTimeToken(t *testing.T) {
 
 	projectID := "project_id"
 
@@ -37,8 +37,8 @@ func TestVerifyTokenWithReplayProtection(t *testing.T) {
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
 		Issuer:    appCheckIssuer,
-		Audience:  jwt.ClaimStrings([]string{"projects/" + projectID}),
-		Subject:   "12345678:app:ID",
+		Audience:  jwt.ClaimStrings([]string{"projects/12345678", "projects/" + projectID}),
+		Subject:   "1:12345678:android:abcdef",
 		ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(mockTime),
 		NotBefore: jwt.NewNumericDate(mockTime.Add(-1 * time.Hour)),
@@ -79,9 +79,9 @@ func TestVerifyTokenWithReplayProtection(t *testing.T) {
 				t.Fatalf("error creating new client: %v", err)
 			}
 
-			client.verifyAppCheckTokenURL = appCheckVerifyMockServer.URL
+			client.tokenVerificationUrl = appCheckVerifyMockServer.URL
 
-			_, err = client.VerifyTokenWithReplayProtection(token)
+			_, err = client.VerifyOneTimeToken(token)
 
 			if !errors.Is(err, tt.expectedError) {
 				t.Errorf("failed to verify token; Expected: %v, but got: %v", tt.expectedError, err)

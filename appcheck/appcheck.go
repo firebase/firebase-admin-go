@@ -36,6 +36,8 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
+const tokenVerificationUrlFormat = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
+
 var (
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
@@ -70,9 +72,9 @@ type DecodedAppCheckToken struct {
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
-	projectID              string
-	jwks                   *keyfunc.JWKS
-	verifyAppCheckTokenURL string
+	projectID            string
+	jwks                 *keyfunc.JWKS
+	tokenVerificationUrl string
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -90,9 +92,9 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	}
 
 	return &Client{
-		projectID:              conf.ProjectID,
-		jwks:                   jwks,
-		verifyAppCheckTokenURL: fmt.Sprintf("%sv1beta/projects/%s:verifyAppCheckToken", appCheckIssuer, conf.ProjectID),
+		projectID:            conf.ProjectID,
+		jwks:                 jwks,
+		tokenVerificationUrl: fmt.Sprintf(tokenVerificationUrlFormat, conf.ProjectID),
 	}, nil
 }
 
@@ -174,10 +176,34 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	return &appCheckToken, nil
 }
 
-// VerifyTokenWithReplayProtection checks the given App Check token as follows:
-// - Uses VerifyToken to validate the given token as described. if verification failed, appropriate error will be returned.
-// - Checks if the token token has been consumed. if already consumed the pointer to decoded token is returned with ErrTokenAlreadyConsumed.
-func (c *Client) VerifyTokenWithReplayProtection(token string) (*DecodedAppCheckToken, error) {
+// VerifyOneTimeToken verifies the given App Check token and consumes it, so that it cannot be consumed again.
+//
+// VerifyOneTimeToken considers an App Check token string to be valid if all the following conditions are met:
+//   - The token string is a valid RS256 JWT.
+//   - The JWT contains valid issuer (iss) and audience (aud) claims that match the issuerPrefix
+//     and projectID of the tokenVerifier.
+//   - The JWT contains a valid subject (sub) claim.
+//   - The JWT is not expired, and it has been issued some time in the past.
+//   - The JWT is signed by a Firebase App Check backend server as determined by the keySource.
+//
+// If any of the above conditions are not met, an error is returned, regardless whether the token was
+// previously consumed or not.
+//
+// This method currently only supports App Check tokens exchanged from the following attestation
+// providers:
+//
+//   - Play Integrity API
+//   - Apple App Attest
+//   - Apple DeviceCheck (DCDevice tokens)
+//   - reCAPTCHA Enterprise
+//   - reCAPTCHA v3
+//   - Custom providers
+//
+// App Check tokens exchanged from debug secrets are also supported. Calling this method on an
+// otherwise valid App Check token with an unsupported provider will cause an error to be returned.
+//
+// If the token was already consumed prior to this call, an error is returned.
+func (c *Client) VerifyOneTimeToken(token string) (*DecodedAppCheckToken, error) {
 	decodedAppCheckToken, err := c.VerifyToken(token)
 
 	if err != nil {
@@ -186,7 +212,7 @@ func (c *Client) VerifyTokenWithReplayProtection(token string) (*DecodedAppCheck
 
 	bodyReader := bytes.NewReader([]byte(fmt.Sprintf(`{"app_check_token":%s}`, token)))
 
-	resp, err := http.Post(c.verifyAppCheckTokenURL, "application/json", bodyReader)
+	resp, err := http.Post(c.tokenVerificationUrl, "application/json", bodyReader)
 
 	if err != nil {
 		return nil, err
@@ -203,7 +229,7 @@ func (c *Client) VerifyTokenWithReplayProtection(token string) (*DecodedAppCheck
 	}
 
 	if rb.AlreadyConsumed {
-		return decodedAppCheckToken, ErrTokenAlreadyConsumed
+		return nil, ErrTokenAlreadyConsumed
 	}
 
 	return decodedAppCheckToken, nil
