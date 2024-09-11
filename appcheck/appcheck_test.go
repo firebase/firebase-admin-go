@@ -79,7 +79,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 				t.Fatalf("error creating new client: %v", err)
 			}
 
-			client.tokenVerificationUrl = appCheckVerifyMockServer.URL
+			client.tokenVerifierUrl = appCheckVerifyMockServer.URL
 
 			_, err = client.VerifyOneTimeToken(token)
 

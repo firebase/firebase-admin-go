@@ -36,7 +36,7 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
-const tokenVerificationUrlFormat = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
+const tokenVerifierBaseUrl = "https://firebaseappcheck.googleapis.com"
 
 var (
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
@@ -72,9 +72,9 @@ type DecodedAppCheckToken struct {
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
-	projectID            string
-	jwks                 *keyfunc.JWKS
-	tokenVerificationUrl string
+	projectID        string
+	jwks             *keyfunc.JWKS
+	tokenVerifierUrl string
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -92,9 +92,9 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	}
 
 	return &Client{
-		projectID:            conf.ProjectID,
-		jwks:                 jwks,
-		tokenVerificationUrl: fmt.Sprintf(tokenVerificationUrlFormat, conf.ProjectID),
+		projectID:        conf.ProjectID,
+		jwks:             jwks,
+		tokenVerifierUrl: buildTokenVerifierUrl(conf.ProjectID),
 	}, nil
 }
 
@@ -212,7 +212,7 @@ func (c *Client) VerifyOneTimeToken(token string) (*DecodedAppCheckToken, error)
 
 	bodyReader := bytes.NewReader([]byte(fmt.Sprintf(`{"app_check_token":%s}`, token)))
 
-	resp, err := http.Post(c.tokenVerificationUrl, "application/json", bodyReader)
+	resp, err := http.Post(c.tokenVerifierUrl, "application/json", bodyReader)
 
 	if err != nil {
 		return nil, err
@@ -233,6 +233,10 @@ func (c *Client) VerifyOneTimeToken(token string) (*DecodedAppCheckToken, error)
 	}
 
 	return decodedAppCheckToken, nil
+}
+
+func buildTokenVerifierUrl(projectId string) string {
+	return fmt.Sprintf("%s/v1beta/projects/%s:verifyAppCheckToken", tokenVerifierBaseUrl, projectId)
 }
 
 func contains(s []string, str string) bool {
