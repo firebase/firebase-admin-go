@@ -148,7 +148,7 @@ var validMessages = []struct {
 		name: "AndroidDataMessage",
 		req: &Message{
 			Android: &AndroidConfig{
-				DirectBootOk: true,
+				DirectBootOK: true,
 				CollapseKey:  "ck",
 				Data: map[string]string{
 					"k1": "v1",
