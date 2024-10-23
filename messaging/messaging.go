@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -897,6 +898,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndp
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
+		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", runtime.Version(), conf.Version)),
 	}
 
 	return &fcmClient{
