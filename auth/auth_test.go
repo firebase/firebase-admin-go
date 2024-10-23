@@ -1452,10 +1452,10 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
 	}
 
-	xGoogApiClientHeader := req.Header.Get("x-goog-api-client")
-	wantXGoogApiClientHeader := fmt.Sprintf("gl-go/%s fire-admin/%s", runtime.Version(), testVersion)
-	if xGoogApiClientHeader != wantXGoogApiClientHeader {
-		return fmt.Errorf("x-goog-api-client header = %q; want = %q", xGoogApiClientHeader, wantXGoogApiClientHeader)
+	xGoogAPIClientHeader := req.Header.Get("x-goog-api-client")
+	wantXGoogAPIClientHeader := fmt.Sprintf("gl-go/%s fire-admin/%s", runtime.Version(), testVersion)
+	if xGoogAPIClientHeader != wantXGoogAPIClientHeader {
+		return fmt.Errorf("x-goog-api-client header = %q; want = %q", xGoogAPIClientHeader, wantXGoogAPIClientHeader)
 	}
 
 	return nil
