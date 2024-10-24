@@ -134,11 +134,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
+	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	hc := internal.WithDefaultRetryConfig(transport)
 	hc.CreateErrFn = handleHTTPError
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", runtime.Version(), conf.Version)),
+		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, conf.Version)),
 	}
 
 	baseURL := defaultAuthURL

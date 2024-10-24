@@ -2317,7 +2317,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		}
 
 		gh = r.Header.Get("x-goog-api-client")
-		wh = fmt.Sprintf("gl-go/%s fire-admin/%s", runtime.Version(), testVersion)
+		wh = fmt.Sprintf("gl-go/%s fire-admin/%s", strings.TrimPrefix(runtime.Version(), "go"), testVersion)
 		if gh != wh {
 			t.Errorf("x-goog-api-client header = %q; want: %q", gh, wh)
 		}
