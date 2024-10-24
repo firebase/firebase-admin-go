@@ -42,6 +42,7 @@ const (
 	testVersion                = "test-version"
 	defaultIDToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 	defaultIDToolkitV2Endpoint = "https://identitytoolkit.googleapis.com/v2"
+	secondFactorIdentifier     = "aaaaaaaa-1111-bbbb-2222-cccccccccccc"
 )
 
 var (
@@ -466,6 +467,12 @@ func TestVerifyIDToken(t *testing.T) {
 	}
 	if ft.UID != ft.Subject {
 		t.Errorf("UID = %q; Sub = %q; want UID = Sub", ft.UID, ft.Subject)
+	}
+	if ft.Firebase.SignInSecondFactor != "totp" {
+		t.Errorf("SignInSecondFactor = %q; want = %q", ft.Firebase.SignInSecondFactor, "totp")
+	}
+	if ft.Firebase.SecondFactorIdentifier != secondFactorIdentifier {
+		t.Errorf("SecondFactorIdentifier = %q; want = %q", ft.Firebase.SecondFactorIdentifier, secondFactorIdentifier)
 	}
 }
 
@@ -1363,8 +1370,10 @@ func getIDTokenWithSignerAndKid(signer cryptoSigner, kid string, p mockIDTokenPa
 		"auth_time": testClock.Now().Unix() - 100,
 		"sub":       "1234567890",
 		"firebase": map[string]interface{}{
-			"identities":       map[string]interface{}{},
-			"sign_in_provider": "custom",
+			"identities":               map[string]interface{}{},
+			"sign_in_provider":         "custom",
+			"sign_in_second_factor":    "totp",
+			"second_factor_identifier": secondFactorIdentifier,
 		},
 		"admin": true,
 	}
