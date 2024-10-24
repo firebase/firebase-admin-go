@@ -32,6 +32,7 @@ type ActionCodeSettings struct {
 	AndroidMinimumVersion string `json:"androidMinimumVersion,omitempty"`
 	AndroidInstallApp     bool   `json:"androidInstallApp,omitempty"`
 	DynamicLinkDomain     string `json:"dynamicLinkDomain,omitempty"`
+	SendEmailLink         bool   `json:"-"`
 }
 
 func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
@@ -39,8 +40,8 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 		return nil, errors.New("URL must not be empty")
 	}
 
-	url, err := url.Parse(settings.URL)
-	if err != nil || url.Scheme == "" || url.Host == "" {
+	parsedURL, err := url.Parse(settings.URL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return nil, fmt.Errorf("malformed url string: %q", settings.URL)
 	}
 
@@ -58,6 +59,9 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 	if err := json.Unmarshal(b, &result); err != nil {
 		return nil, err
 	}
+	// Since SendEmailLink defaults to false, we will always set "returnOobLink" to true by default.
+	// This means no email is sent out in the default case
+	result["returnOobLink"] = !settings.SendEmailLink
 	return result, nil
 }
 
@@ -114,9 +118,8 @@ func (c *baseClient) generateEmailActionLink(
 	}
 
 	payload := map[string]interface{}{
-		"requestType":   linkType,
-		"email":         email,
-		"returnOobLink": true,
+		"requestType": linkType,
+		"email":       email,
 	}
 	if settings != nil {
 		settingsMap, err := settings.toMap()
