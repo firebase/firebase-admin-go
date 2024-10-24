@@ -45,9 +45,9 @@ requests, code review feedback, and also pull requests.
 ## Supported Go Versions
 
 The Admin Go SDK is compatible with at least the three most recent, major Go releases.
-We currently support Go v1.20 and higher.
+We currently support Go v1.21 and higher.
 [Continuous integration](https://github.com/firebase/firebase-admin-go/actions) system
-tests the code on Go v1.20 through v1.22.
+tests the code on Go v1.21 through v1.23.
 
 ## Documentation
 

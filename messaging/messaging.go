@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -121,6 +122,7 @@ type AndroidConfig struct {
 	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
 	Notification          *AndroidNotification `json:"notification,omitempty"`
 	FCMOptions            *AndroidFCMOptions   `json:"fcm_options,omitempty"`
+	DirectBootOK          bool                 `json:"direct_boot_ok,omitempty"`
 }
 
 // MarshalJSON marshals an AndroidConfig into JSON (for internal use only).
@@ -892,10 +894,12 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndp
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 
+	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
+		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, conf.Version)),
 	}
 
 	return &fcmClient{
