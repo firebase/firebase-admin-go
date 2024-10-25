@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,7 +150,7 @@ var validMessages = []struct {
 		name: "AndroidDataMessage",
 		req: &Message{
 			Android: &AndroidConfig{
-				DirectBootOk: true,
+				DirectBootOK: true,
 				CollapseKey:  "ck",
 				Data: map[string]string{
 					"k1": "v1",
@@ -1393,6 +1395,11 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	clientVersion := "fire-admin-go/" + testMessagingConfig.Version
 	if h := tr.Header.Get("X-FIREBASE-CLIENT"); h != clientVersion {
 		t.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
+	}
+	goVersion := strings.TrimPrefix(runtime.Version(), "go")
+	xGoogAPIClientHeader := "gl-go/" + goVersion + " fire-admin/" + testMessagingConfig.Version
+	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 }
 
