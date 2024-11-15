@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	defaulBaseUrl			= "https://firebaseremoteconfig.googleapis.com'"
+	defaulBaseUrl			= "https://firebaseremoteconfig.googleapis.com"
 	firebaseClientHeader   	= "X-Firebase-Client"
 )
 
@@ -118,8 +118,8 @@ func handleRemoteConfigError(resp *internal.Response) error {
 }
 
 type ServerTemplateData struct {
-	Conditions		map[string]interface{} 			 `json:"conditions"`
-	Parameters 		map[string]RemoteConfigParameter `json:"parameters"`
+	Conditions		interface{}		`json:"conditions"`
+	Parameters 		map[string]RemoteConfigParameter	`json:"parameters"`
 
 	Version struct {
 		VersionNumber 	string 	`json:"versionNumber"`
@@ -166,6 +166,7 @@ func (s *ServerTemplate) Load(ctx context.Context) error {
 
 	templateData.ETag = response.Header.Get("etag")
 	s.Cache = &templateData
+	fmt.Println("Etag", s.Cache.ETag) // TODO: Remove ETag 
 	return nil
 }
 
@@ -182,25 +183,10 @@ func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig 
 }
 
 type ServerConfig struct {
-	ConfigValues any
-}
-
-// GetBoolean retrieves a boolean value from the configuration by key.
-func (sc *ServerConfig) GetBoolean(key string) bool {
-	return sc.GetValue(key).(bool)
-}
-
-// GetString retrieves a string value from the configuration by key.
-func (sc *ServerConfig) GetString(key string) string {
-	return sc.GetValue(key).(string)
-}
-
-// GetInt retrieves an integer value from the configuration by key.
-func (sc *ServerConfig) GetInt(key string) int {
-	return sc.GetValue(key).(int)
+	ConfigValues map[string]RemoteConfigParameter
 }
 
 // GetValue returns the raw value associated with a key in the configuration.
 func (sc *ServerConfig) GetValue(key string) interface{} {
-	return sc.ConfigValues.(map[string]interface{})[key]
+	return sc.ConfigValues[key].DefaultValue
 }
