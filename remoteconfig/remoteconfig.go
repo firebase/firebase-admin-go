@@ -22,13 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"firebase.google.com/go/v4/internal"
-	"google.golang.org/api/transport"
 )
 
 const (
@@ -54,21 +51,19 @@ func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Clie
 	}
 
     return &Client{
-		rcClient: newRcClient(hc, c)
+		rcClient: newRcClient(hc, c),
     },nil
 }
 
 // RemoteConfigClient facilitates requests to the Firebase Remote Config backend.
 type rcClient struct {
-    httpClient   *internal.HTTPClient
-    projectId    string
-    rcBaseUrl    string
-	version:	 string
+    HttpClient   *internal.HTTPClient
+    Project    string
+    RcBaseUrl    string
+	Version	  	 string
 }
 
-func newRcClient(hc *http.Client, conf *internal.RemoteConfigClientConfig) *rcClient {
-	client := internal.WithDefaultRetryConfig(hc)
-
+func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientConfig) *rcClient {
 	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
@@ -77,36 +72,34 @@ func newRcClient(hc *http.Client, conf *internal.RemoteConfigClientConfig) *rcCl
 		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, conf.Version)),
 	}
 
-	hc.CreateErrFn = handleRemoteConfigError
+	client.CreateErrFn = handleRemoteConfigError
 
 	return &rcClient{
-		rcBaseUrl: 	defaulBaseUrl,
-		project:   	conf.ProjectID,
-		version:   	version,
-		httpClient:	client,
+		RcBaseUrl: 	defaulBaseUrl,
+		Project:   	conf.ProjectID,
+		Version:   	version,
+		HttpClient:	client,
 	}
 }
 
-func (c *rcClient) GetServerTemplate(ctx: context.Context, defaultConfig map[string]string) (*ServerTemplate, error) { 
+func (c *rcClient) GetServerTemplate(ctx context.Context, defaultConfig map[string]string) (*ServerTemplate, error) { 
 	// Initialize a new ServerTemplate instance 
 	template := c.InitServerTemplate(defaultConfig, nil) 
   
 	// Load the template data from the server and cache it 
-	_, err := template.Load(ctx);
+	err := template.Load(ctx);
 
 	return template, err;
   }
   
-func (c *rcClient) InitServerTemplate(ctx: context.Context, defaultConfig map[string]string, 
-	templateData *ServerTemplateData) *ServerTemplate { 
+func (c *rcClient) InitServerTemplate(defaultConfig map[string]string, templateData *ServerTemplateData) *ServerTemplate { 
 	// Create the ServerTemplate instance with defaultConfig
-	if (defaultConfig != nil) { 
-		template := NewServerTemplate(defaultConfig) 
-	}
+	template := NewServerTemplate(c) 
+
 	// Set template data if provided 
-	if templateData != nil { 
-		template.Set(templateData) 
-	} 
+	//if templateData != nil { 
+	//	template.Set(templateData) 
+	//} 
 
 	return template
 }
@@ -125,17 +118,19 @@ func handleRemoteConfigError(resp *internal.Response) error {
 }
 
 type ServerTemplateData struct {
-    Conditions map[string]interface{} `json:"conditions"`
-    Parameters map[string]RemoteConfigParameter `json:"parameters"`
+    Conditions 			map[string]interface{} 			 `json:"conditions"`
+    Parameters 			map[string]RemoteConfigParameter `json:"parameters"`
+
 	Version struct {
-		VersionNumber string `json:"versionNumber"`
-		IsLegacy      bool   `json:"isLegacy"`
-	} `json:"version"`
-	ETag       string
+		VersionNumber 	string 							 `json:"versionNumber"`
+		IsLegacy      	bool   							 `json:"isLegacy"`
+	} 													 `json:"version"`
+
+	ETag       			string
 }
 
 type RemoteConfigParameter struct {
-    DefaultValue      RemoteConfigParameterValue `json:"defaultValue"`
+    DefaultValue      RemoteConfigParameterValue 			`json:"defaultValue"`
     ConditionalValues map[string]RemoteConfigParameterValue `json:"conditionalValues"`
 }
 
@@ -143,25 +138,15 @@ type RemoteConfigParameterValue interface{}
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
-    rcClient	*rcClient
-    cache       *ServerTemplateData
-}
-
-// NewServerTemplateData initializes a ServerTemplateData instance with template data and an ETag.
-func NewServerTemplateData(templateResponse *internal.Response) *ServerTemplateData {
-    return &ServerTemplateData{
-		Conditions:	templateData["conditions"].([]NamedCondition),
-		Parameters:	templateData["parameters"].(map[string]RemoteConfigParameter),
-        Version:	templateData["version"].(string),
-        ETag:		templateData["etag"].(string)
-    }
+    RcClient	*rcClient
+    Cache       *ServerTemplateData
 }
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
 func NewServerTemplate(rcClient *rcClient) *ServerTemplate {
     return &ServerTemplate{
-		rcClient: rcClient,
-        cache:	  nil
+		RcClient: rcClient,
+        Cache:	  nil,
     }
 }
 
@@ -169,41 +154,48 @@ func NewServerTemplate(rcClient *rcClient) *ServerTemplate {
 func (s *ServerTemplate) Load(ctx context.Context) error {
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", c.rcBaseUrl , c.project),
-		Body:   internal.NewJSONEntity(req),
+		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.RcClient.RcBaseUrl , s.RcClient.Project),
 	}
 
 	var templateData ServerTemplateData
-    response, err := s.rcClient.httpClient.Do(ctx, request, &templateData)
+    response, err := s.RcClient.HttpClient.DoAndUnmarshal(ctx, request, &templateData)
 
 	if err != nil {
 		return err
 	}
 
 	templateData.ETag = response.Header.Get("etag")
-    s.cache = templateData
+    s.Cache = &templateData
     return nil
 }
-
 
 // Evaluate processes the cached template data with a condition evaluator 
 // based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
     // TODO: Write ConditionalEvaluator for evaluating
-    return &ServerConfig{ConfigValues: evaluator.Evaluate()}
+    return &ServerConfig{ConfigValues: s.Cache.Parameters}
 }
-
 
 type ServerConfig struct {
-	Values	map[string]interface{}
+    ConfigValues any
 }
 
-func (s *ServerConfig) GetValue(key string) bool {
-	return Values[key]
+// GetBoolean retrieves a boolean value from the configuration by key.
+func (sc *ServerConfig) GetBoolean(key string) bool {
+    return sc.GetValue(key).(bool)
 }
 
+// GetString retrieves a string value from the configuration by key.
+func (sc *ServerConfig) GetString(key string) string {
+    return sc.GetValue(key).(string)
+}
 
+// GetInt retrieves an integer value from the configuration by key.
+func (sc *ServerConfig) GetInt(key string) int {
+    return sc.GetValue(key).(int)
+}
 
-
-
-  
+// GetValue returns the raw value associated with a key in the configuration.
+func (sc *ServerConfig) GetValue(key string) interface{} {
+    return sc.ConfigValues.(map[string]interface{})[key]
+}
