@@ -30,7 +30,7 @@ import (
 
 const (
 	defaulBaseUrl			= "https://firebaseremoteconfig.googleapis.com"
-	firebaseClientHeader   	= "X-Firebase-Client"
+	firebaseClientHeader	= "X-Firebase-Client"
 )
 
 // Client is the interface for the Remote Config Cloud service.
@@ -57,10 +57,10 @@ func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Clie
 
 // RemoteConfigClient facilitates requests to the Firebase Remote Config backend.
 type rcClient struct {
-	HttpClient   *internal.HTTPClient
-	Project    string
-	RcBaseUrl    string
-	Version	  	 string
+	HttpClient	*internal.HTTPClient
+	Project		string
+	RcBaseUrl	string
+	Version		string
 }
 
 func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientConfig) *rcClient {
@@ -90,7 +90,7 @@ func (c *rcClient) GetServerTemplate(ctx context.Context) (*ServerTemplate, erro
 	err := template.Load(ctx);
 
 	return template, err;
-  }
+}
   
 func (c *rcClient) InitServerTemplate(templateData *ServerTemplateData) *ServerTemplate { 
 	// Create the ServerTemplate instance with defaultConfig
@@ -118,20 +118,20 @@ func handleRemoteConfigError(resp *internal.Response) error {
 }
 
 type ServerTemplateData struct {
-	Conditions		interface{}		`json:"conditions"`
-	Parameters 		map[string]RemoteConfigParameter	`json:"parameters"`
+	Conditions	interface{}							`json:"conditions"`
+	Parameters	map[string]RemoteConfigParameter	`json:"parameters"`
 
 	Version struct {
-		VersionNumber 	string 	`json:"versionNumber"`
-		IsLegacy      	bool   	`json:"isLegacy"`
-	} 							`json:"version"`
+		VersionNumber	string	`json:"versionNumber"`
+		IsLegacy		bool	`json:"isLegacy"`
+	}	`json:"version"`
 
 	ETag	string
 }
 
 type RemoteConfigParameter struct {
-	DefaultValue      RemoteConfigParameterValue 			`json:"defaultValue"`
-	ConditionalValues map[string]RemoteConfigParameterValue `json:"conditionalValues"`
+	DefaultValue		RemoteConfigParameterValue				`json:"defaultValue"`
+	ConditionalValues	map[string]RemoteConfigParameterValue	`json:"conditionalValues"`
 }
 
 type RemoteConfigParameterValue interface{}
