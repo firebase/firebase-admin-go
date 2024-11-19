@@ -18,6 +18,7 @@ package appcheck
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -77,6 +78,7 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
 		Ctx:             ctx,
 		RefreshInterval: 6 * time.Hour,
+		RequestFactory:  makeRequestFactory(conf),
 	})
 	if err != nil {
 		return nil, err
@@ -86,6 +88,23 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		projectID: conf.ProjectID,
 		jwks:      jwks,
 	}, nil
+}
+
+func makeRequestFactory(conf *internal.AppCheckConfig) func(ctx context.Context, url string) (*http.Request, error) {
+	opts := []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+	}
+
+	return func(ctx context.Context, url string) (*http.Request, error) {
+		hr, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range opts {
+			o(hr)
+		}
+		return hr, nil
+	}
 }
 
 // VerifyToken verifies the given App Check token.

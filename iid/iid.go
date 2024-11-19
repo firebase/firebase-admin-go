@@ -116,6 +116,9 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 	}
 
 	hc, _, err := internal.NewHTTPClient(ctx, c.Opts...)
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(c.Version)),
+	}
 	if err != nil {
 		return nil, err
 	}

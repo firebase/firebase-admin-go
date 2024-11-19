@@ -172,6 +172,9 @@ type iamSigner struct {
 
 func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner, error) {
 	hc, _, err := internal.NewHTTPClient(ctx, config.Opts...)
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(config.Version)),
+	}
 	if err != nil {
 		return nil, err
 	}

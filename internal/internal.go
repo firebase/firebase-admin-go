@@ -50,6 +50,7 @@ type HashConfig map[string]interface{}
 type InstanceIDConfig struct {
 	Opts      []option.ClientOption
 	ProjectID string
+	Version   string
 }
 
 // DatabaseConfig represents the configuration of Firebase Database service.
@@ -76,6 +77,7 @@ type MessagingConfig struct {
 // AppCheckConfig represents the configuration of App Check service.
 type AppCheckConfig struct {
 	ProjectID string
+	Version   string
 }
 
 // MockTokenSource is a TokenSource implementation that can be used for testing.
