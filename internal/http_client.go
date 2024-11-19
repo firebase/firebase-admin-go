@@ -444,6 +444,7 @@ func retryNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
 	}
 }
 
+// GetMetricsHeader constructs header value for metrics attribution
 func GetMetricsHeader(sdkVersion string) string {
 	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	return fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, sdkVersion)
