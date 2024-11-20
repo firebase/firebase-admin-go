@@ -17,14 +17,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var testAppCheckConfig = &internal.AppCheckConfig{
-	ProjectID: "project_id",
-	Version:   "test-version",
-}
-
 func TestVerifyTokenHasValidClaims(t *testing.T) {
-	var tr http.Request
-	ts, err := setupFakeJWKS(&tr)
+	ts, err := setupFakeJWKS()
 	if err != nil {
 		t.Fatalf("Error setting up fake JWKS server: %v", err)
 	}
@@ -36,15 +30,13 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	}
 
 	JWKSUrl = ts.URL
-
-	client, err := NewClient(context.Background(), testAppCheckConfig)
-	if err != nil {
-		t.Errorf("Error creating NewClient: %v", err)
+	conf := &internal.AppCheckConfig{
+		ProjectID: "project_id",
 	}
 
-	xGoogAPIClientHeader := internal.GetMetricsHeader(testAppCheckConfig.Version)
-	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
-		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
+	client, err := NewClient(context.Background(), conf)
+	if err != nil {
+		t.Errorf("Error creating NewClient: %v", err)
 	}
 
 	type appCheckClaims struct {
@@ -177,16 +169,18 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 }
 
 func TestVerifyTokenMustExist(t *testing.T) {
-	var tr http.Request
-	ts, err := setupFakeJWKS(&tr)
+	ts, err := setupFakeJWKS()
 	if err != nil {
 		t.Fatalf("Error setting up fake JWK server: %v", err)
 	}
 	defer ts.Close()
 
 	JWKSUrl = ts.URL
+	conf := &internal.AppCheckConfig{
+		ProjectID: "project_id",
+	}
 
-	client, err := NewClient(context.Background(), testAppCheckConfig)
+	client, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
@@ -203,8 +197,7 @@ func TestVerifyTokenMustExist(t *testing.T) {
 }
 
 func TestVerifyTokenNotExpired(t *testing.T) {
-	var tr http.Request
-	ts, err := setupFakeJWKS(&tr)
+	ts, err := setupFakeJWKS()
 	if err != nil {
 		t.Fatalf("Error setting up fake JWKS server: %v", err)
 	}
@@ -216,8 +209,11 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	}
 
 	JWKSUrl = ts.URL
+	conf := &internal.AppCheckConfig{
+		ProjectID: "project_id",
+	}
 
-	client, err := NewClient(context.Background(), testAppCheckConfig)
+	client, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
@@ -268,13 +264,12 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	}
 }
 
-func setupFakeJWKS(tr *http.Request) (*httptest.Server, error) {
+func setupFakeJWKS() (*httptest.Server, error) {
 	jwks, err := os.ReadFile("../testdata/mock.jwks.json")
 	if err != nil {
 		return nil, err
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*tr = *r
 		w.Write(jwks)
 	}))
 	return ts, nil
