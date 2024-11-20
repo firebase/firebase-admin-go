@@ -24,34 +24,54 @@ import (
 	"firebase.google.com/go/v4/internal"
 )
 
-type ServerTemplateData struct {
-	Conditions []struct {
-		Name      string      `json:"name"`
-		Condition interface{} `json:"condition"`
-	} `json:"conditions"`
-	Parameters map[string]RemoteConfigParameter `json:"parameters"`
-
-	Version struct {
-		VersionNumber string `json:"versionNumber"`
-		IsLegacy bool `json:"isLegacy"`
-	}	`json:"version"`
-
-	ETag  string
-}
-
-type RemoteConfigParameter struct {
-	DefaultValue struct {
-		Value string `json:"value"`
-	} `json:"defaultValue"`
-	ConditionalValues map[string]RemoteConfigParameterValue `json:"conditionalValues"`
-}
-
-type RemoteConfigParameterValue interface{}
-
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
 	RcClient  *rcClient
 	Cache     *ServerTemplateData
+}
+
+// Represents the data in a Remote Config server template.
+type ServerTemplateData struct {
+	// A list of conditions in descending order by priority.
+	Conditions []NamedCondition
+
+	// Map of parameter keys to their optional default values and optional conditional values.
+	Parameters map[string]RemoteConfigParameter
+
+	// Current Remote Config template ETag.
+	ETag string
+
+	// Version information for the current Remote Config template.
+	Version *Version
+}
+
+// Structure representing a Remote Config parameter.
+// At minimum, a `defaultValue` or a `conditionalValues` entry must be present for the parameter to have any effect.
+type RemoteConfigParameter struct {
+
+	// The value to set the parameter to, when none of the named conditions evaluate to `true`.
+	DefaultValue RemoteConfigParameterValue
+
+	// A `(condition name, value)` map. The condition name of the highest priority
+	// (the one listed first in the Remote Config template's conditions list) determines the value of this parameter.
+	ConditionalValues map[string]RemoteConfigParameterValue
+
+	// A description for this parameter. Should not be over 100 characters and may contain any Unicode characters.
+	Description string
+
+	// The data type for all values of this parameter in the current version of the template.
+	// Defaults to type string if unspecified.
+	ValueType ParameterValueType
+}
+
+// Represents a Remote Config parameter value
+// that could be either an explicit parameter value or an in-app default value.
+type RemoteConfigParameterValue struct {
+	// The `string` value that the parameter is set to when it is an explicit parameter value
+	Value *string
+
+	// If true, indicates that the in-app default value is to be used for the parameter
+	UseInAppDefault *bool
 }
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
