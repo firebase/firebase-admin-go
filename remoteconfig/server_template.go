@@ -1,3 +1,19 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package messaging contains functions for sending messages and managing
+// device subscriptions with Firebase Cloud Messaging (FCM).
 package remoteconfig
 
 import (
@@ -10,32 +26,32 @@ import (
 
 type ServerTemplateData struct {
 	Conditions []struct {
-		Name      string `json:"name"`
+		Name      string      `json:"name"`
 		Condition interface{} `json:"condition"`
 	} `json:"conditions"`
-	Parameters	map[string]RemoteConfigParameter `json:"parameters"`
+	Parameters map[string]RemoteConfigParameter `json:"parameters"`
 
 	Version struct {
-		VersionNumber	string	`json:"versionNumber"`
-		IsLegacy	bool	`json:"isLegacy"`
+		VersionNumber string `json:"versionNumber"`
+		IsLegacy bool `json:"isLegacy"`
 	}	`json:"version"`
 
-	ETag	string
+	ETag  string
 }
 
 type RemoteConfigParameter struct {
 	DefaultValue struct {
 		Value string `json:"value"`
 	} `json:"defaultValue"`
-	ConditionalValues   map[string]RemoteConfigParameterValue	`json:"conditionalValues"`
+	ConditionalValues map[string]RemoteConfigParameterValue `json:"conditionalValues"`
 }
 
 type RemoteConfigParameterValue interface{}
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
-	RcClient	*rcClient
-	Cache       *ServerTemplateData
+	RcClient  *rcClient
+	Cache     *ServerTemplateData
 }
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
@@ -75,7 +91,6 @@ func (s *ServerTemplate) Set(templateData *ServerTemplateData) {
 // based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
 	// TODO: Write ConditionalEvaluator for evaluating
-
     configMap := make(map[string]Value)
     for key, value := range s.Cache.Parameters{
         configMap[key] = *NewValue(Remote, value.DefaultValue.Value)

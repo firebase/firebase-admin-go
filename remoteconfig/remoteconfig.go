@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	defaulBaseUrl			= "https://firebaseremoteconfig.googleapis.com"
-	firebaseClientHeader	= "X-Firebase-Client"
+	defaulBaseUrl         = "https://firebaseremoteconfig.googleapis.com"
+	firebaseClientHeader  = "X-Firebase-Client"
 )
 
 // Client is the interface for the Remote Config Cloud service.

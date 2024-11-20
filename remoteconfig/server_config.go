@@ -1,3 +1,19 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package messaging contains functions for sending messages and managing
+// device subscriptions with Firebase Cloud Messaging (FCM).
 package remoteconfig
 
 import (
@@ -21,9 +37,10 @@ const (
 	// Remote represents a value fetched from a remote source.
 	Remote string = "remote"
 
-	defaultValueForBoolean = false
-	defaultValueForString  = ""
-	defaultValueForNumber = 0
+	// Default Values
+	DefaultValueForBoolean = false
+	DefaultValueForString  = ""
+	DefaultValueForNumber = 0
 )
 
 var booleanTruthyValues = []string{"1", "true", "t", "yes", "y", "on"}
@@ -64,7 +81,7 @@ func (s *ServerConfig) GetValue(key string) *Value {
 // NewValue creates a new Value instance.
 func NewValue(source string, value string) *Value {
 	if value == "" {
-		value = defaultValueForString
+		value = DefaultValueForString
 	}
 	return &Value{source: source, value: value}
 }
@@ -77,7 +94,7 @@ func (v *Value) asString() string {
 // asBoolean returns the value as a boolean.
 func (v *Value) asBoolean() bool {
 	if v.source == Static {
-		return defaultValueForBoolean
+		return DefaultValueForBoolean
 	}
 
 	for _, truthyValue := range booleanTruthyValues {
@@ -92,12 +109,12 @@ func (v *Value) asBoolean() bool {
 // asNumber returns the value as an integer.
 func (v *Value) asNumber() int {
 	if v.source == Static {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 	num, err := strconv.Atoi(v.value)
 	
 	if err != nil {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 
 	return num
