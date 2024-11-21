@@ -115,6 +115,7 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 	conf := &internal.InstanceIDConfig{
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return iid.NewClient(ctx, conf)
 }
