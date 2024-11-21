@@ -1363,8 +1363,9 @@ func getIDTokenWithSignerAndKid(signer cryptoSigner, kid string, p mockIDTokenPa
 		"auth_time": testClock.Now().Unix() - 100,
 		"sub":       "1234567890",
 		"firebase": map[string]interface{}{
-			"identities":       map[string]interface{}{},
-			"sign_in_provider": "custom",
+			"identities":         map[string]interface{}{},
+			"sign_in_provider":   "custom",
+			"sign_in_attributes": map[string]interface{}{},
 		},
 		"admin": true,
 	}
