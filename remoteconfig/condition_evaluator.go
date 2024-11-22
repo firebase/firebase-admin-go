@@ -4,15 +4,12 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"reflect"
 	"strconv"
-	"strings"
 )
-
 
 const (
 	MaxConditionRecursionDepth = 10
-	RandomizationId = "randomizationId"
+	RandomizationId            = "randomizationId"
 )
 
 // Represents a Remote Config condition in the dataplane.
@@ -178,7 +175,7 @@ func (ce *ConditionEvaluator) evaluateConditions() ([]string, map[string]bool) {
 }
 
 func (ce *ConditionEvaluator) evaluateCondition(condition *OneOfCondition, nestingLevel int) bool {
-	if (nestingLevel >= MaxConditionRecursionDepth) {
+	if nestingLevel >= MaxConditionRecursionDepth {
 		return false
 	}
 	if condition.OrCondition != nil {
@@ -196,6 +193,7 @@ func (ce *ConditionEvaluator) evaluateCondition(condition *OneOfCondition, nesti
 func (ce *ConditionEvaluator) evaluateOrCondition(orCondition *OrCondition, nestingLevel int) bool {
 	for _, condition := range orCondition.Conditions {
 		result := ce.evaluateCondition(&condition, nestingLevel+1)
+		// short-circuit evaluation, return true if any of the conditions return true
 		if result {
 			return true
 		}
@@ -206,7 +204,8 @@ func (ce *ConditionEvaluator) evaluateOrCondition(orCondition *OrCondition, nest
 func (ce *ConditionEvaluator) evaluateAndCondition(andCondition *AndCondition, nestingLevel int) bool {
 	for _, condition := range andCondition.Conditions {
 		result := ce.evaluateCondition(&condition, nestingLevel+1)
-		if result {
+		// short-circuit evaluation, return false if any of the conditions return false
+		if !result {
 			return false
 		}
 	}
@@ -242,59 +241,88 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 		return false
 	}
 	if actualCustomSignalValue, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]; ok {
-		switch (customSignalCondition.CustomSignalOperator) {
-			case "STRING_CONTAINS":
-				return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(target, actual string) bool {return true})
-			case "STRING_DOES_NOT_CONTAIN":
-				return true 
-			case "STRING_EXACTLY_MATCHES":
-				return true 
-			case "STRING_CONTAINS_REGEX":
-				return true 
-		
-			// For numeric operators only one target value is allowed.
-			case "NUMERIC_LESS_THAN":
-				return true
-			case "NUMERIC_LESS_EQUAL":
-				return true 
-			case "NUMERIC_EQUAL":
-				return true 
-			case "NUMERIC_NOT_EQUAL":
-				return true 
-			case "NUMERIC_GREATER_THAN":
-				return true
-			case "NUMERIC_GREATER_EQUAL":
-				return true
+		switch customSignalCondition.CustomSignalOperator {
+		// For numeric operators only one target value is allowed
+		case "NUMERIC_LESS_THAN":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, lessThan)
+		case "NUMERIC_LESS_EQUAL":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, lessThanOrEqual)
+		case "NUMERIC_EQUAL":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, equalTo)
+		case "NUMERIC_NOT_EQUAL":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, notEqualTo)
+		case "NUMERIC_GREATER_THAN":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, greaterThan)
+		case "NUMERIC_GREATER_EQUAL":
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, greaterThanOrEqual)
 		}
-	} 
+	}
 	return false
 }
 
-// Compares the actual string value of a signal against a list of target
-// values. If any of the target values are a match, returns true.
+// Compares the actual string value of a signal against a list of target values.
+// If any of the target values are a match, returns true.
 func compareStrings(targetValues []string, actualValue any, predicateFn func(target string, actual string) bool) bool {
-	var actual string 
-	switch actualValue.(type) {
-		case string:
-			actual = actualValue.(string)
-		case bool:
-			actual = strconv.FormatBool(actualValue.(bool))
-		default:
-			return false // not an expected data type, return false and do no further processing
-	}
-	if actualAsString, ok := actualValue.(string); ok {
-		actual = actualAsString
-	} else {
-		actual = strconv.Itoa(actualValue.(int))
+	var actual string
+	switch actualValue := actualValue.(type) {
+	case string:
+		actual = actualValue
+	case int:
+		actual = strconv.Itoa(actualValue)
+	case float64:
+		actual = strconv.FormatFloat(actualValue, 'f', -1, 64)
+	default:
+		// if the custom signal is passed with a value other than these data types return false -- should throw an error ?
+		return false
 	}
 	for _, target := range targetValues {
-		if (predicateFn(target, actual)) {
+		if predicateFn(target, actual) {
 			return true
 		}
 	}
- 	return false
-}	
+	return false
+}
 
-func compareNumbers(targetValue []string, actualValue any, predicateFn func(target string, actual string) bool) bool {
-	return true
+func compareNumbers(targetValue []string, actualValue any, predicateFn func(actual float64, target float64) bool) bool {
+	if len(targetValue) == 0 {
+		return false
+	}
+	var actualValueAsFloat float64
+	switch actualValue := actualValue.(type) {
+	case int:
+		actualValueAsFloat = float64(actualValue)
+	case float64:
+		actualValueAsFloat = actualValue
+	default:
+		return false
+	}
+	targetValueAsFloat, err := strconv.ParseFloat(targetValue[0], 64)
+	if err != nil {
+		return false
+	}
+	return predicateFn(actualValueAsFloat, targetValueAsFloat)
+}
+
+func lessThan(x float64, y float64) bool {
+	return x < y
+}
+
+func lessThanOrEqual(x float64, y float64) bool {
+	return x < y
+}
+
+func equalTo(x float64, y float64) bool {
+	return x == y
+}
+
+func notEqualTo(x float64, y float64) bool {
+	return x == y
+}
+
+func greaterThan(x float64, y float64) bool {
+	return x > y
+}
+
+func greaterThanOrEqual(x float64, y float64) bool {
+	return x >= y
 }

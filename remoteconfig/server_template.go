@@ -18,9 +18,11 @@ package remoteconfig
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	
+	"strconv"
+
 	"firebase.google.com/go/v4/internal"
 )
 
@@ -98,23 +100,69 @@ func (s *ServerTemplate) Load(ctx context.Context) error {
 
 	templateData.ETag = response.Header.Get("etag")
 	s.Cache = &templateData
-	fmt.Println("Etag", s.Cache.ETag) // TODO: Remove ETag 
 	return nil
 }
 
 // Load fetches the server template data from the remote config service and caches it.
 func (s *ServerTemplate) Set(templateData *ServerTemplateData) {
-	s.Cache = templateData 
+	s.Cache = templateData
 }
 
-// Evaluate processes the cached template data with a condition evaluator 
-// based on the provided context.
-func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
-	// TODO: Write ConditionalEvaluator for evaluating
-    configMap := make(map[string]Value)
-    for key, value := range s.Cache.Parameters{
-        configMap[key] = *NewValue(Remote, value.DefaultValue.Value)
-    }
+func stringifyDefaultConfig(context map[string]any) map[string]Value {
+	config := make(map[string]Value)
+	for key, value := range context {
+		var valueAsString string
+		switch value := value.(type) {
+		case string:
+			valueAsString = value
+		case int:
+			valueAsString = strconv.Itoa(value)
+		case float64:
+			valueAsString = strconv.FormatFloat(value, 'f', -1, 64)
+		case bool:
+			valueAsString = strconv.FormatBool(value)
+		}
+		config[key] = Value{source: Default, value: valueAsString}
+	}
+	return config
+}
 
-	return &ServerConfig{ConfigValues: configMap}
+// Process the cached template data with a condition evaluator based on the provided context.
+func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error) {
+	if s.Cache == nil {
+		return &ServerConfig{}, errors.New("no Remote Config Server template in cache, call Load() before calling Evaluate()")
+	}
+	ce := ConditionEvaluator{
+		conditions:        s.Cache.Conditions,
+		evaluationContext: context,
+	}
+	orderedConditions, evaluatedConditions := ce.evaluateConditions()
+	config := stringifyDefaultConfig(context)
+	for key, param := range s.Cache.Parameters {
+		var paramValueWrapper RemoteConfigParameterValue 
+		for _, condition := range orderedConditions {
+			if value, ok := param.ConditionalValues[condition]; ok && evaluatedConditions[condition] {
+				paramValueWrapper = value 
+				break 
+			}
+		}
+
+		if paramValueWrapper.UseInAppDefault != nil && *paramValueWrapper.UseInAppDefault {
+			continue
+		}
+
+		if paramValueWrapper.Value != nil {
+			config[key] = Value{source: Remote, value: *paramValueWrapper.Value}
+			continue
+		}
+
+		if param.DefaultValue.UseInAppDefault != nil && *param.DefaultValue.UseInAppDefault {
+			continue
+		}
+
+		if param.DefaultValue.Value != nil {
+			config[key] = Value{source: Remote, value : *param.DefaultValue.Value}
+		}
+	}
+	return &ServerConfig{ConfigValues: config}, nil
 }
