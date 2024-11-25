@@ -137,7 +137,7 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 		evaluationContext: context,
 	}
 	orderedConditions, evaluatedConditions := ce.evaluateConditions()
-	config := stringifyDefaultConfig(context)
+	config := make(map[string]Value)
 	for key, param := range s.Cache.Parameters {
 		var paramValueWrapper RemoteConfigParameterValue 
 		for _, condition := range orderedConditions {

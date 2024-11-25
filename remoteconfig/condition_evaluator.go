@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -242,19 +244,35 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 	}
 	if actualCustomSignalValue, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]; ok {
 		switch customSignalCondition.CustomSignalOperator {
+
+		case "STRING_CONTAINS":
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
+		case "STRING_DOES_NOT_CONTAIN":
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return !strings.Contains(actual, target) })
+		case "STRING_EXACTLY_MATCHES":
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool {return actual == target })
+		case "STRING_CONTAINS_REGEX":
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, targetPattern string) bool {
+				result, err := regexp.MatchString(targetPattern, actual) 
+				if err != nil {
+					return false
+				}
+				return result
+			})
+
 		// For numeric operators only one target value is allowed
 		case "NUMERIC_LESS_THAN":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, lessThan)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual < target })
 		case "NUMERIC_LESS_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, lessThanOrEqual)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual <= target })
 		case "NUMERIC_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, equalTo)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual == target })
 		case "NUMERIC_NOT_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, notEqualTo)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual != target })
 		case "NUMERIC_GREATER_THAN":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, greaterThan)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual > target })
 		case "NUMERIC_GREATER_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, greaterThanOrEqual)
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target float64) bool { return actual >= target })
 		}
 	}
 	return false
@@ -262,7 +280,7 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 
 // Compares the actual string value of a signal against a list of target values.
 // If any of the target values are a match, returns true.
-func compareStrings(targetValues []string, actualValue any, predicateFn func(target string, actual string) bool) bool {
+func compareStrings(targetValues []string, actualValue any, predicateFn func(actual, target string) bool) bool {
 	var actual string
 	switch actualValue := actualValue.(type) {
 	case string:
@@ -276,7 +294,7 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(tar
 		return false
 	}
 	for _, target := range targetValues {
-		if predicateFn(target, actual) {
+		if predicateFn(actual, target) {
 			return true
 		}
 	}
@@ -301,28 +319,4 @@ func compareNumbers(targetValue []string, actualValue any, predicateFn func(actu
 		return false
 	}
 	return predicateFn(actualValueAsFloat, targetValueAsFloat)
-}
-
-func lessThan(x float64, y float64) bool {
-	return x < y
-}
-
-func lessThanOrEqual(x float64, y float64) bool {
-	return x < y
-}
-
-func equalTo(x float64, y float64) bool {
-	return x == y
-}
-
-func notEqualTo(x float64, y float64) bool {
-	return x == y
-}
-
-func greaterThan(x float64, y float64) bool {
-	return x > y
-}
-
-func greaterThanOrEqual(x float64, y float64) bool {
-	return x >= y
 }
