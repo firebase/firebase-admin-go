@@ -15,6 +15,7 @@ const (
 	MaxPossibleSegments        = 5
 	SegmentSeparator           = "."
 	MinBitsPossible            = -1
+	WhiteSpace = " "
 )
 
 // Represents a Remote Config condition in the dataplane.
@@ -249,11 +250,13 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 		switch customSignalCondition.CustomSignalOperator {
 
 		case "STRING_CONTAINS":
+			// return true if atleast one target value is contained in the actual custom signal
 			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
 		case "STRING_DOES_NOT_CONTAIN":
-			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return !strings.Contains(actual, target) })
+			// return true if none of the target values are contained in the actual custom signal
+			return !compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
 		case "STRING_EXACTLY_MATCHES":
-			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return actual == target })
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Trim(actual, WhiteSpace) == strings.Trim(target, WhiteSpace) })
 		case "STRING_CONTAINS_REGEX":
 			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, targetPattern string) bool {
 				result, err := regexp.MatchString(targetPattern, actual)
@@ -323,6 +326,12 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(act
 func compareNumbers(targetValue []string, actualValue any, predicateFn func(result int) bool) bool {
 	var actualAsFloat float64
 	switch actualValue := actualValue.(type) {
+	case string:
+		var err error
+		actualAsFloat, err = strconv.ParseFloat(strings.Trim(actualValue, WhiteSpace), 64)
+		if err != nil {
+			return false
+		}
 	case int:
 		actualAsFloat = float64(actualValue)
 	case float64:
@@ -362,7 +371,7 @@ func compareSemanticVersions(targetValue []string, actualValue any, predicateFn 
 	var actualAsString string
 	switch actualValue := actualValue.(type) {
 	case string:
-		actualAsString = actualValue
+		actualAsString = strings.TrimSpace(actualValue)
 	case int:
 		actualAsString = strconv.Itoa(actualValue)
 	case float64:
