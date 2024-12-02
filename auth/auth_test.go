@@ -23,7 +23,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -1453,11 +1452,9 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
 	}
 
-	goVersion := strings.TrimPrefix(runtime.Version(), "go")
-	xGoogAPIClientHeader := req.Header.Get("x-goog-api-client")
-	wantXGoogAPIClientHeader := fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, testVersion)
-	if xGoogAPIClientHeader != wantXGoogAPIClientHeader {
-		return fmt.Errorf("x-goog-api-client header = %q; want = %q", xGoogAPIClientHeader, wantXGoogAPIClientHeader)
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testVersion)
+	if h := req.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		return fmt.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 
 	return nil

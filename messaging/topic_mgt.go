@@ -63,10 +63,13 @@ type iidClient struct {
 	httpClient  *internal.HTTPClient
 }
 
-func newIIDClient(hc *http.Client) *iidClient {
+func newIIDClient(hc *http.Client, conf *internal.MessagingConfig) *iidClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleIIDError
-	client.Opts = []internal.HTTPOption{internal.WithHeader("access_token_auth", "true")}
+	client.Opts = []internal.HTTPOption{
+		internal.WithHeader("access_token_auth", "true"),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+	}
 	return &iidClient{
 		iidEndpoint: iidEndpoint,
 		httpClient:  client,

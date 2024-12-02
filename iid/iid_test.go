@@ -31,6 +31,7 @@ var testIIDConfig = &internal.InstanceIDConfig{
 	Opts: []option.ClientOption{
 		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
 	},
+	Version: "test-version",
 }
 
 func TestNoProjectID(t *testing.T) {
@@ -82,6 +83,10 @@ func TestDeleteInstanceID(t *testing.T) {
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testIIDConfig.Version)
+	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 }
 
@@ -156,6 +161,10 @@ func TestDeleteInstanceIDError(t *testing.T) {
 		if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 			t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
 		}
+		xGoogAPIClientHeader := internal.GetMetricsHeader(testIIDConfig.Version)
+		if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+			t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
+		}
 		tr = nil
 	}
 }
@@ -200,6 +209,10 @@ func TestDeleteInstanceIDUnexpectedError(t *testing.T) {
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testIIDConfig.Version)
+	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 }
 
