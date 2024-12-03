@@ -62,8 +62,8 @@ type RemoteConfigParameter struct {
 	Description string
 
 	// The data type for all values of this parameter in the current version of the template.
-	// Defaults to type string if unspecified.
-	ValueType ParameterValueType
+	// It can be a string, number, boolean or JSON, and defaults to type string if unspecified.
+	ValueType string
 }
 
 // Represents a Remote Config parameter value

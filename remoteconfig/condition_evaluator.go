@@ -2,6 +2,7 @@ package remoteconfig
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 	"regexp"
@@ -15,7 +16,9 @@ const (
 	MaxPossibleSegments        = 5
 	SegmentSeparator           = "."
 	MinBitsPossible            = -1
-	WhiteSpace = " "
+	WhiteSpace                 = " "
+	DecimalFormat              = 'f'
+	DoublePrecisionWidth       = 64
 )
 
 // Represents a Remote Config condition in the dataplane.
@@ -101,16 +104,6 @@ type CustomSignalCondition struct {
 	// this will have exactly ONE target value.
 	TargetCustomSignalValues []string
 }
-
-// Type representing a Remote Config parameter value data type.
-type ParameterValueType string
-
-const (
-	String  ParameterValueType = "STRING"
-	Boolean ParameterValueType = "BOOLEAN"
-	Number  ParameterValueType = "NUMBER"
-	Json    ParameterValueType = "JSON"
-)
 
 // Structure representing a Remote Config template version.
 // Output only, except for the version description. Contains metadata about a particular
@@ -256,7 +249,9 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 			// return true if none of the target values are contained in the actual custom signal
 			return !compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
 		case "STRING_EXACTLY_MATCHES":
-			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Trim(actual, WhiteSpace) == strings.Trim(target, WhiteSpace) })
+			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool {
+				return strings.Trim(actual, WhiteSpace) == strings.Trim(target, WhiteSpace)
+			})
 		case "STRING_CONTAINS_REGEX":
 			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, targetPattern string) bool {
 				result, err := regexp.MatchString(targetPattern, actual)
@@ -268,31 +263,31 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 
 		// For numeric operators only one target value is allowed
 		case "NUMERIC_LESS_THAN":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result < 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result < 0 })
 		case "NUMERIC_LESS_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result <= 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result <= 0 })
 		case "NUMERIC_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result == 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result == 0 })
 		case "NUMERIC_NOT_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result != 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result != 0 })
 		case "NUMERIC_GREATER_THAN":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result > 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result > 0 })
 		case "NUMERIC_GREATER_EQUAL":
-			return compareNumbers(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result >= 0 })
+			return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result >= 0 })
 
 		// For semantic operators only one target value is allowed.
 		case "SEMANTIC_VERSION_LESS_THAN":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result < 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result < 0 })
 		case "SEMANTIC_VERSION_LESS_EQUAL":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result <= 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result <= 0 })
 		case "SEMANTIC_VERSION_EQUAL":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result == 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result == 0 })
 		case "SEMANTIC_VERSION_NOT_EQUAL":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result != 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result != 0 })
 		case "SEMANTIC_VERSION_GREATER_THAN":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result > 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result > 0 })
 		case "SEMANTIC_VERSION_GREATER_EQUAL":
-			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(result int) bool { return result >= 0 })
+			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result >= 0 })
 		}
 	}
 	return false
@@ -308,7 +303,7 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(act
 	case int:
 		actualAsString = strconv.Itoa(actualValue)
 	case float64:
-		actualAsString = strconv.FormatFloat(actualValue, 'f', MinBitsPossible, 64)
+		actualAsString = strconv.FormatFloat(actualValue, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)
 	default:
 		// if the custom signal is passed with a value other than these data types return false -- should throw an error ?
 		return false
@@ -323,12 +318,12 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(act
 
 // Compares two numbers against each other.
 // Calls the predicate function with  -1, 0, 1 if actual is less than, equal to, or greater than target.
-func compareNumbers(targetValue []string, actualValue any, predicateFn func(result int) bool) bool {
+func compareNumbers(targetValue string, actualValue any, predicateFn func(comparisonResult int) bool) bool {
 	var actualAsFloat float64
 	switch actualValue := actualValue.(type) {
 	case string:
 		var err error
-		actualAsFloat, err = strconv.ParseFloat(strings.Trim(actualValue, WhiteSpace), 64)
+		actualAsFloat, err = strconv.ParseFloat(strings.Trim(actualValue, WhiteSpace), DoublePrecisionWidth)
 		if err != nil {
 			return false
 		}
@@ -339,7 +334,8 @@ func compareNumbers(targetValue []string, actualValue any, predicateFn func(resu
 	default:
 		return false
 	}
-	targetValueAsFloat, err := strconv.ParseFloat(targetValue[0], 64)
+	
+	targetValueAsFloat, err := strconv.ParseFloat(strings.Trim(targetValue, WhiteSpace), DoublePrecisionWidth)
 	if err != nil {
 		return false
 	}
@@ -353,7 +349,8 @@ func compareNumbers(targetValue []string, actualValue any, predicateFn func(resu
 }
 
 func transformVersionToSegments(version string) ([]int, error) {
-	segments := strings.Split(version, SegmentSeparator)
+	// trim any trailing or leading segment separators (.) and split
+	segments := strings.Split(strings.Trim(version, SegmentSeparator), SegmentSeparator)
 	transformedVersion := make([]int, len(segments))
 	for idx := 0; idx < len(segments); idx++ {
 		v, err := strconv.Atoi(segments[idx])
@@ -362,20 +359,24 @@ func transformVersionToSegments(version string) ([]int, error) {
 			return []int{}, err
 		}
 	}
+	if len(transformedVersion) > MaxPossibleSegments {
+		return []int{}, errors.New("number of segments in semantic version exceeds maximum allowed length")
+	}
 	return transformedVersion, nil
 }
 
 // Compares semantic version strings against each other.
 // Calls the predicate function with  -1, 0, 1 if actual is less than, equal to, or greater than target.
-func compareSemanticVersions(targetValue []string, actualValue any, predicateFn func(result int) bool) bool {
+func compareSemanticVersions(targetValue string, actualValue any, predicateFn func(comparisonResult int) bool) bool {
 	var actualAsString string
+	targetValue = strings.Trim(targetValue, WhiteSpace)
 	switch actualValue := actualValue.(type) {
 	case string:
 		actualAsString = strings.TrimSpace(actualValue)
 	case int:
 		actualAsString = strconv.Itoa(actualValue)
 	case float64:
-		actualAsString = strconv.FormatFloat(actualValue, 'f', MinBitsPossible, 64)
+		actualAsString = strconv.FormatFloat(actualValue, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)
 	default:
 		return false
 	}
@@ -383,14 +384,11 @@ func compareSemanticVersions(targetValue []string, actualValue any, predicateFn 
 	if err != nil {
 		return false
 	}
-	version2, err := transformVersionToSegments(targetValue[0])
+	version2, err := transformVersionToSegments(targetValue)
 	if err != nil {
 		return false
 	}
 	version1Segments, version2Segments := len(version1), len(version2)
-	if version1Segments > MaxPossibleSegments || version2Segments > MaxPossibleSegments {
-		return false
-	}
 	maxSegments := version2Segments
 	// append 0's to simplify comparison
 	if version1Segments > version2Segments {
