@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -878,7 +877,7 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 
 	return &Client{
 		fcmClient: newFCMClient(hc, c, messagingEndpoint, batchEndpoint),
-		iidClient: newIIDClient(hc),
+		iidClient: newIIDClient(hc, c),
 	}, nil
 }
 
@@ -894,12 +893,11 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndp
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 
-	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
-		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, conf.Version)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
 	}
 
 	return &fcmClient{

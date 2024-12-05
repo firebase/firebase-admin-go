@@ -175,6 +175,9 @@ func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner,
 	if err != nil {
 		return nil, err
 	}
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(config.Version)),
+	}
 
 	return &iamSigner{
 		mutex:        &sync.Mutex{},

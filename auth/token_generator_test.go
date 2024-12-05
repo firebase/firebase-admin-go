@@ -122,6 +122,7 @@ func TestIAMSigner(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
+		Version:          testVersion,
 	}
 	signer, err := newIAMSigner(ctx, conf)
 	if err != nil {
@@ -155,6 +156,7 @@ func TestIAMSignerHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
+		Version:          testVersion,
 	}
 	signer, err := newIAMSigner(context.Background(), conf)
 	if err != nil {
@@ -182,6 +184,7 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 	conf := &internal.AuthConfig{
 		Opts:             optsWithTokenSource,
 		ServiceAccountID: "test-service-account",
+		Version:          testVersion,
 	}
 	signer, err := newIAMSigner(context.Background(), conf)
 	if err != nil {
@@ -208,7 +211,8 @@ func TestIAMSignerUnknownHTTPError(t *testing.T) {
 func TestIAMSignerWithMetadataService(t *testing.T) {
 	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Opts: optsWithTokenSource,
+		Opts:    optsWithTokenSource,
+		Version: testVersion,
 	}
 
 	signer, err := newIAMSigner(ctx, conf)
@@ -253,7 +257,8 @@ func TestIAMSignerWithMetadataService(t *testing.T) {
 func TestIAMSignerNoMetadataService(t *testing.T) {
 	ctx := context.Background()
 	conf := &internal.AuthConfig{
-		Opts: optsWithTokenSource,
+		Opts:    optsWithTokenSource,
+		Version: testVersion,
 	}
 
 	signer, err := newIAMSigner(ctx, conf)
@@ -339,6 +344,10 @@ func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 		}
 		if r.URL.Path != wantPath {
 			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)
+		}
+		xGoogAPIClientHeader := internal.GetMetricsHeader(testVersion)
+		if h := r.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+			t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
