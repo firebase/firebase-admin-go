@@ -39,7 +39,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "4.15.0"
+const Version = "4.15.1"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -115,6 +115,7 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 	conf := &internal.InstanceIDConfig{
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return iid.NewClient(ctx, conf)
 }
