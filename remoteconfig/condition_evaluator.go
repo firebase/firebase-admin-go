@@ -19,6 +19,8 @@ const (
 	WhiteSpace                 = " "
 	DecimalFormat              = 'f'
 	DoublePrecisionWidth       = 64
+	ErrTooManySegments         = "number of segments in semantic version exceeds maximum allowed length"
+	ErrNegativeSegment         = "segment cannot be negative"
 )
 
 // Represents a Remote Config condition in the dataplane.
@@ -149,7 +151,7 @@ type RemoteConfigUser struct {
 }
 
 type ConditionEvaluator struct {
-	evaluationContext map[string]interface{}
+	evaluationContext map[string]any
 	conditions        []NamedCondition
 }
 
@@ -162,15 +164,12 @@ func (ce *ConditionEvaluator) hashSeededRandomizationId(seedRid string) *big.Int
 	return new(big.Int).SetBytes(hashBytes)
 }
 
-func (ce *ConditionEvaluator) evaluateConditions() ([]string, map[string]bool) {
-	// go does not maintain the order of insertion in a map - https://go.dev/blog/maps#iteration-order
-	orderedConditions := make([]string, 0, len(ce.conditions))
+func (ce *ConditionEvaluator) evaluateConditions() map[string]bool {
 	evaluatedConditions := make(map[string]bool)
 	for _, condition := range ce.conditions {
-		orderedConditions = append(orderedConditions, condition.Name)
 		evaluatedConditions[condition.Name] = ce.evaluateCondition(&condition.Condition, 0)
 	}
-	return orderedConditions, evaluatedConditions
+	return evaluatedConditions
 }
 
 func (ce *ConditionEvaluator) evaluateCondition(condition *OneOfCondition, nestingLevel int) bool {
@@ -216,10 +215,14 @@ func (ce *ConditionEvaluator) evaluatePercentCondition(percentCondition *Percent
 		if percentCondition.PercentOperator == "" {
 			return false
 		}
-		stringToHash := fmt.Sprintf("%s.%s", percentCondition.Seed, rid)
+		seedPrefix := ""
+		if len(percentCondition.Seed) > 0 {
+			seedPrefix = fmt.Sprintf("%s.", percentCondition.Seed)
+		}
+		stringToHash := fmt.Sprintf("%s%s", seedPrefix, rid)
 		hash := ce.hashSeededRandomizationId(stringToHash)
-		instanceMicroPercentileBigInt := new(big.Int).Mod(hash, big.NewInt(100000000))
-		// can safely convert to uint32 since the range is 0 to 100,000,000
+		instanceMicroPercentileBigInt := new(big.Int).Mod(hash, big.NewInt(100*1_000_000))
+		// can safely convert to uint32 since the range is 0 to 100_000_000
 		var instanceMicroPercentile uint32 = uint32(instanceMicroPercentileBigInt.Int64())
 		switch percentCondition.PercentOperator {
 		case "LESS_OR_EQUAL":
@@ -229,7 +232,6 @@ func (ce *ConditionEvaluator) evaluatePercentCondition(percentCondition *Percent
 		case "BETWEEN":
 			return instanceMicroPercentile > percentCondition.MicroPercentRange.MicroPercentLowerBound && instanceMicroPercentile <= percentCondition.MicroPercentRange.MicroPercentUpperBound
 		case "UNKNOWN":
-		default:
 		}
 	}
 	return false
@@ -243,10 +245,8 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 		switch customSignalCondition.CustomSignalOperator {
 
 		case "STRING_CONTAINS":
-			// return true if atleast one target value is contained in the actual custom signal
 			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
 		case "STRING_DOES_NOT_CONTAIN":
-			// return true if none of the target values are contained in the actual custom signal
 			return !compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool { return strings.Contains(actual, target) })
 		case "STRING_EXACTLY_MATCHES":
 			return compareStrings(customSignalCondition.TargetCustomSignalValues, actualCustomSignalValue, func(actual, target string) bool {
@@ -305,7 +305,7 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(act
 	case float64:
 		actualAsString = strconv.FormatFloat(actualValue, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)
 	default:
-		// if the custom signal is passed with a value other than these data types return false -- should throw an error ?
+		// if the custom signal is passed with a value other than these data types return false
 		return false
 	}
 	for _, target := range targetValues {
@@ -334,7 +334,7 @@ func compareNumbers(targetValue string, actualValue any, predicateFn func(compar
 	default:
 		return false
 	}
-	
+
 	targetValueAsFloat, err := strconv.ParseFloat(strings.Trim(targetValue, WhiteSpace), DoublePrecisionWidth)
 	if err != nil {
 		return false
@@ -353,14 +353,17 @@ func transformVersionToSegments(version string) ([]int, error) {
 	segments := strings.Split(strings.Trim(version, SegmentSeparator), SegmentSeparator)
 	transformedVersion := make([]int, len(segments))
 	for idx := 0; idx < len(segments); idx++ {
-		v, err := strconv.Atoi(segments[idx])
-		transformedVersion[idx] = v
+		segment, err := strconv.Atoi(segments[idx])
+		if segment < 0 {
+			return []int{}, errors.New(ErrNegativeSegment)
+		}
 		if err != nil {
 			return []int{}, err
 		}
+		transformedVersion[idx] = segment
 	}
 	if len(transformedVersion) > MaxPossibleSegments {
-		return []int{}, errors.New("number of segments in semantic version exceeds maximum allowed length")
+		return []int{}, errors.New(ErrTooManySegments)
 	}
 	return transformedVersion, nil
 }
@@ -369,7 +372,6 @@ func transformVersionToSegments(version string) ([]int, error) {
 // Calls the predicate function with  -1, 0, 1 if actual is less than, equal to, or greater than target.
 func compareSemanticVersions(targetValue string, actualValue any, predicateFn func(comparisonResult int) bool) bool {
 	var actualAsString string
-	targetValue = strings.Trim(targetValue, WhiteSpace)
 	switch actualValue := actualValue.(type) {
 	case string:
 		actualAsString = strings.TrimSpace(actualValue)
@@ -380,6 +382,9 @@ func compareSemanticVersions(targetValue string, actualValue any, predicateFn fu
 	default:
 		return false
 	}
+
+	targetValue = strings.Trim(targetValue, WhiteSpace)
+
 	version1, err := transformVersionToSegments(actualAsString)
 	if err != nil {
 		return false
