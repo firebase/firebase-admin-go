@@ -25,7 +25,7 @@ type customSignalTestCase struct {
 	outcome bool
 }
 
-type SampleObject struct {
+type sampleObject struct {
 	index    int
 	category string
 }
@@ -140,7 +140,7 @@ func compareSlices(slice1, slice2 []int) bool {
 func TestPercentCondition_KnownValues(t *testing.T) {
 	percentTestCases := []struct {
 		seed            string
-		randomizationId string
+		randomizationId any
 		outcome         bool
 	}{
 		{seed: "1", randomizationId: "one", outcome: false},
@@ -574,7 +574,7 @@ func TestCustomSignals_StringExactlyMatches(t *testing.T) {
 		{actual: 987654321.1234567, targets: []string{"987654321.1234567", "12"}, outcome: true},
 		{actual: "single quote present", targets: []string{"'single quote'", "Present "}, outcome: false},
 		{actual: true, targets: []string{"true"}, outcome: false},
-		{actual: SampleObject{index: 1, category: "sample"}, targets: []string{"{index: 1, category: \"sample\"}"}, outcome: false},
+		{actual: sampleObject{index: 1, category: "sample"}, targets: []string{"{index: 1, category: \"sample\"}"}, outcome: false},
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces("STRING_EXACTLY_MATCHES", t)(tc)
@@ -627,7 +627,7 @@ func TestCustomSignals_NumericEqual(t *testing.T) {
 		{actual: -25.5, targets: []string{"-25.6"}, outcome: false},
 		{actual: "-25.5", targets: []string{"123a"}, outcome: false},
 		{actual: 0, targets: []string{"0"}, outcome: true},
-		{actual: SampleObject{index: 2}, targets: []string{"0"}, outcome: false},
+		{actual: sampleObject{index: 2}, targets: []string{"0"}, outcome: false},
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces("NUMERIC_EQUAL", t)(tc)
@@ -796,7 +796,7 @@ func TestCustomSignals_SemanticVersionNotEqual(t *testing.T) {
 		{actual: "2.3.4.5.6", targets: []string{"2.3.4.5.6"}, outcome: false},
 		{actual: "5.12.-3.4", targets: []string{"5.12.3.4"}, outcome: false},
 		{actual: "1.2.3", targets: []string{"1.2.a"}, outcome: false},
-		{actual: SampleObject{}, targets: []string{"1"}, outcome: false},
+		{actual: sampleObject{}, targets: []string{"1"}, outcome: false},
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces("SEMANTIC_VERSION_NOT_EQUAL", t)(tc)

@@ -28,8 +28,9 @@ import (
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
-	RcClient  *rcClient
-	Cache     *ServerTemplateData
+	rcClient      *rcClient
+	cache         *ServerTemplateData
+	defaultConfig map[string]any
 }
 
 // Represents the data in a Remote Config server template.
@@ -76,11 +77,33 @@ type RemoteConfigParameterValue struct {
 	UseInAppDefault *bool
 }
 
+// Initializes config object with in-app default values.
+func stringifyDefaultConfig(defaultConfig map[string]any) map[string]Value {
+	stringifiedConfig := make(map[string]Value)
+	for key, value := range defaultConfig {
+		// In-app default values other than these data types will be assigned the empty string
+		switch value := value.(type) {
+		case string:
+			stringifiedConfig[key] = Value{source: Default, value: value}
+		case int:
+			stringifiedConfig[key] = Value{source: Default, value: strconv.Itoa(value)}
+		case float64:
+			stringifiedConfig[key] = Value{source: Default, value: strconv.FormatFloat(value, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)}
+		case bool:
+			stringifiedConfig[key] = Value{source: Default, value: strconv.FormatBool(value)}
+		default:
+			stringifiedConfig[key] = Value{source: Static}
+		}
+	}
+	return stringifiedConfig
+}
+
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
-func NewServerTemplate(rcClient *rcClient) *ServerTemplate {
+func NewServerTemplate(rcClient *rcClient, defaultConfig map[string]any) *ServerTemplate {
 	return &ServerTemplate{
-		RcClient: rcClient,
-		Cache:	  nil,
+		rcClient:      rcClient,
+		cache:         nil,
+		defaultConfig: defaultConfig,
 	}
 }
 
@@ -88,62 +111,47 @@ func NewServerTemplate(rcClient *rcClient) *ServerTemplate {
 func (s *ServerTemplate) Load(ctx context.Context) error {
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.RcClient.RcBaseUrl , s.RcClient.Project),
+		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.rcClient.rcBaseUrl, s.rcClient.project),
 	}
 
 	var templateData ServerTemplateData
-	response, err := s.RcClient.HttpClient.DoAndUnmarshal(ctx, request, &templateData)
+	response, err := s.rcClient.httpClient.DoAndUnmarshal(ctx, request, &templateData)
 
 	if err != nil {
 		return err
 	}
 
 	templateData.ETag = response.Header.Get("etag")
-	s.Cache = &templateData
+	s.cache = &templateData
 	return nil
 }
 
 // Load fetches the server template data from the remote config service and caches it.
 func (s *ServerTemplate) Set(templateData *ServerTemplateData) {
-	s.Cache = templateData
-}
-
-func stringifyDefaultConfig(context map[string]any) map[string]Value {
-	config := make(map[string]Value)
-	for key, value := range context {
-		var valueAsString string
-		switch value := value.(type) {
-		case string:
-			valueAsString = value
-		case int:
-			valueAsString = strconv.Itoa(value)
-		case float64:
-			valueAsString = strconv.FormatFloat(value, 'f', -1, 64)
-		case bool:
-			valueAsString = strconv.FormatBool(value)
-		}
-		config[key] = Value{source: Default, value: valueAsString}
-	}
-	return config
+	s.cache = templateData
 }
 
 // Process the cached template data with a condition evaluator based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error) {
-	if s.Cache == nil {
+	if s.cache == nil {
 		return &ServerConfig{}, errors.New("no Remote Config Server template in cache, call Load() before calling Evaluate()")
 	}
+	config := stringifyDefaultConfig(s.defaultConfig)
 	ce := ConditionEvaluator{
-		conditions:        s.Cache.Conditions,
+		conditions:        s.cache.Conditions,
 		evaluationContext: context,
 	}
-	orderedConditions, evaluatedConditions := ce.evaluateConditions()
-	config := make(map[string]Value)
-	for key, param := range s.Cache.Parameters {
-		var paramValueWrapper RemoteConfigParameterValue 
-		for _, condition := range orderedConditions {
-			if value, ok := param.ConditionalValues[condition]; ok && evaluatedConditions[condition] {
-				paramValueWrapper = value 
-				break 
+	evaluatedConditions := ce.evaluateConditions()
+
+	// Overlays config Value objects derived by evaluating the template.
+	for name, param := range s.cache.Parameters {
+		var paramValueWrapper RemoteConfigParameterValue
+
+		// Iterates in order over the condition list. If there is a value associated with a condition, this checks if the condition is true.
+		for _, condition := range s.cache.Conditions {
+			if value, ok := param.ConditionalValues[condition.Name]; ok && evaluatedConditions[condition.Name] {
+				paramValueWrapper = value
+				break
 			}
 		}
 
@@ -152,7 +160,7 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 		}
 
 		if paramValueWrapper.Value != nil {
-			config[key] = Value{source: Remote, value: *paramValueWrapper.Value}
+			config[name] = Value{source: Remote, value: *paramValueWrapper.Value}
 			continue
 		}
 
@@ -161,7 +169,7 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 		}
 
 		if param.DefaultValue.Value != nil {
-			config[key] = Value{source: Remote, value : *param.DefaultValue.Value}
+			config[name] = Value{source: Remote, value: *param.DefaultValue.Value}
 		}
 	}
 	return &ServerConfig{ConfigValues: config}, nil
