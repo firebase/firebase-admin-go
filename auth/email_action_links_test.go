@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"firebase.google.com/go/v4/errorutils"
@@ -98,9 +99,8 @@ func TestEmailVerificationLink(t *testing.T) {
 	}
 
 	want := map[string]interface{}{
-		"requestType":   "VERIFY_EMAIL",
-		"email":         testEmail,
-		"returnOobLink": true,
+		"requestType": "VERIFY_EMAIL",
+		"email":       testEmail,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
 		t.Fatalf("EmailVerificationLink() %v", err)
@@ -111,24 +111,32 @@ func TestEmailVerificationLinkWithSettings(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailVerificationLinkWithSettings() = %q; want = %q", link, testActionLink)
-	}
+	cases := []string{"true", "false", ""}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, caseStr := range cases {
+		if returnOobLink, err := strconv.ParseBool(caseStr); err == nil {
+			testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
+			testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		}
+		link, err := s.Client.EmailVerificationLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("EmailVerificationLinkWithSettings() = %q; want = %q", link, testActionLink)
+		}
 
-	want := map[string]interface{}{
-		"requestType":   "VERIFY_EMAIL",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("EmailVerificationLinkWithSettings() %v", err)
+		want := map[string]interface{}{
+			"requestType": "VERIFY_EMAIL",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("EmailVerificationLinkWithSettings() %v", err)
+		}
 	}
 }
 
@@ -145,9 +153,8 @@ func TestPasswordResetLink(t *testing.T) {
 	}
 
 	want := map[string]interface{}{
-		"requestType":   "PASSWORD_RESET",
-		"email":         testEmail,
-		"returnOobLink": true,
+		"requestType": "PASSWORD_RESET",
+		"email":       testEmail,
 	}
 	if err := checkActionLinkRequest(want, s); err != nil {
 		t.Fatalf("PasswordResetLink() %v", err)
@@ -158,24 +165,30 @@ func TestPasswordResetLinkWithSettings(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("PasswordResetLinkWithSettings() = %q; want = %q", link, testActionLink)
-	}
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := s.Client.PasswordResetLinkWithSettings(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("PasswordResetLinkWithSettings() = %q; want = %q", link, testActionLink)
+		}
 
-	want := map[string]interface{}{
-		"requestType":   "PASSWORD_RESET",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("PasswordResetLinkWithSettings() %v", err)
+		want := map[string]interface{}{
+			"requestType": "PASSWORD_RESET",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("PasswordResetLinkWithSettings() %v", err)
+		}
 	}
 }
 
@@ -204,24 +217,29 @@ func TestEmailSignInLink(t *testing.T) {
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
 
-	link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != testActionLink {
-		t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
-	}
-
-	want := map[string]interface{}{
-		"requestType":   "EMAIL_SIGNIN",
-		"email":         testEmail,
-		"returnOobLink": true,
-	}
-	for k, v := range testActionCodeSettingsMap {
-		want[k] = v
-	}
-	if err := checkActionLinkRequest(want, s); err != nil {
-		t.Fatalf("EmailSignInLink() %v", err)
+	cases := []bool{true, false}
+	testActionCodeSettingsCustom, testActionCodeSettingsMapCustom := getCopiesOfTestSettings(testActionCodeSettings,
+		testActionCodeSettingsMap)
+	for _, returnOobLink := range cases {
+		testActionCodeSettingsCustom.SendEmailLink = !returnOobLink
+		testActionCodeSettingsMapCustom["returnOobLink"] = returnOobLink
+		link, err := s.Client.EmailSignInLink(context.Background(), testEmail, testActionCodeSettingsCustom)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != testActionLink {
+			t.Errorf("EmailSignInLink() = %q; want = %q", link, testActionLink)
+		}
+		want := map[string]interface{}{
+			"requestType": "EMAIL_SIGNIN",
+			"email":       testEmail,
+		}
+		for k, v := range testActionCodeSettingsMapCustom {
+			want[k] = v
+		}
+		if err := checkActionLinkRequest(want, s); err != nil {
+			t.Fatalf("EmailSignInLink() %v", err)
+		}
 	}
 }
 
@@ -332,4 +350,23 @@ func checkActionLinkRequestWithURL(want map[string]interface{}, wantURL string, 
 		return fmt.Errorf("Body = %#v; want = %#v", got, want)
 	}
 	return nil
+}
+
+func getCopiesOfTestSettings(testSettings *ActionCodeSettings,
+	testSettingsMap map[string]interface{}) (*ActionCodeSettings, map[string]interface{}) {
+	testActionCodeSettingsCustom := &ActionCodeSettings{
+		URL:                   testSettings.URL,
+		HandleCodeInApp:       testSettings.HandleCodeInApp,
+		IOSBundleID:           testSettings.IOSBundleID,
+		AndroidPackageName:    testSettings.AndroidPackageName,
+		AndroidMinimumVersion: testSettings.AndroidMinimumVersion,
+		AndroidInstallApp:     testSettings.AndroidInstallApp,
+		DynamicLinkDomain:     testSettings.DynamicLinkDomain,
+		SendEmailLink:         testSettings.SendEmailLink,
+	}
+	testActionCodeSettingsMapCustom := map[string]interface{}{}
+	for k, v := range testSettingsMap {
+		testActionCodeSettingsMapCustom[k] = v
+	}
+	return testActionCodeSettingsCustom, testActionCodeSettingsMapCustom
 }
