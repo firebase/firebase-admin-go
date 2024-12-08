@@ -64,9 +64,10 @@ func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
 type linkType string
 
 const (
-	emailLinkSignIn   linkType = "EMAIL_SIGNIN"
-	emailVerification linkType = "VERIFY_EMAIL"
-	passwordReset     linkType = "PASSWORD_RESET"
+	emailLinkSignIn      linkType = "EMAIL_SIGNIN"
+	emailVerification    linkType = "VERIFY_EMAIL"
+	passwordReset        linkType = "PASSWORD_RESET"
+	verifyAndChangeEmail linkType = "VERIFY_AND_CHANGE_EMAIL"
 )
 
 // EmailVerificationLink generates the out-of-band email action link for email verification flows for the specified
@@ -79,7 +80,7 @@ func (c *baseClient) EmailVerificationLink(ctx context.Context, email string) (s
 // specified email address, using the action code settings provided.
 func (c *baseClient) EmailVerificationLinkWithSettings(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
-	return c.generateEmailActionLink(ctx, emailVerification, email, settings)
+	return c.generateEmailActionLink(ctx, emailVerification, email, settings, nil)
 }
 
 // PasswordResetLink generates the out-of-band email action link for password reset flows for the specified email
@@ -92,18 +93,31 @@ func (c *baseClient) PasswordResetLink(ctx context.Context, email string) (strin
 // specified email address, using the action code settings provided.
 func (c *baseClient) PasswordResetLinkWithSettings(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
-	return c.generateEmailActionLink(ctx, passwordReset, email, settings)
+	return c.generateEmailActionLink(ctx, passwordReset, email, settings, nil)
 }
 
 // EmailSignInLink generates the out-of-band email action link for email link sign-in flows, using the action
 // code settings provided.
 func (c *baseClient) EmailSignInLink(
 	ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
-	return c.generateEmailActionLink(ctx, emailLinkSignIn, email, settings)
+	return c.generateEmailActionLink(ctx, emailLinkSignIn, email, settings, nil)
+}
+
+// VerifyAndChangeEmailLink generates the out-of-band email action link for email verification and change flows for the
+// specified email address.
+func (c *baseClient) VerifyAndChangeEmailLink(ctx context.Context, email string, newEmail string) (string, error) {
+	return c.VerifyAndChangeEmailLinkWithSettings(ctx, email, newEmail, nil)
+}
+
+// VerifyAndChangeEmailLinkWithSettings generates the out-of-band email action link for email verification and change
+// flows for the specified email address, using the action code settings provided.
+func (c *baseClient) VerifyAndChangeEmailLinkWithSettings(
+	ctx context.Context, email string, newEmail string, settings *ActionCodeSettings) (string, error) {
+	return c.generateEmailActionLink(ctx, verifyAndChangeEmail, email, settings, &newEmail)
 }
 
 func (c *baseClient) generateEmailActionLink(
-	ctx context.Context, linkType linkType, email string, settings *ActionCodeSettings) (string, error) {
+	ctx context.Context, linkType linkType, email string, settings *ActionCodeSettings, newEmail *string) (string, error) {
 
 	if email == "" {
 		return "", errors.New("email must not be empty")
@@ -118,6 +132,14 @@ func (c *baseClient) generateEmailActionLink(
 		"email":         email,
 		"returnOobLink": true,
 	}
+
+	if linkType == verifyAndChangeEmail {
+		if newEmail == nil {
+			return "", errors.New("newEmail must not be nil when linkType is verifyAndChangeEmail")
+		}
+		payload["newEmail"] = *newEmail
+	}
+
 	if settings != nil {
 		settingsMap, err := settings.toMap()
 		if err != nil {
