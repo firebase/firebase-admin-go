@@ -82,14 +82,14 @@ type PercentCondition struct {
 }
 
 // Represents the limit of percentiles to target in micro-percents.
-// The value must be in the range [0 and 100000000]
+// The value must be in the range [0 and 100_000_000]
 type MicroPercentRange struct {
 	// The lower limit of percentiles to target in micro-percents.
-	// The value must be in the range [0 and 100000000].
+	// The value must be in the range [0 and 100_000_000].
 	MicroPercentLowerBound uint32
 
 	// The upper limit of percentiles to target in micro-percents.
-	// The value must be in the range [0 and 100000000].
+	// The value must be in the range [0 and 100_000_000].
 	MicroPercentUpperBound uint32
 }
 
@@ -102,8 +102,7 @@ type CustomSignalCondition struct {
 	// The key of the signal set in the EvaluationContext
 	CustomSignalKey string
 
-	// A list of at most 100 target custom signal values. For numeric operators,
-	// this will have exactly ONE target value.
+	// A list of at most 100 target custom signal values. For numeric and semantic version operators, this will have exactly ONE target value.
 	TargetCustomSignalValues []string
 }
 

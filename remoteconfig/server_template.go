@@ -77,7 +77,6 @@ type RemoteConfigParameterValue struct {
 	UseInAppDefault *bool
 }
 
-// Initializes config object with in-app default values.
 func stringifyDefaultConfig(defaultConfig map[string]any) map[string]Value {
 	stringifiedConfig := make(map[string]Value)
 	for key, value := range defaultConfig {
@@ -136,6 +135,8 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 	if s.cache == nil {
 		return &ServerConfig{}, errors.New("no Remote Config Server template in cache, call Load() before calling Evaluate()")
 	}
+	
+	// Initializes config object with in-app default values.
 	config := stringifyDefaultConfig(s.defaultConfig)
 	ce := ConditionEvaluator{
 		conditions:        s.cache.Conditions,
