@@ -133,6 +133,7 @@ func (s *ServerTemplate) Set(templateData *ServerTemplateData) {
 
 // Process the cached template data with a condition evaluator based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error) {
+	log.SetFlags(log.Lshortfile)
 	if s.Cache == nil {
 		return &ServerConfig{}, errors.New("no Remote Config Server template in Cache, call Load() before calling Evaluate()")
 	}
@@ -168,7 +169,7 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 		}
 
 		if param.DefaultValue.UseInAppDefault != nil && *param.DefaultValue.UseInAppDefault {
-			log.Printf("[INFO] Using in-app default for parameter '%s''s default value.\n", key)
+			log.Printf("[INFO] Using in-app default for parameter '%s's default value.\n", key)
 			continue
 		}
 
