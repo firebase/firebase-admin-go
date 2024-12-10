@@ -42,7 +42,7 @@ func Test_StringifyDefaultConfig(t *testing.T) {
 	}
 }
 
-func Test_Evaluate(t *testing.T) {
+func TestEvaluate_Sequential(t *testing.T) {
 	trueVal := true
 	param1Condition2Val := "1500"
 	param1DefaultVal := "2000"
@@ -140,7 +140,7 @@ func Test_Evaluate(t *testing.T) {
 	}
 
 	serverTemplate := ServerTemplate{
-		cache: &serverTemplateData,
+		Cache: &serverTemplateData,
 		defaultConfig: map[string]any{
 			"param_1": 2500,
 			"param_2": "welcome!",

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -173,6 +174,7 @@ func (ce *ConditionEvaluator) evaluateConditions() map[string]bool {
 
 func (ce *ConditionEvaluator) evaluateCondition(condition *OneOfCondition, nestingLevel int) bool {
 	if nestingLevel >= MaxConditionRecursionDepth {
+		log.Println("[WARNING] Maximum recursion depth is exceeded.")
 		return false
 	}
 	if condition.OrCondition != nil {
@@ -184,6 +186,7 @@ func (ce *ConditionEvaluator) evaluateCondition(condition *OneOfCondition, nesti
 	} else if condition.CustomSignal != nil {
 		return ce.evaluateCustomSignalCondition(condition.CustomSignal)
 	}
+	log.Println("[WARNING] Unknown condition type encountered.")
 	return false
 }
 
@@ -212,6 +215,7 @@ func (ce *ConditionEvaluator) evaluateAndCondition(andCondition *AndCondition, n
 func (ce *ConditionEvaluator) evaluatePercentCondition(percentCondition *PercentCondition) bool {
 	if rid, ok := ce.evaluationContext[RandomizationId]; ok {
 		if percentCondition.PercentOperator == "" {
+			log.Println("[WARNING] Missing percent operator for percent condition.")
 			return false
 		}
 		seedPrefix := ""
@@ -231,13 +235,17 @@ func (ce *ConditionEvaluator) evaluatePercentCondition(percentCondition *Percent
 		case "BETWEEN":
 			return instanceMicroPercentile > percentCondition.MicroPercentRange.MicroPercentLowerBound && instanceMicroPercentile <= percentCondition.MicroPercentRange.MicroPercentUpperBound
 		case "UNKNOWN":
+		default:
+			log.Printf("[WARNING] Unknown percent operator: %s\n", percentCondition.PercentOperator)
 		}
 	}
+	log.Println("[WARNING] Missing randomization ID for percent condition.")
 	return false
 }
 
 func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalCondition *CustomSignalCondition) bool {
 	if customSignalCondition.CustomSignalOperator == "" || customSignalCondition.CustomSignalKey == "" || len(customSignalCondition.TargetCustomSignalValues) == 0 {
+		log.Println("[WARNING] Missing operator, key, or target values for custom signal condition.")
 		return false
 	}
 	if actualCustomSignalValue, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]; ok {
@@ -287,8 +295,11 @@ func (ce *ConditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result > 0 })
 		case "SEMANTIC_VERSION_GREATER_EQUAL":
 			return compareSemanticVersions(customSignalCondition.TargetCustomSignalValues[0], actualCustomSignalValue, func(result int) bool { return result >= 0 })
+		default:
+			log.Printf("[WARNING] Unknown custom signal operator: %s\n", customSignalCondition.CustomSignalOperator)
 		}
 	}
+	log.Printf("[WARNING] Custom signal value not found in context: %s\n", customSignalCondition.CustomSignalKey)
 	return false
 }
 
@@ -305,6 +316,7 @@ func compareStrings(targetValues []string, actualValue any, predicateFn func(act
 		actualAsString = strconv.FormatFloat(actualValue, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)
 	default:
 		// if the custom signal is passed with a value other than these data types return false
+		log.Println("[WARNING] Invalid string value for comparison.")
 		return false
 	}
 	for _, target := range targetValues {
@@ -331,6 +343,7 @@ func compareNumbers(targetValue string, actualValue any, predicateFn func(compar
 	case float64:
 		actualAsFloat = actualValue
 	default:
+		log.Println("[WARNING] Invalid numeric value for comparison.")
 		return false
 	}
 
@@ -379,6 +392,7 @@ func compareSemanticVersions(targetValue string, actualValue any, predicateFn fu
 	case float64:
 		actualAsString = strconv.FormatFloat(actualValue, DecimalFormat, MinBitsPossible, DoublePrecisionWidth)
 	default:
+		log.Println("[WARNING] Invalid semantic version format for comparison.")
 		return false
 	}
 

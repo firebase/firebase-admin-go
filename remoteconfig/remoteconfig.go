@@ -56,10 +56,10 @@ func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Clie
 
 // RemoteConfigClient facilitates requests to the Firebase Remote Config backend.
 type rcClient struct {
-	httpClient	*internal.HTTPClient
-	project		string
-	rcBaseUrl	string
-	version		string
+	HttpClient	*internal.HTTPClient
+	Project		string
+	RcBaseUrl	string
+	Version		string
 }
 
 func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientConfig) *rcClient {
@@ -74,10 +74,10 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 	client.CreateErrFn = handleRemoteConfigError
 
 	return &rcClient{
-		rcBaseUrl: 	defaulBaseUrl,
-		project:   	conf.ProjectID,
-		version:   	version,
-		httpClient:	client,
+		RcBaseUrl: 	defaulBaseUrl,
+		Project:   	conf.ProjectID,
+		Version:   	version,
+		HttpClient:	client,
 	}
 }
 

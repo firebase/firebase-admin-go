@@ -780,6 +780,7 @@ func TestCustomSignals_SemanticVersionEqual(t *testing.T) {
 		{actual: "1.2.3.4.5.6", targets: []string{"1.2.3"}, outcome: false},
 		{actual: 2.3, targets: []string{"2.3.0"}, outcome: true},
 		{actual: "2.3.4.5.6", targets: []string{"2.3.4.5.6"}, outcome: true},
+		{actual: "1.3.4.5.6", targets: []string{"2.3.4.5.6"}, outcome: false},
 		{actual: "5.12.-3.4", targets: []string{"5.12.3.4"}, outcome: false},
 	}
 	for _, tc := range testCases {

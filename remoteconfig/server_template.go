@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -28,8 +29,8 @@ import (
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
-	rcClient      *rcClient
-	cache         *ServerTemplateData
+	RcClient      *rcClient
+	Cache         *ServerTemplateData
 	defaultConfig map[string]any
 }
 
@@ -98,10 +99,10 @@ func stringifyDefaultConfig(defaultConfig map[string]any) map[string]Value {
 }
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
-func NewServerTemplate(rcClient *rcClient, defaultConfig map[string]any) *ServerTemplate {
+func NewServerTemplate(RcClient *rcClient, defaultConfig map[string]any) *ServerTemplate {
 	return &ServerTemplate{
-		rcClient:      rcClient,
-		cache:         nil,
+		RcClient:      RcClient,
+		Cache:         nil,
 		defaultConfig: defaultConfig,
 	}
 }
@@ -110,46 +111,46 @@ func NewServerTemplate(rcClient *rcClient, defaultConfig map[string]any) *Server
 func (s *ServerTemplate) Load(ctx context.Context) error {
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.rcClient.rcBaseUrl, s.rcClient.project),
+		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.RcClient.RcBaseUrl, s.RcClient.Project),
 	}
 
 	var templateData ServerTemplateData
-	response, err := s.rcClient.httpClient.DoAndUnmarshal(ctx, request, &templateData)
+	response, err := s.RcClient.HttpClient.DoAndUnmarshal(ctx, request, &templateData)
 
 	if err != nil {
 		return err
 	}
 
 	templateData.ETag = response.Header.Get("etag")
-	s.cache = &templateData
+	s.Cache = &templateData
 	return nil
 }
 
 // Load fetches the server template data from the remote config service and caches it.
 func (s *ServerTemplate) Set(templateData *ServerTemplateData) {
-	s.cache = templateData
+	s.Cache = templateData
 }
 
 // Process the cached template data with a condition evaluator based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error) {
-	if s.cache == nil {
-		return &ServerConfig{}, errors.New("no Remote Config Server template in cache, call Load() before calling Evaluate()")
+	if s.Cache == nil {
+		return &ServerConfig{}, errors.New("no Remote Config Server template in Cache, call Load() before calling Evaluate()")
 	}
 	
 	// Initializes config object with in-app default values.
 	config := stringifyDefaultConfig(s.defaultConfig)
 	ce := ConditionEvaluator{
-		conditions:        s.cache.Conditions,
+		conditions:        s.Cache.Conditions,
 		evaluationContext: context,
 	}
 	evaluatedConditions := ce.evaluateConditions()
 
 	// Overlays config Value objects derived by evaluating the template.
-	for name, param := range s.cache.Parameters {
+	for key, param := range s.Cache.Parameters {
 		var paramValueWrapper RemoteConfigParameterValue
 
 		// Iterates in order over the condition list. If there is a value associated with a condition, this checks if the condition is true.
-		for _, condition := range s.cache.Conditions {
+		for _, condition := range s.Cache.Conditions {
 			if value, ok := param.ConditionalValues[condition.Name]; ok && evaluatedConditions[condition.Name] {
 				paramValueWrapper = value
 				break
@@ -157,20 +158,22 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 		}
 
 		if paramValueWrapper.UseInAppDefault != nil && *paramValueWrapper.UseInAppDefault {
+			log.Printf("[INFO] Using in-app default for the parameter '%s'.\n", key)
 			continue
 		}
 
 		if paramValueWrapper.Value != nil {
-			config[name] = Value{source: Remote, value: *paramValueWrapper.Value}
+			config[key] = Value{source: Remote, value: *paramValueWrapper.Value}
 			continue
 		}
 
 		if param.DefaultValue.UseInAppDefault != nil && *param.DefaultValue.UseInAppDefault {
+			log.Printf("[INFO] Using in-app default for parameter '%s''s default value.\n", key)
 			continue
 		}
 
 		if param.DefaultValue.Value != nil {
-			config[name] = Value{source: Remote, value: *param.DefaultValue.Value}
+			config[key] = Value{source: Remote, value: *param.DefaultValue.Value}
 		}
 	}
 	return &ServerConfig{ConfigValues: config}, nil
