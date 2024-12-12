@@ -139,14 +139,6 @@ func TestEvaluate_Sequential(t *testing.T) {
 		},
 	}
 
-	serverTemplate := ServerTemplate{
-		Cache: &serverTemplateData,
-		defaultConfig: map[string]any{
-			"param_1": 2500,
-			"param_2": "welcome!",
-		},
-	}
-
 	evaluateTestCases := []struct {
 		description string
 		context        map[string]any
@@ -189,6 +181,13 @@ func TestEvaluate_Sequential(t *testing.T) {
 
 	for idx, tc := range evaluateTestCases {
 		t.Run(fmt.Sprintf("Scenario #%d:%s", idx, tc.description), func(t *testing.T) {
+			serverTemplate := ServerTemplate{
+				Cache: &serverTemplateData,
+				defaultConfig: map[string]any{
+					"param_1": 2500,
+					"param_2": "welcome!",
+				},
+			}
 			config, err := serverTemplate.Evaluate(tc.context)
 			if err != nil {
 				t.Fatalf("Error in computing config %s", err.Error())
