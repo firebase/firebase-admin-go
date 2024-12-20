@@ -18,8 +18,11 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -146,28 +149,82 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	}
 	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
 	idToolkitV2Endpoint := fmt.Sprintf("%s/v2", baseURL)
+	secureToolkitV1Endpoint := fmt.Sprintf("%s/v1", "https://securetoken.googleapis.com")
 	userManagementEndpoint := idToolkitV1Endpoint
 	providerConfigEndpoint := idToolkitV2Endpoint
 	tenantMgtEndpoint := idToolkitV2Endpoint
 	projectMgtEndpoint := idToolkitV2Endpoint
 
 	base := &baseClient{
-		userManagementEndpoint: userManagementEndpoint,
-		providerConfigEndpoint: providerConfigEndpoint,
-		tenantMgtEndpoint:      tenantMgtEndpoint,
-		projectMgtEndpoint:     projectMgtEndpoint,
-		projectID:              conf.ProjectID,
-		httpClient:             hc,
-		idTokenVerifier:        idTokenVerifier,
-		cookieVerifier:         cookieVerifier,
-		signer:                 signer,
-		clock:                  internal.SystemClock,
-		isEmulator:             isEmulator,
+		secureToolkitV1Endpoint: secureToolkitV1Endpoint, // here
+		userManagementEndpoint:  userManagementEndpoint,
+		providerConfigEndpoint:  providerConfigEndpoint,
+		tenantMgtEndpoint:       tenantMgtEndpoint,
+		projectMgtEndpoint:      projectMgtEndpoint,
+		projectID:               conf.ProjectID,
+		httpClient:              hc,
+		idTokenVerifier:         idTokenVerifier,
+		cookieVerifier:          cookieVerifier,
+		signer:                  signer,
+		clock:                   internal.SystemClock,
+		isEmulator:              isEmulator,
 	}
 	return &Client{
 		baseClient:    base,
 		TenantManager: newTenantManager(hc, conf, base),
 	}, nil
+}
+
+type TokenResponse struct {
+	ExpiresIn    string `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	IDToken      string `json:"id_token"`
+	UserID       string `json:"user_id"`
+	ProjectID    string `json:"project_id"`
+}
+
+func fetchIdTokenByRefreshToken(apiKey, refreshToken, endpointBase string) (TokenResponse, error) {
+	endpoint := fmt.Sprintf("%s/token?key=%s", endpointBase, apiKey)
+
+	form := url.Values{}
+	form.Add("grant_type", "refresh_token")
+	form.Add("refresh_token", refreshToken)
+
+	req, err := http.NewRequest("POST", endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return TokenResponse{}, fmt.Errorf("fetchIdTokenByRefreshToken: %s", resp.Status)
+	}
+
+	var tokenResp TokenResponse
+	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	return tokenResp, nil
+}
+
+
+func (c *baseClient) ExchangeIdToken(ctx context.Context, apikey string, refreshToken string) (string, error) {
+	res, err := fetchIdTokenByRefreshToken(apikey, refreshToken, c.secureToolkitV1Endpoint)
+	if err != nil {
+		return "", err
+	}
+	return res.IDToken, nil
 }
 
 // CustomToken creates a signed custom authentication token with the specified user ID.
@@ -274,18 +331,19 @@ type FirebaseInfo struct {
 
 // baseClient exposes the APIs common to both auth.Client and auth.TenantClient.
 type baseClient struct {
-	userManagementEndpoint string
-	providerConfigEndpoint string
-	tenantMgtEndpoint      string
-	projectMgtEndpoint     string
-	projectID              string
-	tenantID               string
-	httpClient             *internal.HTTPClient
-	idTokenVerifier        *tokenVerifier
-	cookieVerifier         *tokenVerifier
-	signer                 cryptoSigner
-	clock                  internal.Clock
-	isEmulator             bool
+	secureToolkitV1Endpoint string
+	userManagementEndpoint  string
+	providerConfigEndpoint  string
+	tenantMgtEndpoint       string
+	projectMgtEndpoint      string
+	projectID               string
+	tenantID                string
+	httpClient              *internal.HTTPClient
+	idTokenVerifier         *tokenVerifier
+	cookieVerifier          *tokenVerifier
+	signer                  cryptoSigner
+	clock                   internal.Clock
+	isEmulator              bool
 }
 
 func (c *baseClient) withTenantID(tenantID string) *baseClient {
