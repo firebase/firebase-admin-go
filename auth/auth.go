@@ -184,43 +184,42 @@ type TokenResponse struct {
 	ProjectID    string `json:"project_id"`
 }
 
-func fetchIdTokenByRefreshToken(apiKey, refreshToken, endpointBase string) (TokenResponse, error) {
-	endpoint := fmt.Sprintf("%s/token?key=%s", endpointBase, apiKey)
+func fetchIdTokenByRefreshToken(ctx context.Context, apiKey, refreshToken, endpointBase string) (TokenResponse, error) {
+    endpoint := fmt.Sprintf("%s/token?key=%s", endpointBase, apiKey)
 
-	form := url.Values{}
-	form.Add("grant_type", "refresh_token")
-	form.Add("refresh_token", refreshToken)
+    form := url.Values{}
+    form.Add("grant_type", "refresh_token")
+    form.Add("refresh_token", refreshToken)
 
-	req, err := http.NewRequest("POST", endpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return TokenResponse{}, err
-	}
+    req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(form.Encode()))
+    if err != nil {
+        return TokenResponse{}, err
+    }
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+    req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return TokenResponse{}, err
-	}
-	defer resp.Body.Close()
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return TokenResponse{}, err
+    }
+    defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return TokenResponse{}, fmt.Errorf("fetchIdTokenByRefreshToken: %s", resp.Status)
-	}
+    if resp.StatusCode != http.StatusOK {
+        return TokenResponse{}, fmt.Errorf("fetchIdTokenByRefreshToken: %s", resp.Status)
+    }
 
-	var tokenResp TokenResponse
-	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
-	if err != nil {
-		return TokenResponse{}, err
-	}
+    var tokenResp TokenResponse
+    err = json.NewDecoder(resp.Body).Decode(&tokenResp)
+    if err != nil {
+        return TokenResponse{}, err
+    }
 
-	return tokenResp, nil
+    return tokenResp, nil
 }
 
-
 func (c *baseClient) ExchangeIdToken(ctx context.Context, apikey string, refreshToken string) (string, error) {
-	res, err := fetchIdTokenByRefreshToken(apikey, refreshToken, c.secureToolkitV1Endpoint)
+	res, err := fetchIdTokenByRefreshToken(ctx, apikey, refreshToken, c.secureToolkitV1Endpoint)
 	if err != nil {
 		return "", err
 	}
