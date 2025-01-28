@@ -620,9 +620,10 @@ type WebpushFCMOptions struct {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
 // for more details on supported headers and payload keys.
 type APNSConfig struct {
-	Headers    map[string]string `json:"headers,omitempty"`
-	Payload    *APNSPayload      `json:"payload,omitempty"`
-	FCMOptions *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	Payload           *APNSPayload      `json:"payload,omitempty"`
+	FCMOptions        *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	LiveActivityToken string            `json:"live_activity_token,omitempty"`
 }
 
 // APNSPayload is the payload that can be included in an APNS message.
@@ -685,6 +686,13 @@ type Aps struct {
 	MutableContent   bool                   `json:"-"`
 	Category         string                 `json:"category,omitempty"`
 	ThreadID         string                 `json:"thread-id,omitempty"`
+	StaleDate        *time.Time             `json:"-"`
+	ContentState     map[string]interface{} `json:"content-state,omitempty"`
+	Timestamp        *time.Time             `json:"-"`
+	Event            LiveActivityEvent      `json:"-"`
+	DismissalDate    *time.Time             `json:"-"`
+	AttributesType   string                 `json:"attributes-type,omitempty"`
+	Attributes       map[string]interface{} `json:"attributes,omitempty"`
 	CustomData       map[string]interface{} `json:"-"`
 }
 
@@ -716,6 +724,32 @@ func (a *Aps) standardFields() map[string]interface{} {
 	if a.ThreadID != "" {
 		m["thread-id"] = a.ThreadID
 	}
+	if a.StaleDate != nil {
+		m["stale-date"] = a.StaleDate.Unix()
+	}
+	if a.ContentState != nil {
+		m["content-state"] = a.ContentState
+	}
+	if a.Timestamp != nil {
+		m["timestamp"] = a.Timestamp.Unix()
+	}
+	if a.Event != liveActivityEventUnspecified {
+		events := map[LiveActivityEvent]string{
+			LiveActivityEventStart:  "start",
+			LiveActivityEventUpdate: "update",
+			LiveActivityEventEnd:    "end",
+		}
+		m["event"] = events[a.Event]
+	}
+	if a.DismissalDate != nil {
+		m["dismissal-date"] = a.DismissalDate.Unix()
+	}
+	if a.AttributesType != "" {
+		m["attributes-type"] = a.AttributesType
+	}
+	if a.Attributes != nil {
+		m["attributes"] = a.Attributes
+	}
 	return m
 }
 
@@ -736,6 +770,10 @@ func (a *Aps) UnmarshalJSON(b []byte) error {
 		SoundObject         *json.RawMessage `json:"sound,omitempty"`
 		ContentAvailableInt int              `json:"content-available,omitempty"`
 		MutableContentInt   int              `json:"mutable-content,omitempty"`
+		StaleDate           *int64           `json:"stale-date,omitempty"`
+		Timestamp           *int64           `json:"timestamp,omitempty"`
+		Event               string           `json:"event,omitempty"`
+		DismissalDate       *int64           `json:"dismissal-date,omitempty"`
 		*apsInternal
 	}{
 		apsInternal: (*apsInternal)(a),
@@ -761,6 +799,30 @@ func (a *Aps) UnmarshalJSON(b []byte) error {
 			}
 		}
 	}
+	if temp.StaleDate != nil {
+		staleDate := time.Unix(*temp.StaleDate, 0)
+		a.StaleDate = &staleDate
+	}
+	if temp.Timestamp != nil {
+		timestamp := time.Unix(*temp.Timestamp, 0)
+		a.Timestamp = &timestamp
+	}
+	if temp.Event != "" {
+		events := map[string]LiveActivityEvent{
+			"start":  LiveActivityEventStart,
+			"update": LiveActivityEventUpdate,
+			"end":    LiveActivityEventEnd,
+		}
+		if event, ok := events[temp.Event]; ok {
+			a.Event = event
+		} else {
+			return fmt.Errorf("unknown event value: %q", temp.Event)
+		}
+	}
+	if temp.DismissalDate != nil {
+		dismissalDate := time.Unix(*temp.DismissalDate, 0)
+		a.DismissalDate = &dismissalDate
+	}
 
 	allFields := make(map[string]interface{})
 	if err := json.Unmarshal(b, &allFields); err != nil {
@@ -774,6 +836,22 @@ func (a *Aps) UnmarshalJSON(b []byte) error {
 	}
 	return nil
 }
+
+// LiveActivityEvent represents an event type for Live Activity in push notification payloads.
+type LiveActivityEvent int
+
+const (
+	liveActivityEventUnspecified LiveActivityEvent = iota
+
+	// LiveActivityEventStart starts a Live Activity.
+	LiveActivityEventStart
+
+	// LiveActivityEventUpdate updates a Live Activity.
+	LiveActivityEventUpdate
+
+	// LiveActivityEventEnd ends a Live Activity.
+	LiveActivityEventEnd
+)
 
 // CriticalSound is the sound payload that can be included in an Aps.
 type CriticalSound struct {
