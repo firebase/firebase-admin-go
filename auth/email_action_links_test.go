@@ -29,6 +29,7 @@ const (
 	testActionLink       = "https://test.link"
 	testActionLinkFormat = `{"oobLink": %q}`
 	testEmail            = "user@domain.com"
+	testNewEmail         = "user-new@domain.com"
 )
 
 var testActionLinkResponse = []byte(fmt.Sprintf(testActionLinkFormat, testActionLink))
@@ -306,6 +307,55 @@ func TestEmailVerificationLinkError(t *testing.T) {
 		if err == nil || !check(err) {
 			t.Errorf("EmailVerificationLink(%q) = %v; want = %q", code, err, serverError[code])
 		}
+	}
+}
+
+func TestVerifyAndChangeEmailLink(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	link, err := s.Client.VerifyAndChangeEmailLink(context.Background(), testEmail, testNewEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("TestVerifyAndChangeEmailLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_AND_CHANGE_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+		"newEmail":      testNewEmail,
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatalf("TestVerifyAndChangeEmailLink() %v", err)
+	}
+}
+
+func TestVerifyAndChangeEmailLinkWithSettings(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	link, err := s.Client.VerifyAndChangeEmailLinkWithSettings(context.Background(), testEmail, testNewEmail, testActionCodeSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("VerifyAndChangeEmailLinkWithSettings() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_AND_CHANGE_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+		"newEmail":      testNewEmail,
+	}
+	for k, v := range testActionCodeSettingsMap {
+		want[k] = v
+	}
+	if err := checkActionLinkRequest(want, s); err != nil {
+		t.Fatalf("checkActionLinkRequest() = %v", err)
 	}
 }
 
