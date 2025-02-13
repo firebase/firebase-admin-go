@@ -28,6 +28,7 @@ import (
 
 const projectConfigResponse = `{
 	"mfa": {
+		"state":"ENABLED",
 		"providerConfigs": [
 			{
 				"state":"ENABLED",
@@ -41,6 +42,7 @@ const projectConfigResponse = `{
 
 var testProjectConfig = &ProjectConfig{
 	MultiFactorConfig: &MultiFactorConfig{
+		State: Enabled,
 		ProviderConfigs: []*ProviderConfig{
 			{
 				State: Enabled,
@@ -84,6 +86,7 @@ func TestUpdateProjectConfig(t *testing.T) {
 	}
 	wantBody := map[string]interface{}{
 		"mfa": map[string]interface{}{
+			"state": "ENABLED",
 			"providerConfigs": []interface{}{
 				map[string]interface{}{
 					"state": "ENABLED",
