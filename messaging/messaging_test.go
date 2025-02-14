@@ -48,6 +48,7 @@ var (
 	badgeZero       = 0
 	timestampMillis = int64(12345)
 	timestamp       = time.Unix(0, 1546304523123*1000000).UTC()
+	unixTime        = time.Unix(1546304, 0)
 )
 
 var validMessages = []struct {
@@ -586,6 +587,49 @@ var validMessages = []struct {
 				},
 			},
 			"topic": "test-topic",
+		},
+	},
+	{
+		name: "APNSLiveActivity",
+		req: &Message{
+			Token: "test-token",
+			APNS: &APNSConfig{
+				LiveActivityToken: "live-activity-token",
+				Payload: &APNSPayload{
+					Aps: &Aps{
+						StaleDate: &unixTime,
+						ContentState: map[string]interface{}{
+							"s1": "v",
+							"s2": float64(1),
+						},
+						Timestamp:      &unixTime,
+						Event:          LiveActivityEventStart,
+						DismissalDate:  &unixTime,
+						AttributesType: "TestAttributes",
+						Attributes: map[string]interface{}{
+							"a1": "v",
+							"a2": float64(1),
+						},
+					},
+				},
+			},
+		},
+		want: map[string]interface{}{
+			"token": "test-token",
+			"apns": map[string]interface{}{
+				"live_activity_token": "live-activity-token",
+				"payload": map[string]interface{}{
+					"aps": map[string]interface{}{
+						"stale-date":      float64(unixTime.Unix()),
+						"content-state":   map[string]interface{}{"s1": "v", "s2": float64(1)},
+						"timestamp":       float64(unixTime.Unix()),
+						"event":           "start",
+						"dismissal-date":  float64(unixTime.Unix()),
+						"attributes-type": "TestAttributes",
+						"attributes":      map[string]interface{}{"a1": "v", "a2": float64(1)},
+					},
+				},
+			},
 		},
 	},
 	{
