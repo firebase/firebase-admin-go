@@ -2315,6 +2315,12 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 			t.Errorf("X-Client-Version header = %q; want: %q", gh, wh)
 		}
 
+		gh = r.Header.Get("x-goog-api-client")
+		wh = internal.GetMetricsHeader(testVersion)
+		if gh != wh {
+			t.Errorf("x-goog-api-client header = %q; want: %q", gh, wh)
+		}
+
 		for k, v := range s.Header {
 			w.Header().Set(k, v)
 		}

@@ -50,6 +50,7 @@ type HashConfig map[string]interface{}
 type InstanceIDConfig struct {
 	Opts      []option.ClientOption
 	ProjectID string
+	Version   string
 }
 
 // DatabaseConfig represents the configuration of Firebase Database service.

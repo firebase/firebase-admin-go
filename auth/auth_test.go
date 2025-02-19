@@ -1451,6 +1451,11 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
 	}
 
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testVersion)
+	if h := req.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		return fmt.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
+	}
+
 	return nil
 }
 
