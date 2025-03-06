@@ -191,6 +191,7 @@ type AndroidNotification struct {
 	DefaultLightSettings  bool                          `json:"default_light_settings,omitempty"`
 	Visibility            AndroidNotificationVisibility `json:"-"`
 	NotificationCount     *int                          `json:"notification_count,omitempty"`
+	Proxy                 AndroidNotificationProxy      `json:"-"`
 }
 
 // MarshalJSON marshals an AndroidNotification into JSON (for internal use only).
@@ -217,6 +218,16 @@ func (a *AndroidNotification) MarshalJSON() ([]byte, error) {
 		visibility, _ = visibilities[a.Visibility]
 	}
 
+	var proxy string
+	if a.Proxy != proxyUnspecified {
+		proxies := map[AndroidNotificationProxy]string{
+			ProxyAllow:             "ALLOW",
+			ProxyDeny:              "DENY",
+			ProxyIfPriorityLowered: "IF_PRIORITY_LOWERED",
+		}
+		proxy, _ = proxies[a.Proxy]
+	}
+
 	var timestamp string
 	if a.EventTimestamp != nil {
 		timestamp = a.EventTimestamp.UTC().Format(rfc3339Zulu)
@@ -232,12 +243,14 @@ func (a *AndroidNotification) MarshalJSON() ([]byte, error) {
 		EventTimestamp string   `json:"event_time,omitempty"`
 		Priority       string   `json:"notification_priority,omitempty"`
 		Visibility     string   `json:"visibility,omitempty"`
+		Proxy          string   `json:"proxy,omitempty"`
 		VibrateTimings []string `json:"vibrate_timings,omitempty"`
 		*androidInternal
 	}{
 		EventTimestamp:  timestamp,
 		Priority:        priority,
 		Visibility:      visibility,
+		Proxy:           proxy,
 		VibrateTimings:  vibTimings,
 		androidInternal: (*androidInternal)(a),
 	}
@@ -354,6 +367,15 @@ const (
 
 	// VisibilitySecret does not reveal any part of this notification on a secure lockscreen.
 	VisibilitySecret
+)
+
+type AndroidNotificationProxy int
+
+const (
+	proxyUnspecified AndroidNotificationProxy = iota
+	ProxyAllow
+	ProxyDeny
+	ProxyIfPriorityLowered
 )
 
 // LightSettings to control notification LED.
