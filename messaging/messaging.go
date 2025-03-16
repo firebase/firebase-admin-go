@@ -369,12 +369,20 @@ const (
 	VisibilitySecret
 )
 
+// AndroidNotificationProxy to control when a notification may be proxied.
 type AndroidNotificationProxy int
 
 const (
 	proxyUnspecified AndroidNotificationProxy = iota
+
+	// ProxyAllow tries to proxy this notification.
 	ProxyAllow
+
+	// ProxyDeny does not proxy this notification.
 	ProxyDeny
+
+	// ProxyIfPriorityLowered only tries to proxy this notification if its AndroidConfig's Priority was
+	// lowered from high to normal on the device.
 	ProxyIfPriorityLowered
 )
 
