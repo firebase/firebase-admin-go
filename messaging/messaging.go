@@ -264,6 +264,7 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 		EventTimestamp string   `json:"event_time,omitempty"`
 		Priority       string   `json:"notification_priority,omitempty"`
 		Visibility     string   `json:"visibility,omitempty"`
+		Proxy          string   `json:"proxy,omitempty"`
 		VibrateTimings []string `json:"vibrate_timings,omitempty"`
 		*androidInternal
 	}{
@@ -298,6 +299,19 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 			a.Visibility = vis
 		} else {
 			return fmt.Errorf("unknown visibility value: %q", temp.Visibility)
+		}
+	}
+
+	if temp.Proxy != "" {
+		proxies := map[string]AndroidNotificationProxy{
+			"ALLOW":               ProxyAllow,
+			"DENY":                ProxyDeny,
+			"IF_PRIORITY_LOWERED": ProxyIfPriorityLowered,
+		}
+		if prox, ok := proxies[temp.Proxy]; ok {
+			a.Proxy = prox
+		} else {
+			return fmt.Errorf("unknown proxy value: %q", temp.Proxy)
 		}
 	}
 
