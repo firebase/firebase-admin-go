@@ -683,6 +683,63 @@ var validMessages = []struct {
 			"topic": "test-topic",
 		},
 	},
+	{
+		name: "AndroidNotificationProxyAllow",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyAllow,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "ALLOW",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationProxyDeny",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyDeny,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "DENY",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationProxyIfPriorityLowered",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyIfPriorityLowered,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "IF_PRIORITY_LOWERED",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
 }
 
 var invalidMessages = []struct {
