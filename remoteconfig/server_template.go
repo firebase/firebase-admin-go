@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"unsafe"
+	"sync/atomic"
+	"encoding/json"
 	
 	"firebase.google.com/go/v4/internal"
 )
@@ -52,7 +53,7 @@ type RemoteConfigParameterValue interface{}
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
 	rcClient  *rcClient
-	cache     Pointer[ServerTemplateData]
+	cache     atomic.Pointer[ServerTemplateData]
 	stringifiedDefaultConfig map[string]string
 }
 
@@ -61,12 +62,11 @@ func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) *Server
 	// TODO: Create stringified config to be type safe:
 	stringifiedConfig := make(map[string]string)
     for key, value := range defaultConfig{
-        stringifiedConfig[key] = string(defaultConfig[key])
+        stringifiedConfig[key] = fmt.Sprintf("%v", value)
     }
 
 	return &ServerTemplate{
 		rcClient: rcClient,
-		cache:	  nil,
 		stringifiedDefaultConfig: stringifiedConfig,
 	}
 }
@@ -78,7 +78,7 @@ func (s *ServerTemplate) Load(ctx context.Context) error {
 		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.rcClient.rcBaseUrl , s.rcClient.project),
 	}
 
-	var templateData ServerTemplateData
+	templateData := new(ServerTemplateData)
 	response, err := s.rcClient.httpClient.DoAndUnmarshal(ctx, request, &templateData)
 
 	if err != nil {
@@ -92,20 +92,21 @@ func (s *ServerTemplate) Load(ctx context.Context) error {
 }
 
 // Load fetches the server template data from the remote config service and caches it.
-func (s *ServerTemplate) Set(templateDataJson string) {
-    var templateData ServerTemplateData
-    if err := json.Unmarshal(templateDataJson, &templateData); err != nil {
+func (s *ServerTemplate) Set(templateDataJson string) (error) {
+    templateData := new(ServerTemplateData)
+    if err := json.Unmarshal([]byte(templateDataJson), &templateData); err != nil {
         return fmt.Errorf("error while parsing server template: %v", err)
     }
     s.cache.Store(templateData)
+	return nil
 }
 
 // Returns a json representing the cached ServerTemplateData.
-func (s *ServerTemplate) ToJSON() string, error {
+func (s *ServerTemplate) ToJson() (string, error) {
     jsonServerTemplate, err := json.Marshal(s.cache.Load())
  
     if (err != nil) {
-        return nil, fmt.Errorf("error while parsing server template: %v", err)
+        return "", fmt.Errorf("error while parsing server template: %v", err)
     }
 
     return string(jsonServerTemplate), nil
@@ -115,9 +116,9 @@ func (s *ServerTemplate) ToJSON() string, error {
 // based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
 	// TODO: Write ConditionalEvaluator for evaluating
-    configMap := make(map[string]Value)
+    configMap := make(map[string]value)
     for key, value := range s.cache.Load().Parameters{
-        configMap[key] = *NewValue(Remote, value.DefaultValue.Value)
+        configMap[key] = *newValue(Remote, value.DefaultValue.Value)
     }
 
 	return &ServerConfig{ConfigValues: configMap}

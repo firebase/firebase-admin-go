@@ -84,7 +84,7 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 func (c *rcClient) GetServerTemplate(ctx context.Context, 
 	defaultConfig map[string]any) (*ServerTemplate, error) { 
 	// Initialize a new ServerTemplate instance 
-	template := c.InitServerTemplate(defaultConfig, nil) 
+	template := c.InitServerTemplate(defaultConfig, "") 
   
 	// Load the template data from the server and cache it 
 	err := template.Load(ctx);
@@ -98,8 +98,8 @@ func (c *rcClient) InitServerTemplate(defaultConfig map[string]any,
 	template := newServerTemplate(c, defaultConfig) 
 
 	// Set template data if provided 
-	if templateData != nil { 
-		template.Set(templateData) 
+	if templateDataJson != "" { 
+		template.Set(templateDataJson) 
 	} 
 
 	return template

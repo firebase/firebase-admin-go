@@ -51,7 +51,7 @@ type ServerConfig struct {
 }
 
 // NewServerConfig creates a new ServerConfig instance.
-func NewServerConfig(configValues map[string]Value) *ServerConfig {
+func NewServerConfig(configValues map[string]value) *ServerConfig {
 	return &ServerConfig{ConfigValues: configValues}
 }
 
@@ -75,29 +75,29 @@ func (s *ServerConfig) GetValueSource(key string) string {
 	return s.getValue(key).source
 }
 
-// getValue returns the Value associated with the given key.
-func (s *ServerConfig) getValue(key string) *Value {
+// getValue returns the value associated with the given key.
+func (s *ServerConfig) getValue(key string) *value {
 	if val, ok := s.ConfigValues[key]; ok {
 		return &val
 	}
 	return newValue(Static, "")
 }
 
-// newValue creates a new Value instance.
-func newValue(source string, value string) *Value {
-	if value == "" {
-		value = DefaultValueForString
+// newValue creates a new value instance.
+func newValue(source string, customValue string) *value {
+	if customValue == "" {
+		customValue = DefaultValueForString
 	}
-	return &Value{source: source, value: value}
+	return &value{source: source, value: customValue}
 }
 
 // asString returns the value as a string.
-func (v *Value) asString() string {
+func (v *value) asString() string {
 	return v.value
 }
 
 // asBoolean returns the value as a boolean.
-func (v *Value) asBoolean() bool {
+func (v *value) asBoolean() bool {
 	if v.source == Static {
 		return DefaultValueForBoolean
 	}
@@ -112,7 +112,7 @@ func (v *Value) asBoolean() bool {
 }
 
 // asNumber returns the value as an integer.
-func (v *Value) asNumber() int {
+func (v *value) asNumber() int {
 	if v.source == Static {
 		return DefaultValueForNumber
 	}
