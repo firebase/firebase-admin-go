@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/storage v1.49.0
 	github.com/MicahParks/keyfunc v1.9.0
-	github.com/golang-jwt/jwt/v4 v4.5.1
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-cmp v0.6.0
 	golang.org/x/oauth2 v0.25.0
 	google.golang.org/api v0.215.0
