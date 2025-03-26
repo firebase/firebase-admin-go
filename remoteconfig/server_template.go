@@ -12,73 +12,86 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package messaging contains functions for sending messages and managing
-// device subscriptions with Firebase Cloud Messaging (FCM).
 package remoteconfig
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
-	"encoding/json"
-	
+
 	"firebase.google.com/go/v4/internal"
 )
 
-type ServerTemplateData struct {
+// serverTemplateData stores the internal representation of the server template.
+type serverTemplateData struct {
 	Conditions []struct {
 		Name      string      `json:"name"`
 		Condition interface{} `json:"condition"`
 	} `json:"conditions"`
-	Parameters map[string]RemoteConfigParameter `json:"parameters"`
+	Parameters map[string]parameter `json:"parameters"`
 
 	Version struct {
 		VersionNumber string `json:"versionNumber"`
-		IsLegacy bool `json:"isLegacy"`
-	}	`json:"version"`
+		IsLegacy      bool   `json:"isLegacy"`
+	} `json:"version"`
 
-	ETag  string
+	ETag string
 }
 
-type RemoteConfigParameter struct {
+// parameter stores the representation of a template parameter.
+type parameter struct {
 	DefaultValue struct {
 		Value string `json:"value"`
 	} `json:"defaultValue"`
-	ConditionalValues map[string]RemoteConfigParameterValue `json:"conditionalValues"`
+	ConditionalValues map[string]parameterValue `json:"conditionalValues"`
 }
 
-type RemoteConfigParameterValue interface{}
+// parameterValue defines the representation of the parameter value.
+type parameterValue interface{}
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
-	rcClient  *rcClient
-	cache     atomic.Pointer[ServerTemplateData]
+	rcClient                 *rcClient
+	cache                    atomic.Pointer[serverTemplateData]
 	stringifiedDefaultConfig map[string]string
 }
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
-func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) *ServerTemplate {
+func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*ServerTemplate, error) {
 	// TODO: Create stringified config to be type safe:
-	stringifiedConfig := make(map[string]string)
-    for key, value := range defaultConfig{
-        stringifiedConfig[key] = fmt.Sprintf("%v", value)
-    }
+	stringifiedConfig := make(map[string]string, len(defaultConfig)) // Pre-allocate map
+
+	for key, value := range defaultConfig {
+		if value == nil {
+			stringifiedConfig[key] = ""
+			continue
+		}
+
+		// Marshal the value to JSON bytes
+		jsonBytes, err := json.Marshal(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal config key '%s': %w", key, err)
+		}
+
+		stringifiedConfig[key] = string(jsonBytes)
+	}
 
 	return &ServerTemplate{
-		rcClient: rcClient,
+		rcClient:                 rcClient,
 		stringifiedDefaultConfig: stringifiedConfig,
-	}
+	}, nil
 }
 
 // Load fetches the server template data from the remote config service and caches it.
 func (s *ServerTemplate) Load(ctx context.Context) error {
 	request := &internal.Request{
 		Method: http.MethodGet,
-		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.rcClient.rcBaseUrl , s.rcClient.project),
+		URL:    fmt.Sprintf("%s/v1/projects/%s/namespaces/firebase-server/serverRemoteConfig", s.rcClient.rcBaseURL, s.rcClient.project),
 	}
 
-	templateData := new(ServerTemplateData)
+	templateData := new(serverTemplateData)
 	response, err := s.rcClient.httpClient.DoAndUnmarshal(ctx, request, &templateData)
 
 	if err != nil {
@@ -87,39 +100,38 @@ func (s *ServerTemplate) Load(ctx context.Context) error {
 
 	templateData.ETag = response.Header.Get("etag")
 	s.cache.Store(templateData)
-	fmt.Println("Etag", s.cache.Load().ETag) // TODO: Remove ETag 
 	return nil
 }
 
-// Load fetches the server template data from the remote config service and caches it.
-func (s *ServerTemplate) Set(templateDataJson string) (error) {
-    templateData := new(ServerTemplateData)
-    if err := json.Unmarshal([]byte(templateDataJson), &templateData); err != nil {
-        return fmt.Errorf("error while parsing server template: %v", err)
-    }
-    s.cache.Store(templateData)
+// Set initializes a template using a server template JSON.
+func (s *ServerTemplate) Set(templateDataJSON string) error {
+	templateData := new(serverTemplateData)
+	if err := json.Unmarshal([]byte(templateDataJSON), &templateData); err != nil {
+		return fmt.Errorf("error while parsing server template: %v", err)
+	}
+	s.cache.Store(templateData)
 	return nil
 }
 
-// Returns a json representing the cached ServerTemplateData.
-func (s *ServerTemplate) ToJson() (string, error) {
-    jsonServerTemplate, err := json.Marshal(s.cache.Load())
- 
-    if (err != nil) {
-        return "", fmt.Errorf("error while parsing server template: %v", err)
-    }
+// ToJSON Returns a json representing the cached serverTemplateData.
+func (s *ServerTemplate) ToJSON() (string, error) {
+	jsonServerTemplate, err := json.Marshal(s.cache.Load())
 
-    return string(jsonServerTemplate), nil
+	if err != nil {
+		return "", fmt.Errorf("error while parsing server template: %v", err)
+	}
+
+	return string(jsonServerTemplate), nil
 }
 
-// Evaluate processes the cached template data with a condition evaluator 
+// Evaluate processes the cached template data with a condition evaluator
 // based on the provided context.
 func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
 	// TODO: Write ConditionalEvaluator for evaluating
-    configMap := make(map[string]value)
-    for key, value := range s.cache.Load().Parameters{
-        configMap[key] = *newValue(Remote, value.DefaultValue.Value)
-    }
+	configMap := make(map[string]value)
+	for key, value := range s.cache.Load().Parameters {
+		configMap[key] = *newValue(Remote, value.DefaultValue.Value)
+	}
 
 	return &ServerConfig{ConfigValues: configMap}
 }

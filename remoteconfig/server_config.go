@@ -12,35 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package messaging contains functions for sending messages and managing
-// device subscriptions with Firebase Cloud Messaging (FCM).
 package remoteconfig
 
 import (
-  "strconv"
-  "strings"
+	"strconv"
+	"strings"
+)
+
+// ValueSource represents the source of a value
+type ValueSource int
+
+// Constants for value source
+const (
+	sourceUnspecified ValueSource = iota
+	Static                        // Static represents a statically defined value.
+	Remote                        // Default represents a default value.
+	Default                       // Remote represents a value fetched from a remote source.
 )
 
 // Value defines the interface for configuration values.
 type value struct {
-	source string
+	source ValueSource
 	value  string
 }
 
+// Default Values for config parameters.
 const (
-	// Static represents a statically defined value.
-	Static string = "static"
-
-	// Default represents a default value.
-	Default string = "default"
-
-	// Remote represents a value fetched from a remote source.
-	Remote string = "remote"
-
-	// Default Values
 	DefaultValueForBoolean = false
 	DefaultValueForString  = ""
-	DefaultValueForNumber = 0
+	DefaultValueForNumber  = 0
 )
 
 var booleanTruthyValues = []string{"1", "true", "t", "yes", "y", "on"}
@@ -70,8 +70,8 @@ func (s *ServerConfig) GetString(key string) string {
 	return s.getValue(key).asString()
 }
 
-// GetSource returns the source of the value.
-func (s *ServerConfig) GetValueSource(key string) string {
+// GetValueSource returns the source of the value.
+func (s *ServerConfig) GetValueSource(key string) ValueSource {
 	return s.getValue(key).source
 }
 
@@ -84,7 +84,7 @@ func (s *ServerConfig) getValue(key string) *value {
 }
 
 // newValue creates a new value instance.
-func newValue(source string, customValue string) *value {
+func newValue(source ValueSource, customValue string) *value {
 	if customValue == "" {
 		customValue = DefaultValueForString
 	}
@@ -117,7 +117,7 @@ func (v *value) asNumber() int {
 		return DefaultValueForNumber
 	}
 	num, err := strconv.Atoi(v.value)
-	
+
 	if err != nil {
 		return DefaultValueForNumber
 	}

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package for the clients to use Firebase Remote Config with Go.
-
+// Package remoteconfig for the clients to use Firebase Remote Config with Go.
 package remoteconfig
 
 import (
@@ -28,8 +27,8 @@ import (
 )
 
 const (
-	defaulBaseUrl         = "https://firebaseremoteconfig.googleapis.com"
-	firebaseClientHeader  = "X-Firebase-Client"
+	defaultBaseURL       = "https://firebaseremoteconfig.googleapis.com"
+	firebaseClientHeader = "X-Firebase-Client"
 )
 
 // Client is the interface for the Remote Config Cloud service.
@@ -37,7 +36,7 @@ type Client struct {
 	*rcClient
 }
 
-// NewClient initializes a RemoteConfigClient with app-specific detail and a returns a 
+// NewClient initializes a RemoteConfigClient with app-specific detail and a returns a
 // client to be used by the user.
 func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Client, error) {
 	if c.ProjectID == "" {
@@ -51,15 +50,15 @@ func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Clie
 
 	return &Client{
 		rcClient: newRcClient(hc, c),
-	},nil
+	}, nil
 }
 
 // RemoteConfigClient facilitates requests to the Firebase Remote Config backend.
 type rcClient struct {
-	httpClient	*internal.HTTPClient
-	project		string
-	rcBaseUrl	string
-	version		string
+	httpClient *internal.HTTPClient
+	project    string
+	rcBaseURL  string
+	version    string
 }
 
 func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientConfig) *rcClient {
@@ -74,35 +73,37 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 	client.CreateErrFn = handleRemoteConfigError
 
 	return &rcClient{
-		rcBaseUrl: 	defaulBaseUrl,
-		project:   	conf.ProjectID,
-		version:   	version,
-		httpClient:	client,
+		rcBaseURL:  defaultBaseURL,
+		project:    conf.ProjectID,
+		version:    version,
+		httpClient: client,
 	}
 }
 
-func (c *rcClient) GetServerTemplate(ctx context.Context, 
-	defaultConfig map[string]any) (*ServerTemplate, error) { 
-	// Initialize a new ServerTemplate instance 
-	template := c.InitServerTemplate(defaultConfig, "") 
-  
-	// Load the template data from the server and cache it 
-	err := template.Load(ctx);
+// GetServerTemplate Initializes a new ServerTemplate instance and fetches the server template.
+func (c *rcClient) GetServerTemplate(ctx context.Context,
+	defaultConfig map[string]any) (*ServerTemplate, error) {
+	template, err := c.InitServerTemplate(defaultConfig, "")
 
-	return template, err;
+	if err != nil {
+		return nil, err
+	}
+
+	err = template.Load(ctx)
+	return template, err
 }
-  
-func (c *rcClient) InitServerTemplate(defaultConfig map[string]any, 
-	templateDataJson string) *ServerTemplate { 
-	// Create the ServerTemplate instance with defaultConfig
-	template := newServerTemplate(c, defaultConfig) 
 
-	// Set template data if provided 
-	if templateDataJson != "" { 
-		template.Set(templateDataJson) 
-	} 
+// InitServerTemplate initializes a new ServerTemplate with the default config and
+// an optional template data json.
+func (c *rcClient) InitServerTemplate(defaultConfig map[string]any,
+	templateDataJSON string) (*ServerTemplate, error) {
+	template, err := newServerTemplate(c, defaultConfig)
 
-	return template
+	if templateDataJSON != "" && err == nil {
+		template.Set(templateDataJSON)
+	}
+
+	return template, nil
 }
 
 func handleRemoteConfigError(resp *internal.Response) error {
