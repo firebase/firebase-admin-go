@@ -76,9 +76,9 @@ type MessagingConfig struct {
 
 // RemoteConfigClientConfig represents the configuration of Firebase Remote Config
 type RemoteConfigClientConfig struct {
-	Opts      	[]option.ClientOption
-	ProjectID 	string
-	Version   	string
+	Opts      []option.ClientOption
+	ProjectID string
+	Version   string
 }
 
 // AppCheckConfig represents the configuration of App Check service.
