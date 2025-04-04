@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"runtime"
-	"strings"
 
 	"firebase.google.com/go/v4/internal"
 )
@@ -62,7 +60,6 @@ type rcClient struct {
 }
 
 func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientConfig) *rcClient {
-	goVersion := strings.TrimPrefix(runtime.Version(), "go")
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(firebaseClientHeader, version),
