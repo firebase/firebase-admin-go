@@ -74,17 +74,20 @@ func TestServerTemplateToJSONSuccess(t *testing.T) {
 	template := &ServerTemplate{
 		cache: atomic.Pointer[serverTemplateData]{},
 	}
+	value := "test_value"
 	data := &serverTemplateData{
-		Parameters: map[string]parameter{
+		Parameters: map[string]remoteConfigParameter{
 			"test_param": {
-				// Just provide the field values; Go infers the correct anonymous struct type
-				DefaultValue: struct {
-					Value string `json:"value"`
-				}{
-					Value: "test_value",
+				DefaultValue : remoteConfigParameterValue{
+					Value : &value,
 				},
 			},
 		},
+		Version: version{
+			VersionNumber: "123",
+			IsLegacy: true,
+		},
+		ETag: "test_etag",
 	}
 	template.cache.Store(data)
 	json, err := template.ToJSON()
@@ -92,7 +95,7 @@ func TestServerTemplateToJSONSuccess(t *testing.T) {
 		t.Fatalf("ServerTemplate.ToJSON failed: %v", err)
 	}
 
-	expectedJSON := `{"parameters":{"test_param":{"defaultValue":{"value":"test_value"}}},"version":{"versionNumber":"","isLegacy":false},"ETag":""}`
+	expectedJSON := `{"parameters":{"test_param":{"defaultValue":{"value":"test_value"}}},"version":{"versionNumber":"123","isLegacy":true},"etag":"test_etag"}`
 	if json != expectedJSON {
 		t.Fatalf("ServerTemplate.ToJSON returned incorrect json: %v want %v", json, expectedJSON)
 	}
@@ -103,14 +106,20 @@ func TestServerTemplateEvaluateSuccess(t *testing.T) {
 	template := &ServerTemplate{
 		cache: atomic.Pointer[serverTemplateData]{},
 	}
+	value := "test_value"
 	data := &serverTemplateData{
-		Parameters: map[string]parameter{
+		Parameters: map[string]remoteConfigParameter{
 			"test_param": {
-				DefaultValue: struct {
-					Value string `json:"value"`
-				}{Value: "test_value"},
+				DefaultValue : remoteConfigParameterValue{
+					Value : &value,
+				},
 			},
 		},
+		Version: version{
+			VersionNumber: "123",
+			IsLegacy: true,
+		},
+		ETag: "test_etag",
 	}
 	template.cache.Store(data)
 

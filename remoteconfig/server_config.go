@@ -24,7 +24,7 @@ type ValueSource int
 
 // Constants for value source
 const (
-	sourceUnspecified ValueSource = iota
+	SourceUnspecified ValueSource = iota
 	Static                        // Static represents a statically defined value.
 	Remote                        // Default represents a default value.
 	Default                       // Remote represents a value fetched from a remote source.
