@@ -26,10 +26,6 @@ import (
 
 // serverTemplateData stores the internal representation of the server template.
 type serverTemplateData struct {
-	Conditions []struct {
-		Name      string      `json:"name"`
-		Condition interface{} `json:"condition"`
-	} `json:"conditions"`
 	Parameters map[string]parameter `json:"parameters"`
 
 	Version struct {
@@ -45,11 +41,7 @@ type parameter struct {
 	DefaultValue struct {
 		Value string `json:"value"`
 	} `json:"defaultValue"`
-	ConditionalValues map[string]parameterValue `json:"conditionalValues"`
 }
-
-// parameterValue defines the representation of the parameter value.
-type parameterValue interface{}
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
 type ServerTemplate struct {
@@ -60,7 +52,6 @@ type ServerTemplate struct {
 
 // NewServerTemplate initializes a new ServerTemplate with optional default configuration.
 func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*ServerTemplate, error) {
-	// TODO: Create stringified config to be type safe:
 	stringifiedConfig := make(map[string]string, len(defaultConfig)) // Pre-allocate map
 
 	for key, value := range defaultConfig {
@@ -124,10 +115,8 @@ func (s *ServerTemplate) ToJSON() (string, error) {
 	return string(jsonServerTemplate), nil
 }
 
-// Evaluate processes the cached template data with a condition evaluator
-// based on the provided context.
-func (s *ServerTemplate) Evaluate(context map[string]interface{}) *ServerConfig {
-	// TODO: Write ConditionalEvaluator for evaluating
+// Evaluate and processes the cached template data.
+func (s *ServerTemplate) Evaluate() *ServerConfig {
 	configMap := make(map[string]value)
 	for key, value := range s.cache.Load().Parameters {
 		configMap[key] = *newValue(Remote, value.DefaultValue.Value)

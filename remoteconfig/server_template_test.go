@@ -92,13 +92,13 @@ func TestServerTemplateToJSONSuccess(t *testing.T) {
 		t.Fatalf("ServerTemplate.ToJSON failed: %v", err)
 	}
 
-	expectedJSON := `{"conditions":null,"parameters":{"test_param":{"defaultValue":{"value":"test_value"},"conditionalValues":null}},"version":{"versionNumber":"","isLegacy":false},"ETag":""}`
+	expectedJSON := `{"parameters":{"test_param":{"defaultValue":{"value":"test_value"}}},"version":{"versionNumber":"","isLegacy":false},"ETag":""}`
 	if json != expectedJSON {
 		t.Fatalf("ServerTemplate.ToJSON returned incorrect json: %v want %v", json, expectedJSON)
 	}
 }
 
-// Test ServerTemplate.Evaluate with valid data
+// Test ServerTemplate.Evaluate with valid paramaters
 func TestServerTemplateEvaluateSuccess(t *testing.T) {
 	template := &ServerTemplate{
 		cache: atomic.Pointer[serverTemplateData]{},
@@ -114,8 +114,7 @@ func TestServerTemplateEvaluateSuccess(t *testing.T) {
 	}
 	template.cache.Store(data)
 
-	context := map[string]interface{}{"test_context": "test_value"}
-	config := template.Evaluate(context)
+	config := template.Evaluate()
 	if config == nil {
 		t.Fatal("ServerTemplate.Evaluate returned nil config")
 	}

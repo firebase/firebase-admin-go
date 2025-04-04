@@ -67,7 +67,7 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(firebaseClientHeader, version),
 		internal.WithHeader("X-Firebase-ETag", "true"),
-		internal.WithHeader("x-goog-api-client", fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, conf.Version)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
 	}
 
 	client.CreateErrFn = handleRemoteConfigError

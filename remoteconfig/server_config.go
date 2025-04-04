@@ -60,9 +60,14 @@ func (s *ServerConfig) GetBoolean(key string) bool {
 	return s.getValue(key).asBoolean()
 }
 
-// GetNumber returns the integer value associated with the given key.
-func (s *ServerConfig) GetNumber(key string) int {
-	return s.getValue(key).asNumber()
+// GetInt returns the integer value associated with the given key.
+func (s *ServerConfig) GetInt(key string) int {
+	return s.getValue(key).asInt()
+}
+
+// GetFloat returns the float value associated with the given key.
+func (s *ServerConfig) GetFloat(key string) float64 {
+	return s.getValue(key).asFloat()
 }
 
 // GetString returns the string value associated with the given key.
@@ -111,12 +116,26 @@ func (v *value) asBoolean() bool {
 	return false
 }
 
-// asNumber returns the value as an integer.
-func (v *value) asNumber() int {
+// asInt returns the value as an integer.
+func (v *value) asInt() int {
 	if v.source == Static {
 		return DefaultValueForNumber
 	}
 	num, err := strconv.Atoi(v.value)
+
+	if err != nil {
+		return DefaultValueForNumber
+	}
+
+	return num
+}
+
+// asFloat returns the value as an integer.
+func (v *value) asFloat() float64 {
+	if v.source == Static {
+		return DefaultValueForNumber
+	}
+	num, err := strconv.ParseFloat(v.value, 64)
 
 	if err != nil {
 		return DefaultValueForNumber
