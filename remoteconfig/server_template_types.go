@@ -38,6 +38,9 @@ type oneOfCondition struct {
 
 	// Makes this condition a percent condition.
 	Percent *percentCondition `json:"percent,omitempty"`
+
+	// Added for the purpose of testing
+	Boolean *bool `json:"boolean,omitempty"`
 }
 
 // Represents a collection of conditions that evaluate to true if any are true.
