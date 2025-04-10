@@ -27,28 +27,28 @@ type conditionEvaluator struct {
 }
 
 const (
-	MaxConditionRecursionDepth = 10
-	RandomizationId            = "randomizationId"
-	RootNestingLevel           = 0
-	TotalMicroPercentiles = 100_000_000
+	maxConditionRecursionDepth = 10
+	randomizationId            = "randomizationId"
+	rootNestingLevel           = 0
+	totalMicroPercentiles      = 100_000_000
 )
 
 const (
-	LessThanOrEqual = "LESS_OR_EQUAL"
-	GreaterThan     = "GREATER_THAN"
-	Between         = "BETWEEN"
+	lessThanOrEqual = "LESS_OR_EQUAL"
+	greaterThan     = "GREATER_THAN"
+	between         = "BETWEEN"
 )
 
 func (ce *conditionEvaluator) evaluateConditions() map[string]bool {
 	evaluatedConditions := make(map[string]bool)
 	for _, condition := range ce.conditions {
-		evaluatedConditions[condition.Name] = ce.evaluateCondition(condition.Condition, RootNestingLevel)
+		evaluatedConditions[condition.Name] = ce.evaluateCondition(condition.Condition, rootNestingLevel)
 	}
 	return evaluatedConditions
 }
 
 func (ce *conditionEvaluator) evaluateCondition(condition *oneOfCondition, nestingLevel int) bool {
-	if nestingLevel >= MaxConditionRecursionDepth {
+	if nestingLevel >= maxConditionRecursionDepth {
 		log.Println("Maximum recursion depth is exceeded.")
 		return false
 	}
@@ -89,25 +89,25 @@ func (ce *conditionEvaluator) evaluateAndCondition(andCondition *andCondition, n
 }
 
 func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percentCondition) bool {
-	if rid, ok := ce.evaluationContext[RandomizationId].(string); ok {
+	if rid, ok := ce.evaluationContext[randomizationId].(string); ok {
 		if percentCondition.PercentOperator == "" {
 			log.Println("Missing percent operator for percent condition.")
 			return false
 		}
 		instanceMicroPercentile := computeInstanceMicroPercentile(percentCondition.Seed, rid)
 		switch percentCondition.PercentOperator {
-		case LessThanOrEqual:
+		case lessThanOrEqual:
 			return instanceMicroPercentile <= percentCondition.MicroPercent
-		case GreaterThan:
+		case greaterThan:
 			return instanceMicroPercentile > percentCondition.MicroPercent
-		case Between:
+		case between:
 			return instanceMicroPercentile > percentCondition.MicroPercentRange.MicroPercentLowerBound && instanceMicroPercentile <= percentCondition.MicroPercentRange.MicroPercentUpperBound
 		default:
 			log.Printf("Unknown percent operator: %s\n", percentCondition.PercentOperator)
 			return false
 		}
 	}
-	log.Println("Missing or invalid randomization ID (requires a string value) for percent condition.")
+	log.Println("Missing or invalid randomizationId (requires a string value) for percent condition.")
 	return false
 }
 
@@ -125,7 +125,7 @@ func computeInstanceMicroPercentile(seed string, randomizationId string) uint32 
 
 	hashBigInt := new(big.Int).SetBytes(hashBytes)
 	// Convert the hash bytes to a big.Int. The "0x" prefix is implicit in the conversion from hex to big.Int.
-	instanceMicroPercentileBigInt := new(big.Int).Mod(hashBigInt, big.NewInt(TotalMicroPercentiles))
+	instanceMicroPercentileBigInt := new(big.Int).Mod(hashBigInt, big.NewInt(totalMicroPercentiles))
 	// Can safely convert to uint32 since the range of instanceMicroPercentile is 0 to 100_000_000; range of uint32 is 0 to 4_294_967_295.
 	return uint32(instanceMicroPercentileBigInt.Int64())
 }

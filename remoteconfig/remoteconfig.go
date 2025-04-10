@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package remoteconfig allows clients to use Firebase Remote Config with Go.
+// Package remoteconfig allows clients to use Firebase Remote Config.
 package remoteconfig
 
 import (

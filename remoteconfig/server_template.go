@@ -17,7 +17,9 @@ package remoteconfig
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sync/atomic"
 
@@ -30,7 +32,7 @@ type serverTemplateData struct {
 	Conditions []namedCondition `json:"conditions,omitempty"`
 
 	// Map of parameter keys to their optional default values and optional conditional values.
-	Parameters map[string]remoteConfigParameter `json:"parameters,omitempty"`
+	Parameters map[string]parameter `json:"parameters,omitempty"`
 
 	// Version information for the current Remote Config template.
 	Version version `json:"version,omitempty"`
@@ -46,13 +48,18 @@ type ServerTemplate struct {
 	stringifiedDefaultConfig map[string]string
 }
 
-// NewServerTemplate initializes a new ServerTemplate with optional default configuration.
+// newServerTemplate initializes a new ServerTemplate with optional default configuration.
 func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*ServerTemplate, error) {
 	stringifiedConfig := make(map[string]string, len(defaultConfig)) // Pre-allocate map
 
 	for key, value := range defaultConfig {
 		if value == nil {
 			stringifiedConfig[key] = ""
+			continue
+		}
+
+		if s, ok := value.(string); ok {
+			stringifiedConfig[key] = s
 			continue
 		}
 
@@ -112,7 +119,45 @@ func (s *ServerTemplate) ToJSON() (string, error) {
 }
 
 // Evaluate and processes the cached template data.
-func (s *ServerTemplate) Evaluate() *ServerConfig {
-	configMap := make(map[string]value)
-	return &ServerConfig{ConfigValues: configMap}
+func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error) {
+	if s.cache.Load() == nil {
+		return &ServerConfig{}, errors.New("no Remote Config Server template in Cache, call Load() before calling Evaluate()")
+	}
+
+	config := make(map[string]value)
+	for key, inAppDefault := range s.stringifiedDefaultConfig {
+		config[key] = value{source: Default, value: inAppDefault}
+	}
+
+	ce := conditionEvaluator{
+		conditions:        s.cache.Load().Conditions,
+		evaluationContext: context,
+	}
+	evaluatedConditions := ce.evaluateConditions()
+
+	// Overlays config Value objects derived by evaluating the template.
+	for key, parameter := range s.cache.Load().Parameters {
+		var paramValueWrapper parameterValue
+		var matchedConditionName string // Track the name of the condition that matched
+
+		for _, condition := range s.cache.Load().Conditions {
+			// Iterates in order over the condition list; conditions are ordered in decreasing priority.
+			if value, ok := parameter.ConditionalValues[condition.Name]; ok && evaluatedConditions[condition.Name] {
+				paramValueWrapper = value
+				matchedConditionName = condition.Name // Store the name when a match occurs
+				break
+			}
+		}
+
+		if paramValueWrapper.UseInAppDefault != nil && *paramValueWrapper.UseInAppDefault {
+			log.Printf("Parameter '%s': Condition '%s' uses in-app default.\n", key, matchedConditionName)
+		} else if paramValueWrapper.Value != nil {
+			config[key] = value{source: Remote, value: *paramValueWrapper.Value}
+		} else if parameter.DefaultValue.UseInAppDefault != nil && *parameter.DefaultValue.UseInAppDefault {
+			log.Printf("Parameter '%s': Using parameter's in-app default.\n", key)
+		} else if parameter.DefaultValue.Value != nil {
+			config[key] = value{source: Remote, value: *parameter.DefaultValue.Value}
+		}
+	}
+	return &ServerConfig{configValues: config}, nil
 }

@@ -22,17 +22,10 @@ import (
 )
 
 const (
-	IsEnabled                     = "is_enabled"
-	LeadingWhiteSpaceCountActual  = 3
-	TrailingWhiteSpaceCountActual = 5
-	LeadingWhiteSpaceCountTarget  = 4
-	TrailingWhiteSpaceCountTarget = 2
-	TestRandomizationId           = "123"
-	TestSeed                      = "abcdef"
+	isEnabled           = "is_enabled"
+	testRandomizationId = "123"
+	testSeed            = "abcdef"
 )
-
-var BoolTrue = true
-var BoolFalse = false
 
 func createNamedCondition(name string, condition oneOfCondition) namedCondition {
 	nc := namedCondition{
@@ -48,12 +41,12 @@ func evaluateConditionsAndReportResult(t *testing.T, nc namedCondition, context 
 		evaluationContext: context,
 	}
 	ec := ce.evaluateConditions()
-	value, ok := ec[IsEnabled]
+	value, ok := ec[isEnabled]
 	if !ok {
-		t.Errorf("condition %q was not found in evaluated conditions", IsEnabled)
+		t.Fatalf("condition %q was not found in evaluated conditions", isEnabled)
 	}
 	if value != outcome {
-		t.Errorf("result of condition evaluation for %q = %v, want = %v", IsEnabled, value, outcome)
+		t.Errorf("condition evaluation for %q = %v, want = %v", isEnabled, value, outcome)
 	}
 }
 
@@ -62,13 +55,13 @@ func evaluateConditionsAndReportResult(t *testing.T, nc namedCondition, context 
 func evaluateRandomAssignments(numOfAssignments int, condition namedCondition) int {
 	evalTrueCount := 0
 	for i := 0; i < numOfAssignments; i++ {
-		context := map[string]any{"randomizationId": fmt.Sprintf("random-%d", i)}
+		context := map[string]any{randomizationId: fmt.Sprintf("random-%d", i)}
 		ce := conditionEvaluator{
 			conditions:        []namedCondition{condition},
 			evaluationContext: context,
 		}
 		ec := ce.evaluateConditions()
-		if value, ok := ec[IsEnabled]; ok && value {
+		if value, ok := ec[isEnabled]; ok && value {
 			evalTrueCount += 1
 		}
 	}
@@ -76,14 +69,14 @@ func evaluateRandomAssignments(numOfAssignments int, condition namedCondition) i
 }
 
 func TestEvaluateEmptyOrCondition(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		OrCondition: &orCondition{},
 	})
 	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
 }
 
 func TestEvaluateEmptyOrAndCondition(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		OrCondition: &orCondition{
 			Conditions: []oneOfCondition{
 				{
@@ -96,17 +89,19 @@ func TestEvaluateEmptyOrAndCondition(t *testing.T) {
 }
 
 func TestEvaluateOrConditionShortCircuit(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	boolFalse := false
+	boolTrue := true
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		OrCondition: &orCondition{
 			Conditions: []oneOfCondition{
 				{
-					Boolean: &BoolFalse,
+					Boolean: &boolFalse,
 				},
 				{
-					Boolean: &BoolTrue,
+					Boolean: &boolTrue,
 				},
 				{
-					Boolean: &BoolFalse,
+					Boolean: &boolFalse,
 				},
 			},
 		},
@@ -115,17 +110,19 @@ func TestEvaluateOrConditionShortCircuit(t *testing.T) {
 }
 
 func TestEvaluateAndConditionShortCircuit(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	boolFalse := false
+	boolTrue := true
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		AndCondition: &andCondition{
 			Conditions: []oneOfCondition{
 				{
-					Boolean: &BoolTrue,
+					Boolean: &boolTrue,
 				},
 				{
-					Boolean: &BoolFalse,
+					Boolean: &boolFalse,
 				},
 				{
-					Boolean: &BoolTrue,
+					Boolean: &boolTrue,
 				},
 			},
 		},
@@ -134,10 +131,10 @@ func TestEvaluateAndConditionShortCircuit(t *testing.T) {
 }
 
 func TestPercentConditionWithoutRandomizationId(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		Percent: &percentCondition{
-			PercentOperator: Between,
-			Seed:            TestSeed,
+			PercentOperator: between,
+			Seed:            testSeed,
 			MicroPercentRange: microPercentRange{
 				MicroPercentLowerBound: 0,
 				MicroPercentUpperBound: 1_000_000,
@@ -148,10 +145,10 @@ func TestPercentConditionWithoutRandomizationId(t *testing.T) {
 }
 
 func TestUnknownPercentOperator(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		Percent: &percentCondition{
 			PercentOperator: "UNKNOWN",
-			Seed:            TestSeed,
+			Seed:            testSeed,
 			MicroPercentRange: microPercentRange{
 				MicroPercentLowerBound: 0,
 				MicroPercentUpperBound: 1_000_000,
@@ -162,9 +159,9 @@ func TestUnknownPercentOperator(t *testing.T) {
 }
 
 func TestEmptyPercentOperator(t *testing.T) {
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		Percent: &percentCondition{
-			Seed: TestSeed,
+			Seed: testSeed,
 			MicroPercentRange: microPercentRange{
 				MicroPercentLowerBound: 0,
 				MicroPercentUpperBound: 1_000_000,
@@ -176,9 +173,9 @@ func TestEmptyPercentOperator(t *testing.T) {
 
 func TestInvalidRandomizationIdType(t *testing.T) {
 	// randomizationId is expected to be a string
-	condition := createNamedCondition(IsEnabled, oneOfCondition{
+	condition := createNamedCondition(isEnabled, oneOfCondition{
 		Percent: &percentCondition{
-			Seed: TestSeed,
+			Seed: testSeed,
 			MicroPercentRange: microPercentRange{
 				MicroPercentLowerBound: 0,
 				MicroPercentUpperBound: 1_000_000,
@@ -197,7 +194,7 @@ func TestInvalidRandomizationIdType(t *testing.T) {
 	for _, tc := range invalidRandomizationIdTestCases {
 		description := fmt.Sprintf("RandomizationId %v of type %s", tc.randomizationId, reflect.TypeOf(tc.randomizationId))
 		t.Run(description, func(t *testing.T) {
-			evaluateConditionsAndReportResult(t, condition, map[string]any{"randomizationId": tc.randomizationId}, false)
+			evaluateConditionsAndReportResult(t, condition, map[string]any{randomizationId: tc.randomizationId}, false)
 		})
 	}
 
@@ -272,26 +269,26 @@ func TestPercentConditionMicroPercent(t *testing.T) {
 		{
 			description:  "Evaluate LESS_OR_EQUAL to 9571542 to true",
 			operator:     "LESS_OR_EQUAL",
-			microPercent: 9_571_542, // instanceMicroPercentile of abcdef.123 (TestSeed.TestRandomizationId) is 9_571_542
+			microPercent: 9_571_542, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
 			outcome:      true,
 		},
 		{
 			description:  "Evaluate greater than 9571542 to true",
 			operator:     "GREATER_THAN",
-			microPercent: 9_571_541, // instanceMicroPercentile of abcdef.123 (TestSeed.TestRandomizationId) is 9_571_542
+			microPercent: 9_571_541, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
 			outcome:      true,
 		},
 	}
 	for _, tc := range microPercentTestCases {
 		t.Run(tc.description, func(t *testing.T) {
-			percentCondition := createNamedCondition(IsEnabled, oneOfCondition{
+			percentCondition := createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
 					PercentOperator: tc.operator,
 					MicroPercent:    tc.microPercent,
-					Seed:            TestSeed,
+					Seed:            testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationId": TestRandomizationId}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationId": testRandomizationId}, tc.outcome)
 		})
 	}
 }
@@ -324,7 +321,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 			outcome:        true,
 		},
 		{
-			description:    "Evaluate to true when between lower and upper bound", // instanceMicroPercentile of abcdef.123 (TestSeed.TestRandomizationId) is 9_571_542
+			description:    "Evaluate to true when between lower and upper bound", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
 			microPercentLb: 9_000_000,
 			microPercentUb: 9_571_542, // interval is (9_000_000, 9_571_542]
 			operator:       "BETWEEN",
@@ -338,7 +335,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 			outcome:        false,
 		},
 		{
-			description:    "Evaluate to false when not between 9_400_000 and 9_500_000", // instanceMicroPercentile of abcdef.123 (TestSeed.TestRandomizationId) is 9_571_542
+			description:    "Evaluate to false when not between 9_400_000 and 9_500_000", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
 			microPercentLb: 9_400_000,
 			microPercentUb: 9_500_000,
 			operator:       "BETWEEN",
@@ -347,22 +344,23 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 	}
 	for _, tc := range microPercentTestCases {
 		t.Run(tc.description, func(t *testing.T) {
-			percentCondition := createNamedCondition(IsEnabled, oneOfCondition{
+			percentCondition := createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
 					PercentOperator: tc.operator,
 					MicroPercentRange: microPercentRange{
 						MicroPercentLowerBound: tc.microPercentLb,
 						MicroPercentUpperBound: tc.microPercentUb,
 					},
-					Seed: TestSeed,
+					Seed: testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationId": TestRandomizationId}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{randomizationId: testRandomizationId}, tc.outcome)
 		})
 	}
 }
 
-func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
+// Statistically validates that percentage conditions accurately target the intended proportion of users over many random evaluations.
+func TestPercentConditionProbabilisticEvaluation(t *testing.T) {
 	probabilisticEvalTestCases := []struct {
 		description string
 		condition   namedCondition
@@ -372,9 +370,9 @@ func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
 	}{
 		{
 			description: "Evaluate less or equal to 10% to approx 10%",
-			condition: createNamedCondition(IsEnabled, oneOfCondition{
+			condition: createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
-					PercentOperator: "LESS_OR_EQUAL",
+					PercentOperator: lessThanOrEqual,
 					MicroPercent:    10_000_000,
 				},
 			}),
@@ -384,9 +382,9 @@ func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
 		},
 		{
 			description: "Evaluate between 0 to 10% to approx 10%",
-			condition: createNamedCondition(IsEnabled, oneOfCondition{
+			condition: createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
-					PercentOperator: "BETWEEN",
+					PercentOperator: between,
 					MicroPercentRange: microPercentRange{
 						MicroPercentUpperBound: 10_000_000,
 					},
@@ -398,9 +396,9 @@ func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
 		},
 		{
 			description: "Evaluate greater than 10% to approx 90%",
-			condition: createNamedCondition(IsEnabled, oneOfCondition{
+			condition: createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
-					PercentOperator: "GREATER_THAN",
+					PercentOperator: greaterThan,
 					MicroPercent:    10_000_000,
 				},
 			}),
@@ -410,9 +408,9 @@ func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
 		},
 		{
 			description: "Evaluate between 40% to 60% to approx 20%",
-			condition: createNamedCondition(IsEnabled, oneOfCondition{
+			condition: createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
-					PercentOperator: "BETWEEN",
+					PercentOperator: between,
 					MicroPercentRange: microPercentRange{
 						MicroPercentLowerBound: 40_000_000,
 						MicroPercentUpperBound: 60_000_000,
@@ -425,9 +423,9 @@ func TestPercentCondition_ProbabilisticEvaluation(t *testing.T) {
 		},
 		{
 			description: "Evaluate between interquartile range to approx 50%",
-			condition: createNamedCondition(IsEnabled, oneOfCondition{
+			condition: createNamedCondition(isEnabled, oneOfCondition{
 				Percent: &percentCondition{
-					PercentOperator: "BETWEEN",
+					PercentOperator: between,
 					MicroPercentRange: microPercentRange{
 						MicroPercentLowerBound: 25_000_000,
 						MicroPercentUpperBound: 75_000_000,
