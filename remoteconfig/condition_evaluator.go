@@ -28,7 +28,7 @@ type conditionEvaluator struct {
 
 const (
 	maxConditionRecursionDepth = 10
-	randomizationId            = "randomizationId"
+	randomizationID            = "randomizationID"
 	rootNestingLevel           = 0
 	totalMicroPercentiles      = 100_000_000
 )
@@ -89,7 +89,7 @@ func (ce *conditionEvaluator) evaluateAndCondition(andCondition *andCondition, n
 }
 
 func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percentCondition) bool {
-	if rid, ok := ce.evaluationContext[randomizationId].(string); ok {
+	if rid, ok := ce.evaluationContext[randomizationID].(string); ok {
 		if percentCondition.PercentOperator == "" {
 			log.Println("Missing percent operator for percent condition.")
 			return false
@@ -107,16 +107,16 @@ func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percent
 			return false
 		}
 	}
-	log.Println("Missing or invalid randomizationId (requires a string value) for percent condition.")
+	log.Println("Missing or invalid randomizationID (requires a string value) for percent condition.")
 	return false
 }
 
-func computeInstanceMicroPercentile(seed string, randomizationId string) uint32 {
+func computeInstanceMicroPercentile(seed string, randomizationID string) uint32 {
 	seedPrefix := ""
 	if len(seed) > 0 {
 		seedPrefix = fmt.Sprintf("%s.", seed)
 	}
-	stringToHash := fmt.Sprintf("%s%s", seedPrefix, randomizationId)
+	stringToHash := fmt.Sprintf("%s%s", seedPrefix, randomizationID)
 
 	hash := sha256.New()
 	hash.Write([]byte(stringToHash))

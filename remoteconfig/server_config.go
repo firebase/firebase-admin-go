@@ -24,10 +24,10 @@ type ValueSource int
 
 // Constants for value source
 const (
-	SourceUnspecified ValueSource = iota
+	sourceUnspecified ValueSource = iota
 	Static                        // Static represents a statically defined value.
-	Remote                        // Remote represents a value fetched from a remote source.
-	Default                       // Default represents a default value.
+	Remote                        // Default represents a default value.
+	Default                       // Remote represents a value fetched from a remote source.
 )
 
 // Value defines the interface for configuration values.
@@ -38,46 +38,39 @@ type value struct {
 
 // Default Values for config parameters.
 const (
-	defaultValueForBoolean = false
-	defaultValueForString  = ""
-	defaultValueForNumber  = 0
+	DefaultValueForBoolean = false
+	DefaultValueForString  = ""
+	DefaultValueForNumber  = 0
 )
 
 var booleanTruthyValues = []string{"1", "true", "t", "yes", "y", "on"}
 
 // ServerConfig is the implementation of the ServerConfig interface.
 type ServerConfig struct {
-	configValues map[string]value
+	ConfigValues map[string]value
 }
 
 // NewServerConfig creates a new ServerConfig instance.
 func NewServerConfig(configValues map[string]value) *ServerConfig {
-	return &ServerConfig{configValues: configValues}
+	return &ServerConfig{ConfigValues: configValues}
 }
 
 // GetBoolean returns the boolean value associated with the given key.
-// It returns true if the string value is "1", "true", "t", "yes", "y", or "on" (case-insensitive).
-// Otherwise, or if the key is not found, it returns the default boolean value (false).
 func (s *ServerConfig) GetBoolean(key string) bool {
 	return s.getValue(key).asBoolean()
 }
 
 // GetInt returns the integer value associated with the given key.
-// If the underlying value cannot be parsed as an integer, or if the key is not found,
-// it returns the default numeric value (0).
 func (s *ServerConfig) GetInt(key string) int {
 	return s.getValue(key).asInt()
 }
 
 // GetFloat returns the float value associated with the given key.
-// If the underlying value cannot be parsed as a float64, or if the key is not found,
-// it returns the default numeric value (0).
 func (s *ServerConfig) GetFloat(key string) float64 {
 	return s.getValue(key).asFloat()
 }
 
 // GetString returns the string value associated with the given key.
-// If the key is not found, it returns the default string value ("").
 func (s *ServerConfig) GetString(key string) string {
 	return s.getValue(key).asString()
 }
@@ -89,16 +82,16 @@ func (s *ServerConfig) GetValueSource(key string) ValueSource {
 
 // getValue returns the value associated with the given key.
 func (s *ServerConfig) getValue(key string) *value {
-	if val, ok := s.configValues[key]; ok {
+	if val, ok := s.ConfigValues[key]; ok {
 		return &val
 	}
-	return newValue(Static, defaultValueForString)
+	return newValue(Static, "")
 }
 
 // newValue creates a new value instance.
 func newValue(source ValueSource, customValue string) *value {
 	if customValue == "" {
-		customValue = defaultValueForString
+		customValue = DefaultValueForString
 	}
 	return &value{source: source, value: customValue}
 }
@@ -111,7 +104,7 @@ func (v *value) asString() string {
 // asBoolean returns the value as a boolean.
 func (v *value) asBoolean() bool {
 	if v.source == Static {
-		return defaultValueForBoolean
+		return DefaultValueForBoolean
 	}
 
 	for _, truthyValue := range booleanTruthyValues {
@@ -126,12 +119,12 @@ func (v *value) asBoolean() bool {
 // asInt returns the value as an integer.
 func (v *value) asInt() int {
 	if v.source == Static {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 	num, err := strconv.Atoi(v.value)
 
 	if err != nil {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 
 	return num
@@ -140,12 +133,12 @@ func (v *value) asInt() int {
 // asFloat returns the value as an integer.
 func (v *value) asFloat() float64 {
 	if v.source == Static {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 	num, err := strconv.ParseFloat(v.value, 64)
 
 	if err != nil {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 
 	return num

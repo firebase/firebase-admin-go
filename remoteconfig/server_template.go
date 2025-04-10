@@ -28,17 +28,16 @@ import (
 
 // serverTemplateData stores the internal representation of the server template.
 type serverTemplateData struct {
-	// A list of conditions in descending order by priority.
-	Conditions []namedCondition `json:"conditions,omitempty"`
-
-	// Map of parameter keys to their optional default values and optional conditional values.
 	Parameters map[string]parameter `json:"parameters,omitempty"`
 
-	// Version information for the current Remote Config template.
-	Version version `json:"version,omitempty"`
+	Conditions []namedCondition `json:"conditions,omitempty"`
 
-	// Current Remote Config template ETag.
-	ETag string `json:"etag,omitempty"`
+	Version struct {
+		VersionNumber string `json:"versionNumber"`
+		IsLegacy      bool   `json:"isLegacy"`
+	} `json:"version"`
+
+	ETag string `json:"etag"`
 }
 
 // ServerTemplate represents a template with configuration data, cache, and service information.
@@ -58,8 +57,8 @@ func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*Serve
 			continue
 		}
 
-		if s, ok := value.(string); ok {
-			stringifiedConfig[key] = s
+		if stringVal, ok := value.(string); ok {
+			stringifiedConfig[key] = stringVal
 			continue
 		}
 
@@ -159,5 +158,5 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 			config[key] = value{source: Remote, value: *parameter.DefaultValue.Value}
 		}
 	}
-	return &ServerConfig{configValues: config}, nil
+	return NewServerConfig(config), nil
 }

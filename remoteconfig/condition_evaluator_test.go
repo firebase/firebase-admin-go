@@ -23,7 +23,7 @@ import (
 
 const (
 	isEnabled           = "is_enabled"
-	testRandomizationId = "123"
+	testRandomizationID = "123"
 	testSeed            = "abcdef"
 )
 
@@ -55,14 +55,14 @@ func evaluateConditionsAndReportResult(t *testing.T, nc namedCondition, context 
 func evaluateRandomAssignments(numOfAssignments int, condition namedCondition) int {
 	evalTrueCount := 0
 	for i := 0; i < numOfAssignments; i++ {
-		context := map[string]any{randomizationId: fmt.Sprintf("random-%d", i)}
+		context := map[string]any{randomizationID: fmt.Sprintf("random-%d", i)}
 		ce := conditionEvaluator{
 			conditions:        []namedCondition{condition},
 			evaluationContext: context,
 		}
 		ec := ce.evaluateConditions()
 		if value, ok := ec[isEnabled]; ok && value {
-			evalTrueCount += 1
+			evalTrueCount++
 		}
 	}
 	return evalTrueCount
@@ -172,7 +172,7 @@ func TestEmptyPercentOperator(t *testing.T) {
 }
 
 func TestInvalidRandomizationIdType(t *testing.T) {
-	// randomizationId is expected to be a string
+	// randomizationID is expected to be a string
 	condition := createNamedCondition(isEnabled, oneOfCondition{
 		Percent: &percentCondition{
 			Seed: testSeed,
@@ -183,18 +183,18 @@ func TestInvalidRandomizationIdType(t *testing.T) {
 		},
 	})
 
-	invalidRandomizationIdTestCases := []struct {
-		randomizationId any
+	invalidRandomizationIDTestCases := []struct {
+		randomizationID any
 	}{
-		{randomizationId: 123},
-		{randomizationId: true},
-		{randomizationId: 123.4},
-		{randomizationId: "{\"hello\": \"world\"}"},
+		{randomizationID: 123},
+		{randomizationID: true},
+		{randomizationID: 123.4},
+		{randomizationID: "{\"hello\": \"world\"}"},
 	}
-	for _, tc := range invalidRandomizationIdTestCases {
-		description := fmt.Sprintf("RandomizationId %v of type %s", tc.randomizationId, reflect.TypeOf(tc.randomizationId))
+	for _, tc := range invalidRandomizationIDTestCases {
+		description := fmt.Sprintf("RandomizationId %v of type %s", tc.randomizationID, reflect.TypeOf(tc.randomizationID))
 		t.Run(description, func(t *testing.T) {
-			evaluateConditionsAndReportResult(t, condition, map[string]any{randomizationId: tc.randomizationId}, false)
+			evaluateConditionsAndReportResult(t, condition, map[string]any{randomizationID: tc.randomizationID}, false)
 		})
 	}
 
@@ -203,26 +203,26 @@ func TestInvalidRandomizationIdType(t *testing.T) {
 func TestInstanceMicroPercentileComputation(t *testing.T) {
 	percentTestCases := []struct {
 		seed                    string
-		randomizationId         string
+		randomizationID         string
 		expectedMicroPercentile uint32
 	}{
-		{seed: "1", randomizationId: "one", expectedMicroPercentile: 64146488},
-		{seed: "2", randomizationId: "two", expectedMicroPercentile: 76516209},
-		{seed: "3", randomizationId: "three", expectedMicroPercentile: 6701947},
-		{seed: "4", randomizationId: "four", expectedMicroPercentile: 85000289},
-		{seed: "5", randomizationId: "five", expectedMicroPercentile: 2514745},
-		{seed: "", randomizationId: "😊", expectedMicroPercentile: 9911325},
-		{seed: "", randomizationId: "😀", expectedMicroPercentile: 62040281},
-		{seed: "hêl£o", randomizationId: "wørlÐ", expectedMicroPercentile: 67411682},
-		{seed: "řemøťe", randomizationId: "çōnfįġ", expectedMicroPercentile: 19728496},
-		{seed: "long", randomizationId: strings.Repeat(".", 100), expectedMicroPercentile: 39278120},
-		{seed: "very-long", randomizationId: strings.Repeat(".", 1000), expectedMicroPercentile: 71699042},
+		{seed: "1", randomizationID: "one", expectedMicroPercentile: 64146488},
+		{seed: "2", randomizationID: "two", expectedMicroPercentile: 76516209},
+		{seed: "3", randomizationID: "three", expectedMicroPercentile: 6701947},
+		{seed: "4", randomizationID: "four", expectedMicroPercentile: 85000289},
+		{seed: "5", randomizationID: "five", expectedMicroPercentile: 2514745},
+		{seed: "", randomizationID: "😊", expectedMicroPercentile: 9911325},
+		{seed: "", randomizationID: "😀", expectedMicroPercentile: 62040281},
+		{seed: "hêl£o", randomizationID: "wørlÐ", expectedMicroPercentile: 67411682},
+		{seed: "řemøťe", randomizationID: "çōnfįġ", expectedMicroPercentile: 19728496},
+		{seed: "long", randomizationID: strings.Repeat(".", 100), expectedMicroPercentile: 39278120},
+		{seed: "very-long", randomizationID: strings.Repeat(".", 1000), expectedMicroPercentile: 71699042},
 	}
 
 	for _, tc := range percentTestCases {
-		description := fmt.Sprintf("Instance micro-percentile for seed %s & randomization_id %s", tc.seed, tc.randomizationId)
+		description := fmt.Sprintf("Instance micro-percentile for seed %s & randomization_id %s", tc.seed, tc.randomizationID)
 		t.Run(description, func(t *testing.T) {
-			actualMicroPercentile := computeInstanceMicroPercentile(tc.seed, tc.randomizationId)
+			actualMicroPercentile := computeInstanceMicroPercentile(tc.seed, tc.randomizationID)
 			if tc.expectedMicroPercentile != actualMicroPercentile {
 				t.Errorf("instanceMicroPercentile = %d, want %d", actualMicroPercentile, tc.expectedMicroPercentile)
 
@@ -269,13 +269,13 @@ func TestPercentConditionMicroPercent(t *testing.T) {
 		{
 			description:  "Evaluate LESS_OR_EQUAL to 9571542 to true",
 			operator:     "LESS_OR_EQUAL",
-			microPercent: 9_571_542, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
+			microPercent: 9_571_542, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			outcome:      true,
 		},
 		{
 			description:  "Evaluate greater than 9571542 to true",
 			operator:     "GREATER_THAN",
-			microPercent: 9_571_541, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
+			microPercent: 9_571_541, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			outcome:      true,
 		},
 	}
@@ -288,7 +288,7 @@ func TestPercentConditionMicroPercent(t *testing.T) {
 					Seed:            testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationId": testRandomizationId}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationID": testRandomizationID}, tc.outcome)
 		})
 	}
 }
@@ -321,7 +321,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 			outcome:        true,
 		},
 		{
-			description:    "Evaluate to true when between lower and upper bound", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
+			description:    "Evaluate to true when between lower and upper bound", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			microPercentLb: 9_000_000,
 			microPercentUb: 9_571_542, // interval is (9_000_000, 9_571_542]
 			operator:       "BETWEEN",
@@ -335,7 +335,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 			outcome:        false,
 		},
 		{
-			description:    "Evaluate to false when not between 9_400_000 and 9_500_000", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationId) is 9_571_542
+			description:    "Evaluate to false when not between 9_400_000 and 9_500_000", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			microPercentLb: 9_400_000,
 			microPercentUb: 9_500_000,
 			operator:       "BETWEEN",
@@ -354,7 +354,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 					Seed: testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{randomizationId: testRandomizationId}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{randomizationID: testRandomizationID}, tc.outcome)
 		})
 	}
 }
