@@ -16,9 +16,13 @@ package remoteconfig
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 type conditionEvaluator struct {
@@ -28,15 +32,32 @@ type conditionEvaluator struct {
 
 const (
 	maxConditionRecursionDepth = 10
-	randomizationID            = "randomizationID"
 	rootNestingLevel           = 0
-	totalMicroPercentiles      = 100_000_000
+	doublePrecision            = 64
 )
 
 const (
-	lessThanOrEqual = "LESS_OR_EQUAL"
-	greaterThan     = "GREATER_THAN"
-	between         = "BETWEEN"
+	randomizationID       = "randomizationID"
+	totalMicroPercentiles = 100_000_000
+	lessThanOrEqual       = "LESS_OR_EQUAL"
+	greaterThan           = "GREATER_THAN"
+	between               = "BETWEEN"
+)
+
+const (
+	whiteSpace = " "
+
+	stringContains       = "STRING_CONTAINS"
+	stringDoesNotContain = "STRING_DOES_NOT_CONTAIN"
+	stringExactlyMatches = "STRING_EXACTLY_MATCHES"
+	stringContainsRegex  = "STRING_CONTAINS_REGEX"
+
+	numericLessThan      = "NUMERIC_LESS_THAN"
+	numericLessThanEqual = "NUMERIC_LESS_EQUAL"
+	numericEqual         = "NUMERIC_EQUAL"
+	numericNotEqual      = "NUMERIC_NOT_EQUAL"
+	numericGreaterThan   = "NUMERIC_GREATER_THAN"
+	numericGreaterEqual  = "NUMERIC_GREATER_EQUAL"
 )
 
 func (ce *conditionEvaluator) evaluateConditions() map[string]bool {
@@ -61,6 +82,8 @@ func (ce *conditionEvaluator) evaluateCondition(condition *oneOfCondition, nesti
 		return ce.evaluateAndCondition(condition.AndCondition, nestingLevel+1)
 	} else if condition.Percent != nil {
 		return ce.evaluatePercentCondition(condition.Percent)
+	} else if condition.CustomSignal != nil {
+		return ce.evaluateCustomSignalCondition(condition.CustomSignal)
 	}
 	log.Println("Unknown condition type encountered.")
 	return false
@@ -128,4 +151,143 @@ func computeInstanceMicroPercentile(seed string, randomizationID string) uint32 
 	instanceMicroPercentileBigInt := new(big.Int).Mod(hashBigInt, big.NewInt(totalMicroPercentiles))
 	// Can safely convert to uint32 since the range of instanceMicroPercentile is 0 to 100_000_000; range of uint32 is 0 to 4_294_967_295.
 	return uint32(instanceMicroPercentileBigInt.Int64())
+}
+
+func (ce *conditionEvaluator) evaluateCustomSignalCondition(customSignalCondition *customSignalCondition) bool {
+	if !customSignalCondition.isValid() {
+		return false
+	}
+	csVal, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]
+	if !ok {
+		log.Printf("Custom signal key: %s, missing from context\n", customSignalCondition.CustomSignalKey)
+		return false
+	}
+
+	fmt.Println("CUSTOM SIGNALS ---- ")
+	fmt.Println("signal value from context ", csVal)
+	fmt.Println(customSignalCondition.TargetCustomSignalValues)
+
+	switch customSignalCondition.CustomSignalOperator {
+	case stringContains:
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool { return strings.Contains(csVal, target) })
+	case stringDoesNotContain:
+		return !compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool { return strings.Contains(csVal, target) })
+	case stringExactlyMatches:
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool {
+			return strings.Trim(csVal, whiteSpace) == strings.Trim(target, whiteSpace)
+		})
+	case stringContainsRegex:
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, targetPattern string) bool {
+			result, err := regexp.MatchString(targetPattern, csVal)
+			if err != nil {
+				return false
+			}
+			return result
+		})
+
+	// For numeric operators only one target value is allowed
+	case numericLessThan:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result < 0 })
+	case numericLessThanEqual:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result <= 0 })
+	case numericEqual:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result == 0 })
+	case numericNotEqual:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result != 0 })
+	case numericGreaterThan:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result > 0 })
+	case numericGreaterEqual:
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result >= 0 })
+	}
+
+	return false
+}
+
+func (cs *customSignalCondition) isValid() bool {
+	if cs.CustomSignalOperator == "" || cs.CustomSignalKey == "" || len(cs.TargetCustomSignalValues) == 0 {
+		log.Println("Missing operator, key, or target values for custom signal condition.")
+		return false
+	}
+	return true
+}
+
+// Compares the actual string value of a signal against a list of target values.
+// If any of the target values are a match, returns true.
+func compareStrings(targetCustomSignalValues []string, csVal any, compare func(csVal, target string) bool) bool {
+	csValStr, ok := csVal.(string)
+	if !ok {
+		if jsonBytes, err := json.Marshal(csVal); err == nil {
+			csValStr = string(jsonBytes)
+		} else {
+			log.Printf("failed to parse custom signal value '%v' as a string\n", csVal)
+			return false
+		}
+	}
+
+	for _, target := range targetCustomSignalValues {
+		if compare(csValStr, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// Compares two numbers against each other.
+// Calls the predicate function with  -1, 0, 1 if actual is less than, equal to, or greater than target.
+func compareNumbers(targetCustomSignalValue string, csVal any, compare func(result int) bool) bool {
+	targetFloat, err := strconv.ParseFloat(strings.Trim(targetCustomSignalValue, whiteSpace), doublePrecision)
+	if err != nil {
+		log.Printf("Failed to convert target custom signal value '%v' from string to number: %v", targetCustomSignalValue, err)
+		return false
+	}
+	var csValFloat float64
+	switch csVal := csVal.(type) {
+	case float32:
+		csValFloat = float64(csVal)
+	case float64:
+		csValFloat = csVal
+	case int8:
+		csValFloat = float64(csVal)
+	case int:
+		csValFloat = float64(csVal)
+	case int16:
+		csValFloat = float64(csVal)
+	case int32:
+		csValFloat = float64(csVal)
+	case int64:
+		csValFloat = float64(csVal)
+	case uint8:
+		csValFloat = float64(csVal)
+	case uint:
+		csValFloat = float64(csVal)
+	case uint16:
+		csValFloat = float64(csVal)
+	case uint32:
+		csValFloat = float64(csVal)
+	case uint64:
+		csValFloat = float64(csVal)
+	case bool:
+		if csVal {
+			csValFloat = 1
+		} else {
+			csValFloat = 0
+		}
+	case string:
+		csValFloat, err = strconv.ParseFloat(strings.Trim(csVal, whiteSpace), doublePrecision)
+		if err != nil {
+			log.Printf("Failed to convert custom signal value '%v' from string to number: %v", csVal, err)
+			return false
+		}
+	default:
+		log.Printf("Cannot parse custom signal value '%v' of type %T as a number", csVal, csVal)
+		return false
+	}
+	result := 0
+	if csValFloat > targetFloat {
+		result = 1
+	} else if csValFloat < targetFloat {
+		result = -1
+	}
+	r := compare(result)
+	return r
 }

@@ -15,6 +15,7 @@
 package remoteconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -23,9 +24,22 @@ import (
 
 const (
 	isEnabled           = "is_enabled"
+	subscriptionType    = "subscriptionType"
+	premium             = "premium"
 	testRandomizationID = "123"
 	testSeed            = "abcdef"
+
+	leadingWhiteSpaceCountTarget  = 3
+	trailingWhiteSpaceCountTarget = 5
+	leadingWhiteSpaceCountActual  = 4
+	trailingWhiteSpaceCountActual = 2
 )
+
+type customSignalTestCase struct {
+	targets string
+	actual  any
+	outcome bool
+}
 
 func createNamedCondition(name string, condition oneOfCondition) namedCondition {
 	nc := namedCondition{
@@ -35,18 +49,18 @@ func createNamedCondition(name string, condition oneOfCondition) namedCondition 
 	return nc
 }
 
-func evaluateConditionsAndReportResult(t *testing.T, nc namedCondition, context map[string]any, outcome bool) {
+func evaluateConditionsAndReportResult(t *testing.T, nc namedCondition, conditionName string, context map[string]any, outcome bool) {
 	ce := conditionEvaluator{
 		conditions:        []namedCondition{nc},
 		evaluationContext: context,
 	}
 	ec := ce.evaluateConditions()
-	value, ok := ec[isEnabled]
+	value, ok := ec[conditionName]
 	if !ok {
-		t.Fatalf("condition %q was not found in evaluated conditions", isEnabled)
+		t.Fatalf("condition %q was not found in evaluated conditions", conditionName)
 	}
 	if value != outcome {
-		t.Errorf("condition evaluation for %q = %v, want = %v", isEnabled, value, outcome)
+		t.Errorf("condition evaluation for %q = %v, want = %v", conditionName, value, outcome)
 	}
 }
 
@@ -68,11 +82,51 @@ func evaluateRandomAssignments(numOfAssignments int, condition namedCondition) i
 	return evalTrueCount
 }
 
+func runCustomSignalTestCase(operator string, t *testing.T) func(customSignalTestCase) {
+	return func(tc customSignalTestCase) {
+		description := fmt.Sprintf("Evaluates operator %v with targets %v and actual %v to outcome %v", operator, tc.targets, tc.actual, tc.outcome)
+		t.Run(description, func(t *testing.T) {
+			condition := createNamedCondition(isEnabled, oneOfCondition{
+				CustomSignal: &customSignalCondition{
+					CustomSignalOperator:     operator,
+					CustomSignalKey:          subscriptionType,
+					TargetCustomSignalValues: strings.Split(tc.targets, ","),
+				},
+			})
+			evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{subscriptionType: tc.actual}, tc.outcome)
+		})
+	}
+}
+
+func runCustomSignalTestCaseWithWhiteSpaces(operator string, t *testing.T) func(customSignalTestCase) {
+	return func(tc customSignalTestCase) {
+		targetsWithWhiteSpaces := []string{}
+		for _, target := range strings.Split(tc.targets, ",") {
+			targetsWithWhiteSpaces = append(targetsWithWhiteSpaces, addLeadingAndTrailingWhiteSpaces(target, leadingWhiteSpaceCountTarget, trailingWhiteSpaceCountTarget))
+		}
+		runCustomSignalTestCase(operator, t)(customSignalTestCase{
+			outcome: tc.outcome,
+			actual:  addLeadingAndTrailingWhiteSpaces(tc.actual, leadingWhiteSpaceCountActual, trailingWhiteSpaceCountActual),
+			targets: strings.Join(targetsWithWhiteSpaces, ","),
+		})
+	}
+}
+
+func addLeadingAndTrailingWhiteSpaces(v any, leadingSpacesCount int, trailingSpacesCount int) string {
+	vStr, ok := v.(string)
+	if !ok {
+		if jsonBytes, err := json.Marshal(v); err == nil {
+			vStr = string(jsonBytes)
+		}
+	}
+	return strings.Repeat(whiteSpace, leadingSpacesCount) + vStr + strings.Repeat(whiteSpace, trailingSpacesCount)
+}
+
 func TestEvaluateEmptyOrCondition(t *testing.T) {
 	condition := createNamedCondition(isEnabled, oneOfCondition{
 		OrCondition: &orCondition{},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, false)
 }
 
 func TestEvaluateEmptyOrAndCondition(t *testing.T) {
@@ -85,7 +139,7 @@ func TestEvaluateEmptyOrAndCondition(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, true)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, true)
 }
 
 func TestEvaluateOrConditionShortCircuit(t *testing.T) {
@@ -106,7 +160,7 @@ func TestEvaluateOrConditionShortCircuit(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, true)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, true)
 }
 
 func TestEvaluateAndConditionShortCircuit(t *testing.T) {
@@ -127,7 +181,7 @@ func TestEvaluateAndConditionShortCircuit(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, false)
 }
 
 func TestPercentConditionWithoutRandomizationId(t *testing.T) {
@@ -141,7 +195,7 @@ func TestPercentConditionWithoutRandomizationId(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, false)
 }
 
 func TestUnknownPercentOperator(t *testing.T) {
@@ -155,7 +209,7 @@ func TestUnknownPercentOperator(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, false)
 }
 
 func TestEmptyPercentOperator(t *testing.T) {
@@ -168,7 +222,7 @@ func TestEmptyPercentOperator(t *testing.T) {
 			},
 		},
 	})
-	evaluateConditionsAndReportResult(t, condition, map[string]any{}, false)
+	evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{}, false)
 }
 
 func TestInvalidRandomizationIdType(t *testing.T) {
@@ -194,7 +248,7 @@ func TestInvalidRandomizationIdType(t *testing.T) {
 	for _, tc := range invalidRandomizationIDTestCases {
 		description := fmt.Sprintf("RandomizationId %v of type %s", tc.randomizationID, reflect.TypeOf(tc.randomizationID))
 		t.Run(description, func(t *testing.T) {
-			evaluateConditionsAndReportResult(t, condition, map[string]any{randomizationID: tc.randomizationID}, false)
+			evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{randomizationID: tc.randomizationID}, false)
 		})
 	}
 
@@ -288,7 +342,7 @@ func TestPercentConditionMicroPercent(t *testing.T) {
 					Seed:            testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{"randomizationID": testRandomizationID}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, isEnabled, map[string]any{"randomizationID": testRandomizationID}, tc.outcome)
 		})
 	}
 }
@@ -354,7 +408,7 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 					Seed: testSeed,
 				},
 			})
-			evaluateConditionsAndReportResult(t, percentCondition, map[string]any{randomizationID: testRandomizationID}, tc.outcome)
+			evaluateConditionsAndReportResult(t, percentCondition, isEnabled, map[string]any{randomizationID: testRandomizationID}, tc.outcome)
 		})
 	}
 }
@@ -448,5 +502,254 @@ func TestPercentConditionProbabilisticEvaluation(t *testing.T) {
 					truthyAssignments, tc.baseline-tc.tolerance, tc.baseline+tc.tolerance, tc.baseline, tc.tolerance)
 			}
 		})
+	}
+}
+
+func TestCustomSignalConditionIsValid(t *testing.T) {
+	testCases := []struct {
+		description string
+		condition   customSignalCondition
+		expected    bool
+	}{
+		{
+			description: "Valid condition",
+			condition: customSignalCondition{
+				CustomSignalOperator:     stringExactlyMatches,
+				CustomSignalKey:          subscriptionType,
+				TargetCustomSignalValues: []string{premium},
+			},
+			expected: true,
+		},
+		{
+			description: "Missing operator",
+			condition: customSignalCondition{
+				CustomSignalKey:          subscriptionType,
+				TargetCustomSignalValues: []string{premium},
+			},
+			expected: false,
+		},
+		{
+			description: "Missing key",
+			condition: customSignalCondition{
+				CustomSignalOperator:     stringExactlyMatches,
+				TargetCustomSignalValues: []string{premium},
+			},
+			expected: false,
+		},
+		{
+			description: "Missing target values",
+			condition: customSignalCondition{
+				CustomSignalOperator: stringExactlyMatches,
+				CustomSignalKey:      subscriptionType,
+			},
+			expected: false,
+		},
+		{
+			description: "Missing multiple fields (operator and key)",
+			condition: customSignalCondition{
+				TargetCustomSignalValues: []string{premium},
+			},
+			expected: false,
+		},
+		{
+			description: "Missing all fields",
+			condition:   customSignalCondition{},
+			expected:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			actual := tc.condition.isValid()
+			if actual != tc.expected {
+				t.Errorf("isValid() = %v, want %v for condition: %+v", actual, tc.expected, tc.condition)
+			}
+		})
+	}
+}
+
+func TestEvaluateCustomSignalCondition_MissingKeyInContext(t *testing.T) {
+	condition := createNamedCondition(isEnabled, oneOfCondition{
+		CustomSignal: &customSignalCondition{
+			CustomSignalOperator:     stringExactlyMatches,
+			CustomSignalKey:          subscriptionType,
+			TargetCustomSignalValues: []string{premium},
+		},
+	})
+	// Context does NOT contain 'subscriptionType'
+	context := map[string]any{
+		"key": "value",
+	}
+	evaluateConditionsAndReportResult(t, condition, isEnabled, context, false)
+}
+
+func TestCustomSignals_StringContains(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: "testing", targets: "test,sting", outcome: true},
+		{actual: "check for spaces", targets: "for ,test", outcome: true},
+		{actual: "no word is present", targets: "not,absent,words", outcome: false},
+		{actual: "case Sensitive", targets: "Case,sensitive", outcome: false},
+		{actual: "match 'single quote'", targets: "'single quote',Match", outcome: true},
+		{actual: false, targets: "true, false", outcome: false},
+		{actual: false, targets: "true,false", outcome: true},
+		{actual: "no quote present", targets: "'no quote',\"present\"", outcome: false},
+		{actual: 123, targets: "23,string", outcome: true},
+		{actual: 123.45, targets: "9862123451,23.4", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(stringContains, t)(tc)
+	}
+}
+
+func TestCustomSignals_StringDoesNotContain(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: "foobar", targets: "foo,biz", outcome: false},
+		{actual: "foobar", targets: "biz,cat,car", outcome: true},
+		{actual: 387.42, targets: "6.4,54", outcome: true},
+		{actual: "single quote present", targets: "'single quote',Present ", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(stringDoesNotContain, t)(tc)
+	}
+}
+
+func TestCustomSignals_StringExactlyMatches(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: "foobar", targets: "foo,biz", outcome: false},
+		{actual: "Foobar", targets: "   Foobar ,cat,car", outcome: true},
+		{actual: "matches if there are leading and trailing whitespaces", targets: "   matches if there are leading and trailing whitespaces    ", outcome: true},
+		{actual: "does not match internal whitespaces", targets: "   does    not match internal    whitespaces    ", outcome: false},
+		{actual: 123.456, targets: "123.45,456", outcome: false},
+		{actual: 987654321.1234567, targets: "  987654321.1234567  ,12", outcome: true},
+		{actual: "single quote present", targets: "'single quote',Present ", outcome: false},
+		{actual: true, targets: "true ", outcome: true},
+		{actual: struct {
+			index    int
+			category string
+		}{index: 1, category: "sample"}, targets: "{index: 1, category: \"sample\"}", outcome: false},
+	}
+
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(stringExactlyMatches, t)(tc)
+	}
+
+	for _, tc := range testCases {
+		runCustomSignalTestCase(stringExactlyMatches, t)(tc)
+	}
+}
+
+func TestCustomSignals_StringContainsRegex(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: "foobar", targets: "^foo,biz", outcome: true},
+		{actual: " hello world ", targets: "     hello ,    world    ", outcome: false},
+		{actual: "endswithhello", targets: ".*hello$", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(stringContainsRegex, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericLessThan(t *testing.T) {
+	withWhiteSpaces := []customSignalTestCase{
+		{actual: int16(2), targets: "4", outcome: true},
+		{actual: " -2.0 ", targets: "  -2  ", outcome: false},
+		{actual: int8(25), targets: "25.6", outcome: true},
+		{actual: float32(-25.5), targets: "-25.6", outcome: false},
+		{actual: " -25.5", targets: " -25.1  ", outcome: true},
+		{actual: " 3", targets: " 2,4  ", outcome: false},
+		{actual: "0", targets: "0", outcome: false},
+	}
+	for _, tc := range withWhiteSpaces {
+		runCustomSignalTestCaseWithWhiteSpaces(numericLessThan, t)(tc)
+	}
+	withoutWhiteSpaces := append(withWhiteSpaces, customSignalTestCase{actual: false, targets: "1", outcome: true})
+	for _, tc := range withoutWhiteSpaces {
+		runCustomSignalTestCase(numericLessThan, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericLessEqual(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: int16(2), targets: "4", outcome: true},
+		{actual: "-2", targets: "-2", outcome: true},
+		{actual: float32(25.5), targets: "25.6", outcome: true},
+		{actual: -25.5, targets: "-25.6", outcome: false},
+		{actual: "-25.5", targets: "-25.1", outcome: true},
+		{actual: "0", targets: "0", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(numericLessThanEqual, t)(tc)
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(numericLessThanEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericEqual(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: float32(2), targets: "4", outcome: false},
+		{actual: "-2", targets: "-2", outcome: true},
+		{actual: -25.5, targets: "-25.6", outcome: false},
+		{actual: "-25.5", targets: "123a", outcome: false},
+		{actual: int16(0), targets: "0", outcome: true},
+		{actual: struct {
+			index int
+		}{index: 2}, targets: "0", outcome: false},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(numericEqual, t)(tc)
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(numericEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericNotEqual(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: int16(-2), targets: "4", outcome: true},
+		{actual: "-2", targets: "-2", outcome: false},
+		{actual: float32(-25.5), targets: "-25.6", outcome: true},
+		{actual: "123a", targets: "-25.5", outcome: false},
+		{actual: "0", targets: "0", outcome: false},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(numericNotEqual, t)(tc)
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(numericNotEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericGreaterThan(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: float32(2), targets: "4", outcome: false},
+		{actual: "-2", targets: "-2", outcome: false},
+		{actual: 25.59, targets: "25.6", outcome: false},
+		{actual: int32(-25), targets: "-25.6", outcome: true},
+		{actual: "-25.5", targets: "-25.5", outcome: false},
+		{actual: "0", targets: "0", outcome: false},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(numericGreaterThan, t)(tc)
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(numericGreaterThan, t)(tc)
+	}
+}
+
+func TestCustomSignals_NumericGreaterEqual(t *testing.T) {
+	testCases := []customSignalTestCase{
+		{actual: int32(2), targets: "4", outcome: false},
+		{actual: "-2", targets: "-2", outcome: true},
+		{actual: float32(25.5), targets: "25.6", outcome: false},
+		{actual: -25.5, targets: "-25.6", outcome: true},
+		{actual: "-25.5", targets: "-25.5", outcome: true},
+		{actual: "0", targets: "0", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(numericGreaterEqual, t)(tc)
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCase(numericGreaterEqual, t)(tc)
 	}
 }
