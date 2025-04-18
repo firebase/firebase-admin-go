@@ -16,6 +16,7 @@ package remoteconfig
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,7 +25,7 @@ import (
 
 const (
 	isEnabled           = "is_enabled"
-	subscriptionType    = "subscriptionType"
+	customSignalKey     = "customSignalKey"
 	premium             = "premium"
 	testRandomizationID = "123"
 	testSeed            = "abcdef"
@@ -89,11 +90,11 @@ func runCustomSignalTestCase(operator string, t *testing.T) func(customSignalTes
 			condition := createNamedCondition(isEnabled, oneOfCondition{
 				CustomSignal: &customSignalCondition{
 					CustomSignalOperator:     operator,
-					CustomSignalKey:          subscriptionType,
+					CustomSignalKey:          customSignalKey,
 					TargetCustomSignalValues: strings.Split(tc.targets, ","),
 				},
 			})
-			evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{subscriptionType: tc.actual}, tc.outcome)
+			evaluateConditionsAndReportResult(t, condition, isEnabled, map[string]any{customSignalKey: tc.actual}, tc.outcome)
 		})
 	}
 }
@@ -509,24 +510,24 @@ func TestCustomSignalConditionIsValid(t *testing.T) {
 	testCases := []struct {
 		description string
 		condition   customSignalCondition
-		expected    bool
+		expected    error
 	}{
 		{
 			description: "Valid condition",
 			condition: customSignalCondition{
 				CustomSignalOperator:     stringExactlyMatches,
-				CustomSignalKey:          subscriptionType,
+				CustomSignalKey:          customSignalKey,
 				TargetCustomSignalValues: []string{premium},
 			},
-			expected: true,
+			expected: nil,
 		},
 		{
 			description: "Missing operator",
 			condition: customSignalCondition{
-				CustomSignalKey:          subscriptionType,
+				CustomSignalKey:          customSignalKey,
 				TargetCustomSignalValues: []string{premium},
 			},
-			expected: false,
+			expected: errInvalidCustomSignal,
 		},
 		{
 			description: "Missing key",
@@ -534,27 +535,27 @@ func TestCustomSignalConditionIsValid(t *testing.T) {
 				CustomSignalOperator:     stringExactlyMatches,
 				TargetCustomSignalValues: []string{premium},
 			},
-			expected: false,
+			expected: errInvalidCustomSignal,
 		},
 		{
 			description: "Missing target values",
 			condition: customSignalCondition{
 				CustomSignalOperator: stringExactlyMatches,
-				CustomSignalKey:      subscriptionType,
+				CustomSignalKey:      customSignalKey,
 			},
-			expected: false,
+			expected: errInvalidCustomSignal,
 		},
 		{
 			description: "Missing multiple fields (operator and key)",
 			condition: customSignalCondition{
 				TargetCustomSignalValues: []string{premium},
 			},
-			expected: false,
+			expected: errInvalidCustomSignal,
 		},
 		{
 			description: "Missing all fields",
 			condition:   customSignalCondition{},
-			expected:    false,
+			expected:    errInvalidCustomSignal,
 		},
 	}
 
@@ -572,11 +573,11 @@ func TestEvaluateCustomSignalCondition_MissingKeyInContext(t *testing.T) {
 	condition := createNamedCondition(isEnabled, oneOfCondition{
 		CustomSignal: &customSignalCondition{
 			CustomSignalOperator:     stringExactlyMatches,
-			CustomSignalKey:          subscriptionType,
+			CustomSignalKey:          customSignalKey,
 			TargetCustomSignalValues: []string{premium},
 		},
 	})
-	// Context does NOT contain 'subscriptionType'
+	// Context does NOT contain 'customSignalKey'
 	context := map[string]any{
 		"key": "value",
 	}
@@ -631,18 +632,24 @@ func TestCustomSignals_StringExactlyMatches(t *testing.T) {
 
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(stringExactlyMatches, t)(tc)
-	}
-
-	for _, tc := range testCases {
 		runCustomSignalTestCase(stringExactlyMatches, t)(tc)
 	}
 }
 
 func TestCustomSignals_StringContainsRegex(t *testing.T) {
 	testCases := []customSignalTestCase{
-		{actual: "foobar", targets: "^foo,biz", outcome: true},
-		{actual: " hello world ", targets: "     hello ,    world    ", outcome: false},
-		{actual: "endswithhello", targets: ".*hello$", outcome: true},
+		{actual: "foobar", targets: "^foo,biz", outcome: true},                          // Matches start anchor ^foo
+		{actual: " hello world ", targets: "     hello ,    world    ", outcome: false}, // Patterns are literal strings including spaces, neither matches exactly? (Outcome seems unexpected for contains)
+		{actual: "endswithhello", targets: ".*hello$", outcome: true},                   // Matches end anchor hello$
+		{actual: "foobar", targets: "^foo", outcome: true},                              // Starts with "foo"
+		{actual: "barfoo", targets: "^foo", outcome: false},                             // Does not start with "foo"
+		{actual: "foobar", targets: "bar$", outcome: true},                              // Ends with "bar"
+		{actual: "barfoo", targets: "bar$", outcome: false},                             // Does not end with "bar"
+		{actual: "hello world", targets: "hello.*world", outcome: true},                 // Contains "hello" and "world" with anything in between
+		{actual: "hello world", targets: "hello\\s+world", outcome: true},               // Contains "hello" and "world" with one or more whitespace in between
+		{actual: "helloworld", targets: "hello\\s+world", outcome: false},               // No whitespace between hello and world
+		{actual: "123-456-7890", targets: "\\d{3}-\\d{3}-\\d{4}", outcome: true},        // Phone number format
+		{actual: "invalid", targets: "([a-z]+", outcome: false},
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCase(stringContainsRegex, t)(tc)
@@ -653,7 +660,7 @@ func TestCustomSignals_NumericLessThan(t *testing.T) {
 	withWhiteSpaces := []customSignalTestCase{
 		{actual: int16(2), targets: "4", outcome: true},
 		{actual: " -2.0 ", targets: "  -2  ", outcome: false},
-		{actual: int8(25), targets: "25.6", outcome: true},
+		{actual: uint8(25), targets: "25.6", outcome: true},
 		{actual: float32(-25.5), targets: "-25.6", outcome: false},
 		{actual: " -25.5", targets: " -25.1  ", outcome: true},
 		{actual: " 3", targets: " 2,4  ", outcome: false},
@@ -679,8 +686,6 @@ func TestCustomSignals_NumericLessEqual(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(numericLessThanEqual, t)(tc)
-	}
-	for _, tc := range testCases {
 		runCustomSignalTestCase(numericLessThanEqual, t)(tc)
 	}
 }
@@ -691,15 +696,13 @@ func TestCustomSignals_NumericEqual(t *testing.T) {
 		{actual: "-2", targets: "-2", outcome: true},
 		{actual: -25.5, targets: "-25.6", outcome: false},
 		{actual: "-25.5", targets: "123a", outcome: false},
-		{actual: int16(0), targets: "0", outcome: true},
+		{actual: uint16(0), targets: "0", outcome: true},
 		{actual: struct {
 			index int
 		}{index: 2}, targets: "0", outcome: false},
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(numericEqual, t)(tc)
-	}
-	for _, tc := range testCases {
 		runCustomSignalTestCase(numericEqual, t)(tc)
 	}
 }
@@ -714,8 +717,6 @@ func TestCustomSignals_NumericNotEqual(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(numericNotEqual, t)(tc)
-	}
-	for _, tc := range testCases {
 		runCustomSignalTestCase(numericNotEqual, t)(tc)
 	}
 }
@@ -731,15 +732,13 @@ func TestCustomSignals_NumericGreaterThan(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(numericGreaterThan, t)(tc)
-	}
-	for _, tc := range testCases {
 		runCustomSignalTestCase(numericGreaterThan, t)(tc)
 	}
 }
 
 func TestCustomSignals_NumericGreaterEqual(t *testing.T) {
 	testCases := []customSignalTestCase{
-		{actual: int32(2), targets: "4", outcome: false},
+		{actual: uint32(2), targets: "4", outcome: false},
 		{actual: "-2", targets: "-2", outcome: true},
 		{actual: float32(25.5), targets: "25.6", outcome: false},
 		{actual: -25.5, targets: "-25.6", outcome: true},
@@ -748,8 +747,195 @@ func TestCustomSignals_NumericGreaterEqual(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		runCustomSignalTestCaseWithWhiteSpaces(numericGreaterEqual, t)(tc)
+		runCustomSignalTestCase(numericGreaterEqual, t)(tc)
+	}
+}
+
+func Test_TransformVersionToSegments(t *testing.T) {
+	versionToSegmentTestCases := []struct {
+		description     string
+		semanticVersion string
+		outcome         struct {
+			err      error
+			segments []int
+		}
+	}{
+		{
+			semanticVersion: "1.2.3.4.5",
+			description:     "Valid semantic version with maximum allowed segments",
+			outcome: struct {
+				err      error
+				segments []int
+			}{
+				err:      nil,
+				segments: []int{1, 2, 3, 4, 5},
+			},
+		},
+		{
+			semanticVersion: "1.2.3.4.5.6",
+			description:     "Returns error when version exceeds maximum allowed segments",
+			outcome: struct {
+				err      error
+				segments []int
+			}{
+				err:      errTooManySegments,
+				segments: nil,
+			},
+		},
+		{
+			semanticVersion: "1.2.3.4.-5",
+			description:     "Returns error when a segment is negative",
+			outcome: struct {
+				err      error
+				segments []int
+			}{
+				err:      errNegativeSegment,
+				segments: nil,
+			},
+		},
+		{
+			semanticVersion: ".1.2.",
+			description:     "Handles leading/trailing separators and pads missing segments with zero",
+			outcome: struct {
+				err      error
+				segments []int
+			}{
+				err:      nil,
+				segments: []int{1, 2, 0, 0, 0},
+			},
+		},
+		{
+			semanticVersion: "abcd.123",
+			description:     "Returns error for non-numeric segment value",
+			outcome: struct {
+				err      error
+				segments []int
+			}{
+				err:      errors.New("failed to parse segment \"abcd\": strconv.Atoi: parsing \"abcd\": invalid syntax"),
+				segments: nil,
+			},
+		},
+	}
+
+	for _, tc := range versionToSegmentTestCases {
+		t.Run(tc.description, func(t *testing.T) {
+			segments, err := transformVersionToSegments(tc.semanticVersion)
+			if tc.outcome.err == nil {
+				if err != nil {
+					t.Fatalf("transformVersionToSegments(%q) error = %v, want nil", tc.semanticVersion, err)
+				}
+			} else {
+				if err == nil || tc.outcome.err.Error() != err.Error() {
+					t.Fatalf("transformVersionToSegments(%q) error = %v, want %v", tc.semanticVersion, err, tc.outcome.err)
+				}
+			}
+
+			if !reflect.DeepEqual(tc.outcome.segments, segments) {
+				t.Errorf("transformVersionToSegments(%q) segments = %v, want %v", tc.semanticVersion, segments, tc.outcome.segments)
+			}
+		})
+	}
+}
+
+func TestCustomSignals_SemanticVersionLessThan(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: uint16(2), targets: "4", outcome: true},
+		{actual: 2., targets: "4.0", outcome: true},
+		{actual: .9, targets: "0.4", outcome: false},
+		{actual: ".3", targets: "0.1", outcome: false},
+		{actual: float32(2.3), targets: "2.3.2", outcome: true},
+		{actual: "2.3.4.1", targets: "2.3.4", outcome: false},
+		{actual: 2.3, targets: "2.3.0", outcome: false},
+		{actual: int16(3), targets: "1.2,4", outcome: false},
 	}
 	for _, tc := range testCases {
-		runCustomSignalTestCase(numericGreaterEqual, t)(tc)
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionLessThan, t)(tc)
+		runCustomSignalTestCase(semanticVersionLessThan, t)(tc)
+	}
+}
+
+func TestCustomSignals_SemanticVersionLessEqual(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: 2., targets: "2.0", outcome: true},
+		{actual: .456, targets: "0.456.13", outcome: true},
+		{actual: ".3", targets: "0.1,0.4", outcome: false},
+		{actual: float32(2.3), targets: "2.3.0", outcome: true},
+		{actual: "2.3.4.5.6", targets: "2.3.4.5.6", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionLessEqual, t)(tc)
+		runCustomSignalTestCase(semanticVersionLessEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_SemanticVersionEqual(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: 2., targets: "2.0", outcome: true},
+		{actual: 2.0, targets: "2", outcome: true},
+		{actual: uint16(2), targets: "2", outcome: true},
+		{actual: ".3", targets: "0.1, 0.4", outcome: false},
+		{actual: "1.2.3.4.5.6", targets: "1.2.3", outcome: false},
+		{actual: float32(2.3), targets: "2.3.0", outcome: true},
+		{actual: "2.3.4.5.6", targets: "2.3.4.5.6", outcome: true},
+		{actual: "1.3.4.5.6", targets: "2.3.4.5.6", outcome: false},
+		{actual: "5.12.-3.4", targets: "5.12.3.4", outcome: false},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionEqual, t)(tc)
+		runCustomSignalTestCase(semanticVersionEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_SemanticVersionNotEqual(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: 2.3, targets: "2.0", outcome: true},
+		{actual: uint32(8), targets: "2", outcome: true},
+		{actual: "1.2.3.4.5.6", targets: "1.2.3", outcome: false},
+		{actual: "2.3.4.5.6", targets: "2.3.4.5.6", outcome: false},
+		{actual: "5.12.-3.4", targets: "5.12.3.4", outcome: false},
+		{actual: "1.2.3", targets: "1.2.a", outcome: false},
+		{actual: struct{}{}, targets: "1", outcome: false},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionNotEqual, t)(tc)
+		runCustomSignalTestCase(semanticVersionNotEqual, t)(tc)
+	}
+}
+
+func TestCustomSignals_SemanticVersionGreaterThan(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: 2., targets: "2.0", outcome: false},
+		{actual: 2.0, targets: "2", outcome: false},
+		{actual: ".3", targets: "0.1", outcome: true},
+		{actual: "1.2.3.4.5.6", targets: "1.2.3", outcome: false},
+		{actual: 12.4, targets: "12.3.0", outcome: true},
+		{actual: "2.3.4.5.6", targets: "2.3.4.5.6", outcome: false},
+		{actual: "5.12.3.4", targets: "5.11.8.9", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionGreaterThan, t)(tc)
+		runCustomSignalTestCase(semanticVersionGreaterThan, t)(tc)
+	}
+}
+
+func TestCustomSignals_SemanticVersionGreaterEqual(t *testing.T) {
+	// a semantic version with leading or trailing segment separators cannot be entered on the console
+	testCases := []customSignalTestCase{
+		{actual: 2., targets: "2.0", outcome: true},
+		{actual: int16(2), targets: "2", outcome: true},
+		{actual: ".3", targets: "0.1", outcome: true},
+		{actual: "1.2.3.4.5.6", targets: "1.2.3", outcome: false},
+		{actual: float32(12.4), targets: "12.3.0", outcome: true},
+		{actual: "2.3.4.5.6", targets: "2.3.4.5.6", outcome: true},
+		{actual: "5.12.3.4", targets: "5.11.8.9", outcome: true},
+	}
+	for _, tc := range testCases {
+		runCustomSignalTestCaseWithWhiteSpaces(semanticVersionGreaterEqual, t)(tc)
+		runCustomSignalTestCase(semanticVersionGreaterEqual, t)(tc)
 	}
 }

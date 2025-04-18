@@ -17,6 +17,7 @@ package remoteconfig
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -34,6 +35,15 @@ const (
 	maxConditionRecursionDepth = 10
 	rootNestingLevel           = 0
 	doublePrecision            = 64
+	whiteSpace                 = " "
+	segmentSeparator           = "."
+	maxPossibleSegments        = 5
+)
+
+var (
+	errTooManySegments     = errors.New("number of segments in semantic version exceeds maximum allowed length")
+	errNegativeSegment     = errors.New("segment cannot be negative")
+	errInvalidCustomSignal = errors.New("missing operator, key, or target values for custom signal condition")
 )
 
 const (
@@ -45,8 +55,6 @@ const (
 )
 
 const (
-	whiteSpace = " "
-
 	stringContains       = "STRING_CONTAINS"
 	stringDoesNotContain = "STRING_DOES_NOT_CONTAIN"
 	stringExactlyMatches = "STRING_EXACTLY_MATCHES"
@@ -58,6 +66,13 @@ const (
 	numericNotEqual      = "NUMERIC_NOT_EQUAL"
 	numericGreaterThan   = "NUMERIC_GREATER_THAN"
 	numericGreaterEqual  = "NUMERIC_GREATER_EQUAL"
+
+	semanticVersionLessThan     = "SEMANTIC_VERSION_LESS_THAN"
+	semanticVersionLessEqual    = "SEMANTIC_VERSION_LESS_EQUAL"
+	semanticVersionEqual        = "SEMANTIC_VERSION_EQUAL"
+	semanticVersionNotEqual     = "SEMANTIC_VERSION_NOT_EQUAL"
+	semanticVersionGreaterThan  = "SEMANTIC_VERSION_GREATER_THAN"
+	semanticVersionGreaterEqual = "SEMANTIC_VERSION_GREATER_EQUAL"
 )
 
 func (ce *conditionEvaluator) evaluateConditions() map[string]bool {
@@ -92,7 +107,6 @@ func (ce *conditionEvaluator) evaluateCondition(condition *oneOfCondition, nesti
 func (ce *conditionEvaluator) evaluateOrCondition(orCondition *orCondition, nestingLevel int) bool {
 	for _, condition := range orCondition.Conditions {
 		result := ce.evaluateCondition(&condition, nestingLevel+1)
-		// short-circuit evaluation, return true if any of the conditions return true
 		if result {
 			return true
 		}
@@ -103,7 +117,6 @@ func (ce *conditionEvaluator) evaluateOrCondition(orCondition *orCondition, nest
 func (ce *conditionEvaluator) evaluateAndCondition(andCondition *andCondition, nestingLevel int) bool {
 	for _, condition := range andCondition.Conditions {
 		result := ce.evaluateCondition(&condition, nestingLevel+1)
-		// short-circuit evaluation, return false if any of the conditions return false
 		if !result {
 			return false
 		}
@@ -144,41 +157,35 @@ func computeInstanceMicroPercentile(seed string, randomizationID string) uint32 
 	hash := sha256.New()
 	hash.Write([]byte(stringToHash))
 	// Calculate the final SHA-256 hash as a byte slice (32 bytes).
-	hashBytes := hash.Sum(nil)
-
-	hashBigInt := new(big.Int).SetBytes(hashBytes)
-	// Convert the hash bytes to a big.Int. The "0x" prefix is implicit in the conversion from hex to big.Int.
+	// Convert to a big.Int. The "0x" prefix is implicit in the conversion from hex to big.Int.
+	hashBigInt := new(big.Int).SetBytes(hash.Sum(nil))
 	instanceMicroPercentileBigInt := new(big.Int).Mod(hashBigInt, big.NewInt(totalMicroPercentiles))
-	// Can safely convert to uint32 since the range of instanceMicroPercentile is 0 to 100_000_000; range of uint32 is 0 to 4_294_967_295.
+	// Safely convert to uint32 since the range of instanceMicroPercentile is 0 to 100_000_000; range of uint32 is 0 to 4_294_967_295.
 	return uint32(instanceMicroPercentileBigInt.Int64())
 }
 
 func (ce *conditionEvaluator) evaluateCustomSignalCondition(customSignalCondition *customSignalCondition) bool {
-	if !customSignalCondition.isValid() {
+	if err := customSignalCondition.isValid(); err != nil {
+		log.Println(err)
 		return false
 	}
-	csVal, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]
+	actualValue, ok := ce.evaluationContext[customSignalCondition.CustomSignalKey]
 	if !ok {
 		log.Printf("Custom signal key: %s, missing from context\n", customSignalCondition.CustomSignalKey)
 		return false
 	}
-
-	fmt.Println("CUSTOM SIGNALS ---- ")
-	fmt.Println("signal value from context ", csVal)
-	fmt.Println(customSignalCondition.TargetCustomSignalValues)
-
 	switch customSignalCondition.CustomSignalOperator {
 	case stringContains:
-		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool { return strings.Contains(csVal, target) })
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, actualValue, func(actualValue, target string) bool { return strings.Contains(actualValue, target) })
 	case stringDoesNotContain:
-		return !compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool { return strings.Contains(csVal, target) })
+		return !compareStrings(customSignalCondition.TargetCustomSignalValues, actualValue, func(actualValue, target string) bool { return strings.Contains(actualValue, target) })
 	case stringExactlyMatches:
-		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, target string) bool {
-			return strings.Trim(csVal, whiteSpace) == strings.Trim(target, whiteSpace)
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, actualValue, func(actualValue, target string) bool {
+			return strings.Trim(actualValue, whiteSpace) == strings.Trim(target, whiteSpace)
 		})
 	case stringContainsRegex:
-		return compareStrings(customSignalCondition.TargetCustomSignalValues, csVal, func(csVal, targetPattern string) bool {
-			result, err := regexp.MatchString(targetPattern, csVal)
+		return compareStrings(customSignalCondition.TargetCustomSignalValues, actualValue, func(actualValue, targetPattern string) bool {
+			result, err := regexp.MatchString(targetPattern, actualValue)
 			if err != nil {
 				return false
 			}
@@ -187,107 +194,159 @@ func (ce *conditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 
 	// For numeric operators only one target value is allowed
 	case numericLessThan:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result < 0 })
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result < 0 })
 	case numericLessThanEqual:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result <= 0 })
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result <= 0 })
 	case numericEqual:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result == 0 })
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result == 0 })
 	case numericNotEqual:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result != 0 })
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result != 0 })
 	case numericGreaterThan:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result > 0 })
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result > 0 })
 	case numericGreaterEqual:
-		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], csVal, func(result int) bool { return result >= 0 })
-	}
+		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result >= 0 })
 
+	// For semantic operators only one target value is allowed.
+	case semanticVersionLessThan:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result < 0 })
+	case semanticVersionLessEqual:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result <= 0 })
+	case semanticVersionEqual:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result == 0 })
+	case semanticVersionNotEqual:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result != 0 })
+	case semanticVersionGreaterThan:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result > 0 })
+	case semanticVersionGreaterEqual:
+		return compareSemanticVersion(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result >= 0 })
+	}
+	log.Printf("Unknown custom signal operator: %s\n", customSignalCondition.CustomSignalOperator)
 	return false
 }
 
-func (cs *customSignalCondition) isValid() bool {
+func (cs *customSignalCondition) isValid() error {
 	if cs.CustomSignalOperator == "" || cs.CustomSignalKey == "" || len(cs.TargetCustomSignalValues) == 0 {
-		log.Println("Missing operator, key, or target values for custom signal condition.")
-		return false
+		return errInvalidCustomSignal
 	}
-	return true
+	return nil
 }
 
-// Compares the actual string value of a signal against a list of target values.
-// If any of the target values are a match, returns true.
-func compareStrings(targetCustomSignalValues []string, csVal any, compare func(csVal, target string) bool) bool {
-	csValStr, ok := csVal.(string)
+func compareStrings(targetCustomSignalValues []string, actualValue any, predicateFn func(actualValue, target string) bool) bool {
+	csValStr, ok := actualValue.(string)
 	if !ok {
-		if jsonBytes, err := json.Marshal(csVal); err == nil {
+		if jsonBytes, err := json.Marshal(actualValue); err == nil {
 			csValStr = string(jsonBytes)
 		} else {
-			log.Printf("failed to parse custom signal value '%v' as a string\n", csVal)
+			log.Printf("Failed to parse custom signal value '%v' as a string : %v\n", actualValue, err)
 			return false
 		}
 	}
-
 	for _, target := range targetCustomSignalValues {
-		if compare(csValStr, target) {
+		if predicateFn(csValStr, target) {
 			return true
 		}
 	}
 	return false
 }
 
-// Compares two numbers against each other.
-// Calls the predicate function with  -1, 0, 1 if actual is less than, equal to, or greater than target.
-func compareNumbers(targetCustomSignalValue string, csVal any, compare func(result int) bool) bool {
+func compareNumbers(targetCustomSignalValue string, actualValue any, predicateFn func(result int) bool) bool {
 	targetFloat, err := strconv.ParseFloat(strings.Trim(targetCustomSignalValue, whiteSpace), doublePrecision)
 	if err != nil {
 		log.Printf("Failed to convert target custom signal value '%v' from string to number: %v", targetCustomSignalValue, err)
 		return false
 	}
-	var csValFloat float64
-	switch csVal := csVal.(type) {
+	var actualValFloat float64
+	switch actualValue := actualValue.(type) {
 	case float32:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case float64:
-		csValFloat = csVal
+		actualValFloat = actualValue
 	case int8:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case int:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case int16:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case int32:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case int64:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case uint8:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case uint:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case uint16:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case uint32:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case uint64:
-		csValFloat = float64(csVal)
+		actualValFloat = float64(actualValue)
 	case bool:
-		if csVal {
-			csValFloat = 1
+		if actualValue {
+			actualValFloat = 1
 		} else {
-			csValFloat = 0
+			actualValFloat = 0
 		}
 	case string:
-		csValFloat, err = strconv.ParseFloat(strings.Trim(csVal, whiteSpace), doublePrecision)
+		actualValFloat, err = strconv.ParseFloat(strings.Trim(actualValue, whiteSpace), doublePrecision)
 		if err != nil {
-			log.Printf("Failed to convert custom signal value '%v' from string to number: %v", csVal, err)
+			log.Printf("Failed to convert custom signal value '%v' from string to number: %v", actualValue, err)
 			return false
 		}
 	default:
-		log.Printf("Cannot parse custom signal value '%v' of type %T as a number", csVal, csVal)
+		log.Printf("Cannot parse custom signal value '%v' of type %T as a number", actualValue, actualValue)
 		return false
 	}
 	result := 0
-	if csValFloat > targetFloat {
+	if actualValFloat > targetFloat {
 		result = 1
-	} else if csValFloat < targetFloat {
+	} else if actualValFloat < targetFloat {
 		result = -1
 	}
-	r := compare(result)
-	return r
+	return predicateFn(result)
+}
+
+func compareSemanticVersion(targetValue string, actualValue any, predicateFn func(result int) bool) bool {
+	targetSemVer, err := transformVersionToSegments(strings.Trim(targetValue, whiteSpace))
+	if err != nil {
+		log.Printf("Error transforming target semantic version %q: %v\n", targetValue, err)
+		return false
+	}
+	actualValueStr := fmt.Sprintf("%v", actualValue)
+	actualSemVer, err := transformVersionToSegments(strings.Trim(actualValueStr, whiteSpace))
+	if err != nil {
+		log.Printf("Error transforming custom signal value '%v' to semantic version: %v\n", actualValue, err)
+		return false
+	}
+	for idx := 0; idx < maxPossibleSegments; idx++ {
+		if actualSemVer[idx] > targetSemVer[idx] {
+			return predicateFn(1)
+		} else if actualSemVer[idx] < targetSemVer[idx] {
+			return predicateFn(-1)
+		}
+	}
+	return predicateFn(0)
+}
+
+func transformVersionToSegments(version string) ([]int, error) {
+	// Trim any trailing or leading segment separators (.) and split.
+	trimmedVersion := strings.Trim(version, segmentSeparator)
+	segments := strings.Split(trimmedVersion, segmentSeparator)
+
+	if len(segments) > maxPossibleSegments {
+		return nil, errTooManySegments
+	}
+	// Initialize with the maximum possible segment length for consistent comparison.
+	transformedVersion := make([]int, maxPossibleSegments)
+	for idx, segmentStr := range segments {
+		segmentInt, err := strconv.Atoi(segmentStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse segment %q: %w", segmentStr, err)
+		}
+		if segmentInt < 0 {
+			return nil, errNegativeSegment
+		}
+		transformedVersion[idx] = segmentInt
+	}
+	return transformedVersion, nil
 }
