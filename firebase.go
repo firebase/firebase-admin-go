@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -158,6 +159,7 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 // `FIREBASE_CONFIG` environment variable. If the value in it starts with a `{` it is parsed as a
 // JSON object, otherwise it is assumed to be the name of the JSON file containing the options.
 func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
+	fmt.Println("\n************************\nLOCAL ADMIN SDK LINKED\n************************\n")
 	o := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
 	o = append(o, opts...)
 	if config == nil {
