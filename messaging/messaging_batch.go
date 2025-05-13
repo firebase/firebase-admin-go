@@ -171,7 +171,7 @@ func (c *fcmClient) sendEachInBatch(ctx context.Context, messages []*Message, dr
 		}
 	}
 
-	const numWorkers = 10
+	const numWorkers = 50
 	jobs := make(chan job, len(messages))
 	results := make(chan result, len(messages))
 

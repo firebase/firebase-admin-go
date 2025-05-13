@@ -94,16 +94,22 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 	scenarios := []struct {
 		name         string
 		numMessages  int
-		numWorkers   int // This is fixed at 10 in sendEachInBatch, but we test different loads
+		// numWorkers is now fixed at 50 in sendEachInBatch. This comment is for context.
+		// We will test different loads relative to this fixed size.
 		allSuccessful bool
+		testNameSuffix string // To make test names more descriptive if needed
 	}{
-		{"Messages < Workers", 5, 10, true},
-		{"Messages == Workers", 10, 10, true},
-		{"Messages > Workers", 20, 10, true},
-		{"Messages > Workers with Failures", 15, 10, false}, // Test partial failure with worker pool
+		{numMessages: 5, allSuccessful: true, testNameSuffix: " (5msg < 50workers)"},
+		{numMessages: 50, allSuccessful: true, testNameSuffix: " (50msg == 50workers)"},
+		{numMessages: 75, allSuccessful: true, testNameSuffix: " (75msg > 50workers)"},
+		{numMessages: 75, allSuccessful: false, testNameSuffix: " (75msg > 50workers, with Failures)"},
 	}
 
 	for _, s := range scenarios {
+		scenarioName := fmt.Sprintf("NumMessages_%d_AllSuccess_%v%s", s.numMessages, s.allSuccessful, s.testNameSuffix)
+		t.Run(scenarioName, func(t *testing.T) {
+			ctx := context.Background()
+			client, err := NewClient(ctx, testMessagingConfig)
 		t.Run(s.name, func(t *testing.T) {
 			ctx := context.Background()
 			client, err := NewClient(ctx, testMessagingConfig)
@@ -210,7 +216,7 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	numMessages := 25 // More than numWorkers (10)
+	numMessages := 75 // Ensure this is > new worker count of 50
 	messages := make([]*Message, numMessages)
 	for i := 0; i < numMessages; i++ {
 		messages[i] = &Message{Token: fmt.Sprintf("token%d", i)} // Using Token for unique identification
