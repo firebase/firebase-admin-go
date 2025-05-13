@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"strings"
+	"sync"
 	"testing"
 
 	"google.golang.org/api/option"
