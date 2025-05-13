@@ -90,6 +90,265 @@ func TestMultipartEntitySingle(t *testing.T) {
 	}
 }
 
+func TestSendEachWorkerPoolScenarios(t *testing.T) {
+	scenarios := []struct {
+		name         string
+		numMessages  int
+		numWorkers   int // This is fixed at 10 in sendEachInBatch, but we test different loads
+		allSuccessful bool
+	}{
+		{"Messages < Workers", 5, 10, true},
+		{"Messages == Workers", 10, 10, true},
+		{"Messages > Workers", 20, 10, true},
+		{"Messages > Workers with Failures", 15, 10, false}, // Test partial failure with worker pool
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			ctx := context.Background()
+			client, err := NewClient(ctx, testMessagingConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			messages := make([]*Message, s.numMessages)
+			expectedSuccessCount := s.numMessages
+			expectedFailureCount := 0
+
+			serverHitCount := 0
+			mu := &sync.Mutex{} // To protect serverHitCount
+
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				serverHitCount++
+				currentHit := serverHitCount // Capture current hit for stable value in response
+				mu.Unlock()
+
+				var reqBody fcmRequest
+				if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				
+				// For "Messages > Workers with Failures", make every 3rd message fail
+				if !s.allSuccessful && currentHit%3 == 0 {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"error": map[string]interface{}{
+							"message": "Simulated server error",
+							"status":  "INTERNAL",
+						},
+					})
+				} else {
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(map[string]string{
+						"name": fmt.Sprintf("projects/test-project/messages/%s-%d", reqBody.Message.Topic, currentHit),
+					})
+				}
+			}))
+			defer ts.Close()
+			client.fcmEndpoint = ts.URL
+
+			for i := 0; i < s.numMessages; i++ {
+				messages[i] = &Message{Topic: fmt.Sprintf("topic%d", i)}
+			}
+			
+			if !s.allSuccessful {
+				expectedSuccessCount = 0
+				expectedFailureCount = 0
+				for i := 0; i < s.numMessages; i++ {
+					if (i+1)%3 == 0 { // Matches server logic for failures (1-indexed hit count)
+						expectedFailureCount++
+					} else {
+						expectedSuccessCount++
+					}
+				}
+			}
+
+
+			br, err := client.SendEach(ctx, messages)
+			if err != nil {
+				t.Fatalf("SendEach() unexpected error: %v", err)
+			}
+
+			if br.SuccessCount != expectedSuccessCount {
+				t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, expectedSuccessCount)
+			}
+			if br.FailureCount != expectedFailureCount {
+				t.Errorf("FailureCount = %d; want = %d", br.FailureCount, expectedFailureCount)
+			}
+			if len(br.Responses) != s.numMessages {
+				t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), s.numMessages)
+			}
+			mu.Lock() // Protect serverHitCount read
+			if serverHitCount != s.numMessages {
+				t.Errorf("Server hit count = %d; want = %d", serverHitCount, s.numMessages)
+			}
+			mu.Unlock()
+
+			for i, resp := range br.Responses {
+				isExpectedToSucceed := s.allSuccessful || (i+1)%3 != 0
+				if resp.Success != isExpectedToSucceed {
+					t.Errorf("Responses[%d].Success = %v; want = %v", i, resp.Success, isExpectedToSucceed)
+				}
+				if isExpectedToSucceed && resp.MessageID == "" {
+					t.Errorf("Responses[%d].MessageID is empty for a successful message", i)
+				}
+				if !isExpectedToSucceed && resp.Error == nil {
+					t.Errorf("Responses[%d].Error is nil for a failed message", i)
+				}
+			}
+		})
+	}
+}
+
+func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	numMessages := 25 // More than numWorkers (10)
+	messages := make([]*Message, numMessages)
+	for i := 0; i < numMessages; i++ {
+		messages[i] = &Message{Token: fmt.Sprintf("token%d", i)} // Using Token for unique identification
+	}
+
+	// serverHitCount and messageIDLog are protected by mu
+	serverHitCount := 0
+	messageIDLog := make(map[string]int) // Maps message identifier (token) to hit order
+	var mu sync.Mutex
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		serverHitCount++
+		hitOrder := serverHitCount
+		mu.Unlock()
+
+		var reqBody fcmRequest
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		messageIdentifier := reqBody.Message.Token // Assuming token is unique and part of the request
+
+		mu.Lock()
+		messageIDLog[messageIdentifier] = hitOrder // Log which message (by token) was processed in which hit order
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		// Construct message ID that includes the original token to verify later
+		json.NewEncoder(w).Encode(map[string]string{
+			"name": fmt.Sprintf("projects/test-project/messages/msg_for_%s", messageIdentifier),
+		})
+	}))
+	defer ts.Close()
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEach(ctx, messages)
+	if err != nil {
+		t.Fatalf("SendEach() unexpected error: %v", err)
+	}
+
+	if br.SuccessCount != numMessages {
+		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, numMessages)
+	}
+	if len(br.Responses) != numMessages {
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), numMessages)
+	}
+
+	if serverHitCount != numMessages {
+		t.Errorf("Server hit count = %d; want = %d", serverHitCount, numMessages)
+	}
+
+	for i, resp := range br.Responses {
+		if !resp.Success {
+			t.Errorf("Responses[%d] was not successful: %v", i, resp.Error)
+			continue
+		}
+		expectedMessageIDPart := fmt.Sprintf("msg_for_token%d", i)
+		if !strings.Contains(resp.MessageID, expectedMessageIDPart) {
+			t.Errorf("Responses[%d].MessageID = %q; want to contain %q", i, resp.MessageID, expectedMessageIDPart)
+		}
+	}
+
+	// This test doesn't directly check if message N was processed by worker X,
+	// but it ensures that all messages are processed and their responses are correctly ordered.
+	// The messageIDLog could be used for more detailed analysis of concurrency if needed,
+	// but for now, ensuring correct final order and all messages processed is the key.
+}
+
+func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	messagesWithInvalid := []*Message{
+		{Topic: "topic1"},
+		nil, // Invalid message
+		{Topic: "topic2"},
+	}
+
+	serverHitCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHitCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{ "name":"projects/test-project/messages/1" }`))
+	}))
+	defer ts.Close()
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEach(ctx, messagesWithInvalid)
+	if err == nil {
+		t.Errorf("SendEach() expected error for invalid message, got nil")
+	}
+	if br != nil {
+		t.Errorf("SendEach() expected nil BatchResponse for invalid message, got %v", br)
+	}
+
+	if serverHitCount != 0 {
+		t.Errorf("Server hit count = %d; want = 0 due to early validation failure", serverHitCount)
+	}
+
+	// Test with invalid message at the beginning
+	messagesWithInvalidFirst := []*Message{
+		{Topic: "invalid", Condition: "invalid"}, // Invalid: both Topic and Condition
+		{Topic: "topic1"},
+	}
+	serverHitCount = 0
+	br, err = client.SendEach(ctx, messagesWithInvalidFirst)
+	if err == nil {
+		t.Errorf("SendEach() expected error for invalid first message, got nil")
+	}
+	if br != nil {
+		t.Errorf("SendEach() expected nil BatchResponse for invalid first message, got %v", br)
+	}
+	if serverHitCount != 0 {
+		t.Errorf("Server hit count = %d; want = 0 for invalid first message", serverHitCount)
+	}
+
+	// Test with invalid message at the end
+	messagesWithInvalidLast := []*Message{
+		{Topic: "topic1"},
+		{Token: "test-token", Data: map[string]string{"key": string(make([]byte, 4097))}}, // Invalid: data payload too large
+	}
+	serverHitCount = 0
+	br, err = client.SendEach(ctx, messagesWithInvalidLast)
+	if err == nil {
+		t.Errorf("SendEach() expected error for invalid last message, got nil")
+	}
+	if br != nil {
+		t.Errorf("SendEach() expected nil BatchResponse for invalid last message, got %v", br)
+	}
+	if serverHitCount != 0 {
+		t.Errorf("Server hit count = %d; want = 0 for invalid last message", serverHitCount)
+	}
+}
+
 func TestMultipartEntity(t *testing.T) {
 	entity := &multipartEntity{
 		parts: []*part{
@@ -281,38 +540,45 @@ func TestSendEachPartialFailure(t *testing.T) {
 	}
 
 	var failures []string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
-
-		for idx, testMessage := range testMessages {
-			// Write success for topic1 and error for topic2
-			if strings.Contains(string(req), testMessage.Topic) {
-				if idx%2 == 0 {
-					w.Header().Set("Content-Type", wantMime)
-					w.Write([]byte("{ \"name\":\"" + success[0].Name + "\" }"))
-				} else {
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Header().Set("Content-Type", wantMime)
-					w.Write([]byte(failures[0]))
-				}
-			}
-		}
-	}))
-	defer ts.Close()
-
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.fcmEndpoint = ts.URL
 
 	for idx, tc := range httpErrors {
-		failures = []string{tc.resp}
+		failures = []string{tc.resp} // tc.resp is the error JSON string
+		serverHitCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			serverHitCount++
+			reqBody, _ := ioutil.ReadAll(r.Body)
+			var msgIn fcmRequest
+			json.Unmarshal(reqBody, &msgIn)
 
-		br, err := client.SendEach(ctx, testMessages)
+			// Respond successfully for the first message (topic1)
+			if msgIn.Message.Topic == testMessages[0].Topic {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{ "name":"` + success[0].Name + `" }`))
+			} else if msgIn.Message.Topic == testMessages[1].Topic { // Respond with error for the second message (topic2)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/json") // Errors are also JSON
+				w.Write([]byte(failures[0]))
+			} else {
+				// Should not happen with current testMessages
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error":"unknown topic"}`))
+			}
+		}))
+		defer ts.Close()
+		client.fcmEndpoint = ts.URL
+
+		br, err := client.SendEach(ctx, testMessages) // testMessages has 2 messages
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
+		}
+
+		if serverHitCount != len(testMessages) {
+			t.Errorf("[%d] Server hit count = %d; want = %d", idx, serverHitCount, len(testMessages))
 		}
 
 		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
@@ -322,27 +588,31 @@ func TestSendEachPartialFailure(t *testing.T) {
 }
 
 func TestSendEachTotalFailure(t *testing.T) {
-	var resp string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(resp))
-	}))
-	defer ts.Close()
-
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.fcmEndpoint = ts.URL
 	client.fcmClient.httpClient.RetryConfig = nil
 
 	for idx, tc := range httpErrors {
-		resp = tc.resp
-		br, err := client.SendEach(ctx, testMessages)
+		serverHitCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			serverHitCount++
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(tc.resp)) // tc.resp is the error JSON string
+		}))
+		defer ts.Close()
+		client.fcmEndpoint = ts.URL
+
+		br, err := client.SendEach(ctx, testMessages) // testMessages has 2 messages
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
+		}
+
+		if serverHitCount != len(testMessages) {
+			t.Errorf("[%d] Server hit count = %d; want = %d", idx, serverHitCount, len(testMessages))
 		}
 
 		if err := checkTotalErrorBatchResponse(br, tc); err != nil {

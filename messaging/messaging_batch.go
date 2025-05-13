@@ -165,51 +165,83 @@ func (c *fcmClient) sendEachInBatch(ctx context.Context, messages []*Message, dr
 		return nil, fmt.Errorf("messages must not contain more than %d elements", maxMessages)
 	}
 
-	var responses []*SendResponse = make([]*SendResponse, len(messages))
-	var wg sync.WaitGroup
-
 	for idx, m := range messages {
 		if err := validateMessage(m); err != nil {
 			return nil, fmt.Errorf("invalid message at index %d: %v", idx, err)
 		}
-		wg.Add(1)
-		go func(idx int, m *Message, dryRun bool, responses []*SendResponse) {
-			defer wg.Done()
-			var resp string
-			var err error
-			if dryRun {
-				resp, err = c.SendDryRun(ctx, m)
-			} else {
-				resp, err = c.Send(ctx, m)
-			}
-			if err == nil {
-				responses[idx] = &SendResponse{
-					Success:   true,
-					MessageID: resp,
-				}
-			} else {
-				responses[idx] = &SendResponse{
-					Success: false,
-					Error:   err,
-				}
-			}
-		}(idx, m, dryRun, responses)
 	}
-	// Wait for all SendDryRun/Send calls to finish
-	wg.Wait()
+
+	const numWorkers = 10
+	jobs := make(chan job, len(messages))
+	results := make(chan result, len(messages))
+
+	responses := make([]*SendResponse, len(messages))
+
+	for w := 0; w < numWorkers; w++ {
+		go worker(ctx, c, dryRun, jobs, results)
+	}
+
+	for idx, m := range messages {
+		jobs <- job{message: m, index: idx}
+	}
+	close(jobs)
+
+	for i := 0; i < len(messages); i++ {
+		res := <-results
+		responses[res.index] = res.response
+	}
 
 	successCount := 0
+	failureCount := 0
 	for _, r := range responses {
 		if r.Success {
 			successCount++
+		} else {
+			failureCount++
 		}
 	}
 
 	return &BatchResponse{
 		Responses:    responses,
 		SuccessCount: successCount,
-		FailureCount: len(responses) - successCount,
+		FailureCount: failureCount,
 	}, nil
+}
+
+type job struct {
+	message *Message
+	index   int
+}
+
+type result struct {
+	response *SendResponse
+	index    int
+}
+
+func worker(ctx context.Context, c *fcmClient, dryRun bool, jobs <-chan job, results chan<- result) {
+	for j := range jobs {
+		var respMsg string
+		var err error
+		if dryRun {
+			respMsg, err = c.SendDryRun(ctx, j.message)
+		} else {
+			respMsg, err = c.Send(ctx, j.message)
+		}
+
+		var sr *SendResponse
+		if err == nil {
+			sr = &SendResponse{
+				Success:   true,
+				MessageID: respMsg,
+			}
+		} else {
+			sr = &SendResponse{
+				Success: false,
+				Error:   err,
+			}
+		}
+		results <- result{response: sr, index: j.index}
+	}
 }
 
 // SendAll sends the messages in the given array via Firebase Cloud Messaging.
