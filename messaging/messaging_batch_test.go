@@ -33,20 +33,13 @@ import (
 	"google.golang.org/api/option"
 )
 
-var testMessages = []*Message{
-	{Topic: "topic1"},
-	{Topic: "topic2"},
-}
+var testMessages = []*Message{{Topic: "topic1"}, {Topic: "topic2"}}
 var testMulticastMessage = &MulticastMessage{
 	Tokens: []string{"token1", "token2"},
 }
 var testSuccessResponse = []fcmResponse{
-	{
-		Name: "projects/test-project/messages/1",
-	},
-	{
-		Name: "projects/test-project/messages/2",
-	},
+	{Name: "projects/test-project/messages/1"},
+	{Name: "projects/test-project/messages/2"},
 }
 
 const wantMime = "multipart/mixed; boundary=__END_OF_PART__"
@@ -54,13 +47,11 @@ const wantSendURL = "/v1/projects/test-project/messages:send"
 
 func TestMultipartEntitySingle(t *testing.T) {
 	entity := &multipartEntity{
-		parts: []*part{
-			{
-				method: "POST",
-				url:    "http://example.com",
-				body:   map[string]interface{}{"key": "value"},
-			},
-		},
+		parts: []*part{{
+			method: "POST",
+			url:    "http://example.com",
+			body:   map[string]interface{}{"key": "value"},
+		}},
 	}
 
 	mime := entity.Mime()
@@ -93,11 +84,9 @@ func TestMultipartEntitySingle(t *testing.T) {
 
 func TestSendEachWorkerPoolScenarios(t *testing.T) {
 	scenarios := []struct {
-		name         string
-		numMessages  int
-		// numWorkers is now fixed at 50 in sendEachInBatch. This comment is for context.
-		// We will test different loads relative to this fixed size.
-		allSuccessful bool
+		name           string
+		numMessages    int
+		allSuccessful  bool
 		testNameSuffix string // To make test names more descriptive if needed
 	}{
 		{numMessages: 5, allSuccessful: true, testNameSuffix: " (5msg < 50workers)"},
@@ -125,7 +114,6 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				serverHitCount++
-				// currentHit := serverHitCount // No longer using currentHit for failure decision
 				mu.Unlock()
 
 				var reqBody fcmRequest
@@ -136,23 +124,19 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 
 				var originalIndex int
 				if !s.allSuccessful { // Only parse index if we might fail based on it
-					// Extract index from topic: "topicN"
 					topicParts := strings.Split(reqBody.Message.Topic, "topic")
 					if len(topicParts) == 2 {
 						fmt.Sscanf(topicParts[1], "%d", &originalIndex)
-						// No error check for Sscanf for simplicity in test, assuming format is correct
 					} else {
-						// Should not happen with current message construction, but handle defensively
 						t.Logf("Unexpected topic format: %s", reqBody.Message.Topic)
-						w.WriteHeader(http.StatusOK) // Default to success if topic format is unexpected
+						w.WriteHeader(http.StatusOK)
 						json.NewEncoder(w).Encode(map[string]string{
 							"name": fmt.Sprintf("projects/test-project/messages/%s-unexpected", reqBody.Message.Topic),
 						})
 						return
 					}
 				}
-				
-				// For "Messages > Workers with Failures", make every 3rd message fail based on original index
+
 				if !s.allSuccessful && (originalIndex+1)%3 == 0 {
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Header().Set("Content-Type", "application/json")
@@ -164,7 +148,6 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 					})
 				} else {
 					w.Header().Set("Content-Type", "application/json")
-					// Use originalIndex in success response too for consistency if needed, though not strictly necessary for this fix
 					json.NewEncoder(w).Encode(map[string]string{
 						"name": fmt.Sprintf("projects/test-project/messages/%s-idx%d", reqBody.Message.Topic, originalIndex),
 					})
@@ -176,19 +159,18 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 			for i := 0; i < s.numMessages; i++ {
 				messages[i] = &Message{Topic: fmt.Sprintf("topic%d", i)}
 			}
-			
+
 			if !s.allSuccessful {
 				expectedSuccessCount = 0
 				expectedFailureCount = 0
 				for i := 0; i < s.numMessages; i++ {
-					if (i+1)%3 == 0 { // Matches server logic for failures (1-indexed hit count)
+					if (i+1)%3 == 0 {
 						expectedFailureCount++
 					} else {
 						expectedSuccessCount++
 					}
 				}
 			}
-
 
 			br, err := client.SendEach(ctx, messages)
 			if err != nil {
@@ -239,9 +221,8 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 		messages[i] = &Message{Token: fmt.Sprintf("token%d", i)} // Using Token for unique identification
 	}
 
-	// serverHitCount and messageIDLog are protected by mu
 	serverHitCount := 0
-	messageIDLog := make(map[string]int) // Maps message identifier (token) to hit order
+	messageIDLog := make(map[string]int) 
 	var mu sync.Mutex
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -255,14 +236,13 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		messageIdentifier := reqBody.Message.Token // Assuming token is unique and part of the request
+		messageIdentifier := reqBody.Message.Token
 
 		mu.Lock()
-		messageIDLog[messageIdentifier] = hitOrder // Log which message (by token) was processed in which hit order
+		messageIDLog[messageIdentifier] = hitOrder
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		// Construct message ID that includes the original token to verify later
 		json.NewEncoder(w).Encode(map[string]string{
 			"name": fmt.Sprintf("projects/test-project/messages/msg_for_%s", messageIdentifier),
 		})
@@ -296,11 +276,6 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 			t.Errorf("Responses[%d].MessageID = %q; want to contain %q", i, resp.MessageID, expectedMessageIDPart)
 		}
 	}
-
-	// This test doesn't directly check if message N was processed by worker X,
-	// but it ensures that all messages are processed and their responses are correctly ordered.
-	// The messageIDLog could be used for more detailed analysis of concurrency if needed,
-	// but for now, ensuring correct final order and all messages processed is the key.
 }
 
 func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
@@ -310,11 +285,7 @@ func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	messagesWithInvalid := []*Message{
-		{Topic: "topic1"},
-		nil, // Invalid message
-		{Topic: "topic2"},
-	}
+	messagesWithInvalid := []*Message{{Topic: "topic1"}, nil, {Topic: "topic2"}}
 
 	serverHitCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -337,7 +308,6 @@ func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
 		t.Errorf("Server hit count = %d; want = 0 due to early validation failure", serverHitCount)
 	}
 
-	// Test with invalid message at the beginning
 	messagesWithInvalidFirst := []*Message{
 		{Topic: "invalid", Condition: "invalid"}, // Invalid: both Topic and Condition
 		{Topic: "topic1"},
@@ -354,16 +324,11 @@ func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
 		t.Errorf("Server hit count = %d; want = 0 for invalid first message", serverHitCount)
 	}
 
-	// Test with invalid message at the end
 	messagesWithInvalidLast := []*Message{
-		{Topic: "topic1"},                                   // Valid first message
+		{Topic: "topic1"},                          // Valid first message
 		{Topic: "topic_last", Token: "token_last"}, // Invalid: cannot have both Topic and Token
 	}
-	serverHitCount = 0 // Reset for this specific sub-test
-	// Note: The mock server (ts) is re-used from the previous sub-test here.
-	// This is generally fine as each SendEach call is independent and serverHitCount is reset.
-	// However, for clarity and robustness, it might be better to scope the server per sub-test if issues arise.
-	// For now, the primary check is that serverHitCount remains 0 for this call.
+	serverHitCount = 0 
 	br, err = client.SendEach(ctx, messagesWithInvalidLast)
 	if err == nil {
 		t.Errorf("SendEach() expected error for invalid last message, got nil")
@@ -383,8 +348,7 @@ func TestMultipartEntity(t *testing.T) {
 				method: "POST",
 				url:    "http://example1.com",
 				body:   map[string]interface{}{"key1": "value"},
-			},
-			{
+			}, {
 				method:  "POST",
 				url:     "http://example2.com",
 				body:    map[string]interface{}{"key2": "value"},
@@ -436,13 +400,11 @@ func TestMultipartEntity(t *testing.T) {
 
 func TestMultipartEntityError(t *testing.T) {
 	entity := &multipartEntity{
-		parts: []*part{
-			{
-				method: "POST",
-				url:    "http://example.com",
-				body:   func() {},
-			},
-		},
+		parts: []*part{{
+			method: "POST",
+			url:    "http://example.com",
+			body:   func() {},
+		}},
 	}
 
 	b, err := entity.Bytes()
@@ -561,9 +523,7 @@ func TestSendEachDryRun(t *testing.T) {
 
 func TestSendEachPartialFailure(t *testing.T) {
 	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
+		{Name: "projects/test-project/messages/1"},
 	}
 
 	var failures []string
@@ -574,7 +534,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 	}
 
 	for idx, tc := range httpErrors {
-		failures = []string{tc.resp} // tc.resp is the error JSON string
+		failures = []string{tc.resp} 
 		serverHitCount := 0
 		var mu sync.Mutex
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -585,16 +545,14 @@ func TestSendEachPartialFailure(t *testing.T) {
 			var msgIn fcmRequest
 			json.Unmarshal(reqBody, &msgIn)
 
-			// Respond successfully for the first message (topic1)
 			if msgIn.Message.Topic == testMessages[0].Topic {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(`{ "name":"` + success[0].Name + `" }`))
-			} else if msgIn.Message.Topic == testMessages[1].Topic { // Respond with error for the second message (topic2)
+			} else if msgIn.Message.Topic == testMessages[1].Topic {
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Header().Set("Content-Type", "application/json") // Errors are also JSON
+				w.Header().Set("Content-Type", "application/json") 
 				w.Write([]byte(failures[0]))
 			} else {
-				// Should not happen with current testMessages
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"error":"unknown topic"}`))
 			}
@@ -602,7 +560,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 		defer ts.Close()
 		client.fcmEndpoint = ts.URL
 
-		br, err := client.SendEach(ctx, testMessages) // testMessages has 2 messages
+		br, err := client.SendEach(ctx, testMessages) 
 		if err != nil {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
@@ -636,12 +594,12 @@ func TestSendEachTotalFailure(t *testing.T) {
 			mu.Unlock()
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(tc.resp)) // tc.resp is the error JSON string
+			w.Write([]byte(tc.resp)) 
 		}))
 		defer ts.Close()
 		client.fcmEndpoint = ts.URL
 
-		br, err := client.SendEach(ctx, testMessages) // testMessages has 2 messages
+		br, err := client.SendEach(ctx, testMessages) 
 		if err != nil {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
@@ -730,10 +688,8 @@ func TestSendEachForMulticastInvalidMessage(t *testing.T) {
 
 	want := "invalid message at index 0: priority must be 'normal' or 'high'"
 	mm := &MulticastMessage{
-		Tokens: []string{"token1"},
-		Android: &AndroidConfig{
-			Priority: "invalid",
-		},
+		Tokens:  []string{"token1"},
+		Android: &AndroidConfig{Priority: "invalid"},
 	}
 	br, err := client.SendEachForMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
@@ -832,9 +788,7 @@ func TestSendEachForMulticastDryRun(t *testing.T) {
 
 func TestSendEachForMulticastPartialFailure(t *testing.T) {
 	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
+		{Name: "projects/test-project/messages/1"},
 	}
 
 	var failures []string
@@ -843,7 +797,6 @@ func TestSendEachForMulticastPartialFailure(t *testing.T) {
 
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
-				// Write success for token1 and error for token2
 				if idx%2 == 0 {
 					w.Header().Set("Content-Type", wantMime)
 					w.Write([]byte("{ \"name\":\"" + success[0].Name + "\" }"))
@@ -994,9 +947,7 @@ func TestSendAllDryRun(t *testing.T) {
 
 func TestSendAllPartialFailure(t *testing.T) {
 	success := []fcmResponse{
-		{
-			Name: "projects/test-project/messages/1",
-		},
+		{Name: "projects/test-project/messages/1"},
 	}
 
 	var req, resp []byte
@@ -1194,10 +1145,8 @@ func TestSendMulticastInvalidMessage(t *testing.T) {
 
 	want := "invalid message at index 0: priority must be 'normal' or 'high'"
 	mm := &MulticastMessage{
-		Tokens: []string{"token1"},
-		Android: &AndroidConfig{
-			Priority: "invalid",
-		},
+		Tokens:  []string{"token1"},
+		Android: &AndroidConfig{Priority: "invalid"},
 	}
 	br, err := client.SendMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
@@ -1308,9 +1257,7 @@ func TestSendMulticastDryRun(t *testing.T) {
 }
 
 func TestSendMulticastPartialFailure(t *testing.T) {
-	success := []fcmResponse{
-		testSuccessResponse[0],
-	}
+	success := []fcmResponse{testSuccessResponse[0]}
 
 	var resp []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1463,7 +1410,7 @@ func checkSuccessfulSendResponse(r *SendResponse, wantID string) error {
 }
 
 func checkMultipartRequest(b []byte, dryRun bool) error {
-	reader := multipart.NewReader(bytes.NewBuffer((b)), multipartBoundary)
+	reader := multipart.NewReader(bytes.NewBuffer(b), multipartBoundary)
 	count := 0
 	for {
 		part, err := reader.NextPart()
