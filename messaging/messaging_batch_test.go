@@ -110,9 +110,6 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 		t.Run(scenarioName, func(t *testing.T) {
 			ctx := context.Background()
 			client, err := NewClient(ctx, testMessagingConfig)
-		t.Run(s.name, func(t *testing.T) {
-			ctx := context.Background()
-			client, err := NewClient(ctx, testMessagingConfig)
 			if err != nil {
 				t.Fatal(err)
 			}

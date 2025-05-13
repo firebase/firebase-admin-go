@@ -27,7 +27,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
-	"sync"
 
 	"firebase.google.com/go/v4/internal"
 )
