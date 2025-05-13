@@ -125,7 +125,7 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				serverHitCount++
-				currentHit := serverHitCount // Capture current hit for stable value in response
+				// currentHit := serverHitCount // No longer using currentHit for failure decision
 				mu.Unlock()
 
 				var reqBody fcmRequest
@@ -133,21 +133,40 @@ func TestSendEachWorkerPoolScenarios(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
+
+				var originalIndex int
+				if !s.allSuccessful { // Only parse index if we might fail based on it
+					// Extract index from topic: "topicN"
+					topicParts := strings.Split(reqBody.Message.Topic, "topic")
+					if len(topicParts) == 2 {
+						fmt.Sscanf(topicParts[1], "%d", &originalIndex)
+						// No error check for Sscanf for simplicity in test, assuming format is correct
+					} else {
+						// Should not happen with current message construction, but handle defensively
+						t.Logf("Unexpected topic format: %s", reqBody.Message.Topic)
+						w.WriteHeader(http.StatusOK) // Default to success if topic format is unexpected
+						json.NewEncoder(w).Encode(map[string]string{
+							"name": fmt.Sprintf("projects/test-project/messages/%s-unexpected", reqBody.Message.Topic),
+						})
+						return
+					}
+				}
 				
-				// For "Messages > Workers with Failures", make every 3rd message fail
-				if !s.allSuccessful && currentHit%3 == 0 {
+				// For "Messages > Workers with Failures", make every 3rd message fail based on original index
+				if !s.allSuccessful && (originalIndex+1)%3 == 0 {
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Header().Set("Content-Type", "application/json")
 					json.NewEncoder(w).Encode(map[string]interface{}{
 						"error": map[string]interface{}{
-							"message": "Simulated server error",
+							"message": fmt.Sprintf("Simulated server error for original index %d", originalIndex),
 							"status":  "INTERNAL",
 						},
 					})
 				} else {
 					w.Header().Set("Content-Type", "application/json")
+					// Use originalIndex in success response too for consistency if needed, though not strictly necessary for this fix
 					json.NewEncoder(w).Encode(map[string]string{
-						"name": fmt.Sprintf("projects/test-project/messages/%s-%d", reqBody.Message.Topic, currentHit),
+						"name": fmt.Sprintf("projects/test-project/messages/%s-idx%d", reqBody.Message.Topic, originalIndex),
 					})
 				}
 			}))
@@ -337,10 +356,14 @@ func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
 
 	// Test with invalid message at the end
 	messagesWithInvalidLast := []*Message{
-		{Topic: "topic1"},
-		{Token: "test-token", Data: map[string]string{"key": string(make([]byte, 4097))}}, // Invalid: data payload too large
+		{Topic: "topic1"},                                   // Valid first message
+		{Topic: "topic_last", Token: "token_last"}, // Invalid: cannot have both Topic and Token
 	}
-	serverHitCount = 0
+	serverHitCount = 0 // Reset for this specific sub-test
+	// Note: The mock server (ts) is re-used from the previous sub-test here.
+	// This is generally fine as each SendEach call is independent and serverHitCount is reset.
+	// However, for clarity and robustness, it might be better to scope the server per sub-test if issues arise.
+	// For now, the primary check is that serverHitCount remains 0 for this call.
 	br, err = client.SendEach(ctx, messagesWithInvalidLast)
 	if err == nil {
 		t.Errorf("SendEach() expected error for invalid last message, got nil")
@@ -553,8 +576,11 @@ func TestSendEachPartialFailure(t *testing.T) {
 	for idx, tc := range httpErrors {
 		failures = []string{tc.resp} // tc.resp is the error JSON string
 		serverHitCount := 0
+		var mu sync.Mutex
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
 			serverHitCount++
+			mu.Unlock()
 			reqBody, _ := ioutil.ReadAll(r.Body)
 			var msgIn fcmRequest
 			json.Unmarshal(reqBody, &msgIn)
@@ -581,9 +607,11 @@ func TestSendEachPartialFailure(t *testing.T) {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
 
+		mu.Lock()
 		if serverHitCount != len(testMessages) {
 			t.Errorf("[%d] Server hit count = %d; want = %d", idx, serverHitCount, len(testMessages))
 		}
+		mu.Unlock()
 
 		if err := checkPartialErrorBatchResponse(br, tc); err != nil {
 			t.Errorf("[%d] SendEach() = %v", idx, err)
@@ -601,8 +629,11 @@ func TestSendEachTotalFailure(t *testing.T) {
 
 	for idx, tc := range httpErrors {
 		serverHitCount := 0
+		var mu sync.Mutex
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
 			serverHitCount++
+			mu.Unlock()
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(tc.resp)) // tc.resp is the error JSON string
@@ -615,9 +646,11 @@ func TestSendEachTotalFailure(t *testing.T) {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
 
+		mu.Lock()
 		if serverHitCount != len(testMessages) {
 			t.Errorf("[%d] Server hit count = %d; want = %d", idx, serverHitCount, len(testMessages))
 		}
+		mu.Unlock()
 
 		if err := checkTotalErrorBatchResponse(br, tc); err != nil {
 			t.Errorf("[%d] SendEach() = %v", idx, err)
