@@ -222,7 +222,7 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 	}
 
 	serverHitCount := 0
-	messageIDLog := make(map[string]int) 
+	messageIDLog := make(map[string]int)
 	var mu sync.Mutex
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +259,7 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, numMessages)
 	}
 	if len(br.Responses) != numMessages {
-		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), numMessages)
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), s.numMessages)
 	}
 
 	if serverHitCount != numMessages {
@@ -328,7 +328,7 @@ func TestSendEachEarlyValidationSkipsSend(t *testing.T) {
 		{Topic: "topic1"},                          // Valid first message
 		{Topic: "topic_last", Token: "token_last"}, // Invalid: cannot have both Topic and Token
 	}
-	serverHitCount = 0 
+	serverHitCount = 0
 	br, err = client.SendEach(ctx, messagesWithInvalidLast)
 	if err == nil {
 		t.Errorf("SendEach() expected error for invalid last message, got nil")
@@ -534,7 +534,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 	}
 
 	for idx, tc := range httpErrors {
-		failures = []string{tc.resp} 
+		failures = []string{tc.resp}
 		serverHitCount := 0
 		var mu sync.Mutex
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -550,7 +550,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 				w.Write([]byte(`{ "name":"` + success[0].Name + `" }`))
 			} else if msgIn.Message.Topic == testMessages[1].Topic {
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Header().Set("Content-Type", "application/json") 
+				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(failures[0]))
 			} else {
 				w.WriteHeader(http.StatusBadRequest)
@@ -560,7 +560,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 		defer ts.Close()
 		client.fcmEndpoint = ts.URL
 
-		br, err := client.SendEach(ctx, testMessages) 
+		br, err := client.SendEach(ctx, testMessages)
 		if err != nil {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
@@ -594,12 +594,12 @@ func TestSendEachTotalFailure(t *testing.T) {
 			mu.Unlock()
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(tc.resp)) 
+			w.Write([]byte(tc.resp))
 		}))
 		defer ts.Close()
 		client.fcmEndpoint = ts.URL
 
-		br, err := client.SendEach(ctx, testMessages) 
+		br, err := client.SendEach(ctx, testMessages)
 		if err != nil {
 			t.Fatalf("[%d] SendEach() unexpected error: %v", idx, err)
 		}
