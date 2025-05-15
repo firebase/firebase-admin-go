@@ -259,7 +259,7 @@ func TestSendEachResponseOrderWithConcurrency(t *testing.T) {
 		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, numMessages)
 	}
 	if len(br.Responses) != numMessages {
-		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), s.numMessages)
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), numMessages)
 	}
 
 	if serverHitCount != numMessages {
