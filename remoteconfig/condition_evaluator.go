@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	errTooManySegments     = errors.New("number of segments in semantic version exceeds maximum allowed length")
+	errTooManySegments     = errors.New("number of segments exceeds maximum allowed length")
 	errNegativeSegment     = errors.New("segment cannot be negative")
 	errInvalidCustomSignal = errors.New("missing operator, key, or target values for custom signal condition")
 )
@@ -341,7 +341,7 @@ func transformVersionToSegments(version string) ([]int, error) {
 	for idx, segmentStr := range segments {
 		segmentInt, err := strconv.Atoi(segmentStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse segment %q: %w", segmentStr, err)
+			return nil, err
 		}
 		if segmentInt < 0 {
 			return nil, errNegativeSegment

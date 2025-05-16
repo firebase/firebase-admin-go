@@ -757,8 +757,7 @@ func Test_TransformVersionToSegments(t *testing.T) {
 		description     string
 		semanticVersion string
 		outcome         struct {
-			errIs    error
-			errAs    bool
+			err      error
 			segments []int
 		}
 	}{
@@ -766,8 +765,7 @@ func Test_TransformVersionToSegments(t *testing.T) {
 			semanticVersion: "1.2.3.4.5",
 			description:     "Valid semantic version with maximum allowed segments",
 			outcome: struct {
-				errIs    error
-				errAs    bool
+				err      error
 				segments []int
 			}{
 				segments: []int{1, 2, 3, 4, 5},
@@ -777,11 +775,10 @@ func Test_TransformVersionToSegments(t *testing.T) {
 			semanticVersion: "1.2.3.4.5.6",
 			description:     "Returns error when version exceeds maximum allowed segments",
 			outcome: struct {
-				errIs    error
-				errAs    bool
+				err      error
 				segments []int
 			}{
-				errIs:    errTooManySegments,
+				err:      errTooManySegments,
 				segments: nil,
 			},
 		},
@@ -789,11 +786,10 @@ func Test_TransformVersionToSegments(t *testing.T) {
 			semanticVersion: "1.2.3.4.-5",
 			description:     "Returns error when a segment is negative",
 			outcome: struct {
-				errIs    error
-				errAs    bool
+				err      error
 				segments []int
 			}{
-				errIs:    errNegativeSegment,
+				err:      errNegativeSegment,
 				segments: nil,
 			},
 		},
@@ -801,8 +797,7 @@ func Test_TransformVersionToSegments(t *testing.T) {
 			semanticVersion: ".1.2.",
 			description:     "Handles leading/trailing separators and pads missing segments with zero",
 			outcome: struct {
-				errIs    error
-				errAs    bool
+				err      error
 				segments []int
 			}{
 				segments: []int{1, 2, 0, 0, 0},
@@ -812,11 +807,10 @@ func Test_TransformVersionToSegments(t *testing.T) {
 			semanticVersion: "abcd.123",
 			description:     "Returns error for non-numeric segment value",
 			outcome: struct {
-				errIs    error
-				errAs    bool
+				err      error
 				segments []int
 			}{
-				errAs:    true,
+				err:      strconv.ErrSyntax,
 				segments: nil,
 			},
 		},
@@ -826,29 +820,12 @@ func Test_TransformVersionToSegments(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Helper()
 			segments, err := transformVersionToSegments(tc.semanticVersion)
-			errExpected := tc.outcome.errIs != nil || tc.outcome.errAs
-			if errExpected {
-				if err == nil { // error expected, no error received
-					t.Fatalf("transformVersionToSegments(%q): wanted an error but got nil", tc.semanticVersion)
-				}
-				if tc.outcome.errIs != nil { // checking for a sentinel error
-					if !errors.Is(err, tc.outcome.errIs) {
-						t.Fatalf("transformVersionToSegments(%q) error = %v, want %v", tc.semanticVersion, err, tc.outcome.errIs)
-					}
-				}
-				if tc.outcome.errAs {
-					var numErr *strconv.NumError
-					if !errors.As(err, &numErr) { // checking for a *strconv.NumError
-						t.Fatalf("transformVersionToSegments(%q) error = %v, want error of type *strconv.NumError", tc.semanticVersion, err)
-					}
-				}
-			} else {
-				if err != nil { // error not expected, but received
-					t.Fatalf("transformVersionToSegments(%q) error = %v, want nil", tc.semanticVersion, err)
-				}
-				if !reflect.DeepEqual(tc.outcome.segments, segments) { // no error expected or received, compare the segments
-					t.Errorf("transformVersionToSegments(%q) segments = %v, want %v", tc.semanticVersion, segments, tc.outcome.segments)
-				}
+			if !errors.Is(err, tc.outcome.err) {
+				t.Fatalf("transformVersionToSegments(%q) error = %v, want %v", tc.semanticVersion, err, tc.outcome.err)
+			}
+
+			if !reflect.DeepEqual(tc.outcome.segments, segments) {
+				t.Errorf("transformVersionToSegments(%q) segments = %v, want %v", tc.semanticVersion, segments, tc.outcome.segments)
 			}
 		})
 	}
