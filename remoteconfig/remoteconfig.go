@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package remoteconfig allows clients to use Firebase Remote Config with Go.
+// Package remoteconfig provides functions to fetch and evaluate a server-side Remote Config template.
 package remoteconfig
 
 import (
@@ -67,6 +67,7 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
 	}
 
+	// Handles errors for non-success HTTP status codes from Remote Config servers.
 	client.CreateErrFn = handleRemoteConfigError
 
 	return &rcClient{
@@ -77,7 +78,7 @@ func newRcClient(client *internal.HTTPClient, conf *internal.RemoteConfigClientC
 	}
 }
 
-// GetServerTemplate Initializes a new ServerTemplate instance and fetches the server template.
+// GetServerTemplate initializes a new ServerTemplate instance and fetches the server template.
 func (c *rcClient) GetServerTemplate(ctx context.Context,
 	defaultConfig map[string]any) (*ServerTemplate, error) {
 	template, err := c.InitServerTemplate(defaultConfig, "")

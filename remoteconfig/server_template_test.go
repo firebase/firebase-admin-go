@@ -19,37 +19,42 @@ import (
 )
 
 const (
-	paramOne           = "test_param_one"
-	valueOne           = "test_value_one"
-	paramTwo           = "test_param_two"
-	valueTwo           = "{\"test\" : \"value\"}"
-	paramThree         = "test_param_three"
-	valueThree         = "123456789.123"
-	paramFour          = "test_param_four"
-	valueFour          = "1"
-	conditionOne       = "test_condition_one"
-	conditionTwo       = "test_condition_two"
+	paramOne   = "test_param_one"
+	paramTwo   = "test_param_two"
+	paramThree = "test_param_three"
+	paramFour  = "test_param_four"
+	paramFive  = "test_param_five"
+
+	valueOne   = "test_value_one"
+	valueTwo   = "{\"test\" : \"value\"}"
+	valueThree = "123456789.123"
+	valueFour  = "1"
+
+	conditionOne = "test_condition_one"
+	conditionTwo = "test_condition_two"
+
 	customSignalKeyOne = "custom_signal_key_one"
-	testEtag           = "test-etag"
-	testVersion        = "test-version"
+
+	testEtag    = "test-etag"
+	testVersion = "test-version"
 )
 
 // Test newServerTemplate with valid default config
 func TestNewServerTemplateStringifiesDefaults(t *testing.T) {
 	defaultConfig := map[string]any{
-		"key1": "value1",
-		"key2": 123,
-		"key3": true,
-		"key4": nil,
-		"key5": "{\"test_param\" : \"test_value\"}",
+		paramOne:   "value1",
+		paramTwo:   123,
+		paramThree: true,
+		paramFour:  nil,
+		paramFive:  "{\"test_param\" : \"test_value\"}",
 	}
 
 	expectedStringified := map[string]string{
-		"key1": "value1",
-		"key2": "123",
-		"key3": "true",
-		"key4": "", // nil becomes empty string
-		"key5": "{\"test_param\" : \"test_value\"}",
+		paramOne:   "value1",
+		paramTwo:   "123",
+		paramThree: "true",
+		paramFour:  "", // nil becomes empty string
+		paramFive:  "{\"test_param\" : \"test_value\"}",
 	}
 
 	rcClient := &rcClient{}
@@ -102,10 +107,7 @@ func TestServerTemplateToJSONSuccess(t *testing.T) {
 				},
 			},
 		},
-		Version: struct {
-			VersionNumber string "json:\"versionNumber\""
-			IsLegacy      bool   "json:\"isLegacy\""
-		}{
+		Version: &version{
 			VersionNumber: testVersion,
 			IsLegacy:      true,
 		},
@@ -134,10 +136,7 @@ func TestServerTemplateReturnsDefaultFromRemote(t *testing.T) {
 				},
 			},
 		},
-		Version: struct {
-			VersionNumber string "json:\"versionNumber\""
-			IsLegacy      bool   "json:\"isLegacy\""
-		}{
+		Version: &version{
 			VersionNumber: testVersion,
 		},
 		ETag: testEtag,
@@ -173,10 +172,7 @@ func TestEvaluateReturnsInAppDefault(t *testing.T) {
 				},
 			},
 		},
-		Version: struct {
-			VersionNumber string "json:\"versionNumber\""
-			IsLegacy      bool   "json:\"isLegacy\""
-		}{
+		Version: &version{
 			VersionNumber: testVersion,
 		},
 		ETag: testEtag,
@@ -268,10 +264,7 @@ func TestEvaluate_WithACondition_ReturnsConditionalRemoteValue(t *testing.T) {
 				},
 			},
 		},
-		Version: struct {
-			VersionNumber string "json:\"versionNumber\""
-			IsLegacy      bool   "json:\"isLegacy\""
-		}{
+		Version: &version{
 			VersionNumber: testVersion,
 		},
 		ETag: testEtag,
@@ -350,10 +343,7 @@ func TestEvaluate_WithACondition_ReturnsConditionalInAppDefaultValue(t *testing.
 				},
 			},
 		},
-		Version: struct {
-			VersionNumber string "json:\"versionNumber\""
-			IsLegacy      bool   "json:\"isLegacy\""
-		}{
+		Version: &version{
 			VersionNumber: testVersion,
 		},
 		ETag: testEtag,
@@ -376,5 +366,101 @@ func TestEvaluate_WithACondition_ReturnsConditionalInAppDefaultValue(t *testing.
 	}
 	if src != Default {
 		t.Fatalf("ServerTemplate.Evaluate returned incorrect source: %v want %v", src, Default)
+	}
+}
+
+func TestGetUsedConditions(t *testing.T) {
+	ncOne := namedCondition{Name: "ncOne"}
+	ncTwo := namedCondition{Name: "ncTwo"}
+	ncThree := namedCondition{Name: "ncThree"}
+
+	paramVal := valueOne
+
+	testCases := []struct {
+		name               string
+		data               *serverTemplateData
+		expectedConditions []namedCondition
+	}{
+		{
+			name:               "No parameters, no conditions",
+			data:               &serverTemplateData{},
+			expectedConditions: []namedCondition{},
+		},
+		{
+			name: "Parameters, but no conditions",
+			data: &serverTemplateData{
+				Parameters: map[string]parameter{
+					paramOne: {DefaultValue: parameterValue{Value: &paramVal}},
+				},
+			},
+			expectedConditions: []namedCondition{},
+		},
+		{
+			name: "Conditions, but no parameters",
+			data: &serverTemplateData{
+				Conditions: []namedCondition{ncOne, ncTwo},
+			},
+			expectedConditions: []namedCondition{},
+		},
+		{
+			name: "Conditions, but parameters use no conditional values",
+			data: &serverTemplateData{
+				Parameters: map[string]parameter{
+					paramOne: {DefaultValue: parameterValue{Value: &paramVal}},
+				},
+				Conditions: []namedCondition{ncOne, ncTwo},
+			},
+			expectedConditions: []namedCondition{},
+		},
+		{
+			name: "One parameter uses one condition",
+			data: &serverTemplateData{
+				Parameters: map[string]parameter{
+					paramOne: {ConditionalValues: map[string]parameterValue{"ncOne": {Value: &paramVal}}},
+				},
+				Conditions: []namedCondition{ncOne, ncTwo},
+			},
+			expectedConditions: []namedCondition{ncOne},
+		},
+		{
+			name: "One parameter uses multiple conditions",
+			data: &serverTemplateData{
+				Parameters: map[string]parameter{
+					paramOne: {ConditionalValues: map[string]parameterValue{
+						"ncOne":   {Value: &paramVal},
+						"ncThree": {Value: &paramVal},
+					}},
+				},
+				Conditions: []namedCondition{ncOne, ncTwo, ncThree},
+			},
+			expectedConditions: []namedCondition{ncOne, ncThree},
+		},
+		{
+			name: "Multiple parameters use overlapping conditions",
+			data: &serverTemplateData{
+				Parameters: map[string]parameter{
+					paramOne: {ConditionalValues: map[string]parameterValue{"ncTwo": {Value: &paramVal}}},
+					paramTwo: {ConditionalValues: map[string]parameterValue{"ncOne": {Value: &paramVal}, "ncTwo": {Value: &paramVal}}},
+				},
+				Conditions: []namedCondition{ncTwo, ncThree, ncOne},
+			},
+			expectedConditions: []namedCondition{ncTwo, ncOne},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			used := tc.data.filterUsedConditions()
+
+			if len(used) != len(tc.expectedConditions) {
+				t.Fatalf("filterUsedConditions() returned %d conditions, want %d", len(used), len(tc.expectedConditions))
+			}
+
+			for idx, ec := range tc.expectedConditions {
+				if used[idx].Name != ec.Name {
+					t.Errorf("Condition at index %d has name %q, want %q", idx, used[idx].Name, ec.Name)
+				}
+			}
+		})
 	}
 }

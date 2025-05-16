@@ -127,3 +127,46 @@ type parameterValue struct {
 	// If true, indicates that the in-app default value is to be used for the parameter
 	UseInAppDefault *bool `json:"useInAppDefault,omitempty"`
 }
+
+// Structure representing a Remote Config template version.
+// Output only, except for the version description. Contains metadata about a particular
+// version of the Remote Config template. All fields are set at the time the specified Remote Config template is published.
+type version struct {
+	// The version number of a Remote Config template.
+	VersionNumber string `json:"versionNumber,omitempty"`
+
+	// The timestamp of when this version of the Remote Config template was written to the
+	// Remote Config backend.
+	UpdateTime string `json:"updateTime,omitempty"`
+
+	// The origin of the template update action.
+	UpdateOrigin string `json:"updateOrigin,omitempty"`
+
+	// The type of the template update action.
+	UpdateType string `json:"updateType,omitempty"`
+
+	// Aggregation of all metadata fields about the account that performed the update.
+	UpdateUser *remoteConfigUser `json:"updateUser,omitempty"`
+
+	// The user-provided description of the corresponding Remote Config template.
+	Description string `json:"description,omitempty"`
+
+	// The version number of the Remote Config template that has become the current version
+	// due to a rollback. Only present if this version is the result of a rollback.
+	RollbackSource string `json:"rollbackSource,omitempty"`
+
+	// Indicates whether this Remote Config template was published before version history was supported.
+	IsLegacy bool `json:"isLegacy,omitempty"`
+}
+
+// Represents a Remote Config user.
+type remoteConfigUser struct {
+	// Email address. Output only.
+	Email string `json:"email,omitempty"`
+
+	// Display name. Output only.
+	Name string `json:"name,omitempty"`
+
+	// Image URL. Output only.
+	ImageURL string `json:"imageUrl,omitempty"`
+}

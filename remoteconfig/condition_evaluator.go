@@ -148,11 +148,13 @@ func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percent
 }
 
 func computeInstanceMicroPercentile(seed string, randomizationID string) uint32 {
-	seedPrefix := ""
+	var sb strings.Builder
 	if len(seed) > 0 {
-		seedPrefix = fmt.Sprintf("%s.", seed)
+		sb.WriteString(seed)
+		sb.WriteRune('.')
 	}
-	stringToHash := fmt.Sprintf("%s%s", seedPrefix, randomizationID)
+	sb.WriteString(randomizationID)
+	stringToHash := sb.String()
 
 	hash := sha256.New()
 	hash.Write([]byte(stringToHash))
