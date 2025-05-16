@@ -19,17 +19,19 @@ import (
 )
 
 const (
-	paramOne     = "test_param_one"
-	valueOne     = "test_value_one"
-	paramTwo     = "test_param_two"
-	valueTwo     = "{\"test\" : \"value\"}"
-	paramThree   = "test_param_three"
-	valueThree   = "123456789.123"
-	paramFour    = "test_param_four"
-	valueFour    = "1"
-	conditionOne = "test_condition_one"
-	testEtag     = "test-etag"
-	testVersion  = "test-version"
+	paramOne           = "test_param_one"
+	valueOne           = "test_value_one"
+	paramTwo           = "test_param_two"
+	valueTwo           = "{\"test\" : \"value\"}"
+	paramThree         = "test_param_three"
+	valueThree         = "123456789.123"
+	paramFour          = "test_param_four"
+	valueFour          = "1"
+	conditionOne       = "test_condition_one"
+	conditionTwo       = "test_condition_two"
+	customSignalKeyOne = "custom_signal_key_one"
+	testEtag           = "test-etag"
+	testVersion        = "test-version"
 )
 
 // Test newServerTemplate with valid default config
@@ -321,12 +323,25 @@ func TestEvaluate_WithACondition_ReturnsConditionalInAppDefaultValue(t *testing.
 					OrCondition: &orCondition{
 						Conditions: []oneOfCondition{
 							{
-								Percent: &percentCondition{
-									PercentOperator: between,
-									Seed:            testSeed,
-									MicroPercentRange: microPercentRange{
-										MicroPercentLowerBound: 0,
-										MicroPercentUpperBound: totalMicroPercentiles,
+								AndCondition: &andCondition{
+									Conditions: []oneOfCondition{
+										{
+											Percent: &percentCondition{
+												PercentOperator: between,
+												Seed:            testSeed,
+												MicroPercentRange: microPercentRange{
+													MicroPercentLowerBound: 0,
+													MicroPercentUpperBound: totalMicroPercentiles,
+												},
+											},
+										},
+										{
+											CustomSignal: &customSignalCondition{
+												CustomSignalKey:          customSignalKeyOne,
+												CustomSignalOperator:     stringExactlyMatches,
+												TargetCustomSignalValues: []string{valueTwo},
+											},
+										},
 									},
 								},
 							},
@@ -345,7 +360,7 @@ func TestEvaluate_WithACondition_ReturnsConditionalInAppDefaultValue(t *testing.
 	}
 	template.cache.Store(data)
 
-	context := map[string]any{randomizationID: testRandomizationID}
+	context := map[string]any{randomizationID: testRandomizationID, customSignalKeyOne: valueTwo}
 	config, err := template.Evaluate(context)
 
 	if err != nil {
