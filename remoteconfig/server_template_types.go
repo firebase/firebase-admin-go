@@ -39,6 +39,9 @@ type oneOfCondition struct {
 	// Makes this condition a percent condition.
 	Percent *percentCondition `json:"percent,omitempty"`
 
+	// Makes this condition a custom signal condition.
+	CustomSignal *customSignalCondition `json:"customSignal,omitempty"`
+
 	// Added for the purpose of testing
 	Boolean *bool `json:"boolean,omitempty"`
 }
@@ -82,6 +85,19 @@ type microPercentRange struct {
 	// The upper limit of percentiles to target in micro-percents.
 	// The value must be in the range [0 and 100_000_000].
 	MicroPercentUpperBound uint32 `json:"microPercentUpperBound"`
+}
+
+// Represents a condition that compares provided signals against a target value.
+type customSignalCondition struct {
+	// The choice of custom signal operator to determine how to compare targets
+	// to value(s).
+	CustomSignalOperator string `json:"customSignalOperator,omitempty"`
+
+	// The key of the signal set in the EvaluationContext
+	CustomSignalKey string `json:"customSignalKey,omitempty"`
+
+	// A list of at most 100 target custom signal values. For numeric and semantic version operators, this will have exactly ONE target value.
+	TargetCustomSignalValues []string `json:"targetCustomSignalValues,omitempty"`
 }
 
 // Structure representing a Remote Config parameter.
