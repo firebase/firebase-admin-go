@@ -28,9 +28,11 @@ func main() {
 		log.Fatalf("[Main] Error in creating RC client : %v ", rcErr)
 	}
 
+	fmt.Println("rc client ", rc)
+
 	// ************* ONE ****************
 	// Operations on an empty template, using GetServerTemplate
-	emptyTemplateOperations(ctx, rc)
+	// emptyTemplateOperations(ctx, rc)
 
 	// ************* TWO ****************
 	// Template evaluation with different conditions
