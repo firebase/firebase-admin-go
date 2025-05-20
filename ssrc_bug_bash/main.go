@@ -61,7 +61,7 @@ func emptyTemplateOperations(ctx context.Context, rc *remoteconfig.Client) {
 		log.Fatalf("[emptyTemplateOperations] Error in evaluating template : %v ", cErr)
 	}
 	// config should be empty
-	fmt.Println(config)
+	fmt.Println("[emptyTemplateOperations] config is ", config)
 }
 
 func templateEvaluation(ctx context.Context, rc *remoteconfig.Client) {
