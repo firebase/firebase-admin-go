@@ -40,7 +40,7 @@ func main() {
 
 	// ************* THREE ****************
 	// Get and InitServerTemplate on a non-empty template
-	// fetchRemoteAndLocalTemplate(rc, ctx)
+	// fetchRemoteAndLocalTemplate(ctx, rc)
 
 }
 
@@ -73,6 +73,9 @@ func templateEvaluation(ctx context.Context, rc *remoteconfig.Client) {
 	// pass values based on your template
 	defaultConfig := make(map[string]any)
 
+	// to pass default parameter values
+	// defaultConfig["paramName"] = "paramValue"
+
 	template, tErr := rc.GetServerTemplate(ctx, defaultConfig)
 	if tErr != nil {
 		log.Fatalf("[templateEvaluation] Error in fetching template : %v ", tErr)
@@ -81,18 +84,25 @@ func templateEvaluation(ctx context.Context, rc *remoteconfig.Client) {
 	// pass values based on your template
 	context := make(map[string]any)
 
+	// to pass a randomizationID
+	// context["randomizationID"] = "12345"
+
 	config, cErr := template.Evaluate(context)
 	if cErr != nil {
 		log.Fatalf("[templateEvaluation] Error in evaluating template : %v ", cErr)
 	}
 
-	// Repeat this block for all your parameters
-	parameterName := "param_one"
-	fmt.Println("Value source : ", config.GetValueSource(parameterName) == remoteconfig.Remote)
-	fmt.Println("as Boolean ", config.GetBoolean(parameterName))
-	fmt.Println("as Float ", config.GetFloat(parameterName))
-	fmt.Println("as Int ", config.GetInt(parameterName))
-	fmt.Println("as String ", config.GetString(parameterName))
+	// to check for Static  / Default value sources
+	// fmt.Println("Value source is Static : ", config.GetValueSource(paramOne) == remoteconfig.Static)
+	// fmt.Println("Value source is Default : ", config.GetValueSource(paramOne) == remoteconfig.Default)
+
+	// Repeat this block for all your parameters, (use := to create new variables)
+	paramOne := "param_one"
+	fmt.Println("Value source is Remote : ", config.GetValueSource(paramOne) == remoteconfig.Remote)
+	fmt.Println("as Boolean ", config.GetBoolean(paramOne))
+	fmt.Println("as Float ", config.GetFloat(paramOne))
+	fmt.Println("as Int ", config.GetInt(paramOne))
+	fmt.Println("as String ", config.GetString(paramOne))
 }
 
 func fetchRemoteAndLocalTemplate(ctx context.Context, rc *remoteconfig.Client) {
