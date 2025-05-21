@@ -132,7 +132,7 @@ func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percent
 		}
 		instanceMicroPercentile := computeInstanceMicroPercentile(percentCondition.Seed, rid)
 		
-		fmt.Printf("\n[DEBUG - ONLY FOR BUG BASH] instanceMicroPercentile for randomizationID '%s' is %v\n ", rid, float64(instanceMicroPercentile * 100.0) / float64(totalMicroPercentiles))
+		fmt.Printf("is micropercentile %v greater than %v and lesser than %v : %v \n", instanceMicroPercentile, percentCondition.MicroPercentRange.MicroPercentLowerBound, percentCondition.MicroPercentRange.MicroPercentUpperBound, instanceMicroPercentile > percentCondition.MicroPercentRange.MicroPercentLowerBound && instanceMicroPercentile <= percentCondition.MicroPercentRange.MicroPercentUpperBound)
 
 		switch percentCondition.PercentOperator {
 		case lessThanOrEqual:
