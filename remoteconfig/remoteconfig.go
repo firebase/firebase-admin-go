@@ -98,10 +98,10 @@ func (c *rcClient) InitServerTemplate(defaultConfig map[string]any,
 	template, err := newServerTemplate(c, defaultConfig)
 
 	if templateDataJSON != "" && err == nil {
-		template.Set(templateDataJSON)
+		err = template.Set(templateDataJSON)
 	}
 
-	return template, nil
+	return template, err
 }
 
 func handleRemoteConfigError(resp *internal.Response) error {
