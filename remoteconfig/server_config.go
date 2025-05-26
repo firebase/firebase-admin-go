@@ -37,11 +37,11 @@ type value struct {
 	value  string
 }
 
-// Default Values for config parameters.
+// Default values for different parameter types.
 const (
-	defaultValueForBoolean = false
-	defaultValueForString  = ""
-	defaultValueForNumber  = 0
+	DefaultValueForBoolean = false
+	DefaultValueForString  = ""
+	DefaultValueForNumber  = 0
 )
 
 var booleanTruthyValues = []string{"1", "true", "t", "yes", "y", "on"}
@@ -97,13 +97,13 @@ func (s *ServerConfig) getValue(key string) *value {
 	if val, ok := s.configValues[key]; ok {
 		return &val
 	}
-	return newValue(Static, defaultValueForString)
+	return newValue(Static, DefaultValueForString)
 }
 
 // newValue creates a new value instance.
 func newValue(source ValueSource, customValue string) *value {
 	if customValue == "" {
-		customValue = defaultValueForString
+		customValue = DefaultValueForString
 	}
 	return &value{source: source, value: customValue}
 }
@@ -116,7 +116,7 @@ func (v *value) asString() string {
 // asBoolean returns the value as a boolean.
 func (v *value) asBoolean() bool {
 	if v.source == Static {
-		return defaultValueForBoolean
+		return DefaultValueForBoolean
 	}
 
 	return slices.Contains(booleanTruthyValues, strings.ToLower(v.value))
@@ -125,12 +125,12 @@ func (v *value) asBoolean() bool {
 // asInt returns the value as an integer.
 func (v *value) asInt() int {
 	if v.source == Static {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 	num, err := strconv.Atoi(v.value)
 
 	if err != nil {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 
 	return num
@@ -139,12 +139,12 @@ func (v *value) asInt() int {
 // asFloat returns the value as a float.
 func (v *value) asFloat() float64 {
 	if v.source == Static {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 	num, err := strconv.ParseFloat(v.value, doublePrecision)
 
 	if err != nil {
-		return defaultValueForNumber
+		return DefaultValueForNumber
 	}
 
 	return num
