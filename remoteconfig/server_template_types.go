@@ -16,7 +16,7 @@ package remoteconfig
 
 // Represents a Remote Config condition in the dataplane.
 // A condition targets a specific group of users. A list of these conditions
-// comprise part of a Remote Config template.
+// comprises part of a Remote Config template.
 type namedCondition struct {
 	// A non-empty and unique name of this condition.
 	Name string `json:"name,omitempty"`
@@ -42,7 +42,7 @@ type oneOfCondition struct {
 	// Makes this condition a custom signal condition.
 	CustomSignal *customSignalCondition `json:"customSignal,omitempty"`
 
-	// Added for the purpose of testing
+	// Added for the purpose of testing.
 	Boolean *bool `json:"boolean,omitempty"`
 }
 
@@ -76,7 +76,7 @@ type percentCondition struct {
 }
 
 // Represents the limit of percentiles to target in micro-percents.
-// The value must be in the range [0 and 100_000_000]
+// The value must be in the range [0 and 100_000_000].
 type microPercentRange struct {
 	// The lower limit of percentiles to target in micro-percents.
 	// The value must be in the range [0 and 100_000_000].
@@ -93,7 +93,7 @@ type customSignalCondition struct {
 	// to value(s).
 	CustomSignalOperator string `json:"customSignalOperator,omitempty"`
 
-	// The key of the signal set in the EvaluationContext
+	// The key of the signal set in the EvaluationContext.
 	CustomSignalKey string `json:"customSignalKey,omitempty"`
 
 	// A list of at most 100 target custom signal values. For numeric and semantic version operators, this will have exactly ONE target value.
@@ -121,10 +121,10 @@ type parameter struct {
 // Represents a Remote Config parameter value
 // that could be either an explicit parameter value or an in-app default value.
 type parameterValue struct {
-	// The `string` value that the parameter is set to when it is an explicit parameter value
+	// The `string` value that the parameter is set to when it is an explicit parameter value.
 	Value *string `json:"value,omitempty"`
 
-	// If true, indicates that the in-app default value is to be used for the parameter
+	// If true, indicates that the in-app default value is to be used for the parameter.
 	UseInAppDefault *bool `json:"useInAppDefault,omitempty"`
 }
 

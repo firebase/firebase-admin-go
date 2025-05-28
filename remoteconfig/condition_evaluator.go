@@ -194,7 +194,7 @@ func (ce *conditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 			return result
 		})
 
-	// For numeric operators only one target value is allowed
+	// For numeric operators only one target value is allowed.
 	case numericLessThan:
 		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result < 0 })
 	case numericLessThanEqual:

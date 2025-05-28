@@ -63,7 +63,7 @@ func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*Serve
 			continue
 		}
 
-		// Marshal the value to JSON bytes
+		// Marshal the value to JSON bytes.
 		jsonBytes, err := json.Marshal(value)
 		if err != nil {
 			return nil, fmt.Errorf("unable to stringify default value for parameter '%s': %w", key, err)
@@ -107,7 +107,7 @@ func (s *ServerTemplate) Set(templateDataJSON string) error {
 	return nil
 }
 
-// ToJSON Returns a json representing the cached serverTemplateData.
+// ToJSON returns a json representing the cached serverTemplateData.
 func (s *ServerTemplate) ToJSON() (string, error) {
 	jsonServerTemplate, err := json.Marshal(s.cache.Load())
 
@@ -173,7 +173,7 @@ func (s *serverTemplateData) filterUsedConditions() []namedCondition {
 		}
 	}
 
-	// Filter the original conditions list, preserving order
+	// Filter the original conditions list, preserving order.
 	conditionsToEvaluate := make([]namedCondition, 0, len(usedConditionNames))
 	for _, condition := range s.Conditions {
 		if _, ok := usedConditionNames[condition.Name]; ok {

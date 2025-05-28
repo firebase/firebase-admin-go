@@ -20,10 +20,10 @@ import (
 	"strings"
 )
 
-// ValueSource represents the source of a value
+// ValueSource represents the source of a value.
 type ValueSource int
 
-// Constants for value source
+// Constants for value source.
 const (
 	sourceUnspecified ValueSource = iota
 	Static                        // Static represents a statically defined value.

@@ -34,7 +34,7 @@ type Client struct {
 	*rcClient
 }
 
-// NewClient initializes a RemoteConfigClient with app-specific detail and a returns a
+// NewClient initializes a RemoteConfigClient with app-specific detail and returns a
 // client to be used by the user.
 func NewClient(ctx context.Context, c *internal.RemoteConfigClientConfig) (*Client, error) {
 	if c.ProjectID == "" {
