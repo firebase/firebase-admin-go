@@ -296,41 +296,41 @@ func TestPercentConditionMicroPercent(t *testing.T) {
 	}{
 		{
 			description:  "Evaluate LESS_OR_EQUAL to true when MicroPercent is max",
-			operator:     "LESS_OR_EQUAL",
+			operator:     lessThanOrEqual,
 			microPercent: 100_000_000,
 			outcome:      true,
 		},
 		{
 			description:  "Evaluate LESS_OR_EQUAL to false when MicroPercent is min",
-			operator:     "LESS_OR_EQUAL",
+			operator:     lessThanOrEqual,
 			microPercent: 0,
 			outcome:      false,
 		},
 		{
 			description: "Evaluate LESS_OR_EQUAL to false when MicroPercent is not set (MicroPercent should use zero)",
-			operator:    "LESS_OR_EQUAL",
+			operator:    lessThanOrEqual,
 			outcome:     false,
 		},
 		{
 			description: "Evaluate GREATER_THAN to true when MicroPercent is not set (MicroPercent should use zero)",
-			operator:    "GREATER_THAN",
+			operator:    greaterThan,
 			outcome:     true,
 		},
 		{
 			description:  "Evaluate GREATER_THAN max to false",
-			operator:     "GREATER_THAN",
+			operator:     greaterThan,
 			outcome:      false,
 			microPercent: 100_000_000,
 		},
 		{
 			description:  "Evaluate LESS_OR_EQUAL to 9571542 to true",
-			operator:     "LESS_OR_EQUAL",
+			operator:     lessThanOrEqual,
 			microPercent: 9_571_542, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			outcome:      true,
 		},
 		{
 			description:  "Evaluate greater than 9571542 to true",
-			operator:     "GREATER_THAN",
+			operator:     greaterThan,
 			microPercent: 9_571_541, // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			outcome:      true,
 		},
@@ -361,40 +361,40 @@ func TestPercentConditionMicroPercentRange(t *testing.T) {
 	}{
 		{
 			description: "Evaluate to false when microPercentRange is not set",
-			operator:    "BETWEEN",
+			operator:    between,
 			outcome:     false,
 		},
 		{
 			description:    "Evaluate to false when upper bound is not set",
 			microPercentLb: 0,
-			operator:       "BETWEEN",
+			operator:       between,
 			outcome:        false,
 		},
 		{
 			description:    "Evaluate to true when lower bound is not set and upper bound is max",
 			microPercentUb: 100_000_000,
-			operator:       "BETWEEN",
+			operator:       between,
 			outcome:        true,
 		},
 		{
 			description:    "Evaluate to true when between lower and upper bound", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			microPercentLb: 9_000_000,
 			microPercentUb: 9_571_542, // interval is (9_000_000, 9_571_542]
-			operator:       "BETWEEN",
+			operator:       between,
 			outcome:        true,
 		},
 		{
 			description:    "Evaluate to false when lower and upper bounds are equal",
 			microPercentLb: 98_000_000,
 			microPercentUb: 98_000_000,
-			operator:       "BETWEEN",
+			operator:       between,
 			outcome:        false,
 		},
 		{
 			description:    "Evaluate to false when not between 9_400_000 and 9_500_000", // instanceMicroPercentile of abcdef.123 (testSeed.testRandomizationID) is 9_571_542
 			microPercentLb: 9_400_000,
 			microPercentUb: 9_500_000,
-			operator:       "BETWEEN",
+			operator:       between,
 			outcome:        false,
 		},
 	}

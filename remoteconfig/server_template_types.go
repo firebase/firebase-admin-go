@@ -16,7 +16,7 @@ package remoteconfig
 
 // Represents a Remote Config condition in the dataplane.
 // A condition targets a specific group of users. A list of these conditions
-// comprise part of a Remote Config template.
+// comprises part of a Remote Config template.
 type namedCondition struct {
 	// A non-empty and unique name of this condition.
 	Name string `json:"name,omitempty"`
@@ -42,7 +42,7 @@ type oneOfCondition struct {
 	// Makes this condition a custom signal condition.
 	CustomSignal *customSignalCondition `json:"customSignal,omitempty"`
 
-	// Added for the purpose of testing
+	// Added for the purpose of testing.
 	Boolean *bool `json:"boolean,omitempty"`
 }
 
@@ -76,7 +76,7 @@ type percentCondition struct {
 }
 
 // Represents the limit of percentiles to target in micro-percents.
-// The value must be in the range [0 and 100_000_000]
+// The value must be in the range [0 and 100_000_000].
 type microPercentRange struct {
 	// The lower limit of percentiles to target in micro-percents.
 	// The value must be in the range [0 and 100_000_000].
@@ -93,7 +93,7 @@ type customSignalCondition struct {
 	// to value(s).
 	CustomSignalOperator string `json:"customSignalOperator,omitempty"`
 
-	// The key of the signal set in the EvaluationContext
+	// The key of the signal set in the EvaluationContext.
 	CustomSignalKey string `json:"customSignalKey,omitempty"`
 
 	// A list of at most 100 target custom signal values. For numeric and semantic version operators, this will have exactly ONE target value.
@@ -121,9 +121,52 @@ type parameter struct {
 // Represents a Remote Config parameter value
 // that could be either an explicit parameter value or an in-app default value.
 type parameterValue struct {
-	// The `string` value that the parameter is set to when it is an explicit parameter value
+	// The `string` value that the parameter is set to when it is an explicit parameter value.
 	Value *string `json:"value,omitempty"`
 
-	// If true, indicates that the in-app default value is to be used for the parameter
+	// If true, indicates that the in-app default value is to be used for the parameter.
 	UseInAppDefault *bool `json:"useInAppDefault,omitempty"`
+}
+
+// Structure representing a Remote Config template version.
+// Output only, except for the version description. Contains metadata about a particular
+// version of the Remote Config template. All fields are set at the time the specified Remote Config template is published.
+type version struct {
+	// The version number of a Remote Config template.
+	VersionNumber string `json:"versionNumber,omitempty"`
+
+	// The timestamp of when this version of the Remote Config template was written to the
+	// Remote Config backend.
+	UpdateTime string `json:"updateTime,omitempty"`
+
+	// The origin of the template update action.
+	UpdateOrigin string `json:"updateOrigin,omitempty"`
+
+	// The type of the template update action.
+	UpdateType string `json:"updateType,omitempty"`
+
+	// Aggregation of all metadata fields about the account that performed the update.
+	UpdateUser *remoteConfigUser `json:"updateUser,omitempty"`
+
+	// The user-provided description of the corresponding Remote Config template.
+	Description string `json:"description,omitempty"`
+
+	// The version number of the Remote Config template that has become the current version
+	// due to a rollback. Only present if this version is the result of a rollback.
+	RollbackSource string `json:"rollbackSource,omitempty"`
+
+	// Indicates whether this Remote Config template was published before version history was supported.
+	IsLegacy bool `json:"isLegacy,omitempty"`
+}
+
+// Represents a Remote Config user.
+type remoteConfigUser struct {
+	// Email address. Output only.
+	Email string `json:"email,omitempty"`
+
+	// Display name. Output only.
+	Name string `json:"name,omitempty"`
+
+	// Image URL. Output only.
+	ImageURL string `json:"imageUrl,omitempty"`
 }

@@ -28,15 +28,16 @@ import (
 
 // serverTemplateData stores the internal representation of the server template.
 type serverTemplateData struct {
+	// A list of conditions in descending order by priority.
 	Parameters map[string]parameter `json:"parameters,omitempty"`
 
+	// Map of parameter keys to their optional default values and optional conditional values.
 	Conditions []namedCondition `json:"conditions,omitempty"`
 
-	Version struct {
-		VersionNumber string `json:"versionNumber"`
-		IsLegacy      bool   `json:"isLegacy"`
-	} `json:"version"`
+	// Version information for the current Remote Config template.
+	Version *version `json:"version,omitempty"`
 
+	// Current Remote Config template ETag.
 	ETag string `json:"etag"`
 }
 
@@ -62,10 +63,10 @@ func newServerTemplate(rcClient *rcClient, defaultConfig map[string]any) (*Serve
 			continue
 		}
 
-		// Marshal the value to JSON bytes
+		// Marshal the value to JSON bytes.
 		jsonBytes, err := json.Marshal(value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal config key '%s': %w", key, err)
+			return nil, fmt.Errorf("unable to stringify default value for parameter '%s': %w", key, err)
 		}
 
 		stringifiedConfig[key] = string(jsonBytes)
@@ -106,7 +107,7 @@ func (s *ServerTemplate) Set(templateDataJSON string) error {
 	return nil
 }
 
-// ToJSON Returns a json representing the cached serverTemplateData.
+// ToJSON returns a json representing the cached serverTemplateData.
 func (s *ServerTemplate) ToJSON() (string, error) {
 	jsonServerTemplate, err := json.Marshal(s.cache.Load())
 
@@ -124,26 +125,28 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 	}
 
 	config := make(map[string]value)
+	// Initialize config with in-app default values.
 	for key, inAppDefault := range s.stringifiedDefaultConfig {
 		config[key] = value{source: Default, value: inAppDefault}
 	}
 
+	usedConditions := s.cache.Load().filterUsedConditions()
 	ce := conditionEvaluator{
-		conditions:        s.cache.Load().Conditions,
+		conditions:        usedConditions,
 		evaluationContext: context,
 	}
 	evaluatedConditions := ce.evaluateConditions()
 
-	// Overlays config Value objects derived by evaluating the template.
+	// Overlays config value objects derived by evaluating the template.
 	for key, parameter := range s.cache.Load().Parameters {
 		var paramValueWrapper parameterValue
-		var matchedConditionName string // Track the name of the condition that matched
+		var matchedConditionName string
 
-		for _, condition := range s.cache.Load().Conditions {
-			// Iterates in order over the condition list; conditions are ordered in decreasing priority.
+		// Iterate through used conditions in decreasing priority order.
+		for _, condition := range usedConditions {
 			if value, ok := parameter.ConditionalValues[condition.Name]; ok && evaluatedConditions[condition.Name] {
 				paramValueWrapper = value
-				matchedConditionName = condition.Name // Store the name when a match occurs
+				matchedConditionName = condition.Name
 				break
 			}
 		}
@@ -158,5 +161,24 @@ func (s *ServerTemplate) Evaluate(context map[string]any) (*ServerConfig, error)
 			config[key] = value{source: Remote, value: *parameter.DefaultValue.Value}
 		}
 	}
-	return NewServerConfig(config), nil
+	return newServerConfig(config), nil
+}
+
+// filterUsedConditions identifies conditions that are referenced by parameters and returns them in order of decreasing priority.
+func (s *serverTemplateData) filterUsedConditions() []namedCondition {
+	usedConditionNames := make(map[string]struct{})
+	for _, parameter := range s.Parameters {
+		for name := range parameter.ConditionalValues {
+			usedConditionNames[name] = struct{}{}
+		}
+	}
+
+	// Filter the original conditions list, preserving order.
+	conditionsToEvaluate := make([]namedCondition, 0, len(usedConditionNames))
+	for _, condition := range s.Conditions {
+		if _, ok := usedConditionNames[condition.Name]; ok {
+			conditionsToEvaluate = append(conditionsToEvaluate, condition)
+		}
+	}
+	return conditionsToEvaluate
 }
