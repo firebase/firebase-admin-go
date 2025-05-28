@@ -148,11 +148,13 @@ func (ce *conditionEvaluator) evaluatePercentCondition(percentCondition *percent
 }
 
 func computeInstanceMicroPercentile(seed string, randomizationID string) uint32 {
-	seedPrefix := ""
+	var sb strings.Builder
 	if len(seed) > 0 {
-		seedPrefix = fmt.Sprintf("%s.", seed)
+		sb.WriteString(seed)
+		sb.WriteRune('.')
 	}
-	stringToHash := fmt.Sprintf("%s%s", seedPrefix, randomizationID)
+	sb.WriteString(randomizationID)
+	stringToHash := sb.String()
 
 	hash := sha256.New()
 	hash.Write([]byte(stringToHash))
@@ -192,7 +194,7 @@ func (ce *conditionEvaluator) evaluateCustomSignalCondition(customSignalConditio
 			return result
 		})
 
-	// For numeric operators only one target value is allowed
+	// For numeric operators only one target value is allowed.
 	case numericLessThan:
 		return compareNumbers(customSignalCondition.TargetCustomSignalValues[0], actualValue, func(result int) bool { return result < 0 })
 	case numericLessThanEqual:
