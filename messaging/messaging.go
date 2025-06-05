@@ -191,6 +191,7 @@ type AndroidNotification struct {
 	DefaultLightSettings  bool                          `json:"default_light_settings,omitempty"`
 	Visibility            AndroidNotificationVisibility `json:"-"`
 	NotificationCount     *int                          `json:"notification_count,omitempty"`
+	Proxy                 AndroidNotificationProxy      `json:"-"`
 }
 
 // MarshalJSON marshals an AndroidNotification into JSON (for internal use only).
@@ -217,6 +218,16 @@ func (a *AndroidNotification) MarshalJSON() ([]byte, error) {
 		visibility, _ = visibilities[a.Visibility]
 	}
 
+	var proxy string
+	if a.Proxy != proxyUnspecified {
+		proxies := map[AndroidNotificationProxy]string{
+			ProxyAllow:             "ALLOW",
+			ProxyDeny:              "DENY",
+			ProxyIfPriorityLowered: "IF_PRIORITY_LOWERED",
+		}
+		proxy, _ = proxies[a.Proxy]
+	}
+
 	var timestamp string
 	if a.EventTimestamp != nil {
 		timestamp = a.EventTimestamp.UTC().Format(rfc3339Zulu)
@@ -232,12 +243,14 @@ func (a *AndroidNotification) MarshalJSON() ([]byte, error) {
 		EventTimestamp string   `json:"event_time,omitempty"`
 		Priority       string   `json:"notification_priority,omitempty"`
 		Visibility     string   `json:"visibility,omitempty"`
+		Proxy          string   `json:"proxy,omitempty"`
 		VibrateTimings []string `json:"vibrate_timings,omitempty"`
 		*androidInternal
 	}{
 		EventTimestamp:  timestamp,
 		Priority:        priority,
 		Visibility:      visibility,
+		Proxy:           proxy,
 		VibrateTimings:  vibTimings,
 		androidInternal: (*androidInternal)(a),
 	}
@@ -251,6 +264,7 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 		EventTimestamp string   `json:"event_time,omitempty"`
 		Priority       string   `json:"notification_priority,omitempty"`
 		Visibility     string   `json:"visibility,omitempty"`
+		Proxy          string   `json:"proxy,omitempty"`
 		VibrateTimings []string `json:"vibrate_timings,omitempty"`
 		*androidInternal
 	}{
@@ -285,6 +299,19 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 			a.Visibility = vis
 		} else {
 			return fmt.Errorf("unknown visibility value: %q", temp.Visibility)
+		}
+	}
+
+	if temp.Proxy != "" {
+		proxies := map[string]AndroidNotificationProxy{
+			"ALLOW":               ProxyAllow,
+			"DENY":                ProxyDeny,
+			"IF_PRIORITY_LOWERED": ProxyIfPriorityLowered,
+		}
+		if prox, ok := proxies[temp.Proxy]; ok {
+			a.Proxy = prox
+		} else {
+			return fmt.Errorf("unknown proxy value: %q", temp.Proxy)
 		}
 	}
 
@@ -354,6 +381,23 @@ const (
 
 	// VisibilitySecret does not reveal any part of this notification on a secure lockscreen.
 	VisibilitySecret
+)
+
+// AndroidNotificationProxy to control when a notification may be proxied.
+type AndroidNotificationProxy int
+
+const (
+	proxyUnspecified AndroidNotificationProxy = iota
+
+	// ProxyAllow tries to proxy this notification.
+	ProxyAllow
+
+	// ProxyDeny does not proxy this notification.
+	ProxyDeny
+
+	// ProxyIfPriorityLowered only tries to proxy this notification if its AndroidConfig's Priority was
+	// lowered from high to normal on the device.
+	ProxyIfPriorityLowered
 )
 
 // LightSettings to control notification LED.
@@ -620,9 +664,10 @@ type WebpushFCMOptions struct {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
 // for more details on supported headers and payload keys.
 type APNSConfig struct {
-	Headers    map[string]string `json:"headers,omitempty"`
-	Payload    *APNSPayload      `json:"payload,omitempty"`
-	FCMOptions *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	Payload           *APNSPayload      `json:"payload,omitempty"`
+	FCMOptions        *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	LiveActivityToken string            `json:"live_activity_token,omitempty"`
 }
 
 // APNSPayload is the payload that can be included in an APNS message.

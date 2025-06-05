@@ -108,7 +108,7 @@ func TestNewClient(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Setenv(emulatorDatabaseEnvVar, tc.EnvURL)
 			fromEnv := os.Getenv(emulatorDatabaseEnvVar)
-			fmt.Printf(fromEnv)
+			fmt.Printf("%s", fromEnv)
 			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
 				Opts:         testOpts,
 				URL:          tc.URL,
