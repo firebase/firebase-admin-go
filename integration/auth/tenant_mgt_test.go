@@ -138,37 +138,45 @@ func TestTenantManager(t *testing.T) {
 	})
 
 	t.Run("UpdateTenant()", func(t *testing.T) {
-		mfaObject := &auth.MultiFactorConfig{
-			ProviderConfigs: []*auth.ProviderConfig{
-				{
-					State: auth.Enabled,
-					TOTPProviderConfig: &auth.TOTPProviderConfig{
-						AdjacentIntervals: 5,
+		mfaObjects := []*auth.MultiFactorConfig{
+			&auth.MultiFactorConfig{
+				State: auth.Enabled,
+			},
+			&auth.MultiFactorConfig{
+				ProviderConfigs: []*auth.ProviderConfig{
+					{
+						State: auth.Enabled,
+						TOTPProviderConfig: &auth.TOTPProviderConfig{
+							AdjacentIntervals: 5,
+						},
 					},
 				},
 			},
 		}
-		want = &auth.Tenant{
-			ID:                    id,
-			DisplayName:           "updated-go-tenant",
-			AllowPasswordSignUp:   false,
-			EnableEmailLinkSignIn: false,
-			EnableAnonymousUsers:  false,
-			MultiFactorConfig:     mfaObject,
-		}
-		req := (&auth.TenantToUpdate{}).
-			DisplayName("updated-go-tenant").
-			AllowPasswordSignUp(false).
-			EnableEmailLinkSignIn(false).
-			EnableAnonymousUsers(false).
-			MultiFactorConfig(*mfaObject)
-		tenant, err := client.TenantManager.UpdateTenant(context.Background(), id, req)
-		if err != nil {
-			t.Fatalf("UpdateTenant() = %v", err)
-		}
 
-		if !reflect.DeepEqual(tenant, want) {
-			t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, want)
+		for _, mfaObject := range mfaObjects {
+			want = &auth.Tenant{
+				ID:                    id,
+				DisplayName:           "updated-go-tenant",
+				AllowPasswordSignUp:   false,
+				EnableEmailLinkSignIn: false,
+				EnableAnonymousUsers:  false,
+				MultiFactorConfig:     mfaObject,
+			}
+			req := (&auth.TenantToUpdate{}).
+				DisplayName("updated-go-tenant").
+				AllowPasswordSignUp(false).
+				EnableEmailLinkSignIn(false).
+				EnableAnonymousUsers(false).
+				MultiFactorConfig(*mfaObject)
+			tenant, err := client.TenantManager.UpdateTenant(context.Background(), id, req)
+			if err != nil {
+				t.Fatalf("UpdateTenant() = %v", err)
+			}
+
+			if !reflect.DeepEqual(tenant, want) {
+				t.Errorf("UpdateTenant() = %#v; want = %#v", tenant, want)
+			}
 		}
 	})
 
