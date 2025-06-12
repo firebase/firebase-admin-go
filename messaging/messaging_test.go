@@ -224,7 +224,7 @@ var validMessages = []struct {
 					"title_loc_args":          []interface{}{"t1", "t2"},
 					"body_loc_key":            "blk",
 					"body_loc_args":           []interface{}{"b1", "b2"},
-					"channel_id":              "channel",
+					"channelId":               "channel",
 					"image":                   "http://image.jpg",
 					"ticker":                  "tkr",
 					"sticky":                  true,
