@@ -31,6 +31,7 @@ import (
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
 	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/remoteconfig"
 	"firebase.google.com/go/v4/storage"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -136,6 +137,16 @@ func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
 		ProjectID: a.projectID,
 	}
 	return appcheck.NewClient(ctx, conf)
+}
+
+// RemoteConfig returns an instance of remoteconfig.Client.
+func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
+	conf := &internal.RemoteConfigClientConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+		Version:   Version,
+	}
+	return remoteconfig.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
