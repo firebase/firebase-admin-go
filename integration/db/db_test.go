@@ -28,10 +28,11 @@ import (
 	"reflect"
 	"testing"
 
-	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/db"
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/integration/internal"
+	// firebase "firebase.google.com/go/v4" // No longer needed for firebase.Config if using app.Config
 )
 
 var client *db.Client
@@ -86,54 +87,54 @@ func TestMain(m *testing.M) {
 
 func initClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
-	url, err := getDatabaseURL()
+	dbURL, err := getDatabaseURL() // Keep using this to get the URL
 	if err != nil {
 		return nil, err
 	}
-	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL: url,
+	// internal.NewTestApp now takes *app.Config and returns *app.App
+	appInstance, err := internal.NewTestApp(ctx, &app.Config{
+		DatabaseURL: dbURL, // Set DatabaseURL in app.Config
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	return app.Database(ctx)
+	// db.NewClient now takes *app.App and optionally a URL.
+	// If URL is in app.Config, it can be omitted here.
+	return db.NewClient(ctx, appInstance)
 }
 
 func initOverrideClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	ao := map[string]interface{}{"uid": "user1"}
-	url, err := getDatabaseURL()
+	dbURL, err := getDatabaseURL()
 	if err != nil {
 		return nil, err
 	}
-	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL:  url,
-		AuthOverride: &ao,
+	appInstance, err := internal.NewTestApp(ctx, &app.Config{
+		DatabaseURL:  dbURL,
+		AuthOverride: &ao, // AuthOverride is part of app.Config
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	return app.Database(ctx)
+	return db.NewClient(ctx, appInstance)
 }
 
 func initGuestClient(pid string) (*db.Client, error) {
 	ctx := context.Background()
 	var nullMap map[string]interface{}
-	url, err := getDatabaseURL()
+	dbURL, err := getDatabaseURL()
 	if err != nil {
 		return nil, err
 	}
-	app, err := internal.NewTestApp(ctx, &firebase.Config{
-		DatabaseURL:  url,
+	appInstance, err := internal.NewTestApp(ctx, &app.Config{
+		DatabaseURL:  dbURL,
 		AuthOverride: &nullMap,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	return app.Database(ctx)
+	return db.NewClient(ctx, appInstance)
 }
 
 func initRules() {

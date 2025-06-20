@@ -19,7 +19,8 @@ import (
 	"context"
 	"log"
 
-	firebase "firebase.google.com/go/v4"
+	firebase "firebase.google.com/go/v4" // Keep for firebase.NewApp, firebase.Config
+	"firebase.google.com/go/v4/app"     // Import for app.App type
 	"firebase.google.com/go/v4/auth"
 	"google.golang.org/api/option"
 )
@@ -30,65 +31,66 @@ import (
 // https://firebase.google.com/docs/admin/setup
 // ==================================================================
 
-func initializeAppWithServiceAccount() *firebase.App {
+func initializeAppWithServiceAccount() *app.App { // Return *app.App
 	// [START initialize_app_service_account_golang]
 	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-	app, err := firebase.NewApp(context.Background(), nil, opt)
+	// firebase.NewApp now returns *app.App, so this is fine.
+	appInstance, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 	// [END initialize_app_service_account_golang]
 
-	return app
+	return appInstance
 }
 
-func initializeAppWithRefreshToken() *firebase.App {
+func initializeAppWithRefreshToken() *app.App { // Return *app.App
 	// [START initialize_app_refresh_token_golang]
 	opt := option.WithCredentialsFile("path/to/refreshToken.json")
-	config := &firebase.Config{ProjectID: "my-project-id"}
-	app, err := firebase.NewApp(context.Background(), config, opt)
+	config := &firebase.Config{ProjectID: "my-project-id"} // firebase.Config is app.Config
+	appInstance, err := firebase.NewApp(context.Background(), config, opt)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 	// [END initialize_app_refresh_token_golang]
 
-	return app
+	return appInstance
 }
 
-func initializeAppDefault() *firebase.App {
+func initializeAppDefault() *app.App { // Return *app.App
 	// [START initialize_app_default_golang]
-	app, err := firebase.NewApp(context.Background(), nil)
+	appInstance, err := firebase.NewApp(context.Background(), nil)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 	// [END initialize_app_default_golang]
 
-	return app
+	return appInstance
 }
 
-func initializeServiceAccountID() *firebase.App {
+func initializeServiceAccountID() *app.App { // Return *app.App
 	// [START initialize_sdk_with_service_account_id]
-	conf := &firebase.Config{
+	conf := &firebase.Config{ // firebase.Config is app.Config
 		ServiceAccountID: "my-client-id@my-project-id.iam.gserviceaccount.com",
 	}
-	app, err := firebase.NewApp(context.Background(), conf)
+	appInstance, err := firebase.NewApp(context.Background(), conf)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 	// [END initialize_sdk_with_service_account_id]
-	return app
+	return appInstance // Corrected return variable
 }
 
 func accessServicesSingleApp() (*auth.Client, error) {
 	// [START access_services_single_app_golang]
 	// Initialize default app
-	app, err := firebase.NewApp(context.Background(), nil)
+	appInstance, err := firebase.NewApp(context.Background(), nil)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 
 	// Access auth service from the default app
-	client, err := app.Auth(context.Background())
+	client, err := auth.NewClient(context.Background(), appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -100,26 +102,26 @@ func accessServicesSingleApp() (*auth.Client, error) {
 func accessServicesMultipleApp() (*auth.Client, error) {
 	// [START access_services_multiple_app_golang]
 	// Initialize the default app
-	defaultApp, err := firebase.NewApp(context.Background(), nil)
+	defaultAppInstance, err := firebase.NewApp(context.Background(), nil)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 
 	// Initialize another app with a different config
 	opt := option.WithCredentialsFile("service-account-other.json")
-	otherApp, err := firebase.NewApp(context.Background(), nil, opt)
+	otherAppInstance, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
 
 	// Access Auth service from default app
-	defaultClient, err := defaultApp.Auth(context.Background())
+	defaultClient, err := auth.NewClient(context.Background(), defaultAppInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
 
 	// Access auth service from other app
-	otherClient, err := otherApp.Auth(context.Background())
+	otherClient, err := auth.NewClient(context.Background(), otherAppInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}

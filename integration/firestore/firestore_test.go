@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"cloud.google.com/go/firestore" // Import the actual Firestore package
 	"firebase.google.com/go/v4/integration/internal"
 )
 
@@ -29,12 +30,13 @@ func TestFirestore(t *testing.T) {
 		return
 	}
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx, nil)
+	app, err := internal.NewTestApp(ctx, nil) // internal.NewTestApp returns *app.App
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client, err := app.Firestore(ctx)
+	// Replace app.Firestore(ctx) with direct firestore.NewClient call
+	client, err := firestore.NewClient(ctx, app.ProjectID(), app.Options()...)
 	if err != nil {
 		t.Fatal(err)
 	}

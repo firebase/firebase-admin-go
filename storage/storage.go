@@ -21,7 +21,8 @@ import (
 	"os"
 
 	"cloud.google.com/go/storage"
-	"firebase.google.com/go/v4/internal"
+	"firebase.google.com/go/v4/app" // Import app package
+	// "firebase.google.com/go/v4/internal" // No longer needed for StorageConfig
 )
 
 // Client is the interface for the Firebase Storage service.
@@ -32,17 +33,24 @@ type Client struct {
 
 // NewClient creates a new instance of the Firebase Storage Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// the Storage service through firebase.App.
-func NewClient(ctx context.Context, c *internal.StorageConfig) (*Client, error) {
+// It requires a context and a previously initialized *app.App instance.
+// The *app.App provides the necessary client options (including credentials)
+// and the default storage bucket name (if configured in app.Config).
+func NewClient(ctx context.Context, appInstance *app.App) (*Client, error) {
 	if os.Getenv("STORAGE_EMULATOR_HOST") == "" && os.Getenv("FIREBASE_STORAGE_EMULATOR_HOST") != "" {
 		os.Setenv("STORAGE_EMULATOR_HOST", os.Getenv("FIREBASE_STORAGE_EMULATOR_HOST"))
 	}
-	client, err := storage.NewClient(ctx, c.Opts...)
+
+	// Use options from app.App
+	clientOpts := appInstance.Options()
+	gcsClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{client: client, bucket: c.Bucket}, nil
+
+	// Use default bucket from app.App
+	defaultBucket := appInstance.StorageBucket()
+	return &Client{client: gcsClient, bucket: defaultBucket}, nil
 }
 
 // DefaultBucket returns a handle to the default Cloud Storage bucket.

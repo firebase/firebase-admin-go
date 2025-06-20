@@ -55,11 +55,11 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	app, err := internal.NewTestApp(context.Background(), nil)
+	appInstance, err := internal.NewTestApp(context.Background(), nil) // Returns *app.App
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client, err = app.Auth(context.Background())
+	client, err = auth.NewClient(context.Background(), appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -99,11 +99,12 @@ func TestCustomTokenWithoutServiceAccount(t *testing.T) {
 	}
 	opt := option.WithTokenSource(jwtConfig.TokenSource(context.Background()))
 
-	app, err := firebase.NewApp(context.Background(), appConfig, opt)
+	// appConfig is *firebase.Config which is an alias for *app.Config
+	appInstance, err := firebase.NewApp(context.Background(), appConfig, opt) // Returns *app.App
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherClient, err := app.Auth(context.Background())
+	otherClient, err := auth.NewClient(context.Background(), appInstance) // Use auth.NewClient
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,12 +23,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/app"
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 	"golang.org/x/oauth2/google"
@@ -38,7 +41,6 @@ import (
 const (
 	credEnvVar                 = "GOOGLE_APPLICATION_CREDENTIALS"
 	testProjectID              = "mock-project-id"
-	testVersion                = "test-version"
 	defaultIDToolkitV1Endpoint = "https://identitytoolkit.googleapis.com/v1"
 	defaultIDToolkitV2Endpoint = "https://identitytoolkit.googleapis.com/v2"
 )
@@ -52,16 +54,169 @@ var (
 	testIDTokenVerifier         *tokenVerifier
 	testCookieVerifier          *tokenVerifier
 
-	optsWithServiceAcct = []option.ClientOption{
+	appOptsWithServiceAcct = []option.ClientOption{
 		option.WithCredentialsFile("../testdata/service_account.json"),
 	}
-	optsWithTokenSource = []option.ClientOption{
+	appOptsWithTokenSource = []option.ClientOption{
 		option.WithTokenSource(&internal.MockTokenSource{
 			AccessToken: "test.token",
 		}),
 	}
 	testClock = &internal.MockClock{Timestamp: time.Now()}
 )
+
+func newTestApp(ctx context.Context, projectID string, saID string, opts ...option.ClientOption) *app.App {
+	appConfig := &app.Config{}
+	if projectID != "" {
+		appConfig.ProjectID = projectID
+	}
+	if saID != "" {
+		appConfig.ServiceAccountID = saID
+	}
+
+	allOpts := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
+	allOpts = append(allOpts, opts...)
+
+	newApp, err := app.New(ctx, appConfig, allOpts...)
+	if err != nil {
+		log.Fatalf("Failed to create test app: %v", err)
+	}
+	return newApp
+}
+
+type authTestRequestData struct {
+	Method     string
+	Path       string
+	Header     http.Header
+	Body       []byte
+	RequestURI string
+}
+
+func newAuthTestRequestData(r *http.Request, t *testing.T) authTestRequestData {
+	var body []byte
+	var err error
+	if r.Body != nil {
+		body, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	}
+	return authTestRequestData{
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		Header:     r.Header,
+		Body:       body,
+		RequestURI: r.RequestURI,
+	}
+}
+
+type mockEchoServer struct {
+	*httptest.Server
+	Client           *Client
+	App              *app.App
+	Rbody            []byte
+	Req              []authTestRequestData
+	Resp             []interface{}
+	Force            error
+	Status           int
+	CustomHandler    http.HandlerFunc
+}
+
+func echoServer(respBodyBytes []byte, t *testing.T) *mockEchoServer {
+	return echoServerWithParam(respBodyBytes, nil, t)
+}
+
+func echoServerWithParam(respBodyBytes []byte, headerParam map[string]string, t *testing.T) *mockEchoServer {
+	var parsedResp interface{}
+	if respBodyBytes != nil && len(respBodyBytes) > 0 {
+		if err := json.Unmarshal(respBodyBytes, &parsedResp); err != nil {
+			t.Logf("echoServer: could not unmarshal respBodyBytes as JSON: %v. Storing as string.", err)
+			parsedResp = string(respBodyBytes)
+		}
+	} else if respBodyBytes == nil {
+        parsedResp = "{}"
+    } else {
+		parsedResp = string(respBodyBytes)
+	}
+
+	s := &mockEchoServer{
+		Resp: []interface{}{parsedResp},
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.CustomHandler != nil {
+			s.CustomHandler(w,r)
+			return
+		}
+
+		reqData := newAuthTestRequestData(r, t)
+		s.Req = append(s.Req, reqData)
+		s.Rbody = reqData.Body
+
+		if s.Force != nil {
+			http.Error(w, s.Force.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		currentRespData := s.Resp[0]
+		if len(s.Resp) > 1 {
+			s.Resp = s.Resp[1:]
+		}
+
+		var out []byte
+		var err error
+		if respStr, isStr := currentRespData.(string); isStr {
+			out = []byte(respStr)
+		} else {
+			out, err = json.Marshal(currentRespData)
+			if err != nil {
+				t.Fatalf("Failed to marshal response in mock server: %v", err)
+			}
+		}
+
+		for k, v := range headerParam {
+			w.Header().Set(k, v)
+		}
+
+		statusToReturn := http.StatusOK
+		if s.Status != 0 {
+			statusToReturn = s.Status
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusToReturn)
+		w.Write(out)
+	})
+	s.Server = httptest.NewServer(handler)
+
+	ctx := context.Background()
+	appOptions := append(appOptsWithTokenSource, option.WithEndpoint(s.Server.URL))
+	s.App = newTestApp(ctx, testProjectID, "", appOptions...)
+
+	var err error
+	s.Client, err = NewClient(ctx, s.App)
+	if err != nil {
+		s.Server.Close()
+		t.Fatalf("Failed to create auth client for echo server: %v", err)
+	}
+
+	if s.Client.baseClient != nil {
+		s.Client.baseClient.userManagementEndpoint = s.Server.URL
+		s.Client.baseClient.providerConfigEndpoint = s.Server.URL
+		s.Client.baseClient.projectMgtEndpoint = s.Server.URL
+		if s.Client.TenantManager != nil {
+			s.Client.TenantManager.endpoint = s.Server.URL
+		}
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+		s.Client.baseClient.clock = testClock
+	} else {
+		s.Server.Close()
+		t.Fatal("auth.Client.baseClient is nil after NewClient")
+	}
+	return s
+}
 
 func TestMain(m *testing.M) {
 	var err error
@@ -86,15 +241,10 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewClientWithServiceAccountCredentials(t *testing.T) {
-	creds, err := transport.Creds(context.Background(), optsWithServiceAcct...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client, err := NewClient(context.Background(), &internal.AuthConfig{
-		Opts:      optsWithServiceAcct,
-		ProjectID: creds.ProjectID,
-		Version:   testVersion,
-	})
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, testProjectID, "", appOptsWithServiceAcct...)
+
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,13 +252,13 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 	if _, ok := client.signer.(*serviceAccountSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = serviceAccountSigner", client.signer)
 	}
-	if err := checkIDTokenVerifier(client.idTokenVerifier, creds.ProjectID); err != nil {
+	if err := checkIDTokenVerifier(client.idTokenVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().idTokenVerifier: %v", err)
 	}
-	if err := checkCookieVerifier(client.cookieVerifier, creds.ProjectID); err != nil {
+	if err := checkCookieVerifier(client.cookieVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkBaseClient(client, creds.ProjectID); err != nil {
+	if err := checkBaseClient(client, appInstance.ProjectID(), appInstance.SDKVersion()); err != nil {
 		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
@@ -117,11 +267,10 @@ func TestNewClientWithServiceAccountCredentials(t *testing.T) {
 }
 
 func TestNewClientWithoutCredentials(t *testing.T) {
-	conf := &internal.AuthConfig{
-		Opts:    optsWithTokenSource,
-		Version: testVersion,
-	}
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, "", "", appOptsWithTokenSource...)
+
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,13 +278,13 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
-	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+	if err := checkIDTokenVerifier(client.idTokenVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
-	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+	if err := checkCookieVerifier(client.cookieVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkBaseClient(client, ""); err != nil {
+	if err := checkBaseClient(client, appInstance.ProjectID(), appInstance.SDKVersion()); err != nil {
 		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
@@ -144,12 +293,10 @@ func TestNewClientWithoutCredentials(t *testing.T) {
 }
 
 func TestNewClientWithServiceAccountID(t *testing.T) {
-	conf := &internal.AuthConfig{
-		Opts:             optsWithTokenSource,
-		ServiceAccountID: "explicit-service-account",
-		Version:          testVersion,
-	}
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, "", "explicit-service-account", appOptsWithTokenSource...)
+
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,13 +304,13 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
-	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+	if err := checkIDTokenVerifier(client.idTokenVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
-	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+	if err := checkCookieVerifier(client.cookieVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkBaseClient(client, ""); err != nil {
+	if err := checkBaseClient(client, appInstance.ProjectID(), appInstance.SDKVersion()); err != nil {
 		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
@@ -171,8 +318,8 @@ func TestNewClientWithServiceAccountID(t *testing.T) {
 	}
 
 	email, err := client.signer.Email(context.Background())
-	if email != conf.ServiceAccountID || err != nil {
-		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, conf.ServiceAccountID)
+	if email != appInstance.ServiceAccountID() || err != nil {
+		t.Errorf("Email() = (%q, %v); want = (%q, nil)", email, err, appInstance.ServiceAccountID())
 	}
 }
 
@@ -183,11 +330,10 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 			"client_secret": "test-secret"
 		}`),
 	}
-	conf := &internal.AuthConfig{
-		Opts:    []option.ClientOption{option.WithCredentials(creds)},
-		Version: testVersion,
-	}
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, "", "", option.WithCredentials(creds))
+
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,13 +341,13 @@ func TestNewClientWithUserCredentials(t *testing.T) {
 	if _, ok := client.signer.(*iamSigner); !ok {
 		t.Errorf("NewClient().signer = %#v; want = iamSigner", client.signer)
 	}
-	if err := checkIDTokenVerifier(client.idTokenVerifier, ""); err != nil {
+	if err := checkIDTokenVerifier(client.idTokenVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().idTokenVerifier = %v; want = nil", err)
 	}
-	if err := checkCookieVerifier(client.cookieVerifier, ""); err != nil {
+	if err := checkCookieVerifier(client.cookieVerifier, appInstance.ProjectID()); err != nil {
 		t.Errorf("NewClient().cookieVerifier: %v", err)
 	}
-	if err := checkBaseClient(client, ""); err != nil {
+	if err := checkBaseClient(client, appInstance.ProjectID(), appInstance.SDKVersion()); err != nil {
 		t.Errorf("NewClient().baseClient: %v", err)
 	}
 	if client.clock != internal.SystemClock {
@@ -213,13 +359,14 @@ func TestNewClientWithMalformedCredentials(t *testing.T) {
 	creds := &google.DefaultCredentials{
 		JSON: []byte("not json"),
 	}
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithCredentials(creds),
-		},
-	}
-	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	ctx := context.Background()
+	appInstance, appErr := app.New(ctx, nil, option.WithCredentials(creds))
+	if appErr == nil {
+		if c, err := NewClient(ctx, appInstance); c != nil || err == nil {
+			t.Errorf("NewClient() with bad JSON creds in app = (%v,%v); want = (nil, error)", c, err)
+		}
+	} else {
+		t.Logf("App creation failed as expected with bad JSON creds: %v", appErr)
 	}
 }
 
@@ -233,13 +380,14 @@ func TestNewClientWithInvalidPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	creds := &google.DefaultCredentials{JSON: b}
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithCredentials(creds),
-		},
-	}
-	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
-		t.Errorf("NewClient() = (%v,%v); want = (nil, error)", c, err)
+	ctx := context.Background()
+	appInstance, appErr := app.New(ctx, nil, option.WithCredentials(creds))
+	if appErr == nil {
+		if c, err := NewClient(ctx, appInstance); c != nil || err == nil {
+			t.Errorf("NewClient() with invalid private key in app = (%v,%v); want = (nil, error)", c, err)
+		}
+	} else {
+		t.Logf("App creation failed as expected with invalid private key: %v", appErr)
 	}
 }
 
@@ -251,9 +399,14 @@ func TestNewClientAppDefaultCredentialsWithInvalidFile(t *testing.T) {
 	}
 	defer os.Setenv(credEnvVar, current)
 
-	conf := &internal.AuthConfig{}
-	if c, err := NewClient(context.Background(), conf); c != nil || err == nil {
-		t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+	ctx := context.Background()
+	appInstance, appErr := app.New(ctx, nil)
+	if appErr == nil {
+		if c, err := NewClient(ctx, appInstance); c != nil || err == nil {
+			t.Errorf("NewClient() with non-existing ADC file = (%v, %v); want (nil, error)", c, err)
+		}
+	} else {
+		t.Logf("App creation failed as expected with non-existing ADC file: %v", appErr)
 	}
 }
 
@@ -264,27 +417,23 @@ func TestNewClientInvalidCredentialFile(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	for _, tc := range invalidFiles {
-		conf := &internal.AuthConfig{
-			Opts: []option.ClientOption{
-				option.WithCredentialsFile(tc),
-			},
-		}
-		if c, err := NewClient(ctx, conf); c != nil || err == nil {
-			t.Errorf("Auth() = (%v, %v); want (nil, error)", c, err)
+	for _, testCase := range invalidFiles {
+		appInstance, appErr := app.New(ctx, nil, option.WithCredentialsFile(testCase))
+		if appErr == nil {
+			if c, err := NewClient(ctx, appInstance); c != nil || err == nil {
+				t.Errorf("NewClient() with invalid cred file %s = (%v, %v); want (nil, error)", testCase, c, err)
+			}
+		} else {
+			t.Logf("App creation failed for %s as expected: %v", testCase, appErr)
 		}
 	}
 }
 
 func TestNewClientExplicitNoAuth(t *testing.T) {
 	ctx := context.Background()
-	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithoutAuthentication(),
-		},
-	}
-	if c, err := NewClient(ctx, conf); c == nil || err != nil {
-		t.Errorf("Auth() = (%v, %v); want (auth, nil)", c, err)
+	appInstance := newTestApp(ctx, "", "", option.WithoutAuthentication())
+	if c, err := NewClient(ctx, appInstance); c == nil || err != nil {
+		t.Errorf("NewClient() with NoAuth = (%v, %v); want (client, nil)", c, err)
 	}
 }
 
@@ -296,7 +445,9 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	os.Setenv(emulatorHostEnvVar, emulatorHost)
 	defer os.Unsetenv(emulatorHostEnvVar)
 
-	client, err := NewClient(context.Background(), &internal.AuthConfig{})
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, "", "", )
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,23 +569,26 @@ func TestCustomTokenError(t *testing.T) {
 
 func TestCustomTokenInvalidCredential(t *testing.T) {
 	ctx := context.Background()
-	conf := &internal.AuthConfig{
-		Opts: optsWithTokenSource,
-	}
-	s, err := NewClient(ctx, conf)
+	appInstance := newTestApp(ctx, testProjectID, "", appOptsWithTokenSource...)
+	s, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.signer.(*iamSigner).httpClient.RetryConfig = nil
+	if iamS, ok := s.signer.(*iamSigner); ok && iamS.httpClient != nil {
+		iamS.httpClient.RetryConfig = nil
+	} else {
+		t.Log("Skipping RetryConfig nil assignment as signer is not an iamSigner with an HTTPClient for this test setup, or signer is nil.")
+	}
+
 	token, err := s.CustomToken(ctx, "user1")
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
+		t.Errorf("CustomToken() with potentially failing signer = (%q, %v); want = (\"\", error)", token, err)
 	}
 
 	token, err = s.CustomTokenWithClaims(ctx, "user1", map[string]interface{}{"foo": "bar"})
 	if token != "" || err == nil {
-		t.Errorf("CustomTokenWithClaims() = (%q, %v); want = (\"\", error)", token, err)
+		t.Errorf("CustomTokenWithClaims() with potentially failing signer = (%q, %v); want = (\"\", error)", token, err)
 	}
 }
 
@@ -685,19 +839,28 @@ func TestVerifyIDTokenInvalidAlgorithm(t *testing.T) {
 }
 
 func TestVerifyIDTokenWithNoProjectID(t *testing.T) {
-	conf := &internal.AuthConfig{
-		ProjectID: "",
-		Opts:      optsWithTokenSource,
-	}
-	c, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, "", "", appOptsWithTokenSource...)
+	c, err := NewClient(ctx, appInstance)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewClient() failed: %v", err)
 	}
+	if c == nil || c.idTokenVerifier == nil {
+		t.Fatalf("Client or its idTokenVerifier is nil after NewClient. App ProjectID: '%s'", appInstance.ProjectID())
+	}
+
+	originalKeySource := c.idTokenVerifier.keySource
 	c.idTokenVerifier.keySource = testIDTokenVerifier.keySource
-	if _, err := c.VerifyIDToken(context.Background(), testIDToken); err == nil {
-		t.Error("VeridyIDToken() = nil; want error")
+
+	_, verifyErr := c.VerifyIDToken(context.Background(), testIDToken)
+	if verifyErr == nil {
+		t.Errorf("VerifyIDToken() with no app project ID = nil; want error because audience check should fail or verifier setup should reflect no project ID.")
+	} else {
+		t.Logf("VerifyIDToken() with no app project ID got error as expected: %v", verifyErr)
 	}
+	c.idTokenVerifier.keySource = originalKeySource
 }
+
 
 func TestVerifyIDTokenUnsigned(t *testing.T) {
 	token := getEmulatedIDToken(nil)
@@ -717,8 +880,13 @@ func TestEmulatorVerifyIDToken(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	s.Client.isEmulator = true
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+		s.Client.baseClient.isEmulator = true
+	} else {
+		t.Fatal("echoServer did not initialize client or baseClient properly.")
+	}
+
 
 	token := getEmulatedIDToken(nil)
 	ft, err := s.Client.VerifyIDToken(context.Background(), token)
@@ -748,8 +916,13 @@ func TestEmulatorVerifyIDTokenExpiredError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.idTokenVerifier = testIDTokenVerifier
-	s.Client.isEmulator = true
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+		s.Client.baseClient.isEmulator = true
+	} else {
+		t.Fatal("echoServer did not initialize client or baseClient properly.")
+	}
+
 
 	now := testClock.Now().Unix()
 	token := getEmulatedIDToken(mockIDTokenPayload{
@@ -764,12 +937,9 @@ func TestEmulatorVerifyIDTokenExpiredError(t *testing.T) {
 }
 
 func TestEmulatorVerifyIDTokenUnreachableEmulator(t *testing.T) {
-	conf := &internal.AuthConfig{
-		Opts:      optsWithTokenSource,
-		ProjectID: testProjectID,
-		Version:   testVersion,
-	}
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, testProjectID, "", appOptsWithTokenSource...)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -803,26 +973,36 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, testProjectID, "", appOptsWithServiceAcct...)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewClient failed: %v", err)
 	}
-	tv.keySource = &mockKeySource{nil, errors.New("mock error")}
-	client := &Client{
-		baseClient: &baseClient{
-			idTokenVerifier: tv,
-		},
+	if client == nil || client.idTokenVerifier == nil {
+		t.Fatal("Client or idTokenVerifier is nil")
 	}
+
+	originalKeySource := client.idTokenVerifier.keySource
+	client.idTokenVerifier.keySource = &mockKeySource{nil, errors.New("mock error")}
+	defer func() { client.idTokenVerifier.keySource = originalKeySource }()
+
 	if _, err := client.VerifyIDToken(context.Background(), testIDToken); !IsCertificateFetchFailed(err) {
-		t.Error("VeridyIDToken() = nil; want = CertificateFetchFailed")
+		t.Errorf("VerifyIDToken() with failing keySource = %v; want = CertificateFetchFailed", err)
 	}
 }
+
 
 func TestVerifyIDTokenAndCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.idTokenVerifier = testIDTokenVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
+
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), testIDToken)
 	if err != nil {
 		t.Fatal(err)
@@ -839,7 +1019,12 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.idTokenVerifier = testIDTokenVerifier
+
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	ft, err := s.Client.VerifyIDToken(context.Background(), revokedToken)
 	if err != nil {
@@ -856,7 +1041,11 @@ func TestVerifyIDTokenDoesNotCheckRevoked(t *testing.T) {
 func TestInvalidTokenDoesNotCheckRevokedOrDisabled(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	s.Client.idTokenVerifier = testIDTokenVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	ft, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), "")
 	if ft != nil || !IsIDTokenInvalid(err) || IsIDTokenRevoked(err) || IsUserDisabled(err) {
@@ -871,7 +1060,11 @@ func TestVerifyIDTokenAndCheckRevokedError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.idTokenVerifier = testIDTokenVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "ID token has been revoked"
@@ -885,7 +1078,11 @@ func TestVerifyIDTokenAndCheckDisabledError(t *testing.T) {
 	s := echoServer(testGetDisabledUserResponse, t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.idTokenVerifier = testIDTokenVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	we := "user has been disabled"
@@ -903,7 +1100,11 @@ func TestIDTokenRevocationCheckUserMgtError(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	revokedToken := getIDToken(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.idTokenVerifier = testIDTokenVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.idTokenVerifier = testIDTokenVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifyIDTokenAndCheckRevoked(context.Background(), revokedToken)
 	if p != nil || !IsUserNotFound(err) {
@@ -1072,7 +1273,11 @@ func TestVerifySessionCookieDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testCookieVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	ft, err := s.Client.VerifySessionCookie(context.Background(), revokedCookie)
 	if err != nil {
@@ -1089,8 +1294,12 @@ func TestVerifySessionCookieDoesNotCheckRevoked(t *testing.T) {
 func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
-	s.Client.cookieVerifier = testCookieVerifier
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), testSessionCookie)
 	if err != nil {
 		t.Fatal(err)
@@ -1106,7 +1315,11 @@ func TestVerifySessionCookieAndCheckRevoked(t *testing.T) {
 func TestInvalidCookieDoesNotCheckRevoked(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
-	s.Client.cookieVerifier = testCookieVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	ft, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), "")
 	if ft != nil || !IsSessionCookieInvalid(err) {
@@ -1121,7 +1334,11 @@ func TestVerifySessionCookieAndCheckRevokedError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testCookieVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "session cookie has been revoked"
@@ -1135,7 +1352,11 @@ func TestVerifySessionCookieAndCheckDisabledError(t *testing.T) {
 	s := echoServer(testGetDisabledUserResponse, t)
 	defer s.Close()
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testCookieVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	we := "user has been disabled"
@@ -1153,7 +1374,11 @@ func TestCookieRevocationCheckUserMgtError(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 	revokedCookie := getSessionCookie(mockIDTokenPayload{"uid": "uid", "iat": 1970})
-	s.Client.cookieVerifier = testCookieVerifier
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	p, err := s.Client.VerifySessionCookieAndCheckRevoked(context.Background(), revokedCookie)
 	if p != nil || !IsUserNotFound(err) {
@@ -1179,8 +1404,12 @@ func TestEmulatorVerifySessionCookie(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.cookieVerifier = testCookieVerifier
-	s.Client.isEmulator = true
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+		s.Client.baseClient.isEmulator = true
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	token := getEmulatedSessionCookie(nil)
 	ft, err := s.Client.VerifySessionCookie(context.Background(), token)
@@ -1210,8 +1439,12 @@ func TestEmulatorVerifySessionCookieExpiredError(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
 
-	s.Client.cookieVerifier = testCookieVerifier
-	s.Client.isEmulator = true
+	if s.Client != nil && s.Client.baseClient != nil {
+		s.Client.baseClient.cookieVerifier = testCookieVerifier
+		s.Client.baseClient.isEmulator = true
+	} else {
+		t.Fatal("echoServer client not properly initialized")
+	}
 
 	now := testClock.Now().Unix()
 	token := getEmulatedSessionCookie(mockIDTokenPayload{
@@ -1226,12 +1459,9 @@ func TestEmulatorVerifySessionCookieExpiredError(t *testing.T) {
 }
 
 func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
-	conf := &internal.AuthConfig{
-		Opts:      optsWithTokenSource,
-		ProjectID: testProjectID,
-		Version:   testVersion,
-	}
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestApp(ctx, testProjectID, "", appOptsWithTokenSource...)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1247,7 +1477,7 @@ func TestEmulatorVerifySessionCookieUnreachableEmulator(t *testing.T) {
 }
 
 func signerForTests(ctx context.Context) (cryptoSigner, error) {
-	creds, err := transport.Creds(ctx, optsWithServiceAcct...)
+	creds, err := transport.Creds(ctx, appOptsWithServiceAcct...)
 	if err != nil {
 		return nil, err
 	}
@@ -1283,7 +1513,6 @@ func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 	return tv, nil
 }
 
-// mockKeySource provides access to a set of in-memory public keys.
 type mockKeySource struct {
 	keys []*publicKey
 	err  error
@@ -1422,7 +1651,7 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 	return nil
 }
 
-func checkBaseClient(client *Client, wantProjectID string) error {
+func checkBaseClient(client *Client, wantProjectID string, sdkVersion string) error {
 	baseClient := client.baseClient
 	if baseClient.userManagementEndpoint != defaultIDToolkitV1Endpoint {
 		return fmt.Errorf("userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, defaultIDToolkitV1Endpoint)
@@ -1431,7 +1660,7 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Endpoint)
 	}
 	if baseClient.tenantMgtEndpoint != defaultIDToolkitV2Endpoint {
-		return fmt.Errorf("providerConfigEndpoint = %q; want = %q", baseClient.providerConfigEndpoint, defaultIDToolkitV2Endpoint)
+		return fmt.Errorf("tenantMgtEndpoint = %q; want = %q", baseClient.tenantMgtEndpoint, defaultIDToolkitV2Endpoint)
 	}
 	if baseClient.projectID != wantProjectID {
 		return fmt.Errorf("projectID = %q; want = %q", baseClient.projectID, wantProjectID)
@@ -1445,13 +1674,13 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 	for _, opt := range baseClient.httpClient.Opts {
 		opt(req)
 	}
-	version := req.Header.Get("X-Client-Version")
-	wantVersion := fmt.Sprintf("Go/Admin/%s", testVersion)
-	if version != wantVersion {
-		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
+	versionHeader := req.Header.Get("X-Client-Version")
+	wantVersionHeader := fmt.Sprintf("Go/Admin/%s", sdkVersion)
+	if versionHeader != wantVersionHeader {
+		return fmt.Errorf("X-Client-Version header = %q; want = %q", versionHeader, wantVersionHeader)
 	}
 
-	xGoogAPIClientHeader := internal.GetMetricsHeader(testVersion)
+	xGoogAPIClientHeader := internal.GetMetricsHeader(sdkVersion)
 	if h := req.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
 		return fmt.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
@@ -1492,7 +1721,7 @@ func verifyCustomToken(
 	} else if payload.Iss != email {
 		return fmt.Errorf("Issuer: %q; want: %q", payload.Iss, email)
 	} else if payload.Sub != email {
-		return fmt.Errorf("Subject: %q; want: %q", payload.Sub, email)
+		return fmt.Errorf("Subject: %q; want = %q", payload.Sub, email)
 	}
 
 	now := testClock.Now().Unix()

@@ -63,15 +63,19 @@ type iidClient struct {
 	httpClient  *internal.HTTPClient
 }
 
-func newIIDClient(hc *http.Client, conf *internal.MessagingConfig) *iidClient {
+func newIIDClient(hc *http.Client, sdkVersion string) *iidClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleIIDError
+	// x-goog-api-client should be on hc from app.Options() if hc is correctly propagated.
+	// For safety, or if hc is a raw client, we add it.
+	// The firebaseClientHeader is not typically used for direct IID calls like this,
+	// but x-goog-api-client is standard.
 	client.Opts = []internal.HTTPOption{
-		internal.WithHeader("access_token_auth", "true"),
-		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+		internal.WithHeader("access_token_auth", "true"), // Specific to IID server
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(sdkVersion)),
 	}
 	return &iidClient{
-		iidEndpoint: iidEndpoint,
+		iidEndpoint: iidEndpoint, // Uses the iidEndpoint const from this package
 		httpClient:  client,
 	}
 }

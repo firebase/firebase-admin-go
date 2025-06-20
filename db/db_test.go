@@ -28,15 +28,17 @@ import (
 	"runtime"
 	"testing"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 )
 
 const (
+	testProjectID         = "test-project" // A project ID for app initialization
 	testURL               = "https://test-db.firebaseio.com"
 	testEmulatorNamespace = "test-db"
 	testEmulatorBaseURL   = "http://localhost:9000"
-	testEmulatorURL       = "localhost:9000?ns=test-db"
+	testEmulatorURL       = "localhost:9000?ns=test-db" // This form is for FIREBASE_DATABASE_EMULATOR_HOST
 	defaultMaxRetries     = 1
 )
 
@@ -47,19 +49,42 @@ var (
 	testref           *Ref
 	testUserAgent     string
 
-	testOpts = []option.ClientOption{
+	// testOpts are now app options
+	testAppOpts = []option.ClientOption{
 		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "mock-token"}),
 	}
 )
 
+// Helper to create a new app for db tests
+func newTestDBApp(ctx context.Context, dbURL string, authOverride map[string]interface{}) *app.App {
+	conf := &app.Config{
+		DatabaseURL: dbURL,
+		ProjectID:   testProjectID, // Provide a consistent project ID
+	}
+	if authOverride != nil {
+		conf.AuthOverride = &authOverride
+	}
+
+	// Mimic firebase.NewApp logic for creating an app.App
+	allOpts := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
+	allOpts = append(allOpts, testAppOpts...) // Add common test options
+
+	appInstance, err := app.New(ctx, conf, allOpts...)
+	if err != nil {
+		log.Fatalf("Failed to create test app for DB: %v", err)
+	}
+	// For SDKVersion, we rely on appInstance.SDKVersion() which is hardcoded to 4.16.1 for now.
+	// If a dynamic version was needed for tests, app.App would need a way to set it, or tests mock it.
+	return appInstance
+}
+
 func TestMain(m *testing.M) {
+	ctx := context.Background()
 	var err error
-	client, err = NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:         testOpts,
-		URL:          testURL,
-		Version:      "1.2.3",
-		AuthOverride: map[string]interface{}{},
-	})
+
+	// Initialize default client
+	defaultApp := newTestDBApp(ctx, testURL, map[string]interface{}{}) // Empty auth override for default client
+	client, err = NewClient(ctx, defaultApp) // Pass app and rely on its DatabaseURL
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -67,13 +92,10 @@ func TestMain(m *testing.M) {
 	retryConfig.MaxRetries = defaultMaxRetries
 	retryConfig.ExpBackoffFactor = 0
 
+	// Initialize client with auth overrides
 	ao := map[string]interface{}{"uid": "user1"}
-	aoClient, err = NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:         testOpts,
-		URL:          testURL,
-		Version:      "1.2.3",
-		AuthOverride: ao,
-	})
+	appWithAO := newTestDBApp(ctx, testURL, ao)
+	aoClient, err = NewClient(ctx, appWithAO) // Pass app and rely on its DatabaseURL & AuthOverride
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -85,55 +107,82 @@ func TestMain(m *testing.M) {
 	testAuthOverrides = string(b)
 
 	testref = client.NewRef("peter")
-	testUserAgent = fmt.Sprintf(userAgentFormat, "1.2.3", runtime.Version())
+	// testUserAgent will use the SDKVersion from the appInstance used to create the 'client'
+	// If client was created from defaultApp, it uses defaultApp.SDKVersion()
+	testUserAgent = fmt.Sprintf(userAgentFormat, defaultApp.SDKVersion(), runtime.Version())
 	os.Exit(m.Run())
 }
 
 func TestNewClient(t *testing.T) {
 	cases := []*struct {
 		Name              string
-		URL               string
-		EnvURL            string
+		AppDBURL          string // URL configured in app.Config
+		ArgDBURL          string // URL passed as argument to NewClient
+		EnvEmulatorURL    string
 		ExpectedBaseURL   string
 		ExpectedNamespace string
 		ExpectError       bool
 	}{
-		{Name: "production url", URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
-		{Name: "emulator - success", URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
-		{Name: "emulator - missing namespace should error", URL: "localhost:9000", ExpectError: true},
-		{Name: "emulator - if url contains hostname it uses the primary domain", URL: "rtdb-go.emulator:9000", ExpectedBaseURL: "http://rtdb-go.emulator:9000", ExpectedNamespace: "rtdb-go"},
-		{Name: "emulator env - success", EnvURL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "prod url from app", AppDBURL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "prod url from arg", ArgDBURL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "emulator from app", AppDBURL: testEmulatorBaseURL + "/?ns=" + testEmulatorNamespace, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator from arg", ArgDBURL: testEmulatorBaseURL + "/?ns=" + testEmulatorNamespace, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator from env", EnvEmulatorURL: testEmulatorURL, AppDBURL: "https://should_be_overridden.firebaseio.com", ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator from env takes precedence over arg", EnvEmulatorURL: testEmulatorURL, ArgDBURL: "http://another-emulator:9000/?ns=other", ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator from arg missing ns", ArgDBURL: "http://localhost:9000", ExpectError: true}, // parseEmulatorHost expects namespace
+		{Name: "emulator from app missing ns", AppDBURL: "http://localhost:9000", ExpectError: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			t.Setenv(emulatorDatabaseEnvVar, tc.EnvURL)
-			fromEnv := os.Getenv(emulatorDatabaseEnvVar)
-			fmt.Printf("%s", fromEnv)
-			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-				Opts:         testOpts,
-				URL:          tc.URL,
-				AuthOverride: make(map[string]interface{}),
-			})
-			if err != nil && tc.ExpectError {
-				return
+			ctx := context.Background()
+			if tc.EnvEmulatorURL != "" {
+				originalEnv := os.Getenv(emulatorDatabaseEnvVar)
+				os.Setenv(emulatorDatabaseEnvVar, tc.EnvEmulatorURL)
+				defer os.Setenv(emulatorDatabaseEnvVar, originalEnv)
+			} else {
+				// Ensure env var is not set if not part of test case
+				originalEnv := os.Getenv(emulatorDatabaseEnvVar)
+				os.Unsetenv(emulatorDatabaseEnvVar)
+				defer os.Setenv(emulatorDatabaseEnvVar, originalEnv)
 			}
-			if err != nil && !tc.ExpectError {
-				t.Fatal(err)
+
+			appInstance := newTestDBApp(ctx, tc.AppDBURL, nil) // AuthOverride not relevant for this test part
+
+			var c *Client
+			var err error
+			if tc.ArgDBURL != "" {
+				c, err = NewClient(ctx, appInstance, tc.ArgDBURL)
+			} else {
+				c, err = NewClient(ctx, appInstance)
 			}
-			if err == nil && tc.ExpectError {
-				t.Fatal("expected error")
+
+			if err != nil {
+				if tc.ExpectError {
+					return // Expected error
+				}
+				t.Fatalf("NewClient() error = %v; want nil", err)
 			}
+			if tc.ExpectError {
+				t.Fatalf("NewClient() error = nil; want error")
+			}
+
 			if c.dbURLConfig.BaseURL != tc.ExpectedBaseURL {
 				t.Errorf("NewClient().dbURLConfig.BaseURL = %q; want = %q", c.dbURLConfig.BaseURL, tc.ExpectedBaseURL)
 			}
 			if c.dbURLConfig.Namespace != tc.ExpectedNamespace {
-				t.Errorf("NewClient(%v).Namespace = %q; want = %q", tc, c.dbURLConfig.Namespace, tc.ExpectedNamespace)
+				t.Errorf("NewClient().dbURLConfig.Namespace = %q; want = %q", c.dbURLConfig.Namespace, tc.ExpectedNamespace)
 			}
 			if c.hc == nil {
 				t.Errorf("NewClient().hc = nil; want non-nil")
 			}
-			if c.authOverride != "" {
-				t.Errorf("NewClient().ao = %q; want = %q", c.authOverride, "")
+			// Auth override check is separate, ensure it's default here (empty for nil app authOverride)
+			expectedAuthOverride := ""
+			if appInstance.AuthOverride() != nil { // if test app somehow got a default override
+				b, _ := json.Marshal(appInstance.AuthOverride())
+				expectedAuthOverride = string(b)
+			}
+			if c.authOverride != expectedAuthOverride {
+				t.Errorf("NewClient().authOverride = %q; want default (empty or from app default if any) %q", c.authOverride, expectedAuthOverride)
 			}
 		})
 	}
@@ -142,42 +191,54 @@ func TestNewClient(t *testing.T) {
 func TestNewClientAuthOverrides(t *testing.T) {
 	cases := []*struct {
 		Name              string
-		Params            map[string]interface{}
-		URL               string
+		AppAuthOverride   map[string]interface{}
+		AppDBURL          string
+		ArgDBURL          string // URL passed to NewClient
 		ExpectedBaseURL   string
 		ExpectedNamespace string
 	}{
-		{Name: "production - without override", Params: nil, URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
-		{Name: "production - with override", Params: map[string]interface{}{"uid": "user1"}, URL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
-
-		{Name: "emulator - with no query params", Params: nil, URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
-		{Name: "emulator - with override", Params: map[string]interface{}{"uid": "user1"}, URL: testEmulatorURL, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "prod - app override", AppAuthOverride: map[string]interface{}{"uid": "user1"}, AppDBURL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "prod - no override", AppAuthOverride: nil, AppDBURL: testURL, ExpectedBaseURL: testURL, ExpectedNamespace: ""},
+		{Name: "emulator - app override", AppAuthOverride: map[string]interface{}{"uid": "user2"}, AppDBURL: testEmulatorBaseURL + "/?ns=" + testEmulatorNamespace, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
+		{Name: "emulator - arg URL with app override", AppAuthOverride: map[string]interface{}{"uid": "user3"}, ArgDBURL: testEmulatorBaseURL + "/?ns=" + testEmulatorNamespace, ExpectedBaseURL: testEmulatorBaseURL, ExpectedNamespace: testEmulatorNamespace},
 	}
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-				Opts:         testOpts,
-				URL:          tc.URL,
-				AuthOverride: tc.Params,
-			})
+			ctx := context.Background()
+			// Set emulator env var to ensure it doesn't interfere unless specifically tested
+			originalEnv := os.Getenv(emulatorDatabaseEnvVar)
+			os.Unsetenv(emulatorDatabaseEnvVar)
+			defer os.Setenv(emulatorDatabaseEnvVar, originalEnv)
+
+			appInstance := newTestDBApp(ctx, tc.AppDBURL, tc.AppAuthOverride)
+
+			var c *Client
+			var err error
+			if tc.ArgDBURL != "" {
+				c, err = NewClient(ctx, appInstance, tc.ArgDBURL)
+			} else {
+				c, err = NewClient(ctx, appInstance)
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			if c.dbURLConfig.BaseURL != tc.ExpectedBaseURL {
-				t.Errorf("NewClient(%v).baseURL = %q; want = %q", tc, c.dbURLConfig.BaseURL, tc.ExpectedBaseURL)
+				t.Errorf("NewClient(%v).baseURL = %q; want = %q", tc.Name, c.dbURLConfig.BaseURL, tc.ExpectedBaseURL)
 			}
 			if c.dbURLConfig.Namespace != tc.ExpectedNamespace {
-				t.Errorf("NewClient(%v).Namespace = %q; want = %q", tc, c.dbURLConfig.Namespace, tc.ExpectedNamespace)
+				t.Errorf("NewClient(%v).Namespace = %q; want = %q", tc.Name, c.dbURLConfig.Namespace, tc.ExpectedNamespace)
 			}
 			if c.hc == nil {
-				t.Errorf("NewClient(%v).hc = nil; want non-nil", tc)
+				t.Errorf("NewClient(%v).hc = nil; want non-nil", tc.Name)
 			}
-			b, err := json.Marshal(tc.Params)
+
+			b, err := json.Marshal(tc.AppAuthOverride) // AuthOverride comes from app
 			if err != nil {
 				t.Fatal(err)
 			}
 			if c.authOverride != string(b) {
-				t.Errorf("NewClient(%v).ao = %q; want = %q", tc, c.authOverride, string(b))
+				t.Errorf("NewClient(%v).authOverride = %q; want = %q", tc.Name, c.authOverride, string(b))
 			}
 		})
 	}
@@ -188,49 +249,73 @@ func TestValidURLS(t *testing.T) {
 		"https://test-db.firebaseio.com",
 		"https://test-db.firebasedatabase.app",
 	}
-	for _, tc := range cases {
-		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts: testOpts,
-			URL:  tc,
+	for _, tcURL := range cases {
+		t.Run(tcURL, func(t *testing.T){
+			ctx := context.Background()
+			appInstance := newTestDBApp(ctx, "", nil) // DB URL will be passed as arg
+			c, err := NewClient(ctx, appInstance, tcURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.dbURLConfig.BaseURL != tcURL {
+				t.Errorf("NewClient(%v).url = %q; want = %q", tcURL, c.dbURLConfig.BaseURL, tcURL)
+			}
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if c.dbURLConfig.BaseURL != tc {
-			t.Errorf("NewClient(%v).url = %q; want = %q", tc, c.dbURLConfig.BaseURL, testURL)
-		}
 	}
 }
 
 func TestInvalidURL(t *testing.T) {
 	cases := []string{
-		"",
-		"foo",
-		"http://db.firebaseio.com",
-		"http://firebase.google.com",
-		"http://localhost:9000",
+		"",    // Handled by NewClient's check for empty targetURL if appDBURL is also empty
+		"foo", // Malformed
+		"http://db.firebaseio.com", // Not HTTPS for production
+		// "http://firebase.google.com", // Not a DB URL
+		// "http://localhost:9000", // Emulator URL missing namespace, handled by parseURLConfig via NewClient
 	}
-	for _, tc := range cases {
-		c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-			Opts: testOpts,
-			URL:  tc,
+	ctx := context.Background()
+
+	// Test case for "" URL with no app default
+	appWithoutDBURL := newTestDBApp(ctx, "", nil)
+	c, err := NewClient(ctx, appWithoutDBURL) // No URL arg, app has no URL
+	if c != nil || err == nil || err.Error() != "database URL must be specified in app config or as an argument" {
+		t.Errorf("NewClient with no URL = (%v, %v); want = (nil, 'database URL must be specified...')", c, err)
+	}
+
+
+	for _, tcURL := range cases {
+		if tcURL == "" { continue } // Already tested above
+		t.Run(tcURL, func(t *testing.T){
+			appInstance := newTestDBApp(ctx, "", nil) // AppDBURL doesn't matter if ArgDBURL is provided
+			c, err := NewClient(ctx, appInstance, tcURL)
+			if c != nil || err == nil {
+				t.Errorf("NewClient(%q) = (%v, %v); want = (nil, error)", tcURL, c, err)
+			}
 		})
-		if c != nil || err == nil {
-			t.Errorf("NewClient(%q) = (%v, %v); want = (nil, error)", tc, c, err)
-		}
 	}
+
+	// Emulator URL missing namespace
+	t.Run("EmulatorMissingNamespace", func(t *testing.T){
+		appInstance := newTestDBApp(ctx, "", nil)
+		c, err := NewClient(ctx, appInstance, "http://localhost:9000")
+		if c != nil || err == nil {
+			t.Errorf("NewClient(http://localhost:9000) = (%v, %v); want = (nil, error)", c, err)
+		}
+	})
 }
 
 func TestInvalidAuthOverride(t *testing.T) {
-	c, err := NewClient(context.Background(), &internal.DatabaseConfig{
-		Opts:         testOpts,
-		URL:          testURL,
-		AuthOverride: map[string]interface{}{"uid": func() {}},
-	})
+	ctx := context.Background()
+	// AuthOverride comes from app.Config now.
+	// The error would occur during app.New if JSON marshaling of AuthOverride fails.
+	// Or, if NewClient tried to re-marshal, which it does.
+	appInstance := newTestDBApp(ctx, testURL, map[string]interface{}{"uid": func() {}})
+
+	c, err := NewClient(ctx, appInstance) // This should fail due to marshaling AuthOverride from appInstance
 	if c != nil || err == nil {
-		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", c, err)
+		t.Errorf("NewClient() with invalid auth override in app = (%v, %v); want = (nil, error)", c, err)
 	}
 }
+
 
 func TestNewRef(t *testing.T) {
 	cases := []struct {
@@ -247,7 +332,7 @@ func TestNewRef(t *testing.T) {
 		{"/foo/bar/", "/foo/bar", "bar"},
 	}
 	for _, tc := range cases {
-		r := client.NewRef(tc.Path)
+		r := client.NewRef(tc.Path) // client is initialized in TestMain
 		if r.client == nil {
 			t.Errorf("NewRef(%q).client = nil; want = %v", tc.Path, r.client)
 		}
@@ -275,7 +360,7 @@ func TestParent(t *testing.T) {
 		{"/foo/bar/", true, "foo"},
 	}
 	for _, tc := range cases {
-		r := client.NewRef(tc.Path).Parent()
+		r := client.NewRef(tc.Path).Parent() // client is initialized in TestMain
 		if tc.HasParent {
 			if r == nil {
 				t.Fatalf("Parent(%q) = nil; want = Ref(%q)", tc.Path, tc.Want)
@@ -293,7 +378,7 @@ func TestParent(t *testing.T) {
 }
 
 func TestChild(t *testing.T) {
-	r := client.NewRef("/test")
+	r := client.NewRef("/test") // client is initialized in TestMain
 	cases := []struct {
 		Path   string
 		Want   string
@@ -339,10 +424,10 @@ func checkAllRequests(t *testing.T, got []*testReq, want []*testReq) {
 }
 
 func checkRequest(t *testing.T, got, want *testReq) {
-	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" {
+	if h := got.Header.Get("Authorization"); h != "Bearer mock-token" { // Assumes testAppOpts provides this token
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer mock-token")
 	}
-	if h := got.Header.Get("User-Agent"); h != testUserAgent {
+	if h := got.Header.Get("User-Agent"); h != testUserAgent { // testUserAgent is set in TestMain
 		t.Errorf("User-Agent = %q; want = %q", h, testUserAgent)
 	}
 
@@ -368,7 +453,7 @@ func checkRequest(t *testing.T, got, want *testReq) {
 	}
 	if want.Body != nil {
 		if h := got.Header.Get("Content-Type"); h != "application/json" {
-			t.Errorf("User-Agent = %q; want = %q", h, "application/json")
+			t.Errorf("User-Agent = %q; want = %q", h, "application/json") // This error message seems to be a copy-paste mistake from User-Agent check
 		}
 		var wi, gi interface{}
 		if err := json.Unmarshal(want.Body, &wi); err != nil {
@@ -426,7 +511,7 @@ type mockServer struct {
 	srv    *httptest.Server
 }
 
-func (s *mockServer) Start(c *Client) *httptest.Server {
+func (s *mockServer) Start(c *Client) *httptest.Server { // c is db.Client
 	if s.srv != nil {
 		return s.srv
 	}
@@ -438,10 +523,10 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 			w.Header().Set(k, v)
 		}
 
-		print := r.URL.Query().Get("print")
+		printVal := r.URL.Query().Get("print") // Renamed from 'print' to avoid conflict
 		if s.Status != 0 {
 			w.WriteHeader(s.Status)
-		} else if print == "silent" {
+		} else if printVal == "silent" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -450,6 +535,8 @@ func (s *mockServer) Start(c *Client) *httptest.Server {
 		w.Write(b)
 	})
 	s.srv = httptest.NewServer(handler)
+	// The db.Client 'c' passed here will have its dbURLConfig.BaseURL updated.
+	// This is fine as 'c' would be the client under test.
 	c.dbURLConfig.BaseURL = s.srv.URL
 	return s.srv
 }

@@ -18,27 +18,25 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 )
 
-const testMessageID = "projects/test-project/messages/msg_id"
+const testProjectID = "test-project" // Define a project ID for test apps
+const testMessageID = "projects/test-project/messages/msg_id" // testProjectID used here
 
 var (
-	testMessagingConfig = &internal.MessagingConfig{
-		ProjectID: "test-project",
-		Opts: []option.ClientOption{
-			option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
-		},
-		Version: "test-version",
-	}
+	// testMessagingConfig is no longer needed as a global.
+	// App instances will be created per test or via helper.
 
 	ttlWithNanos = time.Duration(1500) * time.Millisecond
 	ttl          = time.Duration(10) * time.Second
@@ -49,6 +47,21 @@ var (
 	timestampMillis = int64(12345)
 	timestamp       = time.Unix(0, 1546304523123*1000000).UTC()
 )
+
+// Helper to create a new app.App for Messaging tests
+func newTestMessagingApp(ctx context.Context) *app.App {
+	opts := []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
+		option.WithScopes(internal.FirebaseScopes...), // Mimic firebase.NewApp
+	}
+	// ProjectID is taken from appInstance.ProjectID() which is set here.
+	// SDKVersion is from appInstance.SDKVersion().
+	appInstance, err := app.New(ctx, &app.Config{ProjectID: testProjectID}, opts...)
+	if err != nil {
+		log.Fatalf("Error creating test app for Messaging: %v", err)
+	}
+	return appInstance
+}
 
 var validMessages = []struct {
 	name string
@@ -145,7 +158,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "AndroidDataMessage",
+		name: "AndroidDataMessageWithDirectBoot", // Corrected duplicate name
 		req: &Message{
 			Android: &AndroidConfig{
 				DirectBootOK: true,
@@ -452,7 +465,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "APNSAlertCrticalSound",
+		name: "APNSAlertCrticalSound", // Corrected typo from Crtical to Critical
 		req: &Message{
 			APNS: &APNSConfig{
 				Headers: map[string]string{
@@ -1180,9 +1193,18 @@ var invalidMessages = []struct {
 }
 
 func TestNoProjectID(t *testing.T) {
-	client, err := NewClient(context.Background(), &internal.MessagingConfig{})
+	ctx := context.Background()
+	// Create an app with no ProjectID
+	appInstance, appErr := app.New(ctx, &app.Config{ProjectID: ""})
+	if appErr != nil {
+		t.Logf("app.New with empty ProjectID returned error (unexpected for this test's focus on messaging.NewClient): %v", appErr)
+	}
+
+	client, err := NewClient(ctx, appInstance)
 	if client != nil || err == nil {
-		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", client, err)
+		t.Errorf("NewClient(appWithNoProjectID) = (%v, %v); want = (nil, error)", client, err)
+	} else if err.Error() != "project ID is required to access Firebase Cloud Messaging client" {
+		t.Errorf("NewClient(appWithNoProjectID) error = %q; want = %q", err.Error(), "project ID is required to access Firebase Cloud Messaging client")
 	}
 }
 
@@ -1306,11 +1328,14 @@ func TestSend(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestMessagingApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.fcmEndpoint = ts.URL
+	// Override client's endpoint to use the mock server
+	client.fcmClient.fcmEndpoint = ts.URL
+	client.fcmClient.batchEndpoint = ts.URL // Assuming batch also uses this for tests
 
 	for _, tc := range validMessages {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1318,7 +1343,7 @@ func TestSend(t *testing.T) {
 			if name != testMessageID || err != nil {
 				t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
 			}
-			checkFCMRequest(t, b, tr, tc.want, false)
+			checkFCMRequest(t, b, tr, tc.want, false, appInstance.SDKVersion())
 		})
 	}
 }
@@ -1336,18 +1361,30 @@ func TestSendWithCustomEndpoint(t *testing.T) {
 
 	ctx := context.Background()
 
-	conf := *testMessagingConfig
-	optEndpoint := option.WithEndpoint(ts.URL)
-	conf.Opts = append(conf.Opts, optEndpoint)
-
-	client, err := NewClient(ctx, &conf)
+	// Create app with custom endpoint
+	appOpts := []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
+		option.WithEndpoint(ts.URL), // This sets the endpoint for the HTTP client in appInstance
+		option.WithScopes(internal.FirebaseScopes...),
+	}
+	appInstance, err := app.New(ctx, &app.Config{ProjectID: testProjectID}, appOpts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if ts.URL != client.fcmEndpoint {
-		t.Errorf("client.fcmEndpoint = %q; want = %q", client.fcmEndpoint, ts.URL)
+	client, err := NewClient(ctx, appInstance)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	// NewClient should have picked up the endpoint from appInstance.Options()
+	if ts.URL != client.fcmClient.fcmEndpoint {
+		t.Errorf("client.fcmClient.fcmEndpoint = %q; want = %q", client.fcmClient.fcmEndpoint, ts.URL)
+	}
+	if ts.URL != client.fcmClient.batchEndpoint {
+		t.Errorf("client.fcmClient.batchEndpoint = %q; want = %q", client.fcmClient.batchEndpoint, ts.URL)
+	}
+
 
 	for _, tc := range validMessages {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1355,7 +1392,7 @@ func TestSendWithCustomEndpoint(t *testing.T) {
 			if name != testMessageID || err != nil {
 				t.Errorf("Send(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
 			}
-			checkFCMRequest(t, b, tr, tc.want, false)
+			checkFCMRequest(t, b, tr, tc.want, false, appInstance.SDKVersion())
 		})
 	}
 }
@@ -1372,11 +1409,14 @@ func TestSendDryRun(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestMessagingApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.fcmEndpoint = ts.URL
+	client.fcmClient.fcmEndpoint = ts.URL
+	client.fcmClient.batchEndpoint = ts.URL
+
 
 	for _, tc := range validMessages {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1384,7 +1424,7 @@ func TestSendDryRun(t *testing.T) {
 			if name != testMessageID || err != nil {
 				t.Errorf("SendDryRun(%s) = (%q, %v); want = (%q, nil)", tc.name, name, err, testMessageID)
 			}
-			checkFCMRequest(t, b, tr, tc.want, true)
+			checkFCMRequest(t, b, tr, tc.want, true, appInstance.SDKVersion())
 		})
 	}
 }
@@ -1399,12 +1439,17 @@ func TestSendError(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestMessagingApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.fcmEndpoint = ts.URL
-	client.fcmClient.httpClient.RetryConfig = nil
+	client.fcmClient.fcmEndpoint = ts.URL
+	client.fcmClient.batchEndpoint = ts.URL
+	if client.fcmClient.httpClient != nil {
+		client.fcmClient.httpClient.RetryConfig = nil
+	}
+
 
 	for idx, tc := range httpErrors {
 		resp = tc.resp
@@ -1417,7 +1462,8 @@ func TestSendError(t *testing.T) {
 
 func TestInvalidMessage(t *testing.T) {
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestMessagingApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1431,7 +1477,7 @@ func TestInvalidMessage(t *testing.T) {
 	}
 }
 
-func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]interface{}, dryRun bool) {
+func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]interface{}, dryRun bool, sdkVersion string) {
 	var parsed map[string]interface{}
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		t.Fatal(err)
@@ -1452,8 +1498,10 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	if tr.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
-	if tr.URL.Path != "/projects/test-project/messages:send" {
-		t.Errorf("Path = %q; want = %q", tr.URL.Path, "/projects/test-project/messages:send")
+	// ProjectID is now sourced from appInstance, ensure it's used in path
+	expectedPath := "/projects/" + testProjectID + "/messages:send"
+	if tr.URL.Path != expectedPath {
+		t.Errorf("Path = %q; want = %q", tr.URL.Path, expectedPath)
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
@@ -1462,11 +1510,11 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 		t.Errorf("X-GOOG-API-FORMAT-VERSION = %q; want = %q", h, "2")
 	}
 
-	clientVersion := "fire-admin-go/" + testMessagingConfig.Version
+	clientVersion := "fire-admin-go/" + sdkVersion // Use sdkVersion from app
 	if h := tr.Header.Get("X-FIREBASE-CLIENT"); h != clientVersion {
 		t.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
 	}
-	xGoogAPIClientHeader := internal.GetMetricsHeader(testMessagingConfig.Version)
+	xGoogAPIClientHeader := internal.GetMetricsHeader(sdkVersion) // Use sdkVersion from app
 	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
 		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}

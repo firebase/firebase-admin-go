@@ -18,7 +18,9 @@ import (
 	"context"
 	"log"
 
-	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/app"     // Import app package
+	firebase "firebase.google.com/go/v4" // For firebase.NewApp, firebase.Config
+	"firebase.google.com/go/v4/storage" // Import storage package
 	"google.golang.org/api/option"
 )
 
@@ -37,7 +39,8 @@ func cloudStorage() {
 		log.Fatalln(err)
 	}
 
-	client, err := app.Storage(context.Background())
+	// app is now *app.App
+	client, err := storage.NewClient(context.Background(), app) // Use storage.NewClient
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -54,8 +57,8 @@ func cloudStorage() {
 	log.Printf("Created bucket handle: %v\n", bucket)
 }
 
-func cloudStorageCustomBucket(app *firebase.App) {
-	client, err := app.Storage(context.Background())
+func cloudStorageCustomBucket(appInstance *app.App) { // Parameter changed to *app.App
+	client, err := storage.NewClient(context.Background(), appInstance) // Use storage.NewClient
 	if err != nil {
 		log.Fatalln(err)
 	}

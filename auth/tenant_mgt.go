@@ -83,11 +83,11 @@ type TenantManager struct {
 	httpClient *internal.HTTPClient
 }
 
-func newTenantManager(client *internal.HTTPClient, conf *internal.AuthConfig, base *baseClient) *TenantManager {
+func newTenantManager(client *internal.HTTPClient, projectID string, base *baseClient) *TenantManager {
 	return &TenantManager{
 		base:       base,
 		endpoint:   base.tenantMgtEndpoint,
-		projectID:  conf.ProjectID,
+		projectID:  projectID,
 		httpClient: client,
 	}
 }

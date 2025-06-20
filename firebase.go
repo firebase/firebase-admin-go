@@ -12,213 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package firebase is the entry point to the Firebase Admin SDK. It provides functionality for initializing App
-// instances, which serve as the central entities that provide access to various other Firebase services exposed
-// from the SDK.
+// Package firebase is the entry point to the Firebase Admin SDK.
+// It provides functionality for initializing App instances using the app package.
 package firebase
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"io/ioutil"
-	"os"
-
-	"cloud.google.com/go/firestore"
-	"firebase.google.com/go/v4/appcheck"
-	"firebase.google.com/go/v4/auth"
-	"firebase.google.com/go/v4/db"
-	"firebase.google.com/go/v4/iid"
-	"firebase.google.com/go/v4/internal"
-	"firebase.google.com/go/v4/messaging"
-	"firebase.google.com/go/v4/storage"
+	// We will need to import the new app package
+	"firebase.google.com/go/v4/app"
+	// Other imports like option might still be needed if NewApp signature keeps them.
 	"google.golang.org/api/option"
-	"google.golang.org/api/transport"
+	// internal.FirebaseScopes was used by the old NewApp. app.New now handles this.
 )
-
-var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
 const Version = "4.16.1"
 
-// firebaseEnvName is the name of the environment variable with the Config.
-const firebaseEnvName = "FIREBASE_CONFIG"
+// Config is an alias to app.Config for convenience.
+// Users can import app.Config directly, but this provides a smoother transition for existing code.
+type Config = app.Config
 
-// An App holds configuration and state common to all Firebase services that are exposed from the SDK.
-type App struct {
-	authOverride     map[string]interface{}
-	dbURL            string
-	projectID        string
-	serviceAccountID string
-	storageBucket    string
-	opts             []option.ClientOption
-}
-
-// Config represents the configuration used to initialize an App.
-type Config struct {
-	AuthOverride     *map[string]interface{} `json:"databaseAuthVariableOverride"`
-	DatabaseURL      string                  `json:"databaseURL"`
-	ProjectID        string                  `json:"projectId"`
-	ServiceAccountID string                  `json:"serviceAccountId"`
-	StorageBucket    string                  `json:"storageBucket"`
-}
-
-// Auth returns an instance of auth.Client.
-func (a *App) Auth(ctx context.Context) (*auth.Client, error) {
-	conf := &internal.AuthConfig{
-		ProjectID:        a.projectID,
-		Opts:             a.opts,
-		ServiceAccountID: a.serviceAccountID,
-		Version:          Version,
-	}
-	return auth.NewClient(ctx, conf)
-}
-
-// Database returns an instance of db.Client to interact with the default Firebase Database
-// configured via Config.DatabaseURL.
-func (a *App) Database(ctx context.Context) (*db.Client, error) {
-	return a.DatabaseWithURL(ctx, a.dbURL)
-}
-
-// DatabaseWithURL returns an instance of db.Client to interact with the Firebase Database
-// identified by the given URL.
-func (a *App) DatabaseWithURL(ctx context.Context, url string) (*db.Client, error) {
-	conf := &internal.DatabaseConfig{
-		AuthOverride: a.authOverride,
-		URL:          url,
-		Opts:         a.opts,
-		Version:      Version,
-	}
-	return db.NewClient(ctx, conf)
-}
-
-// Storage returns a new instance of storage.Client.
-func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
-	conf := &internal.StorageConfig{
-		Opts:   a.opts,
-		Bucket: a.storageBucket,
-	}
-	return storage.NewClient(ctx, conf)
-}
-
-// Firestore returns a new firestore.Client instance from the https://godoc.org/cloud.google.com/go/firestore
-// package.
-func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
-	if a.projectID == "" {
-		return nil, errors.New("project id is required to access Firestore")
-	}
-	return firestore.NewClient(ctx, a.projectID, a.opts...)
-}
-
-// InstanceID returns an instance of iid.Client.
-func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
-	conf := &internal.InstanceIDConfig{
-		ProjectID: a.projectID,
-		Opts:      a.opts,
-		Version:   Version,
-	}
-	return iid.NewClient(ctx, conf)
-}
-
-// Messaging returns an instance of messaging.Client.
-func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
-	conf := &internal.MessagingConfig{
-		ProjectID: a.projectID,
-		Opts:      a.opts,
-		Version:   Version,
-	}
-	return messaging.NewClient(ctx, conf)
-}
-
-// AppCheck returns an instance of appcheck.Client.
-func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
-	conf := &internal.AppCheckConfig{
-		ProjectID: a.projectID,
-	}
-	return appcheck.NewClient(ctx, conf)
-}
-
-// NewApp creates a new App from the provided config and client options.
+// NewApp creates a new default App instance.
+//
+// This function is a convenience wrapper around app.New().
+// It initializes the default Firebase app. For named apps, or more control,
+// use the app package directly.
 //
 // If the client options contain a valid credential (a service account file, a refresh token
 // file or an oauth2.TokenSource) the App will be authenticated using that credential. Otherwise,
 // NewApp attempts to authenticate the App with Google application default credentials.
 // If `config` is nil, the SDK will attempt to load the config options from the
-// `FIREBASE_CONFIG` environment variable. If the value in it starts with a `{` it is parsed as a
-// JSON object, otherwise it is assumed to be the name of the JSON file containing the options.
-func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*App, error) {
-	o := []option.ClientOption{option.WithScopes(internal.FirebaseScopes...)}
-	o = append(o, opts...)
-	if config == nil {
-		var err error
-		if config, err = getConfigDefaults(); err != nil {
-			return nil, err
-		}
-	}
-
-	pid := getProjectID(ctx, config, o...)
-	ao := defaultAuthOverrides
-	if config.AuthOverride != nil {
-		ao = *config.AuthOverride
-	}
-
-	return &App{
-		authOverride:     ao,
-		dbURL:            config.DatabaseURL,
-		projectID:        pid,
-		serviceAccountID: config.ServiceAccountID,
-		storageBucket:    config.StorageBucket,
-		opts:             o,
-	}, nil
+// `FIREBASE_CONFIG` environment variable.
+func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*app.App, error) {
+	// The app.New function now handles the logic of default scopes, config loading etc.
+	return app.New(ctx, config, opts...)
 }
 
-// getConfigDefaults reads the default config file, defined by the FIREBASE_CONFIG
-// env variable, used only when options are nil.
-func getConfigDefaults() (*Config, error) {
-	fbc := &Config{}
-	confFileName := os.Getenv(firebaseEnvName)
-	if confFileName == "" {
-		return fbc, nil
-	}
-	var dat []byte
-	if confFileName[0] == byte('{') {
-		dat = []byte(confFileName)
-	} else {
-		var err error
-		if dat, err = ioutil.ReadFile(confFileName); err != nil {
-			return nil, err
-		}
-	}
-	if err := json.Unmarshal(dat, fbc); err != nil {
-		return nil, err
-	}
-
-	// Some special handling necessary for db auth overrides
-	var m map[string]interface{}
-	if err := json.Unmarshal(dat, &m); err != nil {
-		return nil, err
-	}
-	if ao, ok := m["databaseAuthVariableOverride"]; ok && ao == nil {
-		// Auth overrides are explicitly set to null
-		var nullMap map[string]interface{}
-		fbc.AuthOverride = &nullMap
-	}
-	return fbc, nil
-}
-
-func getProjectID(ctx context.Context, config *Config, opts ...option.ClientOption) string {
-	if config.ProjectID != "" {
-		return config.ProjectID
-	}
-
-	creds, _ := transport.Creds(ctx, opts...)
-	if creds != nil && creds.ProjectID != "" {
-		return creds.ProjectID
-	}
-
-	if pid := os.Getenv("GOOGLE_CLOUD_PROJECT"); pid != "" {
-		return pid
-	}
-
-	return os.Getenv("GCLOUD_PROJECT")
-}
+// TODO: Future considerations:
+// - Global app registry (appMap, GetApp, DeleteApp, NewAppWithName)
+//   If this functionality is to be preserved, it would live in this firebase package,
+//   managing instances of app.App. For now, this is simplified to just NewApp for the default app.
+// - The original firebase.App struct also had methods like Auth(), Database(), etc.
+//   These are intentionally removed as per the modularization goal. Users will now
+//   create service clients directly, e.g., auth.NewClient(ctx, appInstance).
+// - The firebaseEnvName and defaultAuthOverrides constants were part of the logic
+//   moved to app/app.go.
+// - The functions getConfigDefaults and getProjectID were moved to app/app.go.
+// - Firestore, AppCheck, etc. client creations were methods on the old firebase.App.
+//   These services will also follow the new pattern: servicePkg.NewClient(ctx, appInstance).
+// - The imports for "cloud.google.com/go/firestore", "firebase.google.com/go/v4/auth", etc.
+//   are no longer needed in this file as firebase.App no longer provides direct service client methods.
+//   The `internal` import is also removed as its usage was tied to the old App methods.
+//   The `app` package now handles its own dependencies, which might include `internal`.
+// - The `firebase.App` type itself is removed. Functions now return `*app.App`.
+//   If a distinct `firebase.App` type is needed (e.g. for app management), it would
+//   be a new struct, likely embedding or holding an `*app.App`.
+//   For this step, we assume `firebase.NewApp` returns `*app.App` directly.
+// - Consider if `firebase.Option` (if it existed) should alias `app.Option` or `option.ClientOption`.
+//   The `opts ...option.ClientOption` is from `google.golang.org/api/option`.
+//   `app.Config` is the configuration struct.
+//   The user's example `opt := option.WithCredentialsFile(...)` uses `google.golang.org/api/option`.
+//   So `firebase.Config` aliasing `app.Config` seems correct.

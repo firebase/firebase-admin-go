@@ -20,13 +20,15 @@ package auth
 import (
 	"context"
 
-	"firebase.google.com/go/v4/internal"
+	// "firebase.google.com/go/v4/internal" // No longer needed directly by newCryptoSigner
+	"google.golang.org/api/option" // To match signature of non-AppEngine version
 	"google.golang.org/appengine/v2"
 )
 
 type aeSigner struct{}
 
-func newCryptoSigner(ctx context.Context, conf *internal.AuthConfig) (cryptoSigner, error) {
+// conf parameter (serviceAccountID, sdkVersion, opts) is unused in App Engine implementation but included for signature consistency.
+func newCryptoSigner(ctx context.Context, serviceAccountID string, sdkVersion string, opts ...option.ClientOption) (cryptoSigner, error) {
 	return aeSigner{}, nil
 }
 

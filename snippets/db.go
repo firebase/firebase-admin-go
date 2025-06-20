@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"log"
 
-	firebase "firebase.google.com/go/v4"
+	firebase "firebase.google.com/go/v4" // For firebase.NewApp and firebase.Config (alias)
+	"firebase.google.com/go/v4/app"     // For app.App type
 	"firebase.google.com/go/v4/db"
 	"google.golang.org/api/option"
 )
@@ -30,19 +31,21 @@ import (
 func authenticateWithAdminPrivileges() {
 	// [START authenticate_with_admin_privileges]
 	ctx := context.Background()
-	conf := &firebase.Config{
+	conf := &firebase.Config{ // firebase.Config is an alias to app.Config
 		DatabaseURL: "https://databaseName.firebaseio.com",
 	}
 	// Fetch the service account key JSON file contents
 	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
 
 	// Initialize the app with a service account, granting admin privileges
-	app, err := firebase.NewApp(ctx, conf, opt)
+	appInstance, err := firebase.NewApp(ctx, conf, opt) // Returns *app.App
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
 
-	client, err := app.Database(ctx)
+	// Use db.NewClient(ctx, appInstance, optionalURL)
+	// If DatabaseURL is in appInstance.Config, it will be used by default.
+	client, err := db.NewClient(ctx, appInstance)
 	if err != nil {
 		log.Fatalln("Error initializing database client:", err)
 	}
@@ -62,7 +65,7 @@ func authenticateWithLimitedPrivileges() {
 	ctx := context.Background()
 	// Initialize the app with a custom auth variable, limiting the server's access
 	ao := map[string]interface{}{"uid": "my-service-worker"}
-	conf := &firebase.Config{
+	conf := &firebase.Config{ // firebase.Config is an alias to app.Config
 		DatabaseURL:  "https://databaseName.firebaseio.com",
 		AuthOverride: &ao,
 	}
@@ -70,12 +73,12 @@ func authenticateWithLimitedPrivileges() {
 	// Fetch the service account key JSON file contents
 	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
 
-	app, err := firebase.NewApp(ctx, conf, opt)
+	appInstance, err := firebase.NewApp(ctx, conf, opt) // Returns *app.App
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
 
-	client, err := app.Database(ctx)
+	client, err := db.NewClient(ctx, appInstance) // Uses DatabaseURL and AuthOverride from appInstance
 	if err != nil {
 		log.Fatalln("Error initializing database client:", err)
 	}
@@ -95,7 +98,7 @@ func authenticateWithGuestPrivileges() {
 	ctx := context.Background()
 	// Initialize the app with a nil auth variable, limiting the server's access
 	var nilMap map[string]interface{}
-	conf := &firebase.Config{
+	conf := &firebase.Config{ // firebase.Config is an alias to app.Config
 		DatabaseURL:  "https://databaseName.firebaseio.com",
 		AuthOverride: &nilMap,
 	}
@@ -103,12 +106,12 @@ func authenticateWithGuestPrivileges() {
 	// Fetch the service account key JSON file contents
 	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
 
-	app, err := firebase.NewApp(ctx, conf, opt)
+	appInstance, err := firebase.NewApp(ctx, conf, opt) // Returns *app.App
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
 
-	client, err := app.Database(ctx)
+	client, err := db.NewClient(ctx, appInstance) // Uses DatabaseURL and AuthOverride from appInstance
 	if err != nil {
 		log.Fatalln("Error initializing database client:", err)
 	}
@@ -123,10 +126,11 @@ func authenticateWithGuestPrivileges() {
 	// [END authenticate_with_guest_privileges]
 }
 
-func getReference(ctx context.Context, app *firebase.App) {
+func getReference(ctx context.Context, appInstance *app.App) { // Parameter type changed to *app.App
 	// [START get_reference]
 	// Create a database client from App.
-	client, err := app.Database(ctx)
+	// The DatabaseURL from appInstance's config will be used by default.
+	client, err := db.NewClient(ctx, appInstance)
 	if err != nil {
 		log.Fatalln("Error initializing database client:", err)
 	}
@@ -296,10 +300,10 @@ func transaction(ctx context.Context, client *db.Client) {
 	// [END transaction]
 }
 
-func readValue(ctx context.Context, app *firebase.App) {
+func readValue(ctx context.Context, appInstance *app.App) { // Parameter type changed to *app.App
 	// [START read_value]
 	// Create a database client from App.
-	client, err := app.Database(ctx)
+	client, err := db.NewClient(ctx, appInstance) // Use db.NewClient
 	if err != nil {
 		log.Fatalln("Error initializing database client:", err)
 	}
@@ -308,12 +312,12 @@ func readValue(ctx context.Context, app *firebase.App) {
 	ref := client.NewRef("server/saving-data/fireblog/posts")
 
 	// Read the data at the posts reference (this is a blocking operation)
-	var post Post
+	var post Post // Assuming Post is defined elsewhere in snippets
 	if err := ref.Get(ctx, &post); err != nil {
 		log.Fatalln("Error reading value:", err)
 	}
 	// [END read_value]
-	fmt.Println(ref.Path)
+	fmt.Println(ref.Path) // This will print the path, not the post itself
 }
 
 // [START dinosaur_type]

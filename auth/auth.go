@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"firebase.google.com/go/v4/app"
 	"firebase.google.com/go/v4/internal"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
@@ -53,10 +54,12 @@ var emulatorToken = &oauth2.Token{
 	AccessToken: "owner",
 }
 
-// Client is the interface for the Firebase auth service.
+// Client is the primary interface for the Firebase Authentication service.
+// It provides methods for minting custom tokens, verifying ID tokens and session cookies,
+// and managing users in a Firebase project.
 //
-// Client facilitates generating custom JWT tokens for Firebase clients, and verifying ID tokens issued
-// by Firebase backend services.
+// An instance of the Auth Client is obtained by calling NewClient with a valid
+// *app.App instance.
 type Client struct {
 	*baseClient
 	TenantManager *TenantManager
@@ -64,9 +67,22 @@ type Client struct {
 
 // NewClient creates a new instance of the Firebase Auth Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// Auth service through firebase.App.
-func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) {
+// It requires a context and a previously initialized *app.App instance.
+// The *app.App provides the necessary configuration (like Project ID and credentials)
+// for the Auth client to interact with Firebase services.
+//
+// Example:
+//
+//	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
+//	appInstance, err := app.New(context.Background(), nil, opt)
+//	if err != nil {
+//	    log.Fatalf("error initializing app: %v\n", err)
+//	}
+//	authClient, err := auth.NewClient(context.Background(), appInstance)
+//	if err != nil {
+//	    log.Fatalf("error getting Auth client: %v\n", err)
+//	}
+func NewClient(ctx context.Context, app *app.App) (*Client, error) {
 	var (
 		isEmulator bool
 		signer     cryptoSigner
@@ -79,65 +95,73 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		signer = emulatedSigner{}
 	}
 
+	// Use app.Options() which contains all client options including credentials.
+	clientOpts := app.Options()
+
 	if signer == nil {
-		creds, _ := transport.Creds(ctx, conf.Opts...)
+		creds, _ := transport.Creds(ctx, clientOpts...)
 
 		// Initialize a signer by following the go/firebase-admin-sign protocol.
 		if creds != nil && len(creds.JSON) > 0 {
 			// If the SDK was initialized with a service account, use it to sign bytes.
 			signer, err = signerFromCreds(creds.JSON)
-			if err != nil && err != errNotAServiceAcct {
+			// Use errors.Is for checking specific error instances
+			if err != nil && !errors.Is(err, errNotAServiceAcct) {
 				return nil, err
 			}
 		}
 	}
 
+	// Construct an internal.AuthConfig equivalent or pass individual fields for legacy functions.
+	sdkVersion := app.SDKVersion()
+
 	if signer == nil {
-		if conf.ServiceAccountID != "" {
+		if app.ServiceAccountID() != "" {
 			// If the SDK was initialized with a service account email, use it with the IAM service
 			// to sign bytes.
-			signer, err = newIAMSigner(ctx, conf)
+			signer, err = newIAMSigner(ctx, app.ServiceAccountID(), sdkVersion, clientOpts...)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			// Use GAE signing capabilities if available. Otherwise, obtain a service account email
 			// from the local Metadata service, and fallback to the IAM service.
-			signer, err = newCryptoSigner(ctx, conf)
+			signer, err = newCryptoSigner(ctx, app.ServiceAccountID(), sdkVersion, clientOpts...)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, app.ProjectID())
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, app.ProjectID())
 	if err != nil {
 		return nil, err
 	}
 
-	var opts []option.ClientOption
+	var transportOpts []option.ClientOption
 	if isEmulator {
 		ts := oauth2.StaticTokenSource(emulatorToken)
-		opts = append(opts, option.WithTokenSource(ts))
+		transportOpts = append(transportOpts, option.WithTokenSource(ts))
 	} else {
-		opts = append(opts, conf.Opts...)
+		transportOpts = append(transportOpts, clientOpts...)
 	}
 
-	transport, _, err := transport.NewHTTPClient(ctx, opts...)
+	httpClientTransport, _, err := transport.NewHTTPClient(ctx, transportOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	hc := internal.WithDefaultRetryConfig(transport)
+	hc := internal.WithDefaultRetryConfig(httpClientTransport)
 	hc.CreateErrFn = handleHTTPError
+	// sdkVersion is already defined above
 	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
-		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", sdkVersion)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(sdkVersion)),
 	}
 
 	baseURL := defaultAuthURL
@@ -156,7 +180,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		providerConfigEndpoint: providerConfigEndpoint,
 		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectMgtEndpoint:     projectMgtEndpoint,
-		projectID:              conf.ProjectID,
+		projectID:              app.ProjectID(),
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
 		cookieVerifier:         cookieVerifier,
@@ -164,9 +188,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		clock:                  internal.SystemClock,
 		isEmulator:             isEmulator,
 	}
+
+	tenantManager := newTenantManager(hc, app.ProjectID(), base)
+
 	return &Client{
 		baseClient:    base,
-		TenantManager: newTenantManager(hc, conf, base),
+		TenantManager: tenantManager,
 	}, nil
 }
 
@@ -448,11 +475,10 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 }
 
 func hasAuthErrorCode(err error, code string) bool {
-	fe, ok := err.(*internal.FirebaseError)
-	if !ok {
-		return false
+	var fe *internal.FirebaseError
+	if errors.As(err, &fe) {
+		got, ok := fe.Ext[authErrorCode]
+		return ok && got == code
 	}
-
-	got, ok := fe.Ext[authErrorCode]
-	return ok && got == code
+	return false
 }

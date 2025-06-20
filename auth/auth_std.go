@@ -20,9 +20,11 @@ package auth
 import (
 	"context"
 
-	"firebase.google.com/go/v4/internal"
+	"google.golang.org/api/option"
+	// internal is not directly used by this newCryptoSigner anymore
+	// "firebase.google.com/go/v4/internal"
 )
 
-func newCryptoSigner(ctx context.Context, conf *internal.AuthConfig) (cryptoSigner, error) {
-	return newIAMSigner(ctx, conf)
+func newCryptoSigner(ctx context.Context, serviceAccountID string, sdkVersion string, opts ...option.ClientOption) (cryptoSigner, error) {
+	return newIAMSigner(ctx, serviceAccountID, sdkVersion, opts...)
 }

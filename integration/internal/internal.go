@@ -23,7 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	firebase "firebase.google.com/go/v4"
+	firebase "firebase.google.com/go/v4" // For top-level NewApp if used, or for Config alias
+	"firebase.google.com/go/v4/app"     // For app.App and app.Config types
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -43,7 +44,9 @@ func Resource(name string) string {
 // NewTestApp looks for a service account JSON file named integration_cert.json
 // in the testdata directory. This file is used to initialize the newly created
 // App instance.
-func NewTestApp(ctx context.Context, conf *firebase.Config) (*firebase.App, error) {
+func NewTestApp(ctx context.Context, conf *app.Config) (*app.App, error) { // Changed param and return type
+	// firebase.NewApp now correctly returns *app.App.
+	// The conf parameter is *app.Config, which firebase.NewApp expects (via alias).
 	return firebase.NewApp(ctx, conf, option.WithCredentialsFile(Resource(certPath)))
 }
 

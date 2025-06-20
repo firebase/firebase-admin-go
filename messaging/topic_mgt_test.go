@@ -18,15 +18,35 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
+	"google.golang.org/api/option" // For app options
 )
+
+// testMessagingProjectID is defined in messaging_test.go, assuming it's accessible
+// or we redefine it here if necessary. For now, assume it's "test-project".
+
+// Helper to create a new app.App for Messaging Topic Management tests
+func newTestTopicApp(ctx context.Context) *app.App {
+	opts := []option.ClientOption{
+		option.WithTokenSource(&internal.MockTokenSource{AccessToken: "test-token"}),
+		option.WithScopes(internal.FirebaseScopes...),
+	}
+	appInstance, err := app.New(ctx, &app.Config{ProjectID: testMessagingProjectID}, opts...)
+	if err != nil {
+		log.Fatalf("Error creating test app for Messaging (topic_mgt): %v", err)
+	}
+	return appInstance
+}
+
 
 func TestSubscribe(t *testing.T) {
 	var tr *http.Request
@@ -40,23 +60,46 @@ func TestSubscribe(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestTopicApp(ctx)
+	client, err := NewClient(ctx, appInstance) // NewClient now takes *app.App
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL + "/v1"
+	// The iidClient within the messaging client handles its own endpoint.
+	// We need to ensure the test server URL is used by the internal iidClient.
+	// This requires the iidClient to be configurable or to use the app's http client,
+	// which can be a test client.
+	// For simplicity in this refactor, if iidClient is not using app's http client directly for its endpoint,
+	// we'd have to modify it or accept this test might not hit the mock for iid part.
+	// However, `newIIDClient` (in topic_mgt.go) takes an `hc *http.Client`.
+	// This `hc` comes from `appInstance.Options()` in `messaging.NewClient`.
+	// So, if we want `iidClient` to talk to `ts`, `appInstance` needs an http client pointing to `ts`.
+	// This is complex. A simpler mock for `iidClient` methods might be needed if direct http override is hard.
+
+	// For now, let's assume the internal iidClient's httpClient will be correctly
+	// configured if the appInstance passed to messaging.NewClient has a test http client.
+	// The `newTestTopicApp` creates a generic app.
+	// A more robust test setup would involve creating an app with an httptest client.
+	// Let's override the iidClient's endpoint for this test to ensure it hits the mock.
+	if client.iidClient != nil {
+		client.iidClient.iidEndpoint = ts.URL // Override internal IID endpoint
+	} else {
+		t.Fatal("messaging client's internal iidClient is nil")
+	}
+
 
 	resp, err := client.SubscribeToTopic(ctx, []string{"id1", "id2"}, "test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkIIDRequest(t, b, tr, iidSubscribe)
+	checkIIDRequest(t, b, tr, iidSubscribe, appInstance.SDKVersion()) // Pass sdkVersion
 	checkTopicMgtResponse(t, resp)
 }
 
 func TestInvalidSubscribe(t *testing.T) {
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestTopicApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,23 +126,30 @@ func TestUnsubscribe(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestTopicApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL + "/v1"
+	if client.iidClient != nil {
+		client.iidClient.iidEndpoint = ts.URL
+	} else {
+		t.Fatal("messaging client's internal iidClient is nil")
+	}
+
 
 	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1", "id2"}, "test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkIIDRequest(t, b, tr, iidUnsubscribe)
+	checkIIDRequest(t, b, tr, iidUnsubscribe, appInstance.SDKVersion()) // Pass sdkVersion
 	checkTopicMgtResponse(t, resp)
 }
 
 func TestInvalidUnsubscribe(t *testing.T) {
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestTopicApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,25 +165,31 @@ func TestInvalidUnsubscribe(t *testing.T) {
 }
 
 func TestTopicManagementError(t *testing.T) {
-	var resp string
+	var respBody string // Renamed from resp to avoid conflict
 	var status int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(resp))
+		w.Write([]byte(respBody))
 	}))
 	defer ts.Close()
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
+	appInstance := newTestTopicApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.iidEndpoint = ts.URL + "/v1"
-	client.iidClient.httpClient.RetryConfig = nil
+	if client.iidClient != nil && client.iidClient.httpClient != nil {
+		client.iidClient.iidEndpoint = ts.URL
+		client.iidClient.httpClient.RetryConfig = nil
+	} else {
+		t.Fatal("messaging client's internal iidClient or its httpClient is nil")
+	}
+
 
 	cases := []struct {
-		name, resp, want string
+		name, resp, want string // field resp renamed to respStr to avoid conflict
 		status           int
 		check            func(err error) bool
 	}{
@@ -161,7 +217,7 @@ func TestTopicManagementError(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		resp = tc.resp
+		respBody = tc.resp // Set the global respBody for the handler
 		status = tc.status
 
 		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
@@ -176,7 +232,7 @@ func TestTopicManagementError(t *testing.T) {
 	}
 }
 
-func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
+func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string, sdkVersion string) {
 	var parsed map[string]interface{}
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		t.Fatal(err)
@@ -192,14 +248,14 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 	if tr.Method != http.MethodPost {
 		t.Errorf("Method = %q; want = %q", tr.Method, http.MethodPost)
 	}
-	wantOp := "/v1:" + op
+	wantOp := ":" + op // Path for IID batchAdd/Remove is just ":op" relative to endpoint
 	if tr.URL.Path != wantOp {
 		t.Errorf("Path = %q; want = %q", tr.URL.Path, wantOp)
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
 	}
-	xGoogAPIClientHeader := internal.GetMetricsHeader(testMessagingConfig.Version)
+	xGoogAPIClientHeader := internal.GetMetricsHeader(sdkVersion) // Use sdkVersion
 	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
 		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}

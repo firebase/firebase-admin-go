@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"strings"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/internal"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
@@ -64,30 +65,49 @@ type dbURLConfig struct {
 
 // NewClient creates a new instance of the Firebase Database Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// Database service through firebase.App.
-func NewClient(ctx context.Context, c *internal.DatabaseConfig) (*Client, error) {
-	urlConfig, isEmulator, err := parseURLConfig(c.URL)
+// It requires a context and a previously initialized *app.App instance.
+// Optionally, a specific databaseURL can be provided as the first element of dbURL.
+// If no dbURL is provided, the DatabaseURL from the app's configuration (app.Config.DatabaseURL)
+// will be used. If neither is available, an error is returned.
+//
+// The *app.App provides the necessary configuration (like Project ID, credentials,
+// and auth overrides) for the Database client.
+func NewClient(ctx context.Context, appInstance *app.App, dbURL ...string) (*Client, error) {
+	var targetURL string
+	if len(dbURL) > 0 && dbURL[0] != "" {
+		targetURL = dbURL[0]
+	} else {
+		targetURL = appInstance.DatabaseURL()
+	}
+
+	if targetURL == "" {
+		return nil, errors.New("database URL must be specified in app config or as an argument")
+	}
+
+	urlConfig, isEmulator, err := parseURLConfig(targetURL)
 	if err != nil {
 		return nil, err
 	}
 
 	var ao []byte
-	if c.AuthOverride == nil || len(c.AuthOverride) > 0 {
-		ao, err = json.Marshal(c.AuthOverride)
+	authOverride := appInstance.AuthOverride() // Get from app.App
+	if authOverride == nil || len(authOverride) > 0 { // Logic for when to marshal remains similar
+		ao, err = json.Marshal(authOverride)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	opts := append([]option.ClientOption{}, c.Opts...)
+	// Use options from app.App
+	clientOpts := append([]option.ClientOption{}, appInstance.Options()...)
 	if isEmulator {
 		ts := oauth2.StaticTokenSource(emulatorToken)
-		opts = append(opts, option.WithTokenSource(ts))
+		clientOpts = append(clientOpts, option.WithTokenSource(ts))
 	}
-	ua := fmt.Sprintf(userAgentFormat, c.Version, runtime.Version())
-	opts = append(opts, option.WithUserAgent(ua))
-	hc, _, err := internal.NewHTTPClient(ctx, opts...)
+	// User-Agent now uses SDKVersion from app.App
+	ua := fmt.Sprintf(userAgentFormat, appInstance.SDKVersion(), runtime.Version())
+	clientOpts = append(clientOpts, option.WithUserAgent(ua))
+	hc, _, err := internal.NewHTTPClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
 	}

@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/app" // Changed from firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
 	"firebase.google.com/go/v4/auth/hash"
 	"google.golang.org/api/iterator"
@@ -33,9 +33,9 @@ import (
 // https://firebase.google.com/docs/auth/admin/create-custom-tokens
 // ==================================================================
 
-func createCustomToken(ctx context.Context, app *firebase.App) string {
+func createCustomToken(ctx context.Context, appInstance *app.App) string { // Changed to *app.App
 	// [START create_custom_token_golang]
-	client, err := app.Auth(context.Background())
+	client, err := auth.NewClient(context.Background(), appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -51,9 +51,9 @@ func createCustomToken(ctx context.Context, app *firebase.App) string {
 	return token
 }
 
-func createCustomTokenWithClaims(ctx context.Context, app *firebase.App) string {
+func createCustomTokenWithClaims(ctx context.Context, appInstance *app.App) string { // Changed to *app.App
 	// [START create_custom_token_claims_golang]
-	client, err := app.Auth(context.Background())
+	client, err := auth.NewClient(context.Background(), appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -77,9 +77,9 @@ func createCustomTokenWithClaims(ctx context.Context, app *firebase.App) string 
 // https://firebase.google.com/docs/auth/admin/verify-id-tokens
 // ==================================================================
 
-func verifyIDToken(ctx context.Context, app *firebase.App, idToken string) *auth.Token {
+func verifyIDToken(ctx context.Context, appInstance *app.App, idToken string) *auth.Token { // Changed to *app.App
 	// [START verify_id_token_golang]
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -99,9 +99,9 @@ func verifyIDToken(ctx context.Context, app *firebase.App, idToken string) *auth
 // https://firebase.google.com/docs/auth/admin/manage-sessions
 // ==================================================================
 
-func revokeRefreshTokens(ctx context.Context, app *firebase.App, uid string) {
+func revokeRefreshTokens(ctx context.Context, appInstance *app.App, uid string) { // Changed to *app.App
 	// [START revoke_tokens_golang]
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -118,9 +118,9 @@ func revokeRefreshTokens(ctx context.Context, app *firebase.App, uid string) {
 	// [END revoke_tokens_golang]
 }
 
-func verifyIDTokenAndCheckRevoked(ctx context.Context, app *firebase.App, idToken string) *auth.Token {
+func verifyIDTokenAndCheckRevoked(ctx context.Context, appInstance *app.App, idToken string) *auth.Token { // Changed to *app.App
 	// [START verify_id_token_and_check_revoked_golang]
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -142,12 +142,12 @@ func verifyIDTokenAndCheckRevoked(ctx context.Context, app *firebase.App, idToke
 // https://firebase.google.com/docs/auth/admin/manage-users
 // ==================================================================
 
-func getUser(ctx context.Context, app *firebase.App) *auth.UserRecord {
+func getUser(ctx context.Context, appInstance *app.App) *auth.UserRecord { // Changed to *app.App
 	uid := "some_string_uid"
 
 	// [START get_user_golang]
 	// Get an auth client from the firebase.App
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -289,11 +289,11 @@ func bulkDeleteUsers(ctx context.Context, client *auth.Client) {
 	// [END bulk_delete_users_golang]
 }
 
-func customClaimsSet(ctx context.Context, app *firebase.App) {
+func customClaimsSet(ctx context.Context, appInstance *app.App) { // Changed to *app.App
 	uid := "uid"
 	// [START set_custom_user_claims_golang]
 	// Get an auth client from the firebase.App
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error getting Auth client: %v\n", err)
 	}
@@ -424,7 +424,7 @@ func listUsers(ctx context.Context, client *auth.Client) {
 	// [END list_all_users_golang]
 }
 
-func importUsers(ctx context.Context, app *firebase.App) {
+func importUsers(ctx context.Context, appInstance *app.App) { // Changed to *app.App
 	// [START build_user_list]
 	// Up to 1000 users can be imported at once.
 	var users []*auth.UserToImport
@@ -441,7 +441,7 @@ func importUsers(ctx context.Context, app *firebase.App) {
 	// [END build_user_list]
 
 	// [START import_users]
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalln("Error initializing Auth client", err)
 	}
@@ -1040,9 +1040,9 @@ func listOIDCProviderConfigs(ctx context.Context, client *auth.Client) {
 // https://cloud.google.com/identity-platform/docs/multi-tenancy-managing-tenants
 // =================================================================================
 
-func getTenantClient(ctx context.Context, app *firebase.App, tenantID string) *auth.TenantClient {
+func getTenantClient(ctx context.Context, appInstance *app.App, tenantID string) *auth.TenantClient { // Changed to *app.App
 	// [START get_tenant_client]
-	client, err := app.Auth(ctx)
+	client, err := auth.NewClient(ctx, appInstance) // Use auth.NewClient
 	if err != nil {
 		log.Fatalf("error initializing auth client: %v\n", err)
 	}

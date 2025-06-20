@@ -20,15 +20,16 @@ import (
 	"log"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/app" // Import app package
+	// firebase "firebase.google.com/go/v4" // No longer needed for app type
 	"firebase.google.com/go/v4/messaging"
 )
 
-func sendToToken(app *firebase.App) {
+func sendToToken(appInstance *app.App) { // Changed to *app.App
 	// [START send_to_token_golang]
 	// Obtain a messaging.Client from the App.
 	ctx := context.Background()
-	client, err := app.Messaging(ctx)
+	client, err := messaging.NewClient(ctx, appInstance) // Use messaging.NewClient
 	if err != nil {
 		log.Fatalf("error getting Messaging client: %v\n", err)
 	}

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/transport"
 )
@@ -901,28 +902,43 @@ type Client struct {
 
 // NewClient creates a new instance of the Firebase Cloud Messaging Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// the messaging service through firebase.App.
-func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error) {
-	if c.ProjectID == "" {
+// It requires a context and a previously initialized *app.App instance.
+// The *app.App provides the necessary configuration (like Project ID and credentials)
+// for the Messaging client to interact with Firebase services.
+func NewClient(ctx context.Context, appInstance *app.App) (*Client, error) {
+	projectID := appInstance.ProjectID()
+	if projectID == "" {
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, messagingEndpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
+	clientOpts := appInstance.Options()
+	// transport.NewHTTPClient will use appInstance.Options() which may include custom endpoint.
+	// If no custom endpoint, it defaults.
+	hc, endpoint, err := transport.NewHTTPClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	batchEndpoint := messagingEndpoint
+	messagingEndpoint := endpoint
+	batchEndpoint := endpoint // By default, batch uses the same as messaging if endpoint is set.
 
-	if messagingEndpoint == "" {
+	if endpoint == "" { // No custom endpoint from appInstance.Options()
 		messagingEndpoint = defaultMessagingEndpoint
 		batchEndpoint = defaultBatchEndpoint
+	} else {
+		// If a custom endpoint is provided, it's used for both.
+		// Specific batch endpoint override might need a different mechanism if required.
+		// For now, assume custom endpoint applies to all FCM related calls if set.
 	}
 
+	// No longer need tempConf as newFCMClient and newIIDClient now take projectID and sdkVersion.
+	// hc (http.Client) is already configured with appInstance.Options().
+	// } // This closing brace was from the tempConf block, removing it.
+
+	sdkVersion := appInstance.SDKVersion()
 	return &Client{
-		fcmClient: newFCMClient(hc, c, messagingEndpoint, batchEndpoint),
-		iidClient: newIIDClient(hc, c),
+		fcmClient: newFCMClient(hc, projectID, sdkVersion, messagingEndpoint, batchEndpoint),
+		iidClient: newIIDClient(hc, sdkVersion), // Pass sdkVersion, projectID is not used by this internal newIIDClient's direct logic
 	}, nil
 }
 
@@ -930,26 +946,38 @@ type fcmClient struct {
 	fcmEndpoint   string
 	batchEndpoint string
 	project       string
-	version       string
+	sdkVersion    string // Store sdkVersion
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndpoint string, batchEndpoint string) *fcmClient {
+func newFCMClient(hc *http.Client, projectID, sdkVersion, messagingEndpoint, batchEndpoint string) *fcmClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleFCMError
 
-	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
+	firebaseClientHeaderValue := fmt.Sprintf("fire-admin-go/%s", sdkVersion)
+
+	// Add FCM specific headers.
+	// x-goog-api-client should already be part of hc if created via internal.NewHTTPClient or from app.Options()
+	// For safety, or if hc is a raw http.Client, we can add it here too.
+	// transport.NewHTTPClient (used in appcheck and previously here) adds x-goog-api-client.
+	// Assuming hc from appInstance.Options() via transport.NewHTTPClient has these.
+	// We just add headers specific to FCM on top of the internal.HTTPClient wrapper.
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
-		internal.WithHeader(firebaseClientHeader, version),
-		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+		internal.WithHeader(firebaseClientHeader, firebaseClientHeaderValue),
+		// Ensure x-goog-api-client is present if not already on hc.
+		// internal.NewHTTPClient (which `app.New` would use to build its internal client for services)
+		// would typically add this. If hc is directly from transport.NewHTTPClient, it will have it.
+		// So, this might be redundant if hc is always from `app.Options()` that went through `transport.NewHTTPClient`.
+		// For robustness, let's ensure it via GetMetricsHeader if it's not harmful to set twice (it's a Set not Add).
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(sdkVersion)),
 	}
 
 	return &fcmClient{
 		fcmEndpoint:   messagingEndpoint,
 		batchEndpoint: batchEndpoint,
-		project:       conf.ProjectID,
-		version:       version,
+		project:       projectID,
+		sdkVersion:    sdkVersion, // Set sdkVersion
 		httpClient:    client,
 	}
 }

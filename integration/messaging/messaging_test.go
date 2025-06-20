@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"testing"
 
+	// "firebase.google.com/go/v4/app" // Removed unused import
 	"firebase.google.com/go/v4/integration/internal"
 	"firebase.google.com/go/v4/messaging"
 )
@@ -47,12 +48,12 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx, nil)
+	appInstance, err := internal.NewTestApp(ctx, nil) // Returns *app.App
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.Messaging(ctx)
+	client, err = messaging.NewClient(ctx, appInstance) // Use messaging.NewClient
 	if err != nil {
 		log.Fatalln(err)
 	}

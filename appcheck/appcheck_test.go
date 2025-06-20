@@ -6,16 +6,34 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
-	"firebase.google.com/go/v4/internal"
+	"firebase.google.com/go/v4/app" // Import app package
+	// "firebase.google.com/go/v4/internal" // No longer needed for AppCheckConfig
+	"github.com/MicahParks/keyfunc" // Needed for monkey-patching JWKS in some tests if http client isn't sufficient
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option" // For creating test app with options
 )
+
+const testProjectID = "project_id"
+
+// Helper to create a new app.App for AppCheck tests
+func newTestAppCheckApp(ctx context.Context) *app.App {
+	// AppCheck client doesn't require special options beyond what app.New provides by default for http client.
+	// It does require a ProjectID.
+	appInstance, err := app.New(ctx, &app.Config{ProjectID: testProjectID}, option.WithScopes( /* any specific scopes if needed, else default */ ))
+	if err != nil {
+		log.Fatalf("Error creating test app for AppCheck: %v", err)
+	}
+	return appInstance
+}
+
 
 func TestVerifyTokenHasValidClaims(t *testing.T) {
 	ts, err := setupFakeJWKS()
@@ -29,15 +47,32 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 		t.Fatalf("Error loading private key: %v", err)
 	}
 
-	JWKSUrl = ts.URL
-	conf := &internal.AppCheckConfig{
-		ProjectID: "project_id",
-	}
+	originalJWKSUrl := JWKSUrl // Backup original
+	JWKSUrl = ts.URL           // Point to mock server
+	defer func() { JWKSUrl = originalJWKSUrl }() // Restore
 
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestAppCheckApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
+	// JWKS refresh might happen in background, ensure client has time to fetch from mock if NewClient doesn't block on it.
+	// However, keyfunc.Get in NewClient is blocking, so this should be fine.
+	// If client.jwks is nil, it means keyfunc.Get failed, which NewClient should have errored on.
+	if client.jwks == nil && err == nil {
+		// Attempt a manual refresh if initial failed silently and NewClient didn't error
+		// This might be needed if the test server wasn't up when NewClient's keyfunc.Get ran.
+		// Or, more simply, ensure test server (ts) is started before NewClient is called.
+		// The current setup does this, so client.jwks should be populated.
+		// Forcing a refresh for test stability if http client was an issue:
+		newJwks, refreshErr := keyfunc.Get(ts.URL, keyfunc.Options{Ctx: ctx, Client: http.DefaultClient})
+		if refreshErr != nil {
+			t.Fatalf("Manual JWKS refresh failed: %v", refreshErr)
+		}
+		client.jwks = newJwks
+	}
+
 
 	type appCheckClaims struct {
 		Aud []string `json:"aud"`
@@ -48,47 +83,50 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	jwt.TimeFunc = func() time.Time {
 		return mockTime
 	}
+	defer func() { jwt.TimeFunc = time.Now }() // Restore time function
 
 	tokenTests := []struct {
+		name      string // Added name for better test output
 		claims    *appCheckClaims
 		wantErr   error
 		wantToken *DecodedAppCheckToken
 	}{
 		{
-			&appCheckClaims{
-				[]string{"projects/12345678", "projects/project_id"},
+			name: "ValidToken",
+			claims: &appCheckClaims{
+				[]string{"projects/12345678", "projects/" + testProjectID}, // Use testProjectID
 				jwt.RegisteredClaims{
 					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 					Subject:   "12345678:app:ID",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
-			nil,
-			&DecodedAppCheckToken{
+			wantErr: nil,
+			wantToken: &DecodedAppCheckToken{
 				Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 				Subject:   "12345678:app:ID",
-				Audience:  []string{"projects/12345678", "projects/project_id"},
+				Audience:  []string{"projects/12345678", "projects/" + testProjectID},
 				ExpiresAt: mockTime.Add(time.Hour),
 				IssuedAt:  mockTime,
 				AppID:     "12345678:app:ID",
 				Claims:    map[string]interface{}{},
 			},
 		}, {
-			&appCheckClaims{
-				[]string{"projects/12345678", "projects/project_id"},
+			name: "ValidTokenWithExtraClaims",
+			claims: &appCheckClaims{
+				[]string{"projects/12345678", "projects/" + testProjectID},
 				jwt.RegisteredClaims{
 					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 					Subject:   "12345678:app:ID",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
-					// A field our AppCheckToken does not use.
 					NotBefore: jwt.NewNumericDate(mockTime.Add(-1 * time.Hour)),
 				}},
-			nil,
-			&DecodedAppCheckToken{
+			wantErr: nil,
+			wantToken: &DecodedAppCheckToken{
 				Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 				Subject:   "12345678:app:ID",
-				Audience:  []string{"projects/12345678", "projects/project_id"},
+				Audience:  []string{"projects/12345678", "projects/" + testProjectID},
 				ExpiresAt: mockTime.Add(time.Hour),
 				IssuedAt:  mockTime,
 				AppID:     "12345678:app:ID",
@@ -97,74 +135,73 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 				},
 			},
 		}, {
-			&appCheckClaims{
-				[]string{"projects/0000000", "projects/another_project_id"},
+			name: "WrongAudience",
+			claims: &appCheckClaims{
+				[]string{"projects/0000000", "projects/another_project_id"}, // Does not contain testProjectID
 				jwt.RegisteredClaims{
 					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 					Subject:   "12345678:app:ID",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
-			ErrTokenAudience,
-			nil,
+			wantErr:   ErrTokenAudience,
+			wantToken: nil,
 		}, {
-			&appCheckClaims{
-				[]string{"projects/12345678", "projects/project_id"},
+			name: "WrongIssuer",
+			claims: &appCheckClaims{
+				[]string{"projects/12345678", "projects/" + testProjectID},
 				jwt.RegisteredClaims{
 					Issuer:    "https://not-firebaseappcheck.googleapis.com/12345678",
 					Subject:   "12345678:app:ID",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
-			ErrTokenIssuer,
-			nil,
+			wantErr:   ErrTokenIssuer,
+			wantToken: nil,
 		}, {
-			&appCheckClaims{
-				[]string{"projects/12345678", "projects/project_id"},
+			name: "EmptySubject",
+			claims: &appCheckClaims{
+				[]string{"projects/12345678", "projects/" + testProjectID},
 				jwt.RegisteredClaims{
 					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 					Subject:   "",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
-			ErrTokenSubject,
-			nil,
+			wantErr:   ErrTokenSubject,
+			wantToken: nil,
 		}, {
-			&appCheckClaims{
-				[]string{"projects/12345678", "projects/project_id"},
+			name: "MissingSubject",
+			claims: &appCheckClaims{
+				[]string{"projects/12345678", "projects/" + testProjectID},
 				jwt.RegisteredClaims{
 					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
 					ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
 					IssuedAt:  jwt.NewNumericDate(mockTime),
 				}},
-			ErrTokenSubject,
-			nil,
+			wantErr:   ErrTokenSubject,
+			wantToken: nil,
 		},
 	}
 
 	for _, tc := range tokenTests {
-		// Create an App Check-style token.
-		jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, tc.claims)
+		t.Run(tc.name, func(t *testing.T) {
+			jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, tc.claims)
+			jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU" // From mock.jwks.json
 
-		// kid matches the key ID in testdata/mock.jwks.json,
-		// which is the public key matching to the private key
-		// in testdata/appcheck_pk.pem.
-		jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+			token, err := jwtToken.SignedString(privateKey)
+			if err != nil {
+				t.Fatalf("error generating JWT: %v", err)
+			}
 
-		token, err := jwtToken.SignedString(privateKey)
-		if err != nil {
-			t.Fatalf("error generating JWT: %v", err)
-		}
-
-		// Verify the token.
-		gotToken, gotErr := client.VerifyToken(token)
-		if !errors.Is(gotErr, tc.wantErr) {
-			t.Errorf("Expected error %v, got %v", tc.wantErr, gotErr)
-			continue
-		}
-		if diff := cmp.Diff(tc.wantToken, gotToken); diff != "" {
-			t.Errorf("VerifyToken mismatch (-want +got):\n%s", diff)
-		}
+			gotToken, gotErr := client.VerifyToken(token)
+			if !errors.Is(gotErr, tc.wantErr) {
+				t.Errorf("VerifyToken() error = %v, want %v", gotErr, tc.wantErr)
+			}
+			if diff := cmp.Diff(tc.wantToken, gotToken); diff != "" {
+				t.Errorf("VerifyToken() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -175,12 +212,13 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	}
 	defer ts.Close()
 
+	originalJWKSUrl := JWKSUrl
 	JWKSUrl = ts.URL
-	conf := &internal.AppCheckConfig{
-		ProjectID: "project_id",
-	}
+	defer func() { JWKSUrl = originalJWKSUrl }()
 
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestAppCheckApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
@@ -208,59 +246,70 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 		t.Fatalf("Error loading private key: %v", err)
 	}
 
+	originalJWKSUrl := JWKSUrl
 	JWKSUrl = ts.URL
-	conf := &internal.AppCheckConfig{
-		ProjectID: "project_id",
-	}
+	defer func() { JWKSUrl = originalJWKSUrl }()
 
-	client, err := NewClient(context.Background(), conf)
+	ctx := context.Background()
+	appInstance := newTestAppCheckApp(ctx)
+	client, err := NewClient(ctx, appInstance)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
 	}
+	// Ensure JWKS is loaded if there was any issue with http client in NewClient
+	if client.jwks == nil && err == nil {
+		newJwks, refreshErr := keyfunc.Get(ts.URL, keyfunc.Options{Ctx: ctx, Client: http.DefaultClient})
+		if refreshErr != nil {t.Fatalf("Manual JWKS refresh failed: %v", refreshErr)}
+		client.jwks = newJwks
+	}
+
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 	jwt.TimeFunc = func() time.Time {
 		return mockTime
 	}
+	defer func() { jwt.TimeFunc = time.Now }()
+
 
 	tokenTests := []struct {
+		name      string // Added name
 		expiresAt time.Time
 		wantErr   bool
 	}{
-		// Expire in the future is OK.
-		{mockTime.Add(time.Hour), false},
-		// Expire in the past is not OK.
-		{mockTime.Add(-1 * time.Hour), true},
+		{"FutureExpiry", mockTime.Add(time.Hour), false},
+		{"PastExpiry", mockTime.Add(-1 * time.Hour), true},
 	}
 
 	for _, tc := range tokenTests {
-		claims := struct {
-			Aud []string `json:"aud"`
-			jwt.RegisteredClaims
-		}{
-			[]string{"projects/12345678", "projects/project_id"},
-			jwt.RegisteredClaims{
-				Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
-				Subject:   "12345678:app:ID",
-				ExpiresAt: jwt.NewNumericDate(tc.expiresAt),
-				IssuedAt:  jwt.NewNumericDate(mockTime),
-			},
-		}
+		t.Run(tc.name, func(t *testing.T){
+			claims := struct {
+				Aud []string `json:"aud"`
+				jwt.RegisteredClaims
+			}{
+				[]string{"projects/12345678", "projects/" + testProjectID},
+				jwt.RegisteredClaims{
+					Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
+					Subject:   "12345678:app:ID",
+					ExpiresAt: jwt.NewNumericDate(tc.expiresAt),
+					IssuedAt:  jwt.NewNumericDate(mockTime),
+				},
+			}
 
-		jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-		jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+			jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+			jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
 
-		token, err := jwtToken.SignedString(privateKey)
-		if err != nil {
-			t.Fatalf("error generating JWT: %v", err)
-		}
+			token, err := jwtToken.SignedString(privateKey)
+			if err != nil {
+				t.Fatalf("error generating JWT: %v", err)
+			}
 
-		_, gotErr := client.VerifyToken(token)
-		if tc.wantErr && gotErr == nil {
-			t.Errorf("Expected an error, got none")
-		} else if !tc.wantErr && gotErr != nil {
-			t.Errorf("Expected no error, got %v", gotErr)
-		}
+			_, gotErr := client.VerifyToken(token)
+			if tc.wantErr && gotErr == nil {
+				t.Errorf("Expected an error, got none")
+			} else if !tc.wantErr && gotErr != nil {
+				t.Errorf("Expected no error, got %v", gotErr)
+			}
+		})
 	}
 }
 
@@ -281,6 +330,9 @@ func loadPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	block, _ := pem.Decode(pk)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block containing private key")
+	}
 	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, err

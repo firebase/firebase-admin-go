@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strings"
 
+	"firebase.google.com/go/v4/app" // Import app package
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 )
@@ -106,28 +107,31 @@ type Client struct {
 	project  string
 }
 
-// NewClient creates a new instance of the Firebase instance ID Client.
+// NewClient creates a new instance of the Firebase Instance ID Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// the instance ID service through firebase.App.
-func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, error) {
-	if c.ProjectID == "" {
-		return nil, errors.New("project id is required to access instance id client")
+// It requires a context and a previously initialized *app.App instance.
+// The *app.App provides the necessary configuration (like Project ID and credentials)
+// for the Instance ID client to interact with Firebase services.
+func NewClient(ctx context.Context, appInstance *app.App) (*Client, error) {
+	projectID := appInstance.ProjectID()
+	if projectID == "" {
+		return nil, errors.New("project ID is required to initialize Instance ID client")
 	}
 
-	hc, _, err := internal.NewHTTPClient(ctx, c.Opts...)
+	clientOpts := appInstance.Options()
+	hc, _, err := internal.NewHTTPClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
 	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(c.Version)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(appInstance.SDKVersion())),
 	}
 
 	hc.CreateErrFn = createError
 	return &Client{
 		endpoint: iidEndpoint,
 		client:   hc,
-		project:  c.ProjectID,
+		project:  projectID,
 	}, nil
 }
 

@@ -340,7 +340,7 @@ func (c *fcmClient) newBatchRequest(messages []*Message, dryRun bool) (*internal
 	url := fmt.Sprintf("%s/projects/%s/messages:send", c.fcmEndpoint, c.project)
 	headers := map[string]string{
 		apiFormatVersionHeader: apiFormatVersion,
-		firebaseClientHeader:   c.version,
+		firebaseClientHeader:   fmt.Sprintf("fire-admin-go/%s", c.sdkVersion), // Use c.sdkVersion
 	}
 
 	var parts []*part
@@ -366,7 +366,9 @@ func (c *fcmClient) newBatchRequest(messages []*Message, dryRun bool) (*internal
 		URL:    c.batchEndpoint,
 		Body:   &multipartEntity{parts: parts},
 		Opts: []internal.HTTPOption{
-			internal.WithHeader(firebaseClientHeader, c.version),
+			// This sets the header on the main batch request.
+			// The individual parts also get this header from the `headers` map above.
+			internal.WithHeader(firebaseClientHeader, fmt.Sprintf("fire-admin-go/%s", c.sdkVersion)), // Use c.sdkVersion
 		},
 	}, nil
 }

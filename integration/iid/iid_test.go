@@ -22,6 +22,7 @@ import (
 	"os"
 	"testing"
 
+	// "firebase.google.com/go/v4/app" // Removed unused import
 	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/integration/internal"
@@ -37,12 +38,14 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx, nil)
+	// internal.NewTestApp returns *app.App
+	appInstance, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.InstanceID(ctx)
+	// Use iid.NewClient(ctx, appInstance)
+	client, err = iid.NewClient(ctx, appInstance)
 	if err != nil {
 		log.Fatalln(err)
 	}

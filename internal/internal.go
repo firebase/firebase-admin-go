@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"google.golang.org/api/option"
+	// "google.golang.org/api/option" // Removed as it's no longer used in this file
 )
 
 // FirebaseScopes is the set of OAuth2 scopes used by the Admin SDK.
@@ -35,49 +35,9 @@ var FirebaseScopes = []string{
 // SystemClock is a clock that returns local time of the system.
 var SystemClock = &systemClock{}
 
-// AuthConfig represents the configuration of Firebase Auth service.
-type AuthConfig struct {
-	Opts             []option.ClientOption
-	ProjectID        string
-	ServiceAccountID string
-	Version          string
-}
-
 // HashConfig represents a hash algorithm configuration used to generate password hashes.
+// This is used by the auth package for importing users with password hashes.
 type HashConfig map[string]interface{}
-
-// InstanceIDConfig represents the configuration of Firebase Instance ID service.
-type InstanceIDConfig struct {
-	Opts      []option.ClientOption
-	ProjectID string
-	Version   string
-}
-
-// DatabaseConfig represents the configuration of Firebase Database service.
-type DatabaseConfig struct {
-	Opts         []option.ClientOption
-	URL          string
-	Version      string
-	AuthOverride map[string]interface{}
-}
-
-// StorageConfig represents the configuration of Google Cloud Storage service.
-type StorageConfig struct {
-	Opts   []option.ClientOption
-	Bucket string
-}
-
-// MessagingConfig represents the configuration of Firebase Cloud Messaging service.
-type MessagingConfig struct {
-	Opts      []option.ClientOption
-	ProjectID string
-	Version   string
-}
-
-// AppCheckConfig represents the configuration of App Check service.
-type AppCheckConfig struct {
-	ProjectID string
-}
 
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {

@@ -31,6 +31,7 @@ import (
 	"sync"
 
 	"firebase.google.com/go/v4/internal"
+	"google.golang.org/api/option" // Add missing import
 )
 
 const (
@@ -170,19 +171,19 @@ type iamSigner struct {
 	iamHost      string
 }
 
-func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner, error) {
-	hc, _, err := internal.NewHTTPClient(ctx, config.Opts...)
+func newIAMSigner(ctx context.Context, serviceAccountID string, sdkVersion string, clientOpts ...option.ClientOption) (*iamSigner, error) {
+	hc, _, err := internal.NewHTTPClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
 	hc.Opts = []internal.HTTPOption{
-		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(config.Version)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(sdkVersion)),
 	}
 
 	return &iamSigner{
 		mutex:        &sync.Mutex{},
 		httpClient:   hc,
-		serviceAcct:  config.ServiceAccountID,
+		serviceAcct:  serviceAccountID,
 		metadataHost: "http://metadata.google.internal",
 		iamHost:      "https://iamcredentials.googleapis.com",
 	}, nil

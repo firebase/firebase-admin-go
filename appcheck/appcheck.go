@@ -20,11 +20,13 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"fmt" // Import fmt
 
+	"firebase.google.com/go/v4/app" // Import app package
+	// "firebase.google.com/go/v4/internal" // No longer directly used by NewClient's logic
 	"github.com/MicahParks/keyfunc"
 	"github.com/golang-jwt/jwt/v4"
-
-	"firebase.google.com/go/v4/internal"
+	"google.golang.org/api/transport" // For creating http.Client from app.Options
 )
 
 // JWKSUrl is the URL of the JWKS used to verify App Check tokens.
@@ -70,20 +72,34 @@ type Client struct {
 
 // NewClient creates a new instance of the Firebase App Check Client.
 //
-// This function can only be invoked from within the SDK. Client applications should access the
-// the App Check service through firebase.App.
-func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
-	// TODO: Add support for overriding the HTTP client using the App one.
-	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
+// It requires a context and a previously initialized *app.App instance.
+// The *app.App provides the Project ID and client options (including credentials
+// and custom HTTP transport if configured) for the App Check client.
+func NewClient(ctx context.Context, appInstance *app.App) (*Client, error) {
+	projectID := appInstance.ProjectID()
+	if projectID == "" {
+		return nil, errors.New("project ID is required to initialize App Check client")
+	}
+
+	// Create an http.Client from appInstance.Options() to be used by keyfunc
+	// This ensures that any custom transport or http client settings from app init are respected.
+	httpClient, _, err := transport.NewHTTPClient(ctx, appInstance.Options()...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client for App Check: %w", err)
+	}
+
+	jwksOpts := keyfunc.Options{
 		Ctx:             ctx,
 		RefreshInterval: 6 * time.Hour,
-	})
+		Client:          httpClient, // Pass the HTTP client from appInstance
+	}
+	jwks, err := keyfunc.Get(JWKSUrl, jwksOpts)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		projectID: conf.ProjectID,
+		projectID: projectID,
 		jwks:      jwks,
 	}, nil
 }

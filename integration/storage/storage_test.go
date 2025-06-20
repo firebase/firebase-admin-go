@@ -24,7 +24,8 @@ import (
 	"testing"
 
 	gcs "cloud.google.com/go/storage"
-	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/app" // Import app package
+	// firebase "firebase.google.com/go/v4" // No longer needed for firebase.Config if using app.Config
 	"firebase.google.com/go/v4/integration/internal"
 	"firebase.google.com/go/v4/storage"
 )
@@ -45,14 +46,15 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx = context.Background()
-	app, err := internal.NewTestApp(ctx, &firebase.Config{
+	// internal.NewTestApp now takes *app.Config
+	appInstance, err := internal.NewTestApp(ctx, &app.Config{
 		StorageBucket: fmt.Sprintf("%s.appspot.com", pid),
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	client, err = app.Storage(ctx)
+	client, err = storage.NewClient(ctx, appInstance) // Use storage.NewClient
 	if err != nil {
 		log.Fatalln(err)
 	}
