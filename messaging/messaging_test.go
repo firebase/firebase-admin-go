@@ -589,6 +589,21 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "APNSLiveActivity",
+		req: &Message{
+			Token: "test-token",
+			APNS: &APNSConfig{
+				LiveActivityToken: "live-activity-token",
+			},
+		},
+		want: map[string]interface{}{
+			"token": "test-token",
+			"apns": map[string]interface{}{
+				"live_activity_token": "live-activity-token",
+			},
+		},
+	},
+	{
 		name: "AndroidNotificationPriorityMin",
 		req: &Message{
 			Android: &AndroidConfig{

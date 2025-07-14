@@ -664,9 +664,10 @@ type WebpushFCMOptions struct {
 // See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html
 // for more details on supported headers and payload keys.
 type APNSConfig struct {
-	Headers    map[string]string `json:"headers,omitempty"`
-	Payload    *APNSPayload      `json:"payload,omitempty"`
-	FCMOptions *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	Payload           *APNSPayload      `json:"payload,omitempty"`
+	FCMOptions        *APNSFCMOptions   `json:"fcm_options,omitempty"`
+	LiveActivityToken string            `json:"live_activity_token,omitempty"`
 }
 
 // APNSPayload is the payload that can be included in an APNS message.
