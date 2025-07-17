@@ -35,6 +35,7 @@ var testActionLinkResponse = []byte(fmt.Sprintf(testActionLinkFormat, testAction
 var testActionCodeSettings = &ActionCodeSettings{
 	URL:                   "https://example.dynamic.link",
 	HandleCodeInApp:       true,
+	LinkDomain:            "hosted.page.link",
 	DynamicLinkDomain:     "custom.page.link",
 	IOSBundleID:           "com.example.ios",
 	AndroidPackageName:    "com.example.android",
@@ -44,6 +45,7 @@ var testActionCodeSettings = &ActionCodeSettings{
 var testActionCodeSettingsMap = map[string]interface{}{
 	"continueUrl":           "https://example.dynamic.link",
 	"canHandleCodeInApp":    true,
+	"linkDomain":            "hosted.page.link",
 	"dynamicLinkDomain":     "custom.page.link",
 	"iOSBundleId":           "com.example.ios",
 	"androidPackageName":    "com.example.android",

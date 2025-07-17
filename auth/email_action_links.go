@@ -31,6 +31,7 @@ type ActionCodeSettings struct {
 	AndroidPackageName    string `json:"androidPackageName,omitempty"`
 	AndroidMinimumVersion string `json:"androidMinimumVersion,omitempty"`
 	AndroidInstallApp     bool   `json:"androidInstallApp,omitempty"`
+	LinkDomain            string `json:"linkDomain,omitempty"`
 	DynamicLinkDomain     string `json:"dynamicLinkDomain,omitempty"`
 }
 
