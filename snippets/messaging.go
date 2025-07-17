@@ -140,6 +140,40 @@ func sendAll(ctx context.Context, client *messaging.Client) {
 	// [END send_all]
 }
 
+func sendEach(ctx context.Context, client *messaging.Client) {
+	// This registration token comes from the client FCM SDKs.
+	registrationToken := "YOUR_REGISTRATION_TOKEN"
+
+	// [START send_each]
+	// Create a list containing up to 500 messages.
+	messages := []*messaging.Message{
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "5% off all electronics",
+			},
+			Token: registrationToken,
+		},
+		{
+			Notification: &messaging.Notification{
+				Title: "Price drop",
+				Body:  "2% off all books",
+			},
+			Topic: "readers-club",
+		},
+	}
+
+	br, err := client.SendEach(context.Background(), messages)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// See the BatchResponse reference documentation
+	// for the contents of response.
+	fmt.Printf("%d messages were sent successfully\n", br.SuccessCount)
+	// [END send_each]
+}
+
 func sendMulticast(ctx context.Context, client *messaging.Client) {
 	// [START send_multicast]
 	// Create a list containing up to 500 registration tokens.
@@ -189,6 +223,40 @@ func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	if br.FailureCount > 0 {
+		var failedTokens []string
+		for idx, resp := range br.Responses {
+			if !resp.Success {
+				// The order of responses corresponds to the order of the registration tokens.
+				failedTokens = append(failedTokens, registrationTokens[idx])
+			}
+		}
+		fmt.Printf("List of tokens that caused failures: %v\n", failedTokens)
+	}
+	// [END send_multicast_error]
+}
+
+func sendEachForMulticastAndHandleErrors(ctx context.Context, client *messaging.Client) {
+	// [START send_each_for_multicast_error]
+	// Create a list containing up to 500 registration tokens.
+	// This registration tokens come from the client FCM SDKs.
+	registrationTokens := []string{
+		"YOUR_REGISTRATION_TOKEN_1",
+		// ...
+		"YOUR_REGISTRATION_TOKEN_n",
+	}
+	message := &messaging.MulticastMessage{
+		Data: map[string]string{
+			"score": "850",
+			"time":  "2:45",
+		},
+		Tokens: registrationTokens,
+	}
+
+	br, err := client.SendEachForMulticast(context.Background(), message)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	if br.FailureCount > 0 {
 		var failedTokens []string
@@ -201,7 +269,7 @@ func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client)
 
 		fmt.Printf("List of tokens that caused failures: %v\n", failedTokens)
 	}
-	// [END send_multicast_error]
+	// [END send_each_for_multicast_error]
 }
 
 func sendDryRun(ctx context.Context, client *messaging.Client) {
