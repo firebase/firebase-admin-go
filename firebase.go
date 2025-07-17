@@ -52,6 +52,7 @@ type App struct {
 	projectID        string
 	serviceAccountID string
 	storageBucket    string
+	firestoreID      string
 	opts             []option.ClientOption
 }
 
@@ -62,6 +63,7 @@ type Config struct {
 	ProjectID        string                  `json:"projectId"`
 	ServiceAccountID string                  `json:"serviceAccountId"`
 	StorageBucket    string                  `json:"storageBucket"`
+	FirestoreID      string                  `json:"firestoreId"`
 }
 
 // Auth returns an instance of auth.Client.
@@ -108,7 +110,7 @@ func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
 	if a.projectID == "" {
 		return nil, errors.New("project id is required to access Firestore")
 	}
-	return firestore.NewClient(ctx, a.projectID, a.opts...)
+	return firestore.NewClientWithDatabase(ctx, a.projectID, a.firestoreID, a.opts...)
 }
 
 // InstanceID returns an instance of iid.Client.
@@ -173,12 +175,18 @@ func NewApp(ctx context.Context, config *Config, opts ...option.ClientOption) (*
 		ao = *config.AuthOverride
 	}
 
+	fid := firestore.DefaultDatabaseID
+	if config.FirestoreID != "" {
+		fid = config.FirestoreID
+	}
+
 	return &App{
 		authOverride:     ao,
 		dbURL:            config.DatabaseURL,
 		projectID:        pid,
 		serviceAccountID: config.ServiceAccountID,
 		storageBucket:    config.StorageBucket,
+		firestoreID:      fid,
 		opts:             o,
 	}, nil
 }
