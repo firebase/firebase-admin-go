@@ -31,6 +31,7 @@ import (
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
 	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/projectmanagement"
 	"firebase.google.com/go/v4/remoteconfig"
 	"firebase.google.com/go/v4/storage"
 	"google.golang.org/api/option"
@@ -137,6 +138,15 @@ func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
 		ProjectID: a.projectID,
 	}
 	return appcheck.NewClient(ctx, conf)
+}
+
+// ProjectManagement returns an instance of projects.Client.
+func (a *App) ProjectManagement(ctx context.Context) (*projectmanagement.Client, error) {
+	conf := &internal.ProjectManagementConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+	}
+	return projectmanagement.NewClient(ctx, conf)
 }
 
 // RemoteConfig returns an instance of remoteconfig.Client.
