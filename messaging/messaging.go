@@ -177,7 +177,7 @@ type AndroidNotification struct {
 	BodyLocArgs           []string                      `json:"body_loc_args,omitempty"`
 	TitleLocKey           string                        `json:"title_loc_key,omitempty"`
 	TitleLocArgs          []string                      `json:"title_loc_args,omitempty"`
-	ChannelID             string                        `json:"channel_id,omitempty"`
+	ChannelID             string                        `json:"channelId,omitempty"`
 	ImageURL              string                        `json:"image,omitempty"`
 	Ticker                string                        `json:"ticker,omitempty"`
 	Sticky                bool                          `json:"sticky,omitempty"`
