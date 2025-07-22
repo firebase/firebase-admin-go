@@ -32,7 +32,8 @@ type ActionCodeSettings struct {
 	AndroidMinimumVersion string `json:"androidMinimumVersion,omitempty"`
 	AndroidInstallApp     bool   `json:"androidInstallApp,omitempty"`
 	LinkDomain            string `json:"linkDomain,omitempty"`
-	DynamicLinkDomain     string `json:"dynamicLinkDomain,omitempty"`
+	// Deprecated: Use LinkDomain instead.
+	DynamicLinkDomain string `json:"dynamicLinkDomain,omitempty"`
 }
 
 func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {
