@@ -522,6 +522,7 @@ const (
 	emailAlreadyExists       = "EMAIL_ALREADY_EXISTS"
 	emailNotFound            = "EMAIL_NOT_FOUND"
 	invalidDynamicLinkDomain = "INVALID_DYNAMIC_LINK_DOMAIN"
+	invalidHostingLinkDomain = "INVALID_HOSTING_LINK_DOMAIN"
 	phoneNumberAlreadyExists = "PHONE_NUMBER_ALREADY_EXISTS"
 	tenantNotFound           = "TENANT_NOT_FOUND"
 	uidAlreadyExists         = "UID_ALREADY_EXISTS"
@@ -554,6 +555,11 @@ func IsInsufficientPermission(err error) bool {
 // IsInvalidDynamicLinkDomain checks if the given error was due to an invalid dynamic link domain.
 func IsInvalidDynamicLinkDomain(err error) bool {
 	return hasAuthErrorCode(err, invalidDynamicLinkDomain)
+}
+
+// IsInvalidHostingLinkDomain checks if the given error was due to an invalid hosting link domain.
+func IsInvalidHostingLinkDomain(err error) bool {
+	return hasAuthErrorCode(err, invalidHostingLinkDomain)
 }
 
 // IsInvalidEmail checks if the given error was due to an invalid email.
@@ -1446,6 +1452,11 @@ var serverError = map[string]*authError{
 		code:     internal.InvalidArgument,
 		message:  "the provided dynamic link domain is not configured or authorized for the current project",
 		authCode: invalidDynamicLinkDomain,
+	},
+	"INVALID_HOSTING_LINK_DOMAIN": {
+		code:     internal.InvalidArgument,
+		message:  "the provided hosting link domain is not configured or authorized for the current project",
+		authCode: invalidHostingLinkDomain,
 	},
 	"PHONE_NUMBER_EXISTS": {
 		code:     internal.AlreadyExists,

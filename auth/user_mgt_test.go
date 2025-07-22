@@ -2151,6 +2151,11 @@ func TestHTTPErrorWithCode(t *testing.T) {
 			errorutils.IsInvalidArgument,
 			"the provided dynamic link domain is not configured or authorized for the current project",
 		},
+		"INVALID_HOSTING_LINK_DOMAIN": {
+			IsInvalidHostingLinkDomain,
+			errorutils.IsInvalidArgument,
+			"the provided hosting link domain is not configured or authorized for the current project",
+		},
 		"PHONE_NUMBER_EXISTS": {
 			IsPhoneNumberAlreadyExists,
 			errorutils.IsAlreadyExists,

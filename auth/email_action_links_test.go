@@ -295,6 +295,7 @@ func TestEmailVerificationLinkError(t *testing.T) {
 	cases := map[string]func(error) bool{
 		"UNAUTHORIZED_DOMAIN":         IsUnauthorizedContinueURI,
 		"INVALID_DYNAMIC_LINK_DOMAIN": IsInvalidDynamicLinkDomain,
+		"INVALID_HOSTING_LINK_DOMAIN": IsInvalidHostingLinkDomain,
 	}
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()
