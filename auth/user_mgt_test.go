@@ -2154,7 +2154,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 		"INVALID_HOSTING_LINK_DOMAIN": {
 			IsInvalidHostingLinkDomain,
 			errorutils.IsInvalidArgument,
-			"the provided hosting link domain is not configured or authorized for the current project",
+			"the provided hosting link domain is not configured in Firebase Hosting or is not owned by the current project",
 		},
 		"PHONE_NUMBER_EXISTS": {
 			IsPhoneNumberAlreadyExists,

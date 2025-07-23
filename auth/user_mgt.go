@@ -1455,7 +1455,7 @@ var serverError = map[string]*authError{
 	},
 	"INVALID_HOSTING_LINK_DOMAIN": {
 		code:     internal.InvalidArgument,
-		message:  "the provided hosting link domain is not configured or authorized for the current project",
+		message:  "the provided hosting link domain is not configured in Firebase Hosting or is not owned by the current project",
 		authCode: invalidHostingLinkDomain,
 	},
 	"PHONE_NUMBER_EXISTS": {
