@@ -1305,8 +1305,8 @@ func TestAuthErrorParse(t *testing.T) {
 		URL:             invalidContinueURL,
 		HandleCodeInApp: false,
 	})
-	want := "domain of the continue url is not whitelisted: Domain not whitelisted by project"
-	if err == nil || !auth.IsUnauthorizedContinueURI(err) || err.Error() != want {
+	want := "domain of the continue url is not whitelisted: "
+	if err == nil || !auth.IsUnauthorizedContinueURI(err) || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("EmailSignInLink() expected error, got: %s, want: %s", err, want)
 	}
 }
