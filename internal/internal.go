@@ -86,6 +86,15 @@ type AppCheckConfig struct {
 	ProjectID string
 }
 
+// DataConnectConfig is the configuration for the DataConnect service.
+type DataConnectConfig struct {
+	ProjectID string
+	Opts      []option.ClientOption
+	Version   string
+	Location  string
+	ServiceID string
+}
+
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string

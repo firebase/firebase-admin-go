@@ -27,6 +27,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/appcheck"
 	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/dataconnect"
 	"firebase.google.com/go/v4/db"
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
@@ -62,6 +63,12 @@ type Config struct {
 	ProjectID        string                  `json:"projectId"`
 	ServiceAccountID string                  `json:"serviceAccountId"`
 	StorageBucket    string                  `json:"storageBucket"`
+}
+
+// ConnectorConfig is the configuration for the DataConnect service.
+type ConnectorConfig struct {
+	Location  string
+	ServiceId string
 }
 
 // Auth returns an instance of auth.Client.
@@ -147,6 +154,18 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 		Version:   Version,
 	}
 	return remoteconfig.NewClient(ctx, conf)
+}
+
+// DataConnect returns an instance of dataconnect.Client.
+func (a *App) DataConnect(ctx context.Context, config *ConnectorConfig) (*dataconnect.Client, error) {
+	conf := &internal.DataConnectConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+		Version:   Version,
+		Location:  config.Location,
+		ServiceID: config.ServiceId,
+	}
+	return dataconnect.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
