@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
@@ -37,11 +38,14 @@ const (
 	firebaseAudience   = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 	oneHourInSeconds   = 3600
 
-	// SDK-generated error codes
-	idTokenRevoked       = "ID_TOKEN_REVOKED"
-	userDisabled         = "USER_DISABLED"
-	sessionCookieRevoked = "SESSION_COOKIE_REVOKED"
-	tenantIDMismatch     = "TENANT_ID_MISMATCH"
+	// CodeIDTokenRevoked is the error code for a revoked ID token.
+	CodeIDTokenRevoked = "ID_TOKEN_REVOKED"
+	// CodeUserDisabled is the error code for a disabled user.
+	CodeUserDisabled = "USER_DISABLED"
+	// CodeSessionCookieRevoked is the error code for a revoked session cookie.
+	CodeSessionCookieRevoked = "SESSION_COOKIE_REVOKED"
+	// CodeTenantIDMismatch is the error code for a mismatched tenant ID.
+	CodeTenantIDMismatch = "TENANT_ID_MISMATCH"
 )
 
 var reservedClaims = []string{
@@ -331,16 +335,16 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 
 	if c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
 		return nil, &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
+			ErrorCode: errorutils.InvalidArgument,
 			String:    fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
 			Ext: map[string]interface{}{
-				authErrorCode: tenantIDMismatch,
+				authErrorCode: CodeTenantIDMismatch,
 			},
 		}
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		err = c.checkRevokedOrDisabled(ctx, decoded, idTokenRevoked, "ID token has been revoked")
+		err = c.checkRevokedOrDisabled(ctx, decoded, CodeIDTokenRevoked, "ID token has been revoked")
 		if err != nil {
 			return nil, err
 		}
@@ -351,21 +355,21 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 
 // IsTenantIDMismatch checks if the given error was due to a mismatched tenant ID in a JWT.
 func IsTenantIDMismatch(err error) bool {
-	return hasAuthErrorCode(err, tenantIDMismatch)
+	return hasAuthErrorCode(err, CodeTenantIDMismatch)
 }
 
 // IsIDTokenRevoked checks if the given error was due to a revoked ID token.
 //
 // When IsIDTokenRevoked returns true, IsIDTokenInvalid is guaranteed to return true.
 func IsIDTokenRevoked(err error) bool {
-	return hasAuthErrorCode(err, idTokenRevoked)
+	return hasAuthErrorCode(err, CodeIDTokenRevoked)
 }
 
 // IsUserDisabled checks if the given error was due to a disabled ID token
 //
 // When IsUserDisabled returns true, IsIDTokenInvalid is guaranteed to return true.
 func IsUserDisabled(err error) bool {
-	return hasAuthErrorCode(err, userDisabled)
+	return hasAuthErrorCode(err, CodeUserDisabled)
 }
 
 // VerifySessionCookie verifies the signature and payload of the provided Firebase session cookie.
@@ -403,7 +407,7 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 	}
 
 	if c.isEmulator || checkRevokedOrDisabled {
-		err := c.checkRevokedOrDisabled(ctx, decoded, sessionCookieRevoked, "session cookie has been revoked")
+		err := c.checkRevokedOrDisabled(ctx, decoded, CodeSessionCookieRevoked, "session cookie has been revoked")
 		if err != nil {
 			return nil, err
 		}
@@ -416,7 +420,7 @@ func (c *Client) verifySessionCookie(ctx context.Context, sessionCookie string, 
 //
 // When IsSessionCookieRevoked returns true, IsSessionCookieInvalid is guaranteed to return true.
 func IsSessionCookieRevoked(err error) bool {
-	return hasAuthErrorCode(err, sessionCookieRevoked)
+	return hasAuthErrorCode(err, CodeSessionCookieRevoked)
 }
 
 // checkRevokedOrDisabled checks whether the input token has been revoked or disabled.
@@ -427,17 +431,17 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 	}
 	if user.Disabled {
 		return &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
+			ErrorCode: errorutils.InvalidArgument,
 			String:    "user has been disabled",
 			Ext: map[string]interface{}{
-				authErrorCode: userDisabled,
+				authErrorCode: CodeUserDisabled,
 			},
 		}
 
 	}
 	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
 		return &internal.FirebaseError{
-			ErrorCode: internal.InvalidArgument,
+			ErrorCode: errorutils.InvalidArgument,
 			String:    errMessage,
 			Ext: map[string]interface{}{
 				authErrorCode: errCode,
@@ -448,11 +452,8 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 }
 
 func hasAuthErrorCode(err error, code string) bool {
-	fe, ok := err.(*internal.FirebaseError)
-	if !ok {
-		return false
+	if fe, ok := err.(errorutils.FirebaseError); ok {
+		return fe.ServiceCode() == code
 	}
-
-	got, ok := fe.Ext[authErrorCode]
-	return ok && got == code
+	return false
 }

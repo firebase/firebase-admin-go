@@ -1076,7 +1076,7 @@ func TestInvalidTenantVerifyIDToken(t *testing.T) {
 	})
 	ft, err := client.VerifyIDToken(context.Background(), idToken)
 	if ft != nil || err == nil || !IsTenantIDMismatch(err) {
-		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, %q)", ft, err, tenantIDMismatch)
+		t.Errorf("VerifyIDToken() = (%v, %v); want = (nil, %q)", ft, err, CodeTenantIDMismatch)
 	}
 }
 

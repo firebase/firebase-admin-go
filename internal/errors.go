@@ -22,70 +22,13 @@ import (
 	"net/url"
 	"os"
 	"syscall"
-)
 
-// ErrorCode represents the platform-wide error codes that can be raised by
-// Admin SDK APIs.
-type ErrorCode string
-
-const (
-	// InvalidArgument is a OnePlatform error code.
-	InvalidArgument ErrorCode = "INVALID_ARGUMENT"
-
-	// FailedPrecondition is a OnePlatform error code.
-	FailedPrecondition ErrorCode = "FAILED_PRECONDITION"
-
-	// OutOfRange is a OnePlatform error code.
-	OutOfRange ErrorCode = "OUT_OF_RANGE"
-
-	// Unauthenticated is a OnePlatform error code.
-	Unauthenticated ErrorCode = "UNAUTHENTICATED"
-
-	// PermissionDenied is a OnePlatform error code.
-	PermissionDenied ErrorCode = "PERMISSION_DENIED"
-
-	// NotFound is a OnePlatform error code.
-	NotFound ErrorCode = "NOT_FOUND"
-
-	// Conflict is a custom error code that represents HTTP 409 responses.
-	//
-	// OnePlatform APIs typically respond with ABORTED or ALREADY_EXISTS explicitly. But a few
-	// old APIs send HTTP 409 Conflict without any additional details to distinguish between the two
-	// cases. For these we currently use this error code. As more APIs adopt OnePlatform conventions
-	// this will become less important.
-	Conflict ErrorCode = "CONFLICT"
-
-	// Aborted is a OnePlatform error code.
-	Aborted ErrorCode = "ABORTED"
-
-	// AlreadyExists is a OnePlatform error code.
-	AlreadyExists ErrorCode = "ALREADY_EXISTS"
-
-	// ResourceExhausted is a OnePlatform error code.
-	ResourceExhausted ErrorCode = "RESOURCE_EXHAUSTED"
-
-	// Cancelled is a OnePlatform error code.
-	Cancelled ErrorCode = "CANCELLED"
-
-	// DataLoss is a OnePlatform error code.
-	DataLoss ErrorCode = "DATA_LOSS"
-
-	// Unknown is a OnePlatform error code.
-	Unknown ErrorCode = "UNKNOWN"
-
-	// Internal is a OnePlatform error code.
-	Internal ErrorCode = "INTERNAL"
-
-	// Unavailable is a OnePlatform error code.
-	Unavailable ErrorCode = "UNAVAILABLE"
-
-	// DeadlineExceeded is a OnePlatform error code.
-	DeadlineExceeded ErrorCode = "DEADLINE_EXCEEDED"
+	"firebase.google.com/go/v4/errorutils"
 )
 
 // FirebaseError is an error type containing an error code string.
 type FirebaseError struct {
-	ErrorCode ErrorCode
+	ErrorCode string
 	String    string
 	Response  *http.Response
 	Ext       map[string]interface{}
@@ -95,28 +38,51 @@ func (fe *FirebaseError) Error() string {
 	return fe.String
 }
 
+// PlatformCode returns the platform-level error code.
+func (fe *FirebaseError) PlatformCode() string {
+	return fe.ErrorCode
+}
+
+// ServiceCode returns the service-specific error code.
+func (fe *FirebaseError) ServiceCode() string {
+	if code, ok := fe.Ext["authErrorCode"].(string); ok {
+		return code
+	}
+	return ""
+}
+
+// Message returns the human-readable error message.
+func (fe *FirebaseError) Message() string {
+	return fe.String
+}
+
+// HTTPResponse returns the original HTTP response.
+func (fe *FirebaseError) HTTPResponse() *http.Response {
+	return fe.Response
+}
+
 // HasPlatformErrorCode checks if the given error contains a specific error code.
-func HasPlatformErrorCode(err error, code ErrorCode) bool {
+func HasPlatformErrorCode(err error, code string) bool {
 	fe, ok := err.(*FirebaseError)
 	return ok && fe.ErrorCode == code
 }
 
-var httpStatusToErrorCodes = map[int]ErrorCode{
-	http.StatusBadRequest:          InvalidArgument,
-	http.StatusUnauthorized:        Unauthenticated,
-	http.StatusForbidden:           PermissionDenied,
-	http.StatusNotFound:            NotFound,
-	http.StatusConflict:            Conflict,
-	http.StatusTooManyRequests:     ResourceExhausted,
-	http.StatusInternalServerError: Internal,
-	http.StatusServiceUnavailable:  Unavailable,
+var httpStatusToErrorCodes = map[int]string{
+	http.StatusBadRequest:          errorutils.InvalidArgument,
+	http.StatusUnauthorized:        errorutils.Unauthenticated,
+	http.StatusForbidden:           errorutils.PermissionDenied,
+	http.StatusNotFound:            errorutils.NotFound,
+	http.StatusConflict:            errorutils.Conflict,
+	http.StatusTooManyRequests:     errorutils.ResourceExhausted,
+	http.StatusInternalServerError: errorutils.Internal,
+	http.StatusServiceUnavailable:  errorutils.Unavailable,
 }
 
 // NewFirebaseError creates a new error from the given HTTP response.
 func NewFirebaseError(resp *Response) *FirebaseError {
 	code, ok := httpStatusToErrorCodes[resp.Status]
 	if !ok {
-		code = Unknown
+		code = errorutils.Unknown
 	}
 
 	return &FirebaseError{
@@ -143,7 +109,7 @@ func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 	}
 	json.Unmarshal(resp.Body, &gcpError) // ignore any json parse errors at this level
 	if gcpError.Error.Status != "" {
-		base.ErrorCode = ErrorCode(gcpError.Error.Status)
+		base.ErrorCode = gcpError.Error.Status
 	}
 
 	if gcpError.Error.Message != "" {
@@ -154,16 +120,16 @@ func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 }
 
 func newFirebaseErrorTransport(err error) *FirebaseError {
-	var code ErrorCode
+	var code string
 	var msg string
 	if os.IsTimeout(err) {
-		code = DeadlineExceeded
+		code = errorutils.DeadlineExceeded
 		msg = fmt.Sprintf("timed out while making an http call: %v", err)
 	} else if isConnectionRefused(err) {
-		code = Unavailable
+		code = errorutils.Unavailable
 		msg = fmt.Sprintf("failed to establish a connection: %v", err)
 	} else {
-		code = Unknown
+		code = errorutils.Unknown
 		msg = fmt.Sprintf("unknown error while making an http call: %v", err)
 	}
 

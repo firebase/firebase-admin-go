@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 )
 
@@ -517,32 +518,41 @@ func marshalCustomClaims(claims map[string]interface{}) (string, error) {
 // Error handlers.
 
 const (
-	// Backend-generated error codes
-	configurationNotFound    = "CONFIGURATION_NOT_FOUND"
-	emailAlreadyExists       = "EMAIL_ALREADY_EXISTS"
-	emailNotFound            = "EMAIL_NOT_FOUND"
-	invalidDynamicLinkDomain = "INVALID_DYNAMIC_LINK_DOMAIN"
-	invalidHostingLinkDomain = "INVALID_HOSTING_LINK_DOMAIN"
-	phoneNumberAlreadyExists = "PHONE_NUMBER_ALREADY_EXISTS"
-	tenantNotFound           = "TENANT_NOT_FOUND"
-	uidAlreadyExists         = "UID_ALREADY_EXISTS"
-	unauthorizedContinueURI  = "UNAUTHORIZED_CONTINUE_URI"
-	userNotFound             = "USER_NOT_FOUND"
+	// CodeConfigurationNotFound is the error code for a non-existing IdP configuration.
+	CodeConfigurationNotFound = "CONFIGURATION_NOT_FOUND"
+	// CodeEmailAlreadyExists is the error code for a duplicate email.
+	CodeEmailAlreadyExists = "EMAIL_ALREADY_EXISTS"
+	// CodeEmailNotFound is the error code for a non-existing email.
+	CodeEmailNotFound = "EMAIL_NOT_FOUND"
+	// CodeInvalidDynamicLinkDomain is the error code for an invalid dynamic link domain.
+	CodeInvalidDynamicLinkDomain = "INVALID_DYNAMIC_LINK_DOMAIN"
+	// CodeInvalidHostingLinkDomain is the error code for an invalid hosting link domain.
+	CodeInvalidHostingLinkDomain = "INVALID_HOSTING_LINK_DOMAIN"
+	// CodePhoneNumberAlreadyExists is the error code for a duplicate phone number.
+	CodePhoneNumberAlreadyExists = "PHONE_NUMBER_ALREADY_EXISTS"
+	// CodeTenantNotFound is the error code for a non-existing tenant.
+	CodeTenantNotFound = "TENANT_NOT_FOUND"
+	// CodeUIDAlreadyExists is the error code for a duplicate UID.
+	CodeUIDAlreadyExists = "UID_ALREADY_EXISTS"
+	// CodeUnauthorizedContinueURI is the error code for an unauthorized continue URI.
+	CodeUnauthorizedContinueURI = "UNAUTHORIZED_CONTINUE_URI"
+	// CodeUserNotFound is the error code for a non-existing user.
+	CodeUserNotFound = "USER_NOT_FOUND"
 )
 
 // IsConfigurationNotFound checks if the given error was due to a non-existing IdP configuration.
 func IsConfigurationNotFound(err error) bool {
-	return hasAuthErrorCode(err, configurationNotFound)
+	return hasAuthErrorCode(err, CodeConfigurationNotFound)
 }
 
 // IsEmailAlreadyExists checks if the given error was due to a duplicate email.
 func IsEmailAlreadyExists(err error) bool {
-	return hasAuthErrorCode(err, emailAlreadyExists)
+	return hasAuthErrorCode(err, CodeEmailAlreadyExists)
 }
 
 // IsEmailNotFound checks if the given error was due to the user record corresponding to the email not being found.
 func IsEmailNotFound(err error) bool {
-	return hasAuthErrorCode(err, emailNotFound)
+	return hasAuthErrorCode(err, CodeEmailNotFound)
 }
 
 // IsInsufficientPermission checks if the given error was due to insufficient permissions.
@@ -554,12 +564,12 @@ func IsInsufficientPermission(err error) bool {
 
 // IsInvalidDynamicLinkDomain checks if the given error was due to an invalid dynamic link domain.
 func IsInvalidDynamicLinkDomain(err error) bool {
-	return hasAuthErrorCode(err, invalidDynamicLinkDomain)
+	return hasAuthErrorCode(err, CodeInvalidDynamicLinkDomain)
 }
 
 // IsInvalidHostingLinkDomain checks if the given error was due to an invalid hosting link domain.
 func IsInvalidHostingLinkDomain(err error) bool {
-	return hasAuthErrorCode(err, invalidHostingLinkDomain)
+	return hasAuthErrorCode(err, CodeInvalidHostingLinkDomain)
 }
 
 // IsInvalidEmail checks if the given error was due to an invalid email.
@@ -571,7 +581,7 @@ func IsInvalidEmail(err error) bool {
 
 // IsPhoneNumberAlreadyExists checks if the given error was due to a duplicate phone number.
 func IsPhoneNumberAlreadyExists(err error) bool {
-	return hasAuthErrorCode(err, phoneNumberAlreadyExists)
+	return hasAuthErrorCode(err, CodePhoneNumberAlreadyExists)
 }
 
 // IsProjectNotFound checks if the given error was due to a non-existing project.
@@ -583,17 +593,17 @@ func IsProjectNotFound(err error) bool {
 
 // IsTenantNotFound checks if the given error was due to a non-existing tenant ID.
 func IsTenantNotFound(err error) bool {
-	return hasAuthErrorCode(err, tenantNotFound)
+	return hasAuthErrorCode(err, CodeTenantNotFound)
 }
 
 // IsUIDAlreadyExists checks if the given error was due to a duplicate uid.
 func IsUIDAlreadyExists(err error) bool {
-	return hasAuthErrorCode(err, uidAlreadyExists)
+	return hasAuthErrorCode(err, CodeUIDAlreadyExists)
 }
 
 // IsUnauthorizedContinueURI checks if the given error was due to an unauthorized continue URI domain.
 func IsUnauthorizedContinueURI(err error) bool {
-	return hasAuthErrorCode(err, unauthorizedContinueURI)
+	return hasAuthErrorCode(err, CodeUnauthorizedContinueURI)
 }
 
 // IsUnknown checks if the given error was due to a unknown server error.
@@ -605,7 +615,7 @@ func IsUnknown(err error) bool {
 
 // IsUserNotFound checks if the given error was due to non-existing user.
 func IsUserNotFound(err error) bool {
-	return hasAuthErrorCode(err, userNotFound)
+	return hasAuthErrorCode(err, CodeUserNotFound)
 }
 
 // Validators.
@@ -802,11 +812,11 @@ func (c *baseClient) GetUserByProviderUID(ctx context.Context, providerID string
 
 	if len(getUsersResult.Users) == 0 {
 		return nil, &internal.FirebaseError{
-			ErrorCode: internal.NotFound,
+			ErrorCode: errorutils.NotFound,
 			String:    fmt.Sprintf("cannot find user from providerID: { %s, %s }", providerID, providerUID),
 			Response:  nil,
 			Ext: map[string]interface{}{
-				authErrorCode: userNotFound,
+				authErrorCode: CodeUserNotFound,
 			},
 		}
 	}
@@ -847,11 +857,11 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 
 	if len(parsed.Users) == 0 {
 		return nil, &internal.FirebaseError{
-			ErrorCode: internal.NotFound,
+			ErrorCode: errorutils.NotFound,
 			String:    fmt.Sprintf("no user exists with the %s", query.description()),
 			Response:  resp.LowLevelResponse(),
 			Ext: map[string]interface{}{
-				authErrorCode: userNotFound,
+				authErrorCode: CodeUserNotFound,
 			},
 		}
 	}
@@ -1417,66 +1427,66 @@ func (c *baseClient) makeUserMgtURL(path string) (string, error) {
 }
 
 type authError struct {
-	code     internal.ErrorCode
+	code     string
 	message  string
 	authCode string
 }
 
 var serverError = map[string]*authError{
 	"CONFIGURATION_NOT_FOUND": {
-		code:     internal.NotFound,
+		code:     errorutils.NotFound,
 		message:  "no IdP configuration corresponding to the provided identifier",
-		authCode: configurationNotFound,
+		authCode: CodeConfigurationNotFound,
 	},
 	"DUPLICATE_EMAIL": {
-		code:     internal.AlreadyExists,
+		code:     errorutils.AlreadyExists,
 		message:  "user with the provided email already exists",
-		authCode: emailAlreadyExists,
+		authCode: CodeEmailAlreadyExists,
 	},
 	"DUPLICATE_LOCAL_ID": {
-		code:     internal.AlreadyExists,
+		code:     errorutils.AlreadyExists,
 		message:  "user with the provided uid already exists",
-		authCode: uidAlreadyExists,
+		authCode: CodeUIDAlreadyExists,
 	},
 	"EMAIL_EXISTS": {
-		code:     internal.AlreadyExists,
+		code:     errorutils.AlreadyExists,
 		message:  "user with the provided email already exists",
-		authCode: emailAlreadyExists,
+		authCode: CodeEmailAlreadyExists,
 	},
 	"EMAIL_NOT_FOUND": {
-		code:     internal.NotFound,
+		code:     errorutils.NotFound,
 		message:  "no user record found for the given email",
-		authCode: emailNotFound,
+		authCode: CodeEmailNotFound,
 	},
 	"INVALID_DYNAMIC_LINK_DOMAIN": {
-		code:     internal.InvalidArgument,
+		code:     errorutils.InvalidArgument,
 		message:  "the provided dynamic link domain is not configured or authorized for the current project",
-		authCode: invalidDynamicLinkDomain,
+		authCode: CodeInvalidDynamicLinkDomain,
 	},
 	"INVALID_HOSTING_LINK_DOMAIN": {
-		code:     internal.InvalidArgument,
+		code:     errorutils.InvalidArgument,
 		message:  "the provided hosting link domain is not configured in Firebase Hosting or is not owned by the current project",
-		authCode: invalidHostingLinkDomain,
+		authCode: CodeInvalidHostingLinkDomain,
 	},
 	"PHONE_NUMBER_EXISTS": {
-		code:     internal.AlreadyExists,
+		code:     errorutils.AlreadyExists,
 		message:  "user with the provided phone number already exists",
-		authCode: phoneNumberAlreadyExists,
+		authCode: CodePhoneNumberAlreadyExists,
 	},
 	"TENANT_NOT_FOUND": {
-		code:     internal.NotFound,
+		code:     errorutils.NotFound,
 		message:  "tenant with the specified ID does not exist",
-		authCode: tenantNotFound,
+		authCode: CodeTenantNotFound,
 	},
 	"UNAUTHORIZED_DOMAIN": {
-		code:     internal.InvalidArgument,
+		code:     errorutils.InvalidArgument,
 		message:  "domain of the continue url is not whitelisted",
-		authCode: unauthorizedContinueURI,
+		authCode: CodeUnauthorizedContinueURI,
 	},
 	"USER_NOT_FOUND": {
-		code:     internal.NotFound,
+		code:     errorutils.NotFound,
 		message:  "no user record found for the given identifier",
-		authCode: userNotFound,
+		authCode: CodeUserNotFound,
 	},
 }
 

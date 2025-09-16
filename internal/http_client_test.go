@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/errorutils"
 	"google.golang.org/api/option"
 )
 
@@ -242,8 +243,8 @@ func TestSuccessFn(t *testing.T) {
 		t.Fatalf("Do() err = %v; want = FirebaseError", err)
 	}
 
-	if fe.ErrorCode != Unknown {
-		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unknown)
+	if fe.ErrorCode != errorutils.Unknown {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, errorutils.Unknown)
 	}
 	if fe.Response == nil {
 		t.Fatalf("Do() err.Response = nil; want = non-nil")
@@ -277,8 +278,8 @@ func TestSuccessFnOnRequest(t *testing.T) {
 		t.Fatalf("Do() = (%v, %v); want = (nil, %q)", resp, err, want)
 	}
 
-	if !HasPlatformErrorCode(err, Unknown) {
-		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, Unknown)
+	if !HasPlatformErrorCode(err, errorutils.Unknown) {
+		t.Errorf("ErrorCode = %q; want = %q", err.(*FirebaseError).ErrorCode, errorutils.Unknown)
 	}
 }
 

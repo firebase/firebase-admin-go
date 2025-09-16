@@ -26,17 +26,19 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
-var platformErrorCodes = []ErrorCode{
-	InvalidArgument,
-	Unauthenticated,
-	NotFound,
-	Aborted,
-	AlreadyExists,
-	Internal,
-	Unavailable,
-	Unknown,
+var platformErrorCodes = []string{
+	errorutils.InvalidArgument,
+	errorutils.Unauthenticated,
+	errorutils.NotFound,
+	errorutils.Aborted,
+	errorutils.AlreadyExists,
+	errorutils.Internal,
+	errorutils.Unavailable,
+	errorutils.Unknown,
 }
 
 func TestPlatformError(t *testing.T) {
@@ -110,8 +112,8 @@ func TestPlatformErrorWithoutDetails(t *testing.T) {
 		URL:    server.URL,
 	}
 
-	httpStatusMappings := map[int]ErrorCode{
-		http.StatusNotImplemented: Unknown,
+	httpStatusMappings := map[int]string{
+		http.StatusNotImplemented: errorutils.Unknown,
 	}
 
 	// Add known error code mappings
@@ -175,8 +177,8 @@ func TestTimeoutError(t *testing.T) {
 		t.Fatalf("Do() err = %v; want = FirebaseError", err)
 	}
 
-	if fe.ErrorCode != DeadlineExceeded {
-		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, DeadlineExceeded)
+	if fe.ErrorCode != errorutils.DeadlineExceeded {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, errorutils.DeadlineExceeded)
 	}
 	if fe.Response != nil {
 		t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
@@ -239,8 +241,8 @@ func TestNetworkOutageError(t *testing.T) {
 				t.Fatalf("Do() err = %v; want = FirebaseError", err)
 			}
 
-			if fe.ErrorCode != Unavailable {
-				t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unavailable)
+			if fe.ErrorCode != errorutils.Unavailable {
+				t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, errorutils.Unavailable)
 			}
 			if fe.Response != nil {
 				t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
@@ -276,8 +278,8 @@ func TestUnknownNetworkError(t *testing.T) {
 		t.Fatalf("Do() err = %v; want = FirebaseError", err)
 	}
 
-	if fe.ErrorCode != Unknown {
-		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, Unknown)
+	if fe.ErrorCode != errorutils.Unknown {
+		t.Errorf("Do() err.ErrorCode = %q; want = %q", fe.ErrorCode, errorutils.Unknown)
 	}
 	if fe.Response != nil {
 		t.Errorf("Do() err.Response = %v; want = nil", fe.Response)
