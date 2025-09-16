@@ -21,8 +21,27 @@ const (
 	apiVersion                   = "v1alpha"
 	executeGraphqlEndpoint       = "executeGraphql"
 	executeGraphqlReadEndpoint   = "executeGraphqlRead"
-	queryErrorCode               = "query-error"
+
+	// SDK-generated error codes
+	queryError = "QUERY_ERROR"
 )
+
+// ConnectorConfig is the configuration for the Data Connect service.
+type ConnectorConfig struct {
+	Location  string `json:"location"`
+	ServiceID string `json:"serviceId"`
+}
+
+// GraphqlOptions represents the options for a GraphQL query.
+type GraphqlOptions struct {
+	Variables     map[string]interface{} `json:"variables,omitempty"`
+	OperationName string                 `json:"operationName,omitempty"`
+}
+
+// ExecuteGraphqlResponse is the response from a GraphQL query.
+type ExecuteGraphqlResponse struct {
+	Data map[string]interface{} `json:"data"`
+}
 
 // Client is the interface for the Firebase Data Connect service.
 type Client struct {
@@ -151,7 +170,7 @@ func handleError(resp *internal.Response) error {
 		if fe.Ext == nil {
 			fe.Ext = make(map[string]interface{})
 		}
-		fe.Ext["dataconnectErrorCode"] = queryErrorCode
+		fe.Ext["dataconnectErrorCode"] = queryError
 		return fe
 	}
 	return internal.NewFirebaseError(resp)
@@ -165,5 +184,5 @@ func IsQueryError(err error) bool {
 	}
 
 	got, ok := fe.Ext["dataconnectErrorCode"]
-	return ok && got == queryErrorCode
+	return ok && got == queryError
 }

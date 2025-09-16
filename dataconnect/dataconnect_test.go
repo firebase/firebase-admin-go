@@ -206,7 +206,7 @@ func TestIsQueryError(t *testing.T) {
 		ErrorCode: internal.InvalidArgument,
 		String:    "GraphQL query failed: test",
 		Ext: map[string]interface{}{
-			"dataconnectErrorCode": queryErrorCode,
+			"dataconnectErrorCode": queryError,
 		},
 	}
 
