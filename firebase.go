@@ -27,6 +27,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/appcheck"
 	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/dataconnect"
 	"firebase.google.com/go/v4/db"
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
@@ -147,6 +148,18 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 		Version:   Version,
 	}
 	return remoteconfig.NewClient(ctx, conf)
+}
+
+// DataConnect returns an instance of the Data Connect client.
+func (a *App) DataConnect(ctx context.Context, connectorConfig *dataconnect.ConnectorConfig) (*dataconnect.Client, error) {
+	conf := &internal.DataConnectConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+		Version:   Version,
+		Location:  connectorConfig.Location,
+		ServiceID: connectorConfig.ServiceID,
+	}
+	return dataconnect.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
