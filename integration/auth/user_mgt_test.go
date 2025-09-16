@@ -35,6 +35,7 @@ import (
 
 const (
 	continueURL        = "http://localhost/?a=1&b=2#c=3"
+	invalidContinueURL = "http://www.localhost/?a=1&b=2#c=3"
 	continueURLKey     = "continueUrl"
 	oobCodeKey         = "oobCode"
 	modeKey            = "mode"
@@ -1294,6 +1295,19 @@ func TestEmailSignInLink(t *testing.T) {
 	}
 	if !user.EmailVerified {
 		t.Error("EmailSignInLink() EmailVerified = false; want = true")
+	}
+}
+
+func TestAuthErrorParse(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	_, err := client.EmailSignInLink(context.Background(), user.Email, &auth.ActionCodeSettings{
+		URL:             invalidContinueURL,
+		HandleCodeInApp: false,
+	})
+	want := "domain of the continue url is not whitelisted: "
+	if err == nil || !auth.IsUnauthorizedContinueURI(err) || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("EmailSignInLink() expected error, got: %s, want: %s", err, want)
 	}
 }
 
