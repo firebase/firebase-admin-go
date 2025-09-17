@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 
 	"firebase.google.com/go/v4/internal"
 	"google.golang.org/api/option"
@@ -75,12 +74,14 @@ func NewClient(ctx context.Context, conf *internal.DataConnectConfig) (*Client, 
 	hc := internal.WithDefaultRetryConfig(transport)
 	hc.CreateErrFn = handleError
 	hc.SuccessFn = func(r *internal.Response) bool {
+		// If the status isn't already a know success status we handle these responses normally
 		if !internal.HasSuccessStatus(r) {
 			return false
 		}
-		var errResp graphqlErrorResponse
+		// Otherwise we check the successful response body for error
+		var errResp graphqlQueryErrorResponse
 		if err := json.Unmarshal(r.Body, &errResp); err != nil {
-			return true // Cannot parse, assume success
+			return true // Cannot parse, assume no query errors and thus success
 		}
 		return len(errResp.Errors) == 0
 	}
@@ -145,35 +146,18 @@ func (c *Client) buildURL(endpoint string) string {
 	return fmt.Sprintf(dataConnectProdURLFormat, apiVersion, c.projectID, c.location, c.serviceID, endpoint)
 }
 
-type graphqlError struct {
-	Message string `json:"message"`
-}
-
-type graphqlErrorResponse struct {
-	Errors []graphqlError `json:"errors"`
+type graphqlQueryErrorResponse struct {
+	Errors []map[string]interface{} `json:"errors"`
 }
 
 func handleError(resp *internal.Response) error {
-	if resp.Status == 200 {
-		var errResp graphqlErrorResponse
-		// This will be called only when SuccessFn returns false, so we know there's an errors field.
-		// We can ignore the unmarshal error here as it's handled in SuccessFn.
-		json.Unmarshal(resp.Body, &errResp)
-
-		var messages []string
-		for _, e := range errResp.Errors {
-			messages = append(messages, e.Message)
-		}
-		fe := internal.NewFirebaseError(resp)
-		fe.ErrorCode = internal.InvalidArgument
-		fe.String = fmt.Sprintf("GraphQL query failed: %s", strings.Join(messages, "; "))
-		if fe.Ext == nil {
-			fe.Ext = make(map[string]interface{})
-		}
-		fe.Ext["dataconnectErrorCode"] = queryError
-		return fe
+	fe := internal.NewFirebaseError(resp)
+	var errResp graphqlQueryErrorResponse
+	if err := json.Unmarshal(resp.Body, &errResp); err == nil && len(errResp.Errors) > 0 {
+		// Unmarshalling here verifies query error exists
+		fe.ErrorCode = queryError
 	}
-	return internal.NewFirebaseError(resp)
+	return fe
 }
 
 // IsQueryError checks if the given error is a query error.
@@ -183,6 +167,5 @@ func IsQueryError(err error) bool {
 		return false
 	}
 
-	got, ok := fe.Ext["dataconnectErrorCode"]
-	return ok && got == queryError
+	return fe.ErrorCode == queryError
 }

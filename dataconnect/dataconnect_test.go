@@ -202,12 +202,9 @@ func TestExecuteGraphqlQueryError(t *testing.T) {
 }
 
 func TestIsQueryError(t *testing.T) {
-	queryError := &internal.FirebaseError{
-		ErrorCode: internal.InvalidArgument,
+	testQueryError := &internal.FirebaseError{
+		ErrorCode: queryError,
 		String:    "GraphQL query failed: test",
-		Ext: map[string]interface{}{
-			"dataconnectErrorCode": queryError,
-		},
 	}
 
 	otherFirebaseError := &internal.FirebaseError{
@@ -217,7 +214,7 @@ func TestIsQueryError(t *testing.T) {
 
 	otherError := fmt.Errorf("some other error")
 
-	if !IsQueryError(queryError) {
+	if !IsQueryError(testQueryError) {
 		t.Error("IsQueryError(queryError) = false; want = true")
 	}
 	if IsQueryError(otherFirebaseError) {
