@@ -36,12 +36,12 @@ var connectorConfig = &dataconnect.ConnectorConfig{
 }
 
 const (
-	userId string = "QVBJcy5ndXJ3"
+	userID string = "QVBJcy5ndXJ3"
 
 	queryListUsers   string = "query ListUsers @auth(level: PUBLIC) { users { uid, name, address } }"
 	queryListEmails  string = "query ListEmails @auth(level: NO_ACCESS) { emails { id subject text date from { name } } }"
-	queryGetUserById string = "query GetUser($id: User_Key!) { user(key: $id) { uid name } }"
-	mutation         string = "mutation user { user_insert(data: {uid: \"" + userId + "\", address: \"32 St\", name: \"Fred Car\"}) }"
+	queryGetUserByID string = "query GetUser($id: User_Key!) { user(key: $id) { uid name } }"
+	mutation         string = "mutation user { user_insert(data: {uid: \"" + userID + "\", address: \"32 St\", name: \"Fred Car\"}) }"
 	upsertUser       string = "mutation UpsertUser($id: String) { user_upsert(data: { uid: $id, address: \"32 St.\", name: \"Fred\" }) }"
 	multipleQueries  string = queryListUsers + "\n" + queryListEmails
 )
@@ -50,7 +50,7 @@ var (
 	testUser = map[string]interface{}{
 		"name":    "Fred",
 		"address": "32 St.",
-		"uid":     userId,
+		"uid":     userID,
 	}
 
 	expectedUsers = []map[string]interface{}{
@@ -168,7 +168,7 @@ func TestExecuteGraphqlQueryError(t *testing.T) {
 func TestExecuteGraphqlMutation(t *testing.T) {
 	opts := &dataconnect.GraphqlOptions{
 		Variables: map[string]interface{}{
-			"id": userId,
+			"id": userID,
 		},
 	}
 	resp, err := client.ExecuteGraphql(context.Background(), upsertUser, opts)
@@ -178,7 +178,7 @@ func TestExecuteGraphqlMutation(t *testing.T) {
 	want := &dataconnect.ExecuteGraphqlResponse{
 		Data: map[string]interface{}{
 			"user_upsert": map[string]interface{}{
-				"uid": userId,
+				"uid": userID,
 			},
 		},
 	}
@@ -221,11 +221,11 @@ func TestExecuteGraphqlWithVariables(t *testing.T) {
 	opts := &dataconnect.GraphqlOptions{
 		Variables: map[string]interface{}{
 			"id": map[string]interface{}{
-				"uid": userId,
+				"uid": userID,
 			},
 		},
 	}
-	resp, err := client.ExecuteGraphql(context.Background(), queryGetUserById, opts)
+	resp, err := client.ExecuteGraphql(context.Background(), queryGetUserByID, opts)
 	if err != nil {
 		t.Fatalf("ExecuteGraphql() with variables error = %v", err)
 	}
