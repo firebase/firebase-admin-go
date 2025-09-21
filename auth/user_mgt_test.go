@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -545,7 +546,7 @@ func TestGetNonExistingUser(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
-	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	testListUsersResponse, err := os.ReadFile("../testdata/list_users.json")
 	if err != nil {
 		t.Fatal(err)
 	}

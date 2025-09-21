@@ -18,8 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -149,7 +149,7 @@ func TestTenantGetUserByPhoneNumber(t *testing.T) {
 }
 
 func TestTenantListUsers(t *testing.T) {
-	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	testListUsersResponse, err := os.ReadFile("../testdata/list_users.json")
 	if err != nil {
 		t.Fatal(err)
 	}

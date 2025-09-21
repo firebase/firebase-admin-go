@@ -137,7 +137,7 @@ func initGuestClient(pid string) (*db.Client, error) {
 }
 
 func initRules() {
-	b, err := ioutil.ReadFile(internal.Resource("dinosaurs_index.json"))
+	b, err := os.ReadFile(internal.Resource("dinosaurs_index.json"))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -171,7 +171,7 @@ func initRules() {
 }
 
 func initData() {
-	b, err := ioutil.ReadFile(internal.Resource("dinosaurs.json"))
+	b, err := os.ReadFile(internal.Resource("dinosaurs.json"))
 	if err != nil {
 		log.Fatalln(err)
 	}

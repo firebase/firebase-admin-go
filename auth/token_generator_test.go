@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -90,7 +91,7 @@ func TestEncodeInvalidPayload(t *testing.T) {
 }
 
 func TestServiceAccountSigner(t *testing.T) {
-	b, err := ioutil.ReadFile("../testdata/service_account.json")
+	b, err := os.ReadFile("../testdata/service_account.json")
 	if err != nil {
 		t.Fatal(err)
 	}

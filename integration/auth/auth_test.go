@@ -86,7 +86,7 @@ func TestCustomToken(t *testing.T) {
 func TestCustomTokenWithoutServiceAccount(t *testing.T) {
 	// Create a TokenSource from the service account. This makes the private key not accessible
 	// to the Firebase APIs.
-	b, err := ioutil.ReadFile(internal.Resource("integration_cert.json"))
+	b, err := os.ReadFile(internal.Resource("integration_cert.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
