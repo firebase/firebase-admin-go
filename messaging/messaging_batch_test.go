@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -467,7 +466,7 @@ func TestSendEachInvalidMessage(t *testing.T) {
 
 func TestSendEach(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, testMessage := range testMessages {
 			if strings.Contains(string(req), testMessage.Topic) {
@@ -495,7 +494,7 @@ func TestSendEach(t *testing.T) {
 
 func TestSendEachDryRun(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, testMessage := range testMessages {
 			if strings.Contains(string(req), testMessage.Topic) {
@@ -541,7 +540,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 			mu.Lock()
 			serverHitCount++
 			mu.Unlock()
-			reqBody, _ := ioutil.ReadAll(r.Body)
+			reqBody, _ := io.ReadAll(r.Body)
 			var msgIn fcmRequest
 			json.Unmarshal(reqBody, &msgIn)
 
@@ -699,7 +698,7 @@ func TestSendEachForMulticastInvalidMessage(t *testing.T) {
 
 func TestSendEachForMulticast(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -727,7 +726,7 @@ func TestSendEachForMulticast(t *testing.T) {
 
 func TestSendEachForMulticastWithCustomEndpoint(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -760,7 +759,7 @@ func TestSendEachForMulticastWithCustomEndpoint(t *testing.T) {
 
 func TestSendEachForMulticastDryRun(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -793,7 +792,7 @@ func TestSendEachForMulticastPartialFailure(t *testing.T) {
 
 	var failures []string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -891,7 +890,7 @@ func TestSendAll(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -922,7 +921,7 @@ func TestSendAllDryRun(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -952,7 +951,7 @@ func TestSendAllPartialFailure(t *testing.T) {
 
 	var req, resp []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1162,7 +1161,7 @@ func TestSendMulticast(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1193,7 +1192,7 @@ func TestSendMulticastWithCustomEndpoint(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1233,7 +1232,7 @@ func TestSendMulticastDryRun(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1453,7 +1452,7 @@ func checkRequestPart(part *multipart.Part, dryRun bool) error {
 		return fmt.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
 	}
 
-	b, _ := ioutil.ReadAll(r.Body)
+	b, _ := io.ReadAll(r.Body)
 	var parsed map[string]interface{}
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		return err

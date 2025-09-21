@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -162,7 +162,7 @@ func initRules() {
 	}
 	defer resp.Body.Close()
 
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err = io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	} else if resp.StatusCode != http.StatusOK {

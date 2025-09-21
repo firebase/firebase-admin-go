@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -809,7 +809,7 @@ func sessionLogoutHandlerWithRevocation(client *auth.Client) http.HandlerFunc {
 }
 
 func getIDTokenFromBody(r *http.Request) (string, error) {
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		return "", err
 	}
