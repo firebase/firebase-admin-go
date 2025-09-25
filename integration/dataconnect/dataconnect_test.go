@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package dataconnect_test contains integration tests for the dataconnect package.
 package dataconnect
 
 import (
