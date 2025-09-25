@@ -3,3 +3,6 @@ testdata/integration_*
 *~
 \#*\#
 .DS_Store
+
+# Dataconnect integration test artifacts should not be checked in
+testdata/dataconnect/dataconnect/.dataconnect
