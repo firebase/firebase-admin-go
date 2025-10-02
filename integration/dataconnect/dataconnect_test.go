@@ -34,32 +34,118 @@ var connectorConfig = &dataconnect.ConnectorConfig{
 	ServiceID: "my-service",
 }
 
-const (
-	userID string = "QVBJcy5ndXJ3"
+/**
+ * // Schema
+ * type User @table(key: ["id"]) {
+ *   id: String!
+ *   name: String!
+ *   address: String!
+ * }
+ */
+type User struct {
+	ID      string `json:"id"`
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	// Generated
+	EmailsOnFrom []Email `json:"emails_on_from"`
+}
 
-	queryListUsers   string = "query ListUsers @auth(level: PUBLIC) { users { uid, name, address } }"
-	queryListEmails  string = "query ListEmails @auth(level: NO_ACCESS) { emails { id subject text date from { name } } }"
-	queryGetUserByID string = "query GetUser($id: User_Key!) { user(key: $id) { uid name } }"
-	mutation         string = "mutation user { user_insert(data: {uid: \"" + userID + "\", address: \"32 St\", name: \"Fred Car\"}) }"
-	upsertUser       string = "mutation UpsertUser($id: String) { user_upsert(data: { uid: $id, address: \"32 St.\", name: \"Fred\" }) }"
-	multipleQueries  string = queryListUsers + "\n" + queryListEmails
-)
+/**
+ * // Schema
+ * type Email @table {
+ * 	id: String!
+ * 	subject: String!
+ * 	date: Date!
+ * 	text: String!
+ * 	from: User!
+ * }
+ */
+type Email struct {
+	ID      string `json:"id"`
+	Subject string `json:"subject"`
+	Date    string `json:"date"`
+	Text    string `json:"text"`
+	From    User   `json:"from"`
+}
+
+type GetUserResponse struct {
+	User User `json:"user"`
+}
+
+type ListUsersResponse struct {
+	Users []User `json:"users"`
+}
+
+type UserUpsertResponse struct {
+	UserUpsert struct {
+		ID string `json:"id"`
+	} `json:"user_upsert"`
+}
+
+type UserUpdateResponse struct {
+	UserUpdate struct {
+		ID string `json:"id"`
+	} `json:"user_update"`
+}
+
+type EmailUpsertResponse struct {
+	EmailUpsert struct {
+		ID string `json:"id"`
+	} `json:"email_upsert"`
+}
+
+type ListEmailsResponse struct {
+	Emails []Email `json:"emails"`
+}
+
+type GetUserVariables struct {
+	ID struct {
+		ID string `json:"id"`
+	} `json:"id"`
+}
+
+type DeleteResponse struct {
+	EmailDeleteMany int `json:"email_deleteMany"`
+	UserDeleteMany  int `json:"user_deleteMany"`
+}
 
 var (
-	testUser = map[string]interface{}{
-		"name":    "Fred",
-		"address": "32 St.",
-		"uid":     userID,
+	fredUser = User{
+		ID:      "fred_id",
+		Address: "32 Elm St.",
+		Name:    "Fred",
 	}
 
-	expectedUsers = []map[string]interface{}{
-		testUser,
-		{
-			"name":    "Jeff",
-			"address": "99 Oak St. N",
-			"uid":     "QVBJcy5ndXJ1",
-		},
+	jeffUser = User{
+		ID:      "jeff_id",
+		Address: "99 Oak St.",
+		Name:    "Jeff",
 	}
+
+	fredEmail = Email{
+		ID:      "email_id",
+		Subject: "free bitcoin inside",
+		Date:    "1999-12-31",
+		Text:    "get pranked! LOL!",
+		From:    User{ID: fredUser.ID},
+	}
+
+	initialState = struct {
+		Users  []User  `json:"users"`
+		Emails []Email `json:"emails"`
+	}{
+		Users:  []User{fredUser, jeffUser},
+		Emails: []Email{fredEmail},
+	}
+
+	queryListUsers   string = "query ListUsers @auth(level: PUBLIC) { users { id, name, address } }"
+	queryListEmails  string = "query ListEmails @auth(level: NO_ACCESS) { emails { id subject text date from { id } } }"
+	queryGetUserById string = "query GetUser($id: User_Key!) { user(key: $id) { id name address } }"
+	multipleQueries  string = queryListUsers + "\n" + queryListEmails
+	upsertFredUser   string = "mutation user { user_upsert(data: {id: \"" + fredUser.ID + "\", address: \"" + fredUser.Address + "\", name: \"" + fredUser.Name + "\"})}"
+	upsertJeffUser   string = "mutation user { user_upsert(data: {id: \"" + jeffUser.ID + "\", address: \"" + jeffUser.Address + "\", name: \"" + jeffUser.Name + "\"})}"
+	upsertFredEmail  string = "mutation email {" + "email_upsert(data: {" + "id:\"" + fredEmail.ID + "\"," + "subject: \"" + fredEmail.Subject + "\"," + "date: \"" + fredEmail.Date + "\"," + "text: \"" + fredEmail.Text + "\"," + "fromId: \"" + fredEmail.From.ID + "\"" + "})}"
+	deleteAll        string = `mutation delete { email_deleteMany(all: true) user_deleteMany(all: true) }`
 )
 
 func TestMain(m *testing.M) {
@@ -83,69 +169,181 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// type User struct {
-// 	UID     string `json:"uid"`
-// 	Name    string `json:"name"`
-// 	Address string `json:"address"`
+func initializeDatabase(t *testing.T) {
+	var resp1 UserUpsertResponse
+	err := client.ExecuteGraphql(context.Background(), upsertFredUser, nil, &resp1)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if resp1.UserUpsert.ID != fredUser.ID {
+		t.Errorf("ExecuteGraphql() User = %#v; want = %#v", resp1.UserUpsert.ID, fredUser.ID)
+	}
 
-// 	// Generated
-// 	EmailsOnFrom []Email `json:"emails_on_from"`
-// }
+	var resp2 UserUpsertResponse
+	err = client.ExecuteGraphql(context.Background(), upsertJeffUser, nil, &resp2)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
 
-// type Email struct {
-// 	Subject string `json:"subject"`
-// 	Date    string `json:"date"`
-// 	Text    string `json:"text"`
-// 	From    string `json:"from"`
+	var resp3 EmailUpsertResponse
+	err = client.ExecuteGraphql(context.Background(), upsertFredEmail, nil, &resp3)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+}
 
-// 	// Generated
-// 	ID string `json:"id"`
-// }
+func cleanupDatabase(t *testing.T) {
+	var resp1 DeleteResponse
+	err := client.ExecuteGraphql(context.Background(), deleteAll, nil, &resp1)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+}
 
-func containsExpectedUser(usersSlice []interface{}, expectedUser map[string]interface{}) bool {
-	for _, item := range usersSlice {
-		userMap, ok := item.(map[string]interface{})
-		if !ok {
-			// Item in slice is not the expected type, so it can't be a match
-			continue
-		}
-		if reflect.DeepEqual(userMap, expectedUser) {
+func containsExpectedUser(users []User, expectedUser User) bool {
+	for _, user := range users {
+		if reflect.DeepEqual(user, expectedUser) {
 			return true
 		}
 	}
 	return false
 }
+func TestExecuteGraphql(t *testing.T) {
+	initializeDatabase(t)
+	// defer cleanupDatabase(t)
 
-func TestExecuteGraphqlRead(t *testing.T) {
-	resp, err := client.ExecuteGraphqlRead(context.Background(), queryListUsers, nil)
+	var resp ListUsersResponse
+	err := client.ExecuteGraphql(context.Background(), queryListUsers, nil, &resp)
 	if err != nil {
-		t.Fatalf("ExecuteGraphqlRead() error = %v", err)
+		t.Fatalf("ExecuteGraphql() error = %v", err)
 	}
 
-	if resp.Data == nil {
-		t.Errorf("resp.Data is empty")
-	}
-	users, ok := resp.Data["users"]
-	if !ok {
-		t.Fatal("response data does not contain 'users' key")
-	}
-	usersSlice, ok := users.([]interface{})
-	if !ok {
-		t.Fatal("'users' field is not a slice")
-	}
-	if len(usersSlice) <= 1 {
-		t.Errorf("len(resp.Data[\"users\"]) = %d; want > 1", len(usersSlice))
+	if len(resp.Users) != len(initialState.Users) {
+		t.Errorf("len(resp.Users) = %d; want > %d", len(resp.Users), len(initialState.Users))
 	}
 
-	for _, expectedUser := range expectedUsers {
-		if !containsExpectedUser(usersSlice, expectedUser) {
-			t.Errorf("ExecuteGraphqlRead() response data does not contain expected user: %#v", expectedUser)
+	for _, user := range resp.Users {
+		if !containsExpectedUser(initialState.Users, user) {
+			t.Errorf("User from response was not found in expected initial state: %#v", user)
 		}
 	}
 }
 
-func TestExecuteGraphqlReadMutation(t *testing.T) {
-	_, err := client.ExecuteGraphqlRead(context.Background(), mutation, nil)
+func TestExecuteGraphqlRead(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+
+	var resp ListUsersResponse
+	err := client.ExecuteGraphqlRead(context.Background(), queryListUsers, nil, &resp)
+	if err != nil {
+		t.Fatalf("ExecuteGraphqlRead() error = %v", err)
+	}
+
+	if resp.Users == nil {
+		t.Fatal("response data does not contain 'users' key")
+	}
+	if len(resp.Users) != len(initialState.Users) {
+		t.Errorf("len(resp.Users) = %d; want > %d", len(resp.Users), len(initialState.Users))
+	}
+
+	for _, user := range resp.Users {
+		if !containsExpectedUser(initialState.Users, user) {
+			t.Errorf("User from response was not found in expected initial state: %#v", user)
+		}
+	}
+}
+
+func TestExecuteGraphqlWithVariables(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+
+	var resp GetUserResponse
+	opts := &dataconnect.GraphqlOptions{
+		Variables: GetUserVariables{
+			ID: struct {
+				ID string `json:"id"`
+			}{
+				ID: initialState.Users[0].ID,
+			},
+		},
+	}
+	err := client.ExecuteGraphql(context.Background(), queryGetUserById, opts, &resp)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(resp.User, initialState.Users[0]) {
+		t.Errorf("ExecuteGraphql() User = %#v; want = %#v", resp.User, initialState.Users[0])
+	}
+}
+
+func TestExecuteGraphqlMutation(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+
+	var resp1 UserUpsertResponse
+	err := client.ExecuteGraphql(context.Background(), upsertFredUser, nil, &resp1)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if resp1.UserUpsert.ID != fredUser.ID {
+		t.Errorf("ExecuteGraphql() User = %#v; want = %#v", resp1.UserUpsert.ID, fredUser.ID)
+	}
+
+	var resp2 UserUpsertResponse
+	err = client.ExecuteGraphql(context.Background(), upsertJeffUser, nil, &resp2)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if resp2.UserUpsert.ID != jeffUser.ID {
+		t.Errorf("ExecuteGraphql() User = %#v; want = %#v", resp2.UserUpsert.ID, jeffUser.ID)
+	}
+
+	var resp3 EmailUpsertResponse
+	err = client.ExecuteGraphql(context.Background(), upsertFredEmail, nil, &resp3)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if resp3.EmailUpsert.ID == "" {
+		t.Errorf("ExecuteGraphql() Email = %#v; Expected non-empty ID string", resp3.EmailUpsert.ID)
+	}
+
+	var resp4 DeleteResponse
+	err = client.ExecuteGraphql(context.Background(), deleteAll, nil, &resp4)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if resp4.UserDeleteMany == 0 {
+		t.Errorf("ExecuteGraphql() Expected non-zero users deleted")
+	}
+	if resp4.EmailDeleteMany == 0 {
+		t.Errorf("ExecuteGraphql() Expected non-zero emails deleted")
+	}
+}
+
+func TestExecuteGraphqlOperationNameWithMultipleQueries(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+
+	opts := &dataconnect.GraphqlOptions{
+		OperationName: "ListEmails",
+	}
+
+	var resp ListEmailsResponse
+	err := client.ExecuteGraphql(context.Background(), multipleQueries, opts, &resp)
+	if err != nil {
+		t.Fatalf("ExecuteGraphql() error = %v", err)
+	}
+	if !reflect.DeepEqual(resp.Emails, initialState.Emails) {
+		t.Errorf("ExecuteGraphql() Emails = %#v; want = %#v", resp.Emails, initialState.Emails)
+	}
+}
+
+func TestExecuteGraphqlReadMutationError(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+	var resp UserUpsertResponse
+	err := client.ExecuteGraphqlRead(context.Background(), upsertFredUser, nil, &resp)
 	if err == nil {
 		t.Fatalf("ExecuteGraphqlRead() expected error for read mutation, got nil")
 	}
@@ -154,135 +352,16 @@ func TestExecuteGraphqlReadMutation(t *testing.T) {
 	}
 }
 
-func TestExecuteGraphqlQueryError(t *testing.T) {
-	_, err := client.ExecuteGraphql(context.Background(), mutation, nil)
+func TestExecuteGraphqlQueryErrorWithoutVariables(t *testing.T) {
+	initializeDatabase(t)
+	defer cleanupDatabase(t)
+
+	var resp GetUserResponse
+	err := client.ExecuteGraphql(context.Background(), queryGetUserById, nil, &resp)
 	if err == nil {
 		t.Fatalf("ExecuteGraphql() expected error for bad query, got nil")
 	}
 	if !dataconnect.IsQueryError(err) {
 		t.Fatalf("ExecuteGraphql() expected query error, got %s", err)
-	}
-}
-
-func TestExecuteGraphqlMutation(t *testing.T) {
-	opts := &dataconnect.GraphqlOptions{
-		Variables: map[string]interface{}{
-			"id": userID,
-		},
-	}
-	resp, err := client.ExecuteGraphql(context.Background(), upsertUser, opts)
-	if err != nil {
-		t.Fatalf("ExecuteGraphql() error = %v", err)
-	}
-	want := &dataconnect.ExecuteGraphqlResponse{
-		Data: map[string]interface{}{
-			"user_upsert": map[string]interface{}{
-				"uid": userID,
-			},
-		},
-	}
-	if resp.Data == nil {
-		t.Errorf("resp.Data is empty")
-	}
-	if !reflect.DeepEqual(resp, want) {
-		t.Errorf("ExecuteGraphql() response = %#v; want = %#v", resp, want)
-	}
-}
-
-func TestExecuteGraphqlListUsers(t *testing.T) {
-	resp, err := client.ExecuteGraphql(context.Background(), queryListUsers, nil)
-	if err != nil {
-		t.Fatalf("ExecuteGraphql() error = %v", err)
-	}
-	if resp.Data == nil {
-		t.Errorf("resp.Data is empty")
-	}
-	users, ok := resp.Data["users"]
-	if !ok {
-		t.Fatal("response data does not contain 'users' key")
-	}
-	usersSlice, ok := users.([]interface{})
-	if !ok {
-		t.Fatal("'users' field is not a slice")
-	}
-	if len(usersSlice) <= 1 {
-		t.Errorf("len(resp.Data[\"users\"]) = %d; want > 1", len(usersSlice))
-	}
-
-	for _, expectedUser := range expectedUsers {
-		if !containsExpectedUser(usersSlice, expectedUser) {
-			t.Errorf("ExecuteGraphql() response data does not contain expected user: %#v", expectedUser)
-		}
-	}
-}
-
-func TestExecuteGraphqlWithVariables(t *testing.T) {
-	opts := &dataconnect.GraphqlOptions{
-		Variables: map[string]interface{}{
-			"id": map[string]interface{}{
-				"uid": userID,
-			},
-		},
-	}
-	resp, err := client.ExecuteGraphql(context.Background(), queryGetUserByID, opts)
-	if err != nil {
-		t.Fatalf("ExecuteGraphql() with variables error = %v", err)
-	}
-
-	want := &dataconnect.ExecuteGraphqlResponse{
-		Data: map[string]interface{}{
-			"user": map[string]interface{}{
-				"uid":  testUser["uid"],
-				"name": testUser["name"],
-			},
-		},
-	}
-
-	if resp.Data == nil {
-		t.Errorf("resp.Data is empty")
-	}
-	if !reflect.DeepEqual(resp, want) {
-		t.Errorf("ExecuteGraphql() response = %#v; want = %#v", resp, want)
-	}
-}
-
-func TestExecuteGraphqlWithOperationName(t *testing.T) {
-	opts := &dataconnect.GraphqlOptions{
-		OperationName: "ListEmails",
-	}
-	resp, err := client.ExecuteGraphql(context.Background(), multipleQueries, opts)
-	if err != nil {
-		t.Fatalf("ExecuteGraphql() with operationName error = %v", err)
-	}
-
-	if resp.Data == nil {
-		t.Errorf("resp.Data is empty")
-	}
-
-	emails, ok := resp.Data["emails"]
-	if !ok {
-		t.Fatal("response data does not contain 'emails' key")
-	}
-	emailsSlice, ok := emails.([]interface{})
-	if !ok {
-		t.Fatal("'emails' field is not a slice")
-	}
-	if len(emailsSlice) != 1 {
-		t.Fatalf("len(emails) = %d; want 1", len(emailsSlice))
-	}
-	email, ok := emailsSlice[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("email item is not a map")
-	}
-
-	if email["id"] == nil {
-		t.Error("email.id is nil, expected not undefined")
-	}
-	from, ok := email["from"].(map[string]interface{})
-	if !ok {
-		t.Fatal("email.from is not a map")
-	}
-	if from["name"] != "Jeff" {
-		t.Errorf("email.from.name = %q; want \"Jeff\"", from["name"])
 	}
 }

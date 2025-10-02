@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,6 +36,10 @@ const (
 	testServiceID = "test-service-id"
 	testVersion   = "test-version"
 )
+
+type FooBar struct {
+	Foo string `json:"foo"`
+}
 
 func TestNewClient(t *testing.T) {
 	conf := &internal.DataConnectConfig{
@@ -97,7 +101,7 @@ func TestExecuteGraphql(t *testing.T) {
 			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)
 		}
 
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,8 +115,8 @@ func TestExecuteGraphql(t *testing.T) {
 			t.Errorf("req.query = %q; want = %q", req["query"], "test query")
 		}
 
-		resp := &ExecuteGraphqlResponse{
-			Data: map[string]interface{}{"foo": "bar"},
+		resp := &internalExecuteGraphqlResponse{
+			Data: []byte(`{"foo": "bar"}`),
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -123,13 +127,14 @@ func TestExecuteGraphql(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := client.ExecuteGraphql(context.Background(), "test query", nil)
+	var resp FooBar
+	err = client.ExecuteGraphql(context.Background(), "test query", nil, &resp)
 	if err != nil {
 		t.Fatalf("ExecuteGraphql() error = %v", err)
 	}
 
-	want := &ExecuteGraphqlResponse{
-		Data: map[string]interface{}{"foo": "bar"},
+	want := FooBar{
+		Foo: "bar",
 	}
 	if !reflect.DeepEqual(resp, want) {
 		t.Errorf("ExecuteGraphql() response = %#v; want = %#v", resp, want)
@@ -145,8 +150,8 @@ func TestExecuteGraphqlRead(t *testing.T) {
 		if r.URL.Path != wantPath {
 			t.Errorf("Path = %q; want = %q", r.URL.Path, wantPath)
 		}
-		resp := &ExecuteGraphqlResponse{
-			Data: map[string]interface{}{"foo": "bar"},
+		resp := &internalExecuteGraphqlResponse{
+			Data: []byte(`{"foo": "bar"}`),
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -157,13 +162,14 @@ func TestExecuteGraphqlRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := client.ExecuteGraphqlRead(context.Background(), "test query", nil)
+	var resp FooBar
+	err = client.ExecuteGraphqlRead(context.Background(), "test query", nil, &resp)
 	if err != nil {
 		t.Fatalf("ExecuteGraphqlRead() error = %v", err)
 	}
 
-	want := &ExecuteGraphqlResponse{
-		Data: map[string]interface{}{"foo": "bar"},
+	want := FooBar{
+		Foo: "bar",
 	}
 	if !reflect.DeepEqual(resp, want) {
 		t.Errorf("ExecuteGraphqlRead() response = %#v; want = %#v", resp, want)
@@ -182,7 +188,7 @@ func TestExecuteGraphqlError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.ExecuteGraphql(context.Background(), "test query", nil)
+	err = client.ExecuteGraphql(context.Background(), "test query", nil, nil)
 	if err == nil {
 		t.Fatal("ExecuteGraphql() error = nil; want error")
 	}
@@ -200,7 +206,7 @@ func TestExecuteGraphqlQueryError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.ExecuteGraphql(context.Background(), "test query", nil)
+	err = client.ExecuteGraphql(context.Background(), "test query", nil, nil)
 	if err == nil {
 		t.Fatal("ExecuteGraphql() error = nil; want error")
 	}

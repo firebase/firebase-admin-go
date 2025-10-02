@@ -47,13 +47,13 @@ type ConnectorConfig struct {
 
 // GraphqlOptions represents the options for a GraphQL query.
 type GraphqlOptions struct {
-	Variables     map[string]interface{} `json:"variables,omitempty"`
-	OperationName string                 `json:"operationName,omitempty"`
+	Variables     interface{} `json:"variables,omitempty"`
+	OperationName string      `json:"operationName,omitempty"`
 }
 
 // ExecuteGraphqlResponse is the response from a GraphQL query.
-type ExecuteGraphqlResponse struct {
-	Data map[string]interface{} `json:"data"`
+type internalExecuteGraphqlResponse struct {
+	Data json.RawMessage `json:"data"`
 }
 
 // Client is the interface for the Firebase Data Connect service.
@@ -115,16 +115,16 @@ func NewClient(ctx context.Context, conf *internal.DataConnectConfig) (*Client, 
 }
 
 // ExecuteGraphql executes a GraphQL query or mutation.
-func (c *Client) ExecuteGraphql(ctx context.Context, query string, options *GraphqlOptions) (*ExecuteGraphqlResponse, error) {
-	return c.execute(ctx, executeGraphqlEndpoint, query, options)
+func (c *Client) ExecuteGraphql(ctx context.Context, query string, options *GraphqlOptions, response interface{}) error {
+	return c.execute(ctx, executeGraphqlEndpoint, query, options, response)
 }
 
 // ExecuteGraphqlRead executes a GraphQL read-only query.
-func (c *Client) ExecuteGraphqlRead(ctx context.Context, query string, options *GraphqlOptions) (*ExecuteGraphqlResponse, error) {
-	return c.execute(ctx, executeGraphqlReadEndpoint, query, options)
+func (c *Client) ExecuteGraphqlRead(ctx context.Context, query string, options *GraphqlOptions, response interface{}) error {
+	return c.execute(ctx, executeGraphqlReadEndpoint, query, options, response)
 }
 
-func (c *Client) execute(ctx context.Context, endpoint, query string, options *GraphqlOptions) (*ExecuteGraphqlResponse, error) {
+func (c *Client) execute(ctx context.Context, endpoint, query string, options *GraphqlOptions, response interface{}) error {
 	url := c.buildURL(endpoint)
 
 	req := map[string]interface{}{
@@ -139,7 +139,7 @@ func (c *Client) execute(ctx context.Context, endpoint, query string, options *G
 		}
 	}
 
-	var result ExecuteGraphqlResponse
+	var result internalExecuteGraphqlResponse
 	request := &internal.Request{
 		Method: http.MethodPost,
 		URL:    url,
@@ -147,10 +147,15 @@ func (c *Client) execute(ctx context.Context, endpoint, query string, options *G
 	}
 	_, err := c.client.DoAndUnmarshal(ctx, request, &result)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if response != nil {
+		if err := json.Unmarshal(result.Data, &response); err != nil {
+			return fmt.Errorf("error while parsing response: %v", err)
+		}
 	}
 
-	return &result, nil
+	return nil
 }
 
 func (c *Client) buildURL(endpoint string) string {
