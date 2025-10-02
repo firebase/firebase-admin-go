@@ -140,7 +140,7 @@ var (
 
 	queryListUsers   string = "query ListUsers @auth(level: PUBLIC) { users { id, name, address } }"
 	queryListEmails  string = "query ListEmails @auth(level: NO_ACCESS) { emails { id subject text date from { id } } }"
-	queryGetUserById string = "query GetUser($id: User_Key!) { user(key: $id) { id name address } }"
+	queryGetUserByID string = "query GetUser($id: User_Key!) { user(key: $id) { id name address } }"
 	multipleQueries  string = queryListUsers + "\n" + queryListEmails
 	upsertFredUser   string = "mutation user { user_upsert(data: {id: \"" + fredUser.ID + "\", address: \"" + fredUser.Address + "\", name: \"" + fredUser.Name + "\"})}"
 	upsertJeffUser   string = "mutation user { user_upsert(data: {id: \"" + jeffUser.ID + "\", address: \"" + jeffUser.Address + "\", name: \"" + jeffUser.Name + "\"})}"
@@ -267,7 +267,7 @@ func TestExecuteGraphqlWithVariables(t *testing.T) {
 			},
 		},
 	}
-	err := client.ExecuteGraphql(context.Background(), queryGetUserById, opts, &resp)
+	err := client.ExecuteGraphql(context.Background(), queryGetUserByID, opts, &resp)
 	if err != nil {
 		t.Fatalf("ExecuteGraphql() error = %v", err)
 	}
@@ -357,7 +357,7 @@ func TestExecuteGraphqlQueryErrorWithoutVariables(t *testing.T) {
 	defer cleanupDatabase(t)
 
 	var resp GetUserResponse
-	err := client.ExecuteGraphql(context.Background(), queryGetUserById, nil, &resp)
+	err := client.ExecuteGraphql(context.Background(), queryGetUserByID, nil, &resp)
 	if err == nil {
 		t.Fatalf("ExecuteGraphql() expected error for bad query, got nil")
 	}
