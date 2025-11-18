@@ -838,6 +838,61 @@ type getAccountInfoResponse struct {
 	Users []*userQueryResponse `json:"users"`
 }
 
+// QueryUserInfoResponse is the response structure for the accounts:query endpoint.
+type QueryUserInfoResponse struct {
+	Users []*UserRecord
+	Count string
+}
+
+type queryUsersResponse struct {
+	Users []*userQueryResponse `json:"usersInfo,omitempty"`
+	Count string               `json:"recordsCount,omitempty"`
+}
+
+// SqlExpression is a query condition used to filter results.
+type SqlExpression struct {
+	Email       string `json:"email,omitempty"`
+	UserID      string `json:"userId,omitempty"`
+	PhoneNumber string `json:"phoneNumber,omitempty"`
+}
+
+// QueryUsersRequest is the request structure for the accounts:query endpoint.
+type QueryUsersRequest struct {
+	ReturnUserInfo bool             `json:"returnUserInfo"`
+	Limit          string           `json:"limit,omitempty"`
+	Offset         string           `json:"offset,omitempty"`
+	SortBy         string           `json:"sortBy,omitempty"`
+	Order          string           `json:"order,omitempty"`
+	TenantID       string           `json:"tenantId,omitempty"`
+	Expression     []*SqlExpression `json:"expression,omitempty"`
+}
+
+// SortByField is a field to use for sorting user accounts.
+type SortByField string
+
+const (
+	// UserID sorts results by userId.
+	UserID SortByField = "USER_ID"
+	// Name sorts results by name.
+	Name SortByField = "NAME"
+	// CreatedAt sorts results by createdAt.
+	CreatedAt SortByField = "CREATED_AT"
+	// LastLoginAt sorts results by lastLoginAt.
+	LastLoginAt SortByField = "LAST_LOGIN_AT"
+	// UserEmail sorts results by userEmail.
+	UserEmail SortByField = "USER_EMAIL"
+)
+
+// Order is an order for sorting query results.
+type Order string
+
+const (
+	// Asc sorts in ascending order.
+	Asc Order = "ASC"
+	// Desc sorts in descending order.
+	Desc Order = "DESC"
+)
+
 func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord, error) {
 	var parsed getAccountInfoResponse
 	resp, err := c.post(ctx, "/accounts:lookup", query.build(), &parsed)
@@ -1311,6 +1366,33 @@ type DeleteUsersErrorInfo struct {
 // array of errors that correspond to the failed deletions. An error is
 // returned if any of the identifiers are invalid or if more than 1000
 // identifiers are specified.
+// QueryUsers queries for user accounts based on the provided query configuration.
+func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (*QueryUserInfoResponse, error) {
+	if query == nil {
+		return nil, fmt.Errorf("query request must not be nil")
+	}
+
+	var parsed queryUsersResponse
+	_, err := c.post(ctx, "/accounts:query", query, &parsed)
+	if err != nil {
+		return nil, err
+	}
+
+	var userRecords []*UserRecord
+	for _, user := range parsed.Users {
+		userRecord, err := user.makeUserRecord()
+		if err != nil {
+			return nil, fmt.Errorf("error while parsing response: %w", err)
+		}
+		userRecords = append(userRecords, userRecord)
+	}
+
+	return &QueryUserInfoResponse{
+		Users: userRecords,
+		Count: parsed.Count,
+	}, nil
+}
+
 func (c *baseClient) DeleteUsers(ctx context.Context, uids []string) (*DeleteUsersResult, error) {
 	if len(uids) == 0 {
 		return &DeleteUsersResult{}, nil
