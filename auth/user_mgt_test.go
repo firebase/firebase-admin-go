@@ -2013,23 +2013,23 @@ func TestQueryUsersWithTenant(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
+	tenantClient, err := s.Client.TenantManager.AuthForTenant("test-tenant")
+	if err != nil {
+		t.Fatalf("Failed to create tenant client: %v", err)
+	}
+
 	query := &QueryUsersRequest{
 		ReturnUserInfo: true,
-		TenantID:       "test-tenant",
 	}
 
-	_, err := s.Client.QueryUsers(context.Background(), query)
+	_, err = tenantClient.QueryUsers(context.Background(), query)
 	if err != nil {
-		t.Fatalf("QueryUsers() = %v", err)
+		t.Fatalf("QueryUsers() with tenant client = %v", err)
 	}
 
-	var req map[string]interface{}
-	if err := json.Unmarshal(s.Rbody, &req); err != nil {
-		t.Fatal(err)
-	}
-
-	if req["tenantId"] != "test-tenant" {
-		t.Errorf("QueryUsers() tenantId = %q; want = %q", req["tenantId"], "test-tenant")
+	wantPath := "/projects/mock-project-id/tenants/test-tenant/accounts:query"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
