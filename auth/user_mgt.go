@@ -849,8 +849,8 @@ type queryUsersResponse struct {
 	Count string               `json:"recordsCount,omitempty"`
 }
 
-// SqlExpression is a query condition used to filter results.
-type SqlExpression struct {
+// SQLExpression is a query condition used to filter results.
+type SQLExpression struct {
 	Email       string `json:"email,omitempty"`
 	UserID      string `json:"userId,omitempty"`
 	PhoneNumber string `json:"phoneNumber,omitempty"`
@@ -864,7 +864,7 @@ type QueryUsersRequest struct {
 	SortBy         string           `json:"sortBy,omitempty"`
 	Order          string           `json:"order,omitempty"`
 	TenantID       string           `json:"tenantId,omitempty"`
-	Expression     []*SqlExpression `json:"expression,omitempty"`
+	Expression     []*SQLExpression `json:"expression,omitempty"`
 }
 
 // SortByField is a field to use for sorting user accounts.
