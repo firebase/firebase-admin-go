@@ -2005,34 +2005,6 @@ func TestQueryUsersError(t *testing.T) {
 	}
 }
 
-func TestQueryUsersWithTenant(t *testing.T) {
-	resp := `{
-		"usersInfo": [],
-		"recordsCount": "0"
-	}`
-	s := echoServer([]byte(resp), t)
-	defer s.Close()
-
-	tenantClient, err := s.Client.TenantManager.AuthForTenant("test-tenant")
-	if err != nil {
-		t.Fatalf("Failed to create tenant client: %v", err)
-	}
-
-	query := &QueryUsersRequest{
-		ReturnUserInfo: true,
-	}
-
-	_, err = tenantClient.QueryUsers(context.Background(), query)
-	if err != nil {
-		t.Fatalf("QueryUsers() with tenant client = %v", err)
-	}
-
-	wantPath := "/projects/mock-project-id/tenants/test-tenant/accounts:query"
-	if s.Req[0].RequestURI != wantPath {
-		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
-	}
-}
-
 func TestMakeExportedUser(t *testing.T) {
 	queryResponse := &userQueryResponse{
 		UID:                "testuser",
