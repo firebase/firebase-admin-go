@@ -841,12 +841,12 @@ type getAccountInfoResponse struct {
 // QueryUserInfoResponse is the response structure for the accounts:query endpoint.
 type QueryUserInfoResponse struct {
 	Users []*UserRecord
-	Count string
+	Count int64
 }
 
 type queryUsersResponse struct {
-	Users []*userQueryResponse `json:"usersInfo,omitempty"`
-	Count string               `json:"recordsCount,omitempty"`
+	Users []*userQueryResponse `json:"userInfo"`
+	Count int64                `json:"recordsCount,string,omitempty"`
 }
 
 // SQLExpression is a query condition used to filter results.
@@ -859,8 +859,8 @@ type SQLExpression struct {
 // QueryUsersRequest is the request structure for the accounts:query endpoint.
 type QueryUsersRequest struct {
 	ReturnUserInfo bool             `json:"returnUserInfo"`
-	Limit          string           `json:"limit,omitempty"`
-	Offset         string           `json:"offset,omitempty"`
+	Limit          int64            `json:"limit,string,omitempty"`
+	Offset         int64            `json:"offset,string,omitempty"`
 	SortBy         string           `json:"sortBy,omitempty"`
 	Order          string           `json:"order,omitempty"`
 	TenantID       string           `json:"tenantId,omitempty"`
@@ -1378,6 +1378,8 @@ func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (
 		return nil, err
 	}
 
+	//log.Printf("QueryUsers() with response = %d, %d", parsed.Count, len(parsed.Users))
+
 	var userRecords []*UserRecord
 	for _, user := range parsed.Users {
 		userRecord, err := user.makeUserRecord()
@@ -1480,6 +1482,8 @@ func (c *baseClient) post(
 		URL:    url,
 		Body:   internal.NewJSONEntity(payload),
 	}
+	//log.Printf("%+v \n", req.Body)
+	//log.Printf("%+v \n", resp)
 	return c.httpClient.DoAndUnmarshal(ctx, req, resp)
 }
 
