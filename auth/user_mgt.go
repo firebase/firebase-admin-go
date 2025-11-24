@@ -1062,7 +1062,7 @@ type queryUsersResponse struct {
 // SQLExpression is a query condition used to filter results.
 type SQLExpression struct {
 	Email       string `json:"email,omitempty"`
-	UID      string `json:"userId,omitempty"`
+	UID         string `json:"userId,omitempty"`
 	PhoneNumber string `json:"phoneNumber,omitempty"`
 }
 
@@ -1082,7 +1082,7 @@ func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
 	var sortBy string
 	if q.SortBy != sortByUnspecified {
 		sortBys := map[SortByField]string{
-			UID:      "USER_ID",
+			UID:         "USER_ID",
 			Name:        "NAME",
 			CreatedAt:   "CREATED_AT",
 			LastLoginAt: "LAST_LOGIN_AT",
@@ -1169,7 +1169,6 @@ func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (
 		Count: parsed.Count,
 	}, nil
 }
-
 
 type userQueryResponse struct {
 	UID                string                     `json:"localId,omitempty"`
