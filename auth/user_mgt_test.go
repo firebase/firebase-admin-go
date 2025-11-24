@@ -1901,7 +1901,7 @@ func TestDeleteUsers(t *testing.T) {
 
 func TestQueryUsers(t *testing.T) {
 	resp := `{
-		"usersInfo": [{
+		"userInfo": [{
 			"localId": "testuser",
 			"email": "testuser@example.com",
 			"phoneNumber": "+1234567890",
@@ -1944,9 +1944,9 @@ func TestQueryUsers(t *testing.T) {
 
 	query := &QueryUsersRequest{
 		ReturnUserInfo: true,
-		Limit:          "1",
-		SortBy:         string(UserEmail),
-		Order:          string(Asc),
+		Limit:          1,
+		SortBy:         UserEmail,
+		Order:          Asc,
 		Expression: []*SQLExpression{
 			{
 				Email: "testuser@example.com",
@@ -1963,8 +1963,8 @@ func TestQueryUsers(t *testing.T) {
 		t.Fatalf("QueryUsers() returned %d users; want 1", len(result.Users))
 	}
 
-	if result.Count != "1" {
-		t.Errorf("QueryUsers() returned count %q; want '1'", result.Count)
+	if result.Count != 1 {
+		t.Errorf("QueryUsers() returned count %d; want 1", result.Count)
 	}
 
 	if !reflect.DeepEqual(result.Users[0], testUser) {
@@ -1989,9 +1989,9 @@ func TestQueryUsersError(t *testing.T) {
 
 	query := &QueryUsersRequest{
 		ReturnUserInfo: true,
-		Limit:          "1",
-		SortBy:         "USER_EMAIL",
-		Order:          "ASC",
+		Limit:          1,
+		SortBy:         UserEmail,
+		Order:          Asc,
 		Expression: []*SQLExpression{
 			{
 				Email: "testuser@example.com",
@@ -1999,6 +1999,47 @@ func TestQueryUsersError(t *testing.T) {
 		},
 	}
 
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersNilQuery(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	result, err := s.Client.QueryUsers(context.Background(), nil)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers(nil) = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersMalformedCustomAttributes(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser",
+			"customAttributes": "invalid-json"
+		}]
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	query := &QueryUsersRequest{}
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersMalformedLastRefreshTimestamp(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser",
+			"lastRefreshAt": "invalid-timestamp"
+		}]
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	query := &QueryUsersRequest{}
 	result, err := s.Client.QueryUsers(context.Background(), query)
 	if result != nil || err == nil {
 		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
