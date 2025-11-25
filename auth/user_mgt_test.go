@@ -1947,7 +1947,7 @@ func TestQueryUsers(t *testing.T) {
 		Limit:          1,
 		SortBy:         UserEmail,
 		Order:          Asc,
-		Expression: []*SQLExpression{
+		Expression: []*Expression{
 			{
 				Email: "testuser@example.com",
 			},
@@ -1992,7 +1992,7 @@ func TestQueryUsersError(t *testing.T) {
 		Limit:          1,
 		SortBy:         UserEmail,
 		Order:          Asc,
-		Expression: []*SQLExpression{
+		Expression: []*Expression{
 			{
 				Email: "testuser@example.com",
 			},

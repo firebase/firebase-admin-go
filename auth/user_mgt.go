@@ -1059,8 +1059,8 @@ type queryUsersResponse struct {
 	Count int64                `json:"recordsCount,string,omitempty"`
 }
 
-// SQLExpression is a query condition used to filter results.
-type SQLExpression struct {
+// Expression is a query condition used to filter results.
+type Expression struct {
 	Email       string `json:"email,omitempty"`
 	UID         string `json:"userId,omitempty"`
 	PhoneNumber string `json:"phoneNumber,omitempty"`
@@ -1068,13 +1068,13 @@ type SQLExpression struct {
 
 // QueryUsersRequest is the request structure for the accounts:query endpoint.
 type QueryUsersRequest struct {
-	ReturnUserInfo bool             `json:"returnUserInfo"`
-	Limit          int64            `json:"limit,string,omitempty"`
-	Offset         int64            `json:"offset,string,omitempty"`
-	SortBy         SortBy           `json:"-"`
-	Order          Order            `json:"-"`
-	TenantID       string           `json:"tenantId,omitempty"`
-	Expression     []*SQLExpression `json:"expression,omitempty"`
+	ReturnUserInfo bool          `json:"returnUserInfo"`
+	Limit          int64         `json:"limit,string,omitempty"`
+	Offset         int64         `json:"offset,string,omitempty"`
+	SortBy         SortBy        `json:"-"`
+	Order          Order         `json:"-"`
+	TenantID       string        `json:"tenantId,omitempty"`
+	Expression     []*Expression `json:"expression,omitempty"`
 }
 
 // MarshalJSON marshals a QueryUsersRequest into JSON (for internal use only).
