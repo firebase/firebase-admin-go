@@ -1071,7 +1071,7 @@ type QueryUsersRequest struct {
 	ReturnUserInfo bool             `json:"returnUserInfo"`
 	Limit          int64            `json:"limit,string,omitempty"`
 	Offset         int64            `json:"offset,string,omitempty"`
-	SortBy         SortByField      `json:"-"`
+	SortBy         SortBy           `json:"-"`
 	Order          Order            `json:"-"`
 	TenantID       string           `json:"tenantId,omitempty"`
 	Expression     []*SQLExpression `json:"expression,omitempty"`
@@ -1081,7 +1081,7 @@ type QueryUsersRequest struct {
 func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
 	var sortBy string
 	if q.SortBy != sortByUnspecified {
-		sortBys := map[SortByField]string{
+		sortBys := map[SortBy]string{
 			UID:         "USER_ID",
 			Name:        "NAME",
 			CreatedAt:   "CREATED_AT",
@@ -1113,11 +1113,11 @@ func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(temp)
 }
 
-// SortByField is a field to use for sorting user accounts.
-type SortByField int
+// SortBy is a field to use for sorting user accounts.
+type SortBy int
 
 const (
-	sortByUnspecified SortByField = iota
+	sortByUnspecified SortBy = iota
 	// UID sorts results by userId.
 	UID
 	// Name sorts results by name.
