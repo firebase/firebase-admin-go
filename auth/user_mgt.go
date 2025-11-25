@@ -1077,8 +1077,8 @@ type QueryUsersRequest struct {
 	Expression     []*Expression `json:"expression,omitempty"`
 }
 
-// MarshalJSON marshals a QueryUsersRequest into JSON (for internal use only).
-func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
+// build builds the query request (for internal use only).
+func (q *QueryUsersRequest) build() interface{} {
 	var sortBy string
 	if q.SortBy != sortByUnspecified {
 		sortBys := map[SortBy]string{
@@ -1101,7 +1101,7 @@ func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
 	}
 
 	type queryUsersRequestInternal QueryUsersRequest
-	temp := &struct {
+	return &struct {
 		SortBy string `json:"sortBy,omitempty"`
 		Order  string `json:"order,omitempty"`
 		*queryUsersRequestInternal
@@ -1110,7 +1110,6 @@ func (q *QueryUsersRequest) MarshalJSON() ([]byte, error) {
 		Order:                     order,
 		queryUsersRequestInternal: (*queryUsersRequestInternal)(q),
 	}
-	return json.Marshal(temp)
 }
 
 // SortBy is a field to use for sorting user accounts.
@@ -1148,7 +1147,7 @@ func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (
 	}
 
 	var parsed queryUsersResponse
-	_, err := c.post(ctx, "/accounts:query", query, &parsed)
+	_, err := c.post(ctx, "/accounts:query", query.build(), &parsed)
 	if err != nil {
 		return nil, err
 	}
