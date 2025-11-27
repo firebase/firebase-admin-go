@@ -721,16 +721,17 @@ func (p *APNSPayload) UnmarshalJSON(b []byte) error {
 // Alert may be specified as a string (via the AlertString field), or as a struct (via the Alert
 // field).
 type Aps struct {
-	AlertString      string                 `json:"-"`
-	Alert            *ApsAlert              `json:"-"`
-	Badge            *int                   `json:"badge,omitempty"`
-	Sound            string                 `json:"-"`
-	CriticalSound    *CriticalSound         `json:"-"`
-	ContentAvailable bool                   `json:"-"`
-	MutableContent   bool                   `json:"-"`
-	Category         string                 `json:"category,omitempty"`
-	ThreadID         string                 `json:"thread-id,omitempty"`
-	CustomData       map[string]interface{} `json:"-"`
+	AlertString       string                 `json:"-"`
+	Alert             *ApsAlert              `json:"-"`
+	Badge             *int                   `json:"badge,omitempty"`
+	Sound             string                 `json:"-"`
+	CriticalSound     *CriticalSound         `json:"-"`
+	ContentAvailable  bool                   `json:"-"`
+	MutableContent    bool                   `json:"-"`
+	InterruptionLevel InterruptionLevel      `json:"interruption-level,omitempty"`
+	Category          string                 `json:"category,omitempty"`
+	ThreadID          string                 `json:"thread-id,omitempty"`
+	CustomData        map[string]interface{} `json:"-"`
 }
 
 // standardFields creates a map containing all the fields except the custom data.
@@ -857,6 +858,23 @@ func (cs *CriticalSound) UnmarshalJSON(b []byte) error {
 	cs.Critical = (temp.CriticalInt == 1)
 	return nil
 }
+
+// InterruptionLevel indicates the importance and delivery timing of a notification. Available on iOS 15+.
+type InterruptionLevel string
+
+const (
+	// InterruptionLevelActive presents notifications immediately, lights up the screen, and can play a sound.
+	InterruptionLevelActive InterruptionLevel = "active"
+
+	// InterruptionLevelCritical presents the notification immediately, lights up the screen, and bypasses the mute switch to play a sound.
+	InterruptionLevelCritical InterruptionLevel = "critical"
+
+	// InterruptionLevelPassive adds the notification to the notification list without lighting up the screen or playing a sound.
+	InterruptionLevelPassive InterruptionLevel = "passive"
+
+	// InterruptionLevelTimeSensitive presents the notification immediately, lights up the screen, can play a sound, and breaks through system notification controls.
+	InterruptionLevelTimeSensitive InterruptionLevel = "time-sensitive"
+)
 
 // ApsAlert is the alert payload that can be included in an Aps.
 //
