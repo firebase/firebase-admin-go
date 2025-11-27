@@ -1158,8 +1158,6 @@ func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (
 		return nil, err
 	}
 
-	//log.Printf("QueryUsers() with response = %d, %d", parsed.Count, len(parsed.Users))
-
 	var userRecords []*UserRecord
 	for _, user := range parsed.Users {
 		userRecord, err := user.makeUserRecord()
@@ -1525,8 +1523,6 @@ func (c *baseClient) post(
 		URL:    url,
 		Body:   internal.NewJSONEntity(payload),
 	}
-	//log.Printf("%+v \n", req.Body)
-	//log.Printf("%+v \n", resp)
 	return c.httpClient.DoAndUnmarshal(ctx, req, resp)
 }
 

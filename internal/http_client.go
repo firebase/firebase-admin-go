@@ -167,8 +167,6 @@ func (c *HTTPClient) DoAndUnmarshal(ctx context.Context, req *Request, v interfa
 		return nil, err
 	}
 
-	//log.Printf("%+v \n", string(resp.Body))
-
 	if v != nil {
 		if err := json.Unmarshal(resp.Body, v); err != nil {
 			return nil, fmt.Errorf("error while parsing response: %v", err)
