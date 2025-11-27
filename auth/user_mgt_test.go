@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -2191,7 +2191,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 }
 
 func TestAuthErrorWithCodeAndDetails(t *testing.T) {
-	resp := []byte(`{"error":{"message":"USER_NOT_FOUND: extra details"}}`)
+	resp := []byte(`{"error":{"message":"USER_NOT_FOUND : extra details"}}`)
 	s := echoServer(resp, t)
 	defer s.Close()
 	s.Client.baseClient.httpClient.RetryConfig = nil
