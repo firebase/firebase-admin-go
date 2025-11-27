@@ -1943,7 +1943,7 @@ func TestQueryUsers(t *testing.T) {
 	defer s.Close()
 
 	returnUserInfo := true
-	query := &QueryUsersRequest {
+	query := &QueryUsersRequest{
 		ReturnUserInfo: &returnUserInfo,
 		Limit:          1,
 		SortBy:         UserEmail,
