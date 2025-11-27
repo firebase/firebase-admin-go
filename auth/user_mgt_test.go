@@ -2078,6 +2078,68 @@ func TestQueryUsersDefaultReturnUserInfo(t *testing.T) {
 	}
 }
 
+func TestQueryUsersValidation(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	tests := []struct {
+		name  string
+		query *QueryUsersRequest
+	}{
+		{
+			name: "Invalid Limit Low",
+			query: &QueryUsersRequest{
+				Limit: -1,
+			},
+		},
+		{
+			name: "Invalid Limit High",
+			query: &QueryUsersRequest{
+				Limit: 501,
+			},
+		},
+		{
+			name: "Invalid Offset",
+			query: &QueryUsersRequest{
+				Offset: -1,
+			},
+		},
+		{
+			name: "Invalid Email in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{Email: "invalid-email"},
+				},
+			},
+		},
+		{
+			name: "Invalid Phone in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{PhoneNumber: "invalid-phone"},
+				},
+			},
+		},
+		{
+			name: "Invalid UID in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{UID: string(make([]byte, 129))},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.Client.QueryUsers(context.Background(), tt.query)
+			if err == nil {
+				t.Errorf("QueryUsers() with %s; want error, got nil", tt.name)
+			}
+		})
+	}
+}
+
 func TestMakeExportedUser(t *testing.T) {
 	queryResponse := &userQueryResponse{
 		UID:                "testuser",

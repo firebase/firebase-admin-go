@@ -1048,7 +1048,7 @@ func (c *baseClient) GetUsers(
 	return &GetUsersResult{userRecords, notFound}, nil
 }
 
-// QueryUserInfoResponse is the response structure for the accounts:query endpoint.
+// QueryUserInfoResponse is the response structure for the QueryUsers function.
 type QueryUserInfoResponse struct {
 	Users []*UserRecord
 	Count int64
@@ -1060,21 +1060,38 @@ type queryUsersResponse struct {
 }
 
 // Expression is a query condition used to filter results.
+//
+// Only one of Email, PhoneNumber, or UID should be specified.
+// If more than one is specified, only the first (in the order of Email, PhoneNumber, UID) will be applied.
 type Expression struct {
-	Email       string `json:"email,omitempty"`
-	UID         string `json:"userId,omitempty"`
+	// Email is a case insensitive string that the account's email should match.
+	Email string `json:"email,omitempty"`
+	// PhoneNumber is a string that the account's phone number should match.
 	PhoneNumber string `json:"phoneNumber,omitempty"`
+	// UID is a string that the account's local ID should match.
+	UID string `json:"userId,omitempty"`
 }
 
-// QueryUsersRequest is the request structure for the accounts:query endpoint.
+// QueryUsersRequest is the request structure for the QueryUsers function.
 type QueryUsersRequest struct {
-	ReturnUserInfo *bool         `json:"returnUserInfo,omitempty"`
-	Limit          int64         `json:"limit,string,omitempty"`
-	Offset         int64         `json:"offset,string,omitempty"`
-	SortBy         SortBy        `json:"-"`
-	Order          Order         `json:"-"`
-	TenantID       string        `json:"tenantId,omitempty"`
-	Expression     []*Expression `json:"expression,omitempty"`
+	// ReturnUserInfo indicates whether to return the accounts matching the query.
+	// If false, only the count of accounts matching the query will be returned.
+	// Defaults to true.
+	ReturnUserInfo *bool `json:"returnUserInfo,omitempty"`
+	// Limit is the maximum number of accounts to return with an upper limit of 500.
+	// Defaults to 500. Only valid when ReturnUserInfo is set to true.
+	Limit int64 `json:"limit,string,omitempty"`
+	// Offset is the number of accounts to skip from the beginning of matching records.
+	// Only valid when ReturnUserInfo is set to true.
+	Offset int64 `json:"offset,string,omitempty"`
+	// SortBy is the field to use for sorting user accounts.
+	SortBy SortBy `json:"-"`
+	// Order is the order for sorting query results.
+	Order Order `json:"-"`
+	// TenantID is the ID of the tenant to which the result is scoped.
+	TenantID string `json:"tenantId,omitempty"`
+	// Expression is a list of query conditions used to filter results.
+	Expression []*Expression `json:"expression,omitempty"`
 }
 
 // build builds the query request (for internal use only).
@@ -1118,6 +1135,33 @@ func (q *QueryUsersRequest) build() interface{} {
 	}
 }
 
+func (q *QueryUsersRequest) validate() error {
+	if q.Limit != 0 && (q.Limit < 1 || q.Limit > 500) {
+		return fmt.Errorf("limit must be between 1 and 500")
+	}
+	if q.Offset < 0 {
+		return fmt.Errorf("offset must be non-negative")
+	}
+	for _, exp := range q.Expression {
+		if exp.Email != "" {
+			if err := validateEmail(exp.Email); err != nil {
+				return err
+			}
+		}
+		if exp.PhoneNumber != "" {
+			if err := validatePhone(exp.PhoneNumber); err != nil {
+				return err
+			}
+		}
+		if exp.UID != "" {
+			if err := validateUID(exp.UID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // SortBy is a field to use for sorting user accounts.
 type SortBy int
 
@@ -1150,6 +1194,9 @@ const (
 func (c *baseClient) QueryUsers(ctx context.Context, query *QueryUsersRequest) (*QueryUserInfoResponse, error) {
 	if query == nil {
 		return nil, fmt.Errorf("query request must not be nil")
+	}
+	if err := query.validate(); err != nil {
+		return nil, err
 	}
 
 	var parsed queryUsersResponse
