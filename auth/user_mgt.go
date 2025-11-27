@@ -1068,7 +1068,7 @@ type Expression struct {
 
 // QueryUsersRequest is the request structure for the accounts:query endpoint.
 type QueryUsersRequest struct {
-	ReturnUserInfo bool          `json:"returnUserInfo"`
+	ReturnUserInfo *bool         `json:"returnUserInfo,omitempty"`
 	Limit          int64         `json:"limit,string,omitempty"`
 	Offset         int64         `json:"offset,string,omitempty"`
 	SortBy         SortBy        `json:"-"`
@@ -1101,6 +1101,12 @@ func (q *QueryUsersRequest) build() interface{} {
 	}
 
 	type queryUsersRequestInternal QueryUsersRequest
+	internal := (*queryUsersRequestInternal)(q)
+	if internal.ReturnUserInfo == nil {
+		t := true
+		internal.ReturnUserInfo = &t
+	}
+
 	return &struct {
 		SortBy string `json:"sortBy,omitempty"`
 		Order  string `json:"order,omitempty"`
@@ -1108,7 +1114,7 @@ func (q *QueryUsersRequest) build() interface{} {
 	}{
 		SortBy:                    sortBy,
 		Order:                     order,
-		queryUsersRequestInternal: (*queryUsersRequestInternal)(q),
+		queryUsersRequestInternal: internal,
 	}
 }
 

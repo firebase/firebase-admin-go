@@ -1461,7 +1461,7 @@ func TestQueryUsers(t *testing.T) {
 		t.Fatalf("QueryUsers() = %v", err)
 	}
 	if len(result.Users) != 1 || result.Users[0].UID != u1.UID {
-		t.Errorf("QueryUsers(email=%s) = %v; want user %s", u1.Email, result.Users, u1.UID)
+		t.Errorf("QueryUsers(uid=%s) = %v; want user %s", u1.UID, result.Users, u1.UID)
 	}
 
 	// Query with limit and sort

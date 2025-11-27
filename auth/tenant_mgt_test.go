@@ -103,8 +103,9 @@ func TestTenantQueryUsers(t *testing.T) {
 		t.Fatalf("Failed to create tenant client: %v", err)
 	}
 
+	returnUserInfo := true
 	query := &QueryUsersRequest{
-		ReturnUserInfo: true,
+		ReturnUserInfo: &returnUserInfo,
 	}
 
 	_, err = tenantClient.QueryUsers(context.Background(), query)

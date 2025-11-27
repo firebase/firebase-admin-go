@@ -1942,8 +1942,9 @@ func TestQueryUsers(t *testing.T) {
 	s := echoServer([]byte(resp), t)
 	defer s.Close()
 
-	query := &QueryUsersRequest{
-		ReturnUserInfo: true,
+	returnUserInfo := true
+	query := &QueryUsersRequest {
+		ReturnUserInfo: &returnUserInfo,
 		Limit:          1,
 		SortBy:         UserEmail,
 		Order:          Asc,
@@ -1987,8 +1988,9 @@ func TestQueryUsersError(t *testing.T) {
 	defer s.Close()
 	s.Status = http.StatusBadRequest
 
+	returnUserInfo := true
 	query := &QueryUsersRequest{
-		ReturnUserInfo: true,
+		ReturnUserInfo: &returnUserInfo,
 		Limit:          1,
 		SortBy:         UserEmail,
 		Order:          Asc,
@@ -2504,4 +2506,34 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 func (s *mockAuthServer) Close() {
 	s.Srv.Close()
+}
+
+func TestQueryUsersDefaultReturnUserInfo(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser"
+		}],
+		"recordsCount": "1"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	// ReturnUserInfo is nil, should default to true in build()
+	query := &QueryUsersRequest{
+		Limit: 1,
+	}
+
+	_, err := s.Client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &got); err != nil {
+		t.Fatal(err)
+	}
+
+	if got["returnUserInfo"] != true {
+		t.Errorf("QueryUsers() request[\"returnUserInfo\"] = %v; want true", got["returnUserInfo"])
+	}
 }
