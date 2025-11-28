@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1510,7 +1510,7 @@ func parseErrorResponse(resp *internal.Response) (string, string) {
 	idx := strings.Index(code, ":")
 	if idx != -1 {
 		detail = strings.TrimSpace(code[idx+1:])
-		code = code[:idx]
+		code = strings.TrimSpace(code[:idx])
 	}
 
 	return code, detail
