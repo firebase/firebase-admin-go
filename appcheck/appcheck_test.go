@@ -1,11 +1,13 @@
 package appcheck
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"firebase.google.com/go/v4/internal"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 )
 
 func TestVerifyOneTimeToken(t *testing.T) {
@@ -67,24 +70,32 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	for _, tt := range appCheckVerifyTestsTable {
 
 		t.Run(tt.label, func(t *testing.T) {
-			appCheckVerifyMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte(tt.mockServerResponse))
-			}))
+
+			mockHttpClient := &http.Client{
+				Transport: &mockHTTPResponse{
+					Response: http.Response{
+						StatusCode: 200,
+						Body:       io.NopCloser(bytes.NewBufferString(tt.mockServerResponse)),
+					},
+					Err: nil,
+				},
+			}
 
 			client, err := NewClient(context.Background(), &internal.AppCheckConfig{
 				ProjectID: projectID,
+				Opts: []option.ClientOption{
+					option.WithHTTPClient(mockHttpClient),
+				},
 			})
 
 			if err != nil {
 				t.Fatalf("error creating new client: %v", err)
 			}
 
-			client.tokenVerifierUrl = appCheckVerifyMockServer.URL
-
-			_, err = client.VerifyOneTimeToken(token)
+			_, err = client.VerifyOneTimeToken(context.Background(), token)
 
 			if !errors.Is(err, tt.expectedError) {
-				t.Errorf("failed to verify token; Expected: %v, but got: %v", tt.expectedError, err)
+				t.Errorf("Expected error: %v, but got: %v", tt.expectedError, err)
 			}
 		})
 
@@ -360,4 +371,13 @@ func loadPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	return privateKey, nil
+}
+
+type mockHTTPResponse struct {
+	Response http.Response
+	Err      error
+}
+
+func (m *mockHTTPResponse) RoundTrip(*http.Request) (*http.Response, error) {
+	return &m.Response, m.Err
 }

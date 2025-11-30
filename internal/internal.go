@@ -84,6 +84,7 @@ type RemoteConfigClientConfig struct {
 // AppCheckConfig represents the configuration of App Check service.
 type AppCheckConfig struct {
 	ProjectID string
+	Opts      []option.ClientOption
 }
 
 // MockTokenSource is a TokenSource implementation that can be used for testing.

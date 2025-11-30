@@ -16,12 +16,9 @@
 package appcheck
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -36,7 +33,7 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
-const tokenVerifierBaseUrl = "https://firebaseappcheck.googleapis.com"
+var verifyTokenURL = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
 
 var (
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
@@ -72,9 +69,9 @@ type DecodedAppCheckToken struct {
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
-	projectID        string
-	jwks             *keyfunc.JWKS
-	tokenVerifierUrl string
+	projectID  string
+	jwks       *keyfunc.JWKS
+	httpClient *internal.HTTPClient
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -91,10 +88,15 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		return nil, err
 	}
 
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		projectID:        conf.ProjectID,
-		jwks:             jwks,
-		tokenVerifierUrl: buildTokenVerifierUrl(conf.ProjectID),
+		projectID:  conf.ProjectID,
+		jwks:       jwks,
+		httpClient: hc,
 	}, nil
 }
 
@@ -203,40 +205,34 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 // otherwise valid App Check token with an unsupported provider will cause an error to be returned.
 //
 // If the token was already consumed prior to this call, an error is returned.
-func (c *Client) VerifyOneTimeToken(token string) (*DecodedAppCheckToken, error) {
+func (c *Client) VerifyOneTimeToken(ctx context.Context, token string) (*DecodedAppCheckToken, error) {
 	decodedAppCheckToken, err := c.VerifyToken(token)
 
 	if err != nil {
 		return nil, err
 	}
 
-	bodyReader := bytes.NewReader([]byte(fmt.Sprintf(`{"app_check_token":%s}`, token)))
-
-	resp, err := http.Post(c.tokenVerifierUrl, "application/json", bodyReader)
-
-	if err != nil {
-		return nil, err
+	req := &internal.Request{
+		Method: "POST",
+		URL:    fmt.Sprintf(verifyTokenURL, c.projectID),
+		Body: internal.NewJSONEntity(map[string]string{
+			"app_check_token": token,
+		}),
 	}
 
-	defer resp.Body.Close()
-
-	var rb struct {
+	var resp struct {
 		AlreadyConsumed bool `json:"alreadyConsumed"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&rb); err != nil {
+	if _, err := c.httpClient.DoAndUnmarshal(ctx, req, &resp); err != nil {
 		return nil, err
 	}
 
-	if rb.AlreadyConsumed {
+	if resp.AlreadyConsumed {
 		return nil, ErrTokenAlreadyConsumed
 	}
 
 	return decodedAppCheckToken, nil
-}
-
-func buildTokenVerifierUrl(projectId string) string {
-	return fmt.Sprintf("%s/v1beta/projects/%s:verifyAppCheckToken", tokenVerifierBaseUrl, projectId)
 }
 
 func contains(s []string, str string) bool {
