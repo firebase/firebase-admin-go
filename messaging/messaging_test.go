@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -134,6 +134,35 @@ var validMessages = []struct {
 		want: map[string]interface{}{
 			"android": map[string]interface{}{
 				"collapse_key": "ck",
+				"data": map[string]interface{}{
+					"k1": "v1",
+					"k2": "v2",
+				},
+				"priority": "normal",
+				"ttl":      "10s",
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidDataMessage",
+		req: &Message{
+			Android: &AndroidConfig{
+				DirectBootOK: true,
+				CollapseKey:  "ck",
+				Data: map[string]string{
+					"k1": "v1",
+					"k2": "v2",
+				},
+				Priority: "normal",
+				TTL:      &ttl,
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"direct_boot_ok": true,
+				"collapse_key":   "ck",
 				"data": map[string]interface{}{
 					"k1": "v1",
 					"k2": "v2",
@@ -560,6 +589,21 @@ var validMessages = []struct {
 		},
 	},
 	{
+		name: "APNSLiveActivity",
+		req: &Message{
+			Token: "test-token",
+			APNS: &APNSConfig{
+				LiveActivityToken: "live-activity-token",
+			},
+		},
+		want: map[string]interface{}{
+			"token": "test-token",
+			"apns": map[string]interface{}{
+				"live_activity_token": "live-activity-token",
+			},
+		},
+	},
+	{
 		name: "AndroidNotificationPriorityMin",
 		req: &Message{
 			Android: &AndroidConfig{
@@ -649,6 +693,63 @@ var validMessages = []struct {
 			"android": map[string]interface{}{
 				"notification": map[string]interface{}{
 					"notification_priority": "PRIORITY_MAX",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationProxyAllow",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyAllow,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "ALLOW",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationProxyDeny",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyDeny,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "DENY",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidNotificationProxyIfPriorityLowered",
+		req: &Message{
+			Android: &AndroidConfig{
+				Notification: &AndroidNotification{
+					Proxy: ProxyIfPriorityLowered,
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"android": map[string]interface{}{
+				"notification": map[string]interface{}{
+					"proxy": "IF_PRIORITY_LOWERED",
 				},
 			},
 			"topic": "test-topic",
@@ -1364,6 +1465,10 @@ func checkFCMRequest(t *testing.T, b []byte, tr *http.Request, want map[string]i
 	clientVersion := "fire-admin-go/" + testMessagingConfig.Version
 	if h := tr.Header.Get("X-FIREBASE-CLIENT"); h != clientVersion {
 		t.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
+	}
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testMessagingConfig.Version)
+	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"firebase.google.com/go/v4/errorutils"
+	"firebase.google.com/go/v4/internal"
 )
 
 func TestSubscribe(t *testing.T) {
@@ -197,6 +198,10 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 	}
 	if h := tr.Header.Get("Authorization"); h != "Bearer test-token" {
 		t.Errorf("Authorization = %q; want = %q", h, "Bearer test-token")
+	}
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testMessagingConfig.Version)
+	if h := tr.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		t.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
 	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/remoteconfig"
 	"firebase.google.com/go/v4/storage"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
@@ -39,7 +40,7 @@ import (
 var defaultAuthOverrides = make(map[string]interface{})
 
 // Version of the Firebase Go Admin SDK.
-const Version = "4.14.1"
+const Version = "4.18.0"
 
 // firebaseEnvName is the name of the environment variable with the Config.
 const firebaseEnvName = "FIREBASE_CONFIG"
@@ -115,6 +116,7 @@ func (a *App) InstanceID(ctx context.Context) (*iid.Client, error) {
 	conf := &internal.InstanceIDConfig{
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return iid.NewClient(ctx, conf)
 }
@@ -135,6 +137,16 @@ func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
 		ProjectID: a.projectID,
 	}
 	return appcheck.NewClient(ctx, conf)
+}
+
+// RemoteConfig returns an instance of remoteconfig.Client.
+func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
+	conf := &internal.RemoteConfigClientConfig{
+		ProjectID: a.projectID,
+		Opts:      a.opts,
+		Version:   Version,
+	}
+	return remoteconfig.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,9 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"google.golang.org/api/option"
@@ -440,4 +442,10 @@ func retryNetworkAndHTTPErrors(statusCodes ...int) RetryCondition {
 		}
 		return false
 	}
+}
+
+// GetMetricsHeader constructs header value for metrics attribution
+func GetMetricsHeader(sdkVersion string) string {
+	goVersion := strings.TrimPrefix(runtime.Version(), "go")
+	return fmt.Sprintf("gl-go/%s fire-admin/%s", goVersion, sdkVersion)
 }

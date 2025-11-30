@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -118,6 +118,9 @@ func NewClient(ctx context.Context, c *internal.InstanceIDConfig) (*Client, erro
 	hc, _, err := internal.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
+	}
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(c.Version)),
 	}
 
 	hc.CreateErrFn = createError

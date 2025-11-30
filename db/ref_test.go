@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -711,7 +711,7 @@ func TestTransactionError(t *testing.T) {
 			mock.Header = map[string]string{"ETag": "mock-etag2"}
 			mock.Resp = &person{"Peter Parker", 19}
 		} else if cnt == 1 {
-			return nil, fmt.Errorf(want)
+			return nil, fmt.Errorf("%s", want)
 		}
 		cnt++
 		var p person

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -137,6 +137,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	hc.CreateErrFn = handleHTTPError
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("X-Client-Version", fmt.Sprintf("Go/Admin/%s", conf.Version)),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
 	}
 
 	baseURL := defaultAuthURL

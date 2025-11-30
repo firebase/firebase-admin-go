@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1449,6 +1449,11 @@ func checkBaseClient(client *Client, wantProjectID string) error {
 	wantVersion := fmt.Sprintf("Go/Admin/%s", testVersion)
 	if version != wantVersion {
 		return fmt.Errorf("version = %q; want = %q", version, wantVersion)
+	}
+
+	xGoogAPIClientHeader := internal.GetMetricsHeader(testVersion)
+	if h := req.Header.Get("x-goog-api-client"); h != xGoogAPIClientHeader {
+		return fmt.Errorf("x-goog-api-client header = %q; want = %q", h, xGoogAPIClientHeader)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ func TestNewClient(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Setenv(emulatorDatabaseEnvVar, tc.EnvURL)
 			fromEnv := os.Getenv(emulatorDatabaseEnvVar)
-			fmt.Printf(fromEnv)
+			fmt.Printf("%s", fromEnv)
 			c, err := NewClient(context.Background(), &internal.DatabaseConfig{
 				Opts:         testOpts,
 				URL:          tc.URL,

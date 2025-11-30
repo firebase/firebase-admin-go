@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,9 @@ type ActionCodeSettings struct {
 	AndroidPackageName    string `json:"androidPackageName,omitempty"`
 	AndroidMinimumVersion string `json:"androidMinimumVersion,omitempty"`
 	AndroidInstallApp     bool   `json:"androidInstallApp,omitempty"`
-	DynamicLinkDomain     string `json:"dynamicLinkDomain,omitempty"`
+	LinkDomain            string `json:"linkDomain,omitempty"`
+	// Deprecated: Use LinkDomain instead.
+	DynamicLinkDomain string `json:"dynamicLinkDomain,omitempty"`
 }
 
 func (settings *ActionCodeSettings) toMap() (map[string]interface{}, error) {

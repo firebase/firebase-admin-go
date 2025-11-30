@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,10 +63,13 @@ type iidClient struct {
 	httpClient  *internal.HTTPClient
 }
 
-func newIIDClient(hc *http.Client) *iidClient {
+func newIIDClient(hc *http.Client, conf *internal.MessagingConfig) *iidClient {
 	client := internal.WithDefaultRetryConfig(hc)
 	client.CreateErrFn = handleIIDError
-	client.Opts = []internal.HTTPOption{internal.WithHeader("access_token_auth", "true")}
+	client.Opts = []internal.HTTPOption{
+		internal.WithHeader("access_token_auth", "true"),
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+	}
 	return &iidClient{
 		iidEndpoint: iidEndpoint,
 		httpClient:  client,

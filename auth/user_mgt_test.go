@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -2151,6 +2151,11 @@ func TestHTTPErrorWithCode(t *testing.T) {
 			errorutils.IsInvalidArgument,
 			"the provided dynamic link domain is not configured or authorized for the current project",
 		},
+		"INVALID_HOSTING_LINK_DOMAIN": {
+			IsInvalidHostingLinkDomain,
+			errorutils.IsInvalidArgument,
+			"the provided hosting link domain is not configured in Firebase Hosting or is not owned by the current project",
+		},
 		"PHONE_NUMBER_EXISTS": {
 			IsPhoneNumberAlreadyExists,
 			errorutils.IsAlreadyExists,
@@ -2186,7 +2191,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 }
 
 func TestAuthErrorWithCodeAndDetails(t *testing.T) {
-	resp := []byte(`{"error":{"message":"USER_NOT_FOUND: extra details"}}`)
+	resp := []byte(`{"error":{"message":"USER_NOT_FOUND : extra details"}}`)
 	s := echoServer(resp, t)
 	defer s.Close()
 	s.Client.baseClient.httpClient.RetryConfig = nil
@@ -2313,6 +2318,12 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 		wh = "Go/Admin/" + testVersion
 		if gh != wh {
 			t.Errorf("X-Client-Version header = %q; want: %q", gh, wh)
+		}
+
+		gh = r.Header.Get("x-goog-api-client")
+		wh = internal.GetMetricsHeader(testVersion)
+		if gh != wh {
+			t.Errorf("x-goog-api-client header = %q; want: %q", gh, wh)
 		}
 
 		for k, v := range s.Header {

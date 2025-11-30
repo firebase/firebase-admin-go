@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -230,6 +230,7 @@ func TestSendEachForMulticast(t *testing.T) {
 }
 
 func TestSendAll(t *testing.T) {
+	t.Skip("Skipping integration tests for deprecated sendAll() API")
 	messages := []*messaging.Message{
 		{
 			Notification: &messaging.Notification{
@@ -289,6 +290,7 @@ func TestSendAll(t *testing.T) {
 }
 
 func TestSendFiveHundred(t *testing.T) {
+	t.Skip("Skipping integration tests for deprecated sendAll() API")
 	var messages []*messaging.Message
 	const limit = 500
 	for i := 0; i < limit; i++ {
@@ -322,6 +324,7 @@ func TestSendFiveHundred(t *testing.T) {
 }
 
 func TestSendMulticast(t *testing.T) {
+	t.Skip("Skipping integration tests for deprecated SendMulticast() API")
 	message := &messaging.MulticastMessage{
 		Notification: &messaging.Notification{
 			Title: "title",
