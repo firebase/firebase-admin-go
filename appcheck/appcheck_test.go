@@ -71,7 +71,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 
 		t.Run(tt.label, func(t *testing.T) {
 
-			mockHttpClient := &http.Client{
+			mockHTTPClient := &http.Client{
 				Transport: &mockHTTPResponse{
 					Response: http.Response{
 						StatusCode: 200,
@@ -84,7 +84,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			client, err := NewClient(context.Background(), &internal.AppCheckConfig{
 				ProjectID: projectID,
 				Opts: []option.ClientOption{
-					option.WithHTTPClient(mockHttpClient),
+					option.WithHTTPClient(mockHTTPClient),
 				},
 			})
 
