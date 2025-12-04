@@ -72,7 +72,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 
 			mockHTTPClient := &http.Client{
-				Transport: &mockHTTPResponse{
+				Transport: &mockHTTPTransport{
 					Response: http.Response{
 						StatusCode: 200,
 						Body:       io.NopCloser(bytes.NewBufferString(tt.mockServerResponse)),
@@ -81,12 +81,14 @@ func TestVerifyOneTimeToken(t *testing.T) {
 				},
 			}
 
-			client, err := NewClient(context.Background(), &internal.AppCheckConfig{
+			conf := &internal.AppCheckConfig{
 				ProjectID: projectID,
 				Opts: []option.ClientOption{
 					option.WithHTTPClient(mockHTTPClient),
 				},
-			})
+			}
+
+			client, err := NewClient(context.Background(), conf)
 
 			if err != nil {
 				t.Fatalf("error creating new client: %v", err)
@@ -117,6 +119,9 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -263,6 +268,9 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -296,6 +304,9 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -373,11 +384,11 @@ func loadPrivateKey() (*rsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
-type mockHTTPResponse struct {
+type mockHTTPTransport struct {
 	Response http.Response
 	Err      error
 }
 
-func (m *mockHTTPResponse) RoundTrip(*http.Request) (*http.Response, error) {
+func (m *mockHTTPTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return &m.Response, m.Err
 }
