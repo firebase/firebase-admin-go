@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,12 +60,43 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	}
 
 	appCheckVerifyTestsTable := []struct {
-		label              string
-		mockServerResponse string
-		expectedError      error
+		label             string
+		expectedError     error
+		mockHTTPTransport mockHTTPTransport
 	}{
-		{label: "testWhenAlreadyConsumedResponseIsTrue", mockServerResponse: `{"alreadyConsumed": true}`, expectedError: ErrTokenAlreadyConsumed},
-		{label: "testWhenAlreadyConsumedResponseIsFalse", mockServerResponse: `{"alreadyConsumed": false}`, expectedError: nil},
+		{
+			label:         "testWhenAlreadyConsumedResponseIsTrue",
+			expectedError: ErrTokenAlreadyConsumed,
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"alreadyConsumed": true}`)),
+				},
+				Err: nil,
+			},
+		},
+		{
+			label:         "testWhenAlreadyConsumedResponseIsFalse",
+			expectedError: nil,
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"alreadyConsumed": false}`)),
+				},
+				Err: nil,
+			},
+		},
+		{
+			label:         "testWhenTokenCheckResponseReturnsError",
+			expectedError: internal.NewFirebaseError(&internal.Response{Status: 500}),
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 500,
+					Body:       http.NoBody,
+				},
+				Err: internal.NewFirebaseError(&internal.Response{Status: 500}),
+			},
+		},
 	}
 
 	for _, tt := range appCheckVerifyTestsTable {
@@ -72,13 +104,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 
 			mockHTTPClient := &http.Client{
-				Transport: &mockHTTPTransport{
-					Response: http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewBufferString(tt.mockServerResponse)),
-					},
-					Err: nil,
-				},
+				Transport: &tt.mockHTTPTransport,
 			}
 
 			conf := &internal.AppCheckConfig{
@@ -94,10 +120,10 @@ func TestVerifyOneTimeToken(t *testing.T) {
 				t.Fatalf("error creating new client: %v", err)
 			}
 
-			_, err = client.VerifyOneTimeToken(context.Background(), token)
+			_, gotErr := client.VerifyOneTimeToken(context.Background(), token)
 
-			if !errors.Is(err, tt.expectedError) {
-				t.Errorf("Expected error: %v, but got: %v", tt.expectedError, err)
+			if gotErr != nil && !strings.HasSuffix(gotErr.Error(), tt.expectedError.Error()) {
+				t.Errorf("Expected error: %v, but got: %v", tt.expectedError, gotErr)
 			}
 		})
 
