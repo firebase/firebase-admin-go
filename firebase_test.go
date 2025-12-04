@@ -287,6 +287,18 @@ func TestFirestore(t *testing.T) {
 	}
 }
 
+func TestFirestoreWithDatabase(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.FirestoreWithDatabase(ctx, "other-db"); c == nil || err != nil {
+		t.Errorf("FirestoreWithDatabase() = (%v, %v); want (client, nil)", c, err)
+	}
+}
+
 func TestFirestoreWithProjectID(t *testing.T) {
 	verify := func(varName string) {
 		current := os.Getenv(varName)
@@ -335,6 +347,10 @@ func TestFirestoreWithNoProjectID(t *testing.T) {
 
 	if c, err := app.Firestore(ctx); c != nil || err == nil {
 		t.Errorf("Firestore() = (%v, %v); want (nil, error)", c, err)
+	}
+
+	if c, err := app.FirestoreWithDatabase(ctx, "other-db"); c != nil || err == nil {
+		t.Errorf("FirestoreWithDatabase() = (%v, %v); want (nil, error)", c, err)
 	}
 }
 
