@@ -61,15 +61,14 @@ func TestFirestore(t *testing.T) {
 	if _, err := doc.Set(ctx, cityData); err != nil {
 		t.Fatal(err)
 	}
+	defer doc.Delete(ctx)
+
 	snap, err := doc.Get(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(snap.Data(), cityData) {
 		t.Errorf("Get() = %v; want %v", snap.Data(), cityData)
-	}
-	if _, err := doc.Delete(ctx); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -95,15 +94,14 @@ func TestFirestoreWithDatabase(t *testing.T) {
 	if _, err := doc.Set(ctx, cityData); err != nil {
 		t.Fatal(err)
 	}
+	defer doc.Delete(ctx)
+
 	snap, err := doc.Get(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(snap.Data(), cityData) {
 		t.Errorf("Get() = %v; want %v", snap.Data(), cityData)
-	}
-	if _, err := doc.Delete(ctx); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -134,9 +132,12 @@ func TestFirestoreMultiDB(t *testing.T) {
 	if _, err := cityDoc.Set(ctx, cityData); err != nil {
 		t.Fatal(err)
 	}
+	defer cityDoc.Delete(ctx)
+
 	if _, err := movieDoc.Set(ctx, movieData); err != nil {
 		t.Fatal(err)
 	}
+	defer movieDoc.Delete(ctx)
 
 	citySnap, err := cityDoc.Get(ctx)
 	if err != nil {
@@ -152,13 +153,6 @@ func TestFirestoreMultiDB(t *testing.T) {
 	}
 	if !reflect.DeepEqual(movieSnap.Data(), movieData) {
 		t.Errorf("Movie Get() = %v; want %v", movieSnap.Data(), movieData)
-	}
-
-	if _, err := cityDoc.Delete(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := movieDoc.Delete(ctx); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -186,6 +180,8 @@ func TestServerTimestamp(t *testing.T) {
 	if _, err := doc.Set(ctx, data); err != nil {
 		t.Fatal(err)
 	}
+	defer doc.Delete(ctx)
+
 	snap, err := doc.Get(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -196,8 +192,5 @@ func TestServerTimestamp(t *testing.T) {
 	}
 	if _, ok := got["timestamp"].(time.Time); !ok {
 		t.Errorf("Timestamp is not a time.Time: %v", got["timestamp"])
-	}
-	if _, err := doc.Delete(ctx); err != nil {
-		t.Fatal(err)
 	}
 }
