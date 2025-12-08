@@ -16,7 +16,9 @@ package firestore
 
 import (
 	"context"
+	"flag"
 	"log"
+	"os"
 	"reflect"
 	"testing"
 
@@ -41,11 +43,16 @@ var (
 	}
 )
 
-func TestFirestore(t *testing.T) {
+func TestMain(m *testing.M) {
+	flag.Parse()
 	if testing.Short() {
 		log.Println("skipping Firestore integration tests in short mode.")
-		return
+		os.Exit(0)
 	}
+	os.Exit(m.Run())
+}
+
+func TestFirestore(t *testing.T) {
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
@@ -73,10 +80,6 @@ func TestFirestore(t *testing.T) {
 }
 
 func TestFirestoreWithDatabase(t *testing.T) {
-	if testing.Short() {
-		log.Println("skipping Firestore integration tests in short mode.")
-		return
-	}
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
@@ -106,10 +109,6 @@ func TestFirestoreWithDatabase(t *testing.T) {
 }
 
 func TestFirestoreMultiDB(t *testing.T) {
-	if testing.Short() {
-		log.Println("skipping Firestore integration tests in short mode.")
-		return
-	}
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
@@ -157,10 +156,6 @@ func TestFirestoreMultiDB(t *testing.T) {
 }
 
 func TestServerTimestamp(t *testing.T) {
-	if testing.Short() {
-		log.Println("skipping Firestore integration tests in short mode.")
-		return
-	}
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
