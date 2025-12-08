@@ -79,7 +79,7 @@ func TestFirestore(t *testing.T) {
 	}
 }
 
-func TestFirestoreWithDatabase(t *testing.T) {
+func TestFirestoreWithDatabaseID(t *testing.T) {
 	ctx := context.Background()
 	app, err := internal.NewTestApp(ctx, nil)
 	if err != nil {
@@ -88,7 +88,7 @@ func TestFirestoreWithDatabase(t *testing.T) {
 
 	// This test requires a non-default database to exist in the project.
 	// If it doesn't exist, this test will fail.
-	client, err := app.FirestoreWithDatabase(ctx, "testing-database")
+	client, err := app.FirestoreWithDatabaseID(ctx, "testing-database")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestFirestoreMultiDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	// This test requires a non-default database to exist in the project.
-	movieClient, err := app.FirestoreWithDatabase(ctx, "testing-database")
+	movieClient, err := app.FirestoreWithDatabaseID(ctx, "testing-database")
 	if err != nil {
 		t.Fatal(err)
 	}

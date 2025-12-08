@@ -105,12 +105,12 @@ func (a *App) Storage(ctx context.Context) (*storage.Client, error) {
 // Firestore returns a new firestore.Client instance from the https://godoc.org/cloud.google.com/go/firestore
 // package.
 func (a *App) Firestore(ctx context.Context) (*firestore.Client, error) {
-	return a.FirestoreWithDatabase(ctx, firestore.DefaultDatabaseID)
+	return a.FirestoreWithDatabaseID(ctx, firestore.DefaultDatabaseID)
 }
 
-// FirestoreWithDatabase returns a new firestore.Client instance with the specified named database from the
+// FirestoreWithDatabaseID returns a new firestore.Client instance with the specified named database from the
 // https://godoc.org/cloud.google.com/go/firestore package.
-func (a *App) FirestoreWithDatabase(ctx context.Context, databaseID string) (*firestore.Client, error) {
+func (a *App) FirestoreWithDatabaseID(ctx context.Context, databaseID string) (*firestore.Client, error) {
 	if a.projectID == "" {
 		return nil, errors.New("project id is required to access Firestore")
 	}
