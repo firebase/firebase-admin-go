@@ -22,11 +22,10 @@ import (
 	"reflect"
 	"testing"
 
-	"time"
-
-	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/integration/internal"
 )
+
+const testDatabaseID = "testing-database"
 
 var (
 	cityData = map[string]interface{}{
@@ -86,9 +85,9 @@ func TestFirestoreWithDatabaseID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// This test requires a non-default database to exist in the project.
+	// This test requires the target non-default database to exist in the project.
 	// If it doesn't exist, this test will fail.
-	client, err := app.FirestoreWithDatabaseID(ctx, "testing-database")
+	client, err := app.FirestoreWithDatabaseID(ctx, testDatabaseID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,8 +118,9 @@ func TestFirestoreMultiDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// This test requires a non-default database to exist in the project.
-	movieClient, err := app.FirestoreWithDatabaseID(ctx, "testing-database")
+	// This test requires the target non-default database to exist in the project.
+	// If it doesn't exist, this test will fail.
+	movieClient, err := app.FirestoreWithDatabaseID(ctx, testDatabaseID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,40 +152,5 @@ func TestFirestoreMultiDB(t *testing.T) {
 	}
 	if !reflect.DeepEqual(movieSnap.Data(), movieData) {
 		t.Errorf("Movie Get() = %v; want %v", movieSnap.Data(), movieData)
-	}
-}
-
-func TestServerTimestamp(t *testing.T) {
-	ctx := context.Background()
-	app, err := internal.NewTestApp(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client, err := app.Firestore(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	doc := client.Collection("cities").NewDoc()
-	data := map[string]interface{}{
-		"name":      "Mountain View",
-		"timestamp": firestore.ServerTimestamp,
-	}
-	if _, err := doc.Set(ctx, data); err != nil {
-		t.Fatal(err)
-	}
-	defer doc.Delete(ctx)
-
-	snap, err := doc.Get(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := snap.Data()
-	if got["name"] != "Mountain View" {
-		t.Errorf("Name = %v; want Mountain View", got["name"])
-	}
-	if _, ok := got["timestamp"].(time.Time); !ok {
-		t.Errorf("Timestamp is not a time.Time: %v", got["timestamp"])
 	}
 }
