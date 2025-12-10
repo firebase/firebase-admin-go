@@ -152,7 +152,7 @@ Set up your Firebase project as follows:
    to set up Firestore either in the production mode or in the test mode.
    > **Note:** Integration tests are run against both the default database and an additional
    database named "testing-database".
-   3. After the bedault datbase is created, click the **Add database** button to create a
+   3. After the default database is created, click the **Add database** button to create a
    second database named "testing-database". 
 
 
