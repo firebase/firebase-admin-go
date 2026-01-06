@@ -77,7 +77,7 @@ func NewFirebaseError(resp *Response) *FirebaseError {
 
 	return &FirebaseError{
 		ErrorCode: code,
-		String:    fmt.Sprintf("unexpected http response with status: %d\n%s", resp.Status, string(resp.Body)),
+		Message:    fmt.Sprintf("unexpected http response with status: %d\n%s", resp.Status, string(resp.Body)),
 		Response:  resp.LowLevelResponse(),
 		Ext:       make(map[string]interface{}),
 	}
@@ -103,7 +103,7 @@ func NewFirebaseErrorOnePlatform(resp *Response) *FirebaseError {
 	}
 
 	if gcpError.Error.Message != "" {
-		base.String = gcpError.Error.Message
+		base.Message = gcpError.Error.Message
 	}
 
 	return base
@@ -125,7 +125,7 @@ func newFirebaseErrorTransport(err error) *FirebaseError {
 
 	return &FirebaseError{
 		ErrorCode: code,
-		String:    msg,
+		Message:    msg,
 		Ext:       make(map[string]interface{}),
 	}
 }

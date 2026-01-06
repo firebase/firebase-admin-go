@@ -85,14 +85,14 @@ const (
 // - additional metadata about the error.
 type FirebaseError struct {
 	ErrorCode ErrorCode
-	String    string
+	Message   string
 	Response  *http.Response
 	Ext       map[string]interface{}
 }
 
 // Error implements the error interface.
 func (fe *FirebaseError) Error() string {
-	return fe.String
+	return fe.Message
 }
 
 // Code returns the canonical error code associated with this error.
@@ -135,6 +135,7 @@ func IsUnauthenticated(err error) bool {
 	return HasPlatformErrorCode(err, Unauthenticated)
 }
 
+// IsPermissionDenied checks if the given error was due to a client not having sufficient
 // permissions.
 //
 // This can happen because the OAuth token does not have the right scopes, the client doesn't have
@@ -189,7 +190,7 @@ func IsDataLoss(err error) bool {
 	return HasPlatformErrorCode(err, DataLoss)
 }
 
-// IsUnknown checks if the given error was cuased by an unknown server error.
+// IsUnknown checks if the given error was caused by an unknown server error.
 //
 // This typically indicates a server bug.
 func IsUnknown(err error) bool {

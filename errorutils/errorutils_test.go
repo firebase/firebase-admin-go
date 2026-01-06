@@ -23,7 +23,7 @@ import (
 func TestFirebaseErrorImplementsError(t *testing.T) {
 	fe := &FirebaseError{
 		ErrorCode: NotFound,
-		String:    "resource not found",
+		Message:   "resource not found",
 	}
 
 	var err error = fe
@@ -38,7 +38,7 @@ func TestFirebaseErrorAccessors(t *testing.T) {
 
 	fe := &FirebaseError{
 		ErrorCode: NotFound,
-		String:    "resource not found",
+		Message:   "resource not found",
 		Response:  resp,
 		Ext:       ext,
 	}
@@ -59,7 +59,7 @@ func TestFirebaseErrorAccessors(t *testing.T) {
 func TestFirebaseErrorAccessorsWithNilFields(t *testing.T) {
 	fe := &FirebaseError{
 		ErrorCode: Internal,
-		String:    "internal error",
+		Message:   "internal error",
 	}
 
 	if fe.HTTPResponse() != nil {
@@ -74,7 +74,7 @@ func TestFirebaseErrorAccessorsWithNilFields(t *testing.T) {
 func TestHasPlatformErrorCode(t *testing.T) {
 	fe := &FirebaseError{
 		ErrorCode: NotFound,
-		String:    "not found",
+		Message:   "not found",
 	}
 
 	if !HasPlatformErrorCode(fe, NotFound) {
@@ -104,7 +104,7 @@ func TestHTTPResponseFunction(t *testing.T) {
 	resp := &http.Response{StatusCode: http.StatusInternalServerError}
 	fe := &FirebaseError{
 		ErrorCode: Internal,
-		String:    "internal error",
+		Message:   "internal error",
 		Response:  resp,
 	}
 
@@ -156,7 +156,7 @@ func TestIsErrorCodeFunctions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fe := &FirebaseError{
 				ErrorCode: tc.code,
-				String:    "test error",
+				Message:   "test error",
 			}
 
 			if tc.checkFn(fe) != tc.wantTrue {
@@ -169,7 +169,7 @@ func TestIsErrorCodeFunctions(t *testing.T) {
 func TestIsErrorCodeFunctionsWithWrongCode(t *testing.T) {
 	fe := &FirebaseError{
 		ErrorCode: NotFound,
-		String:    "not found",
+		Message:   "not found",
 	}
 
 	checks := []struct {
