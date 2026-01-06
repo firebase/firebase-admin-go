@@ -163,19 +163,21 @@ type fcmErrorResponse struct {
 	} `json:"error"`
 }
 
+type fcmQuotaViolation struct {
+	Subject          string            `json:"subject"`
+	Description      string            `json:"description"`
+	APIService       string            `json:"api_service"`
+	QuotaMetric      string            `json:"quota_metric"`
+	QuotaID          string            `json:"quota_id"`
+	QuotaDimensions  map[string]string `json:"quota_dimensions"`
+	QuotaValue       int64             `json:"quota_value"`
+	FutureQuotaValue int64             `json:"future_quota_value"`
+}
+
 type fcmErrorDetail struct {
-	Type       string `json:"@type"`
-	ErrorCode  string `json:"errorCode"`
-	Violations []struct {
-		Subject          string            `json:"subject"`
-		Description      string            `json:"description"`
-		APIService       string            `json:"api_service"`
-		QuotaMetric      string            `json:"quota_metric"`
-		QuotaID          string            `json:"quota_id"`
-		QuotaDimensions  map[string]string `json:"quota_dimensions"`
-		QuotaValue       int64             `json:"quota_value"`
-		FutureQuotaValue int64             `json:"future_quota_value"`
-	} `json:"violations"`
+	Type       string              `json:"@type"`
+	ErrorCode  string              `json:"errorCode"`
+	Violations []fcmQuotaViolation `json:"violations"`
 }
 
 func handleFCMError(resp *internal.Response) error {
