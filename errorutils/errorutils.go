@@ -236,7 +236,3 @@ func HTTPResponse(err error) *http.Response {
 }
 
 // HasPlatformErrorCode checks if the given error contains a specific error code.
-func HasPlatformErrorCode(err error, code ErrorCode) bool {
-	fe, ok := err.(*FirebaseError)
-	return ok && fe.ErrorCode == code
-}
