@@ -2191,7 +2191,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 }
 
 func TestAuthErrorWithCodeAndDetails(t *testing.T) {
-	resp := []byte(`{"error":{"message":"USER_NOT_FOUND : extra details"}}`)
+	resp := []byte(`{"error":{"message":"USER_NOT_FOUND: extra details"}}`)
 	s := echoServer(resp, t)
 	defer s.Close()
 	s.Client.baseClient.httpClient.RetryConfig = nil

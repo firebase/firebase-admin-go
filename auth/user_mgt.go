@@ -1510,7 +1510,7 @@ func parseErrorResponse(resp *internal.Response) (string, string) {
 	idx := strings.Index(code, ":")
 	if idx != -1 {
 		detail = strings.TrimSpace(code[idx+1:])
-		code = strings.TrimSpace(code[:idx])
+		code = code[:idx]
 	}
 
 	return code, detail
