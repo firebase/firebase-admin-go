@@ -135,7 +135,6 @@ func IsUnauthenticated(err error) bool {
 	return HasPlatformErrorCode(err, Unauthenticated)
 }
 
-// IsPermissionDenied checks if the given error was due to a client not having suffificient
 // permissions.
 //
 // This can happen because the OAuth token does not have the right scopes, the client doesn't have
