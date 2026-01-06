@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC All Rights Reserved.
+// Copyright 2020 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,83 +22,39 @@ import (
 	"net/url"
 	"os"
 	"syscall"
+
+	"firebase.google.com/go/v4/errorutils"
 )
 
-// ErrorCode represents the platform-wide error codes that can be raised by
-// Admin SDK APIs.
-type ErrorCode string
+// ErrorCode alias to errorutils.ErrorCode
+type ErrorCode = errorutils.ErrorCode
 
+// Error code constants aliases to errorutils
 const (
-	// InvalidArgument is a OnePlatform error code.
-	InvalidArgument ErrorCode = "INVALID_ARGUMENT"
-
-	// FailedPrecondition is a OnePlatform error code.
-	FailedPrecondition ErrorCode = "FAILED_PRECONDITION"
-
-	// OutOfRange is a OnePlatform error code.
-	OutOfRange ErrorCode = "OUT_OF_RANGE"
-
-	// Unauthenticated is a OnePlatform error code.
-	Unauthenticated ErrorCode = "UNAUTHENTICATED"
-
-	// PermissionDenied is a OnePlatform error code.
-	PermissionDenied ErrorCode = "PERMISSION_DENIED"
-
-	// NotFound is a OnePlatform error code.
-	NotFound ErrorCode = "NOT_FOUND"
-
-	// Conflict is a custom error code that represents HTTP 409 responses.
-	//
-	// OnePlatform APIs typically respond with ABORTED or ALREADY_EXISTS explicitly. But a few
-	// old APIs send HTTP 409 Conflict without any additional details to distinguish between the two
-	// cases. For these we currently use this error code. As more APIs adopt OnePlatform conventions
-	// this will become less important.
-	Conflict ErrorCode = "CONFLICT"
-
-	// Aborted is a OnePlatform error code.
-	Aborted ErrorCode = "ABORTED"
-
-	// AlreadyExists is a OnePlatform error code.
-	AlreadyExists ErrorCode = "ALREADY_EXISTS"
-
-	// ResourceExhausted is a OnePlatform error code.
-	ResourceExhausted ErrorCode = "RESOURCE_EXHAUSTED"
-
-	// Cancelled is a OnePlatform error code.
-	Cancelled ErrorCode = "CANCELLED"
-
-	// DataLoss is a OnePlatform error code.
-	DataLoss ErrorCode = "DATA_LOSS"
-
-	// Unknown is a OnePlatform error code.
-	Unknown ErrorCode = "UNKNOWN"
-
-	// Internal is a OnePlatform error code.
-	Internal ErrorCode = "INTERNAL"
-
-	// Unavailable is a OnePlatform error code.
-	Unavailable ErrorCode = "UNAVAILABLE"
-
-	// DeadlineExceeded is a OnePlatform error code.
-	DeadlineExceeded ErrorCode = "DEADLINE_EXCEEDED"
+	InvalidArgument    = errorutils.InvalidArgument
+	FailedPrecondition = errorutils.FailedPrecondition
+	OutOfRange         = errorutils.OutOfRange
+	Unauthenticated    = errorutils.Unauthenticated
+	PermissionDenied   = errorutils.PermissionDenied
+	NotFound           = errorutils.NotFound
+	Conflict           = errorutils.Conflict
+	Aborted            = errorutils.Aborted
+	AlreadyExists      = errorutils.AlreadyExists
+	ResourceExhausted  = errorutils.ResourceExhausted
+	Cancelled          = errorutils.Cancelled
+	DataLoss           = errorutils.DataLoss
+	Unknown            = errorutils.Unknown
+	Internal           = errorutils.Internal
+	Unavailable        = errorutils.Unavailable
+	DeadlineExceeded   = errorutils.DeadlineExceeded
 )
 
-// FirebaseError is an error type containing an error code string.
-type FirebaseError struct {
-	ErrorCode ErrorCode
-	String    string
-	Response  *http.Response
-	Ext       map[string]interface{}
-}
-
-func (fe *FirebaseError) Error() string {
-	return fe.String
-}
+// FirebaseError is an alias to errorutils.FirebaseError for backwards compatibility.
+type FirebaseError = errorutils.FirebaseError
 
 // HasPlatformErrorCode checks if the given error contains a specific error code.
 func HasPlatformErrorCode(err error, code ErrorCode) bool {
-	fe, ok := err.(*FirebaseError)
-	return ok && fe.ErrorCode == code
+	return errorutils.HasPlatformErrorCode(err, code)
 }
 
 var httpStatusToErrorCodes = map[int]ErrorCode{
