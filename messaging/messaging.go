@@ -39,15 +39,6 @@ const (
 	apiFormatVersionHeader = "X-GOOG-API-FORMAT-VERSION"
 	apiFormatVersion       = "2"
 
-	apnsAuthError       = "APNS_AUTH_ERROR"
-	internalError       = "INTERNAL"
-	thirdPartyAuthError = "THIRD_PARTY_AUTH_ERROR"
-	invalidArgument     = "INVALID_ARGUMENT"
-	quotaExceeded       = "QUOTA_EXCEEDED"
-	senderIDMismatch    = "SENDER_ID_MISMATCH"
-	unregistered        = "UNREGISTERED"
-	unavailable         = "UNAVAILABLE"
-
 	rfc3339Zulu = "2006-01-02T15:04:05.000000000Z"
 )
 
@@ -994,99 +985,6 @@ func (c *fcmClient) makeSendRequest(ctx context.Context, req *fcmRequest) (strin
 	return result.Name, err
 }
 
-// IsInternal checks if the given error was due to an internal server error.
-func IsInternal(err error) bool {
-	return hasMessagingErrorCode(err, internalError)
-}
-
-// IsInvalidAPNSCredentials checks if the given error was due to invalid APNS certificate or auth
-// key.
-//
-// Deprecated: Use IsThirdPartyAuthError().
-func IsInvalidAPNSCredentials(err error) bool {
-	return IsThirdPartyAuthError(err)
-}
-
-// IsThirdPartyAuthError checks if the given error was due to invalid APNS certificate or auth
-// key.
-func IsThirdPartyAuthError(err error) bool {
-	return hasMessagingErrorCode(err, thirdPartyAuthError) || hasMessagingErrorCode(err, apnsAuthError)
-}
-
-// IsInvalidArgument checks if the given error was due to an invalid argument in the request.
-func IsInvalidArgument(err error) bool {
-	return hasMessagingErrorCode(err, invalidArgument)
-}
-
-// IsMessageRateExceeded checks if the given error was due to the client exceeding a quota.
-//
-// Deprecated: Use IsQuotaExceeded().
-func IsMessageRateExceeded(err error) bool {
-	return IsQuotaExceeded(err)
-}
-
-// IsQuotaExceeded checks if the given error was due to the client exceeding a quota.
-func IsQuotaExceeded(err error) bool {
-	return hasMessagingErrorCode(err, quotaExceeded)
-}
-
-// IsMismatchedCredential checks if the given error was due to an invalid credential or permission
-// error.
-//
-// Deprecated: Use IsSenderIDMismatch().
-func IsMismatchedCredential(err error) bool {
-	return IsSenderIDMismatch(err)
-}
-
-// IsSenderIDMismatch checks if the given error was due to an invalid credential or permission
-// error.
-func IsSenderIDMismatch(err error) bool {
-	return hasMessagingErrorCode(err, senderIDMismatch)
-}
-
-// IsRegistrationTokenNotRegistered checks if the given error was due to a registration token that
-// became invalid.
-//
-// Deprecated: Use IsUnregistered().
-func IsRegistrationTokenNotRegistered(err error) bool {
-	return IsUnregistered(err)
-}
-
-// IsUnregistered checks if the given error was due to a registration token that
-// became invalid.
-func IsUnregistered(err error) bool {
-	return hasMessagingErrorCode(err, unregistered)
-}
-
-// IsServerUnavailable checks if the given error was due to the backend server being temporarily
-// unavailable.
-//
-// Deprecated: Use IsUnavailable().
-func IsServerUnavailable(err error) bool {
-	return IsUnavailable(err)
-}
-
-// IsUnavailable checks if the given error was due to the backend server being temporarily
-// unavailable.
-func IsUnavailable(err error) bool {
-	return hasMessagingErrorCode(err, unavailable)
-}
-
-// IsTooManyTopics checks if the given error was due to the client exceeding the allowed number
-// of topics.
-//
-// Deprecated: Always returns false.
-func IsTooManyTopics(err error) bool {
-	return false
-}
-
-// IsUnknown checks if the given error was due to unknown error returned by the backend server.
-//
-// Deprecated: Always returns false.
-func IsUnknown(err error) bool {
-	return false
-}
-
 type fcmRequest struct {
 	ValidateOnly bool     `json:"validate_only,omitempty"`
 	Message      *Message `json:"message,omitempty"`
@@ -1094,37 +992,4 @@ type fcmRequest struct {
 
 type fcmResponse struct {
 	Name string `json:"name"`
-}
-
-type fcmErrorResponse struct {
-	Error struct {
-		Details []struct {
-			Type      string `json:"@type"`
-			ErrorCode string `json:"errorCode"`
-		}
-	} `json:"error"`
-}
-
-func handleFCMError(resp *internal.Response) error {
-	base := internal.NewFirebaseErrorOnePlatform(resp)
-	var fe fcmErrorResponse
-	json.Unmarshal(resp.Body, &fe) // ignore any json parse errors at this level
-	for _, d := range fe.Error.Details {
-		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" {
-			base.Ext["messagingErrorCode"] = d.ErrorCode
-			break
-		}
-	}
-
-	return base
-}
-
-func hasMessagingErrorCode(err error, code string) bool {
-	fe, ok := err.(*internal.FirebaseError)
-	if !ok {
-		return false
-	}
-
-	got, ok := fe.Ext["messagingErrorCode"]
-	return ok && got == code
 }
