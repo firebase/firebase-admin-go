@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC All Rights Reserved.
+// Copyright 2020 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ func NewFirebaseError(resp *Response) *FirebaseError {
 
 	return &FirebaseError{
 		ErrorCode: code,
-		Message:    fmt.Sprintf("unexpected http response with status: %d\n%s", resp.Status, string(resp.Body)),
+		Message:   fmt.Sprintf("unexpected http response with status: %d\n%s", resp.Status, string(resp.Body)),
 		Response:  resp.LowLevelResponse(),
 		Ext:       make(map[string]interface{}),
 	}
@@ -125,7 +125,7 @@ func newFirebaseErrorTransport(err error) *FirebaseError {
 
 	return &FirebaseError{
 		ErrorCode: code,
-		Message:    msg,
+		Message:   msg,
 		Ext:       make(map[string]interface{}),
 	}
 }

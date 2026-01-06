@@ -1,4 +1,4 @@
-// Copyright 2017 Google LLC All Rights Reserved.
+// Copyright 2017 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -332,7 +332,7 @@ func (c *baseClient) verifyIDToken(ctx context.Context, idToken string, checkRev
 	if c.tenantID != "" && c.tenantID != decoded.Firebase.Tenant {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			Message:    fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
+			Message:   fmt.Sprintf("invalid tenant id: %q", decoded.Firebase.Tenant),
 			Ext: map[string]interface{}{
 				authErrorCode: tenantIDMismatch,
 			},
@@ -428,7 +428,7 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 	if user.Disabled {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			Message:    "user has been disabled",
+			Message:   "user has been disabled",
 			Ext: map[string]interface{}{
 				authErrorCode: userDisabled,
 			},
@@ -438,7 +438,7 @@ func (c *baseClient) checkRevokedOrDisabled(ctx context.Context, token *Token, e
 	if token.IssuedAt*1000 < user.TokensValidAfterMillis {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			Message:    errMessage,
+			Message:   errMessage,
 			Ext: map[string]interface{}{
 				authErrorCode: errCode,
 			},
