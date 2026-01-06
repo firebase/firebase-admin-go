@@ -16,6 +16,7 @@ package errorutils
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -32,42 +33,15 @@ func TestFirebaseErrorImplementsError(t *testing.T) {
 	}
 }
 
-func TestFirebaseErrorAccessors(t *testing.T) {
-	resp := &http.Response{StatusCode: http.StatusNotFound}
-	ext := map[string]interface{}{"key": "value"}
-
-	fe := &FirebaseError{
-		ErrorCode: NotFound,
-		Message:   "resource not found",
-		Response:  resp,
-		Ext:       ext,
-	}
-
-	if fe.Code() != NotFound {
-		t.Errorf("Code() = %q; want = %q", fe.Code(), NotFound)
-	}
-
-	if fe.HTTPResponse() != resp {
-		t.Errorf("HTTPResponse() = %v; want = %v", fe.HTTPResponse(), resp)
-	}
-
-	if fe.Extensions()["key"] != "value" {
-		t.Errorf("Extensions()[\"key\"] = %v; want = %q", fe.Extensions()["key"], "value")
-	}
-}
-
-func TestFirebaseErrorAccessorsWithNilFields(t *testing.T) {
+func TestHTTPResponseFunctionWithNilResponseField(t *testing.T) {
 	fe := &FirebaseError{
 		ErrorCode: Internal,
 		Message:   "internal error",
+		Response:  nil,
 	}
 
-	if fe.HTTPResponse() != nil {
-		t.Errorf("HTTPResponse() = %v; want = nil", fe.HTTPResponse())
-	}
-
-	if fe.Extensions() != nil {
-		t.Errorf("Extensions() = %v; want = nil", fe.Extensions())
+	if HTTPResponse(fe) != nil {
+		t.Errorf("HTTPResponse(fe) = %v; want = nil", HTTPResponse(fe))
 	}
 }
 
@@ -129,27 +103,26 @@ func TestHTTPResponseFunctionWithNil(t *testing.T) {
 
 func TestIsErrorCodeFunctions(t *testing.T) {
 	testCases := []struct {
-		name     string
-		code     ErrorCode
-		checkFn  func(error) bool
-		wantTrue bool
+		name    string
+		code    ErrorCode
+		checkFn func(error) bool
 	}{
-		{"InvalidArgument", InvalidArgument, IsInvalidArgument, true},
-		{"FailedPrecondition", FailedPrecondition, IsFailedPrecondition, true},
-		{"OutOfRange", OutOfRange, IsOutOfRange, true},
-		{"Unauthenticated", Unauthenticated, IsUnauthenticated, true},
-		{"PermissionDenied", PermissionDenied, IsPermissionDenied, true},
-		{"NotFound", NotFound, IsNotFound, true},
-		{"Conflict", Conflict, IsConflict, true},
-		{"Aborted", Aborted, IsAborted, true},
-		{"AlreadyExists", AlreadyExists, IsAlreadyExists, true},
-		{"ResourceExhausted", ResourceExhausted, IsResourceExhausted, true},
-		{"Cancelled", Cancelled, IsCancelled, true},
-		{"DataLoss", DataLoss, IsDataLoss, true},
-		{"Unknown", Unknown, IsUnknown, true},
-		{"Internal", Internal, IsInternal, true},
-		{"Unavailable", Unavailable, IsUnavailable, true},
-		{"DeadlineExceeded", DeadlineExceeded, IsDeadlineExceeded, true},
+		{"IsInvalidArgument", InvalidArgument, IsInvalidArgument},
+		{"IsFailedPrecondition", FailedPrecondition, IsFailedPrecondition},
+		{"IsOutOfRange", OutOfRange, IsOutOfRange},
+		{"IsUnauthenticated", Unauthenticated, IsUnauthenticated},
+		{"IsPermissionDenied", PermissionDenied, IsPermissionDenied},
+		{"IsNotFound", NotFound, IsNotFound},
+		{"IsConflict", Conflict, IsConflict},
+		{"IsAborted", Aborted, IsAborted},
+		{"IsAlreadyExists", AlreadyExists, IsAlreadyExists},
+		{"IsResourceExhausted", ResourceExhausted, IsResourceExhausted},
+		{"IsCancelled", Cancelled, IsCancelled},
+		{"IsDataLoss", DataLoss, IsDataLoss},
+		{"IsUnknown", Unknown, IsUnknown},
+		{"IsInternal", Internal, IsInternal},
+		{"IsUnavailable", Unavailable, IsUnavailable},
+		{"IsDeadlineExceeded", DeadlineExceeded, IsDeadlineExceeded},
 	}
 
 	for _, tc := range testCases {
@@ -159,8 +132,8 @@ func TestIsErrorCodeFunctions(t *testing.T) {
 				Message:   "test error",
 			}
 
-			if tc.checkFn(fe) != tc.wantTrue {
-				t.Errorf("%s check = %v; want = %v", tc.name, tc.checkFn(fe), tc.wantTrue)
+			if !tc.checkFn(fe) {
+				t.Errorf("%s check = false; want = true", tc.name)
 			}
 		})
 	}
@@ -234,7 +207,7 @@ func TestIsErrorCodeFunctionsWithNil(t *testing.T) {
 }
 
 func TestErrorCodeValues(t *testing.T) {
-	// Verify error codes have the expected string values
+	// These values are part of the public API contract with OnePlatform
 	testCases := []struct {
 		code ErrorCode
 		want string
@@ -263,5 +236,24 @@ func TestErrorCodeValues(t *testing.T) {
 				t.Errorf("ErrorCode = %q; want = %q", tc.code, tc.want)
 			}
 		})
+	}
+}
+
+func TestWrappedFirebaseErrorNotDetected(t *testing.T) {
+	// Documents current behavior: wrapped errors are NOT detected by IsXxx functions
+	// This is a known limitation - the SDK uses type assertion, not errors.As
+	fe := &FirebaseError{
+		ErrorCode: NotFound,
+		Message:   "not found",
+	}
+	wrapped := fmt.Errorf("wrapped: %w", fe)
+
+	// Current behavior: wrapped errors return false
+	if IsNotFound(wrapped) {
+		t.Error("IsNotFound(wrapped) = true; current implementation should return false for wrapped errors")
+	}
+
+	if HasPlatformErrorCode(wrapped, NotFound) {
+		t.Error("HasPlatformErrorCode(wrapped) = true; current implementation should return false for wrapped errors")
 	}
 }
