@@ -16,6 +16,7 @@
 package errorutils
 
 import (
+	"errors"
 	"net/http"
 )
 
@@ -236,3 +237,7 @@ func HTTPResponse(err error) *http.Response {
 }
 
 // HasPlatformErrorCode checks if the given error contains a specific error code.
+func HasPlatformErrorCode(err error, code ErrorCode) bool {
+	var fe *FirebaseError
+	return errors.As(err, &fe) && fe.ErrorCode == code
+}
