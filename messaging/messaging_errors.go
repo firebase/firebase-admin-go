@@ -99,21 +99,6 @@ func IsQuotaExceeded(err error) bool {
 	return hasMessagingErrorCode(err, quotaExceeded)
 }
 
-// GetQuotaFailure extracts the QuotaFailure details from a FirebaseError.
-// Returns nil if the error does not contain quota failure information.
-// The QuotaFailure indicates which rate limit was violated: device, topic, or overall.
-func GetQuotaFailure(err *errorutils.FirebaseError) *QuotaFailure {
-	if err == nil || err.Ext == nil {
-		return nil
-	}
-
-	qf, ok := err.Ext["quotaFailure"].(*QuotaFailure)
-	if !ok {
-		return nil
-	}
-
-	return qf
-}
 
 // IsMismatchedCredential checks if the given error was due to an invalid credential or permission
 // error.
