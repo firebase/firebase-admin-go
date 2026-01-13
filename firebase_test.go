@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/messaging"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -282,8 +283,20 @@ func TestFirestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if c, err := app.Firestore(ctx); c == nil || err != nil {
-		t.Errorf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	c, err := app.Firestore(ctx)
+	if c == nil || err != nil {
+		t.Fatalf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	}
+
+	// verify that the client is using the overridden database ID
+
+	doc := c.Doc("foo/bar")
+	if doc == nil {
+		t.Fatalf("Doc() = nil; want doc")
+	}
+
+	if !strings.Contains(doc.Path, firestore.DefaultDatabaseID) {
+		t.Fatalf("Doc().Path = %q; want to contain %q", doc.Path, firestore.DefaultDatabaseID)
 	}
 }
 
@@ -335,6 +348,33 @@ func TestFirestoreWithNoProjectID(t *testing.T) {
 
 	if c, err := app.Firestore(ctx); c != nil || err == nil {
 		t.Errorf("Firestore() = (%v, %v); want (nil, error)", c, err)
+	}
+}
+
+func TestFirestoreWithDatabaseID(t *testing.T) {
+	firestoreid := "my-awesome-firestore-db"
+
+	ctx := context.Background()
+	config := &Config{FirestoreID: firestoreid}
+	app, err := NewApp(ctx, config, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := app.Firestore(ctx)
+	if c == nil || err != nil {
+		t.Fatalf("Firestore() = (%v, %v); want (auth, nil)", c, err)
+	}
+
+	// verify that the client is using the default database ID
+
+	doc := c.Doc("foo/bar")
+	if doc == nil {
+		t.Fatalf("Doc() = nil; want doc")
+	}
+
+	if !strings.Contains(doc.Path, firestoreid) {
+		t.Fatalf("Doc().Path = %q; want to contain %q", doc.Path, firestore.DefaultDatabaseID)
 	}
 }
 
