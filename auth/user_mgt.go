@@ -1048,7 +1048,7 @@ func (c *baseClient) GetUsers(
 	return &GetUsersResult{userRecords, notFound}, nil
 }
 
-// QueryUserInfoResponse is the response structure for the QueryUsers function.
+// QueryUserInfoResponse is the response from the QueryUsers function.
 type QueryUserInfoResponse struct {
 	Users []*UserRecord
 	Count int64
@@ -1059,38 +1059,38 @@ type queryUsersResponse struct {
 	Count int64                `json:"recordsCount,string,omitempty"`
 }
 
-// Expression is a query condition used to filter results.
+// Expression represents a query condition used to filter results.
 //
-// Only one of Email, PhoneNumber, or UID should be specified.
-// If more than one is specified, only the first (in the order of Email, PhoneNumber, UID) will be applied.
+// Specify only one of Email, PhoneNumber, or UID. If you specify more than one,
+// only the first (in order of Email, PhoneNumber, then UID) is applied.
 type Expression struct {
-	// Email is a case insensitive string that the account's email should match.
+	// Email is a case-insensitive string that the account's email must match.
 	Email string `json:"email,omitempty"`
-	// PhoneNumber is a string that the account's phone number should match.
+	// PhoneNumber is a string that the account's phone number must match.
 	PhoneNumber string `json:"phoneNumber,omitempty"`
-	// UID is a string that the account's local ID should match.
+	// UID is a string that the account's local ID must match.
 	UID string `json:"userId,omitempty"`
 }
 
 // QueryUsersRequest is the request structure for the QueryUsers function.
 type QueryUsersRequest struct {
-	// ReturnUserInfo indicates whether to return the accounts matching the query.
-	// If false, only the count of accounts matching the query will be returned.
+	// ReturnUserInfo specifies whether to return user accounts that match the query.
+	// If set to false, only the count of matching accounts is returned.
 	// Defaults to true.
 	ReturnUserInfo *bool `json:"returnUserInfo,omitempty"`
 	// Limit is the maximum number of accounts to return with an upper limit of 500.
-	// Defaults to 500. Only valid when ReturnUserInfo is set to true.
+	// Defaults to 500. This field is valid only when ReturnUserInfo is true.
 	Limit int64 `json:"limit,string,omitempty"`
 	// Offset is the number of accounts to skip from the beginning of matching records.
-	// Only valid when ReturnUserInfo is set to true.
+	// This field is valid only when ReturnUserInfo is true.
 	Offset int64 `json:"offset,string,omitempty"`
 	// SortBy is the field to use for sorting user accounts.
 	SortBy SortBy `json:"-"`
-	// Order is the order for sorting query results.
+	// Order is the sort order for the query results.
 	Order Order `json:"-"`
-	// TenantID is the ID of the tenant to which the result is scoped.
+	// TenantID is the ID of the tenant to which the results are scoped.
 	TenantID string `json:"tenantId,omitempty"`
-	// Expression is a list of query conditions used to filter results.
+	// Expression is a list of query conditions used to filter the results.
 	Expression []*Expression `json:"expression,omitempty"`
 }
 
@@ -1162,31 +1162,31 @@ func (q *QueryUsersRequest) validate() error {
 	return nil
 }
 
-// SortBy is a field to use for sorting user accounts.
+// SortBy defines the fields available for sorting user accounts.
 type SortBy int
 
 const (
 	sortByUnspecified SortBy = iota
-	// UID sorts results by userId.
+	// UID sorts results by user ID.
 	UID
 	// Name sorts results by name.
 	Name
-	// CreatedAt sorts results by createdAt.
+	// CreatedAt sorts results by creation time.
 	CreatedAt
-	// LastLoginAt sorts results by lastLoginAt.
+	// LastLoginAt sorts results by the last login time.
 	LastLoginAt
-	// UserEmail sorts results by userEmail.
+	// UserEmail sorts results by user email.
 	UserEmail
 )
 
-// Order is an order for sorting query results.
+// Order defines the sort order for query results.
 type Order int
 
 const (
 	orderUnspecified Order = iota
-	// Asc sorts in ascending order.
+	// Asc sorts results in ascending order.
 	Asc
-	// Desc sorts in descending order.
+	// Desc sorts results in descending order.
 	Desc
 )
 
