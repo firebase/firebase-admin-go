@@ -90,39 +90,14 @@ jobs:
       id: preflight
       run: ./.github/scripts/publish_preflight_check.sh
 
-    # We authorize this step with an access token that has write access to the master branch.
-    - name: Merge to master
-      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
-      with:
-        github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
-        script: |
-            github.rest.repos.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              base: 'master',
-              head: 'dev'
-            })
-
-    # See: https://cli.github.com/manual/gh_release_create
-    - name: Create release tag
+    # Create a PR to merge dev into master.
+    - name: Create Release PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release create ${{ steps.preflight.outputs.version }}
-            --title "Firebase Admin Go SDK ${{ steps.preflight.outputs.version }}"
-            --notes '${{ steps.preflight.outputs.changelog }}'
-            --target "master"
-
-    # Post to Twitter if explicitly opted-in by adding the label 'release:tweet'.
-    - name: Post to Twitter
-      if: success() &&
-        contains(github.event.pull_request.labels.*.name, 'release:tweet')
-      uses: firebase/firebase-admin-node/.github/actions/send-tweet@2e2b36a84ba28679bcb7aecdacabfec0bded2d48 # Admin Node SDK v13.6.0
-      with:
-        status: >
-          ${{ steps.preflight.outputs.version }} of @Firebase Admin Go SDK is available.
-          https://github.com/firebase/firebase-admin-go/releases/tag/${{ steps.preflight.outputs.version }}
-        consumer-key: ${{ secrets.FIREBASE_TWITTER_CONSUMER_KEY }}
-        consumer-secret: ${{ secrets.FIREBASE_TWITTER_CONSUMER_SECRET }}
-        access-token: ${{ secrets.FIREBASE_TWITTER_ACCESS_TOKEN }}
-        access-token-secret: ${{ secrets.FIREBASE_TWITTER_ACCESS_TOKEN_SECRET }}
-      continue-on-error: true
+      run: |
+        gh pr create \
+          --base master \
+          --head dev \
+          --title "[chore] Release ${{ steps.preflight.outputs.version }}" \
+          --body "${{ steps.preflight.outputs.changelog }}" \
+          --label "release:tag"
