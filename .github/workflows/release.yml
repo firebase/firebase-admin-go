@@ -36,13 +36,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    # When manually triggering the build, the requester can specify a target branch or a tag
-    # via the 'ref' client parameter.
     steps:
     - name: Check out code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      with:
-        ref: ${{ github.event.client_payload.ref || github.ref }}
 
     - name: Set up Go
       uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -71,19 +67,19 @@ jobs:
     #   3. with the label 'release:publish', and
     #   4. the title prefix '[chore] Release '.
     if: github.event.pull_request.merged &&
-      github.ref == 'refs/heads/dev' &&
+      github.base_ref == 'dev' &&
       contains(github.event.pull_request.labels.*.name, 'release:publish') &&
       startsWith(github.event.pull_request.title, '[chore] Release ')
 
     runs-on: ubuntu-latest
-    environment: Release
     permissions:
-      contents: write
+      pull-requests: write
 
     steps:
     - name: Checkout source for publish
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
+        ref: dev
         persist-credentials: false
 
     - name: Publish preflight check
@@ -94,10 +90,11 @@ jobs:
     - name: Create Release PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_BODY: ${{ steps.preflight.outputs.changelog }}
+        RELEASE_TITLE: "[chore] Release ${{ steps.preflight.outputs.version }}"
       run: |
         gh pr create \
           --base master \
           --head dev \
-          --title "[chore] Release ${{ steps.preflight.outputs.version }}" \
-          --body "${{ steps.preflight.outputs.changelog }}" \
-          --label "release:tag"
+          --title "$RELEASE_TITLE" \
+          --body "$RELEASE_BODY"
