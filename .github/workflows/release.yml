@@ -80,12 +80,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: Release
     permissions:
-      contents: write
+      pull-requests: write
 
     steps:
     - name: Checkout source for publish
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
+        ref: dev
         persist-credentials: false
 
     - name: Publish preflight check
