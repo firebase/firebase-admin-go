@@ -81,7 +81,6 @@ jobs:
       with:
         ref: dev
         persist-credentials: false
-        fetch-depth: 0
 
     - name: Publish preflight check
       id: preflight
