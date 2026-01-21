@@ -18,11 +18,18 @@ on:
   # Only run the workflow when a PR is updated or when a developer explicitly requests
   # a build by sending a 'firebase_build' event.
   pull_request:
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
 
   repository_dispatch:
     types:
       - firebase_build
+
+  # Run the release candidate action when code is pushed to dev and only if firebase.go is changed
+  push:
+    branches:
+      - dev
+    paths:
+      - 'firebase.go'
 
 jobs:
   stage_release:
@@ -31,18 +38,14 @@ jobs:
     # the 'release:stage' label to a PR.
     if: github.event.action == 'firebase_build' ||
       contains(github.event.pull_request.labels.*.name, 'release:stage') ||
-      (github.event.pull_request.merged &&
-        contains(github.event.pull_request.labels.*.name, 'release:publish'))
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev' &&
+        startsWith(github.event.head_commit.message, '[chore] Release '))
 
     runs-on: ubuntu-latest
 
-    # When manually triggering the build, the requester can specify a target branch or a tag
-    # via the 'ref' client parameter.
     steps:
     - name: Check out code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      with:
-        ref: ${{ github.event.client_payload.ref || github.ref }}
 
     - name: Set up Go
       uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -65,26 +68,22 @@ jobs:
   publish_release:
     needs: stage_release
 
-    # Check whether the release should be published. We publish only when the trigger PR is
-    #   1. merged
-    #   2. to the dev branch
-    #   3. with the label 'release:publish', and
-    #   4. the title prefix '[chore] Release '.
-    if: github.event.pull_request.merged &&
-      github.ref == 'refs/heads/dev' &&
-      contains(github.event.pull_request.labels.*.name, 'release:publish') &&
-      startsWith(github.event.pull_request.title, '[chore] Release ')
+    # Run this ONLY when code is pushed/merged to dev
+    # This automatically satisfies the 'Release' environment protection
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' &&
+      startsWith(github.event.head_commit.message, '[chore] Release ')
 
     runs-on: ubuntu-latest
     environment: Release
     permissions:
-      contents: write
+      pull-requests: write
 
     steps:
     - name: Checkout source for publish
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
         persist-credentials: false
+        fetch-depth: 0
 
     - name: Publish preflight check
       id: preflight
@@ -94,10 +93,11 @@ jobs:
     - name: Create Release PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_BODY: ${{ steps.preflight.outputs.changelog }}
+        RELEASE_TITLE: "[chore] Release ${{ steps.preflight.outputs.version }}"
       run: |
         gh pr create \
           --base master \
           --head dev \
-          --title "[chore] Release ${{ steps.preflight.outputs.version }}" \
-          --body "${{ steps.preflight.outputs.changelog }}" \
-          --label "release:tag"
+          --title "$RELEASE_TITLE" \
+          --body "$RELEASE_BODY"

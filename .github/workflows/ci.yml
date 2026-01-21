@@ -1,7 +1,10 @@
 name: Continuous Integration
-on: pull_request
-jobs:
+on:
+  pull_request:
+  push:
+    branches: [dev]
 
+jobs:
   module:
     name: Module build
     runs-on: ubuntu-latest

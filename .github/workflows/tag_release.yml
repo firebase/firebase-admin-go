@@ -15,19 +15,15 @@
 name: Tag Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
+    branches:
+      - master
+    paths:
+      - 'firebase.go'
 
 jobs:
   tag_release:
-    # Trigger only when:
-    # 1. The PR is merged.
-    # 2. The PR targets the master branch.
-    # 3. The PR has the label 'release:tag'.
-    if: github.event.pull_request.merged &&
-      github.event.pull_request.base.ref == 'master' &&
-      contains(github.event.pull_request.labels.*.name, 'release:tag') &&
-      startsWith(github.event.pull_request.title, '[chore] Release ')
+    if: startsWith(github.event.head_commit.message, '[chore] Release ')
 
     runs-on: ubuntu-latest
     environment: Release
@@ -38,17 +34,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
-        ref: master
+        fetch-depth: 0
 
     - name: Publish preflight check
       id: preflight
       run: ./.github/scripts/publish_preflight_check.sh
 
-    # See: https://cli.github.com/manual/gh_release_create
     - name: Create release tag
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release create ${{ steps.preflight.outputs.version }}
-            --title "Firebase Admin Go SDK ${{ steps.preflight.outputs.version }}"
-            --notes '${{ steps.preflight.outputs.changelog }}'
+        RELEASE_VER: ${{ steps.preflight.outputs.version }}
+        RELEASE_NOTES: ${{ steps.preflight.outputs.changelog }}
+      run: gh release create "$RELEASE_VER" \
+            --title "Firebase Admin Go SDK $RELEASE_VER" \
+            --notes "$RELEASE_NOTES" \
             --target "master"
