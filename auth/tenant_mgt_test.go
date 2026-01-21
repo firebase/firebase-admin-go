@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -87,6 +87,35 @@ func TestTenantGetUser(t *testing.T) {
 	wantPath := "/projects/mock-project-id/tenants/tenantID/accounts:lookup"
 	if s.Req[0].RequestURI != wantPath {
 		t.Errorf("GetUser() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestTenantQueryUsers(t *testing.T) {
+	resp := `{
+		"usersInfo": [],
+		"recordsCount": "0"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	tenantClient, err := s.Client.TenantManager.AuthForTenant("test-tenant")
+	if err != nil {
+		t.Fatalf("Failed to create tenant client: %v", err)
+	}
+
+	returnUserInfo := true
+	query := &QueryUsersRequest{
+		ReturnUserInfo: &returnUserInfo,
+	}
+
+	_, err = tenantClient.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() with tenant client = %v", err)
+	}
+
+	wantPath := "/projects/mock-project-id/tenants/test-tenant/accounts:query"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 

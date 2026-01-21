@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -287,6 +287,18 @@ func TestFirestore(t *testing.T) {
 	}
 }
 
+func TestFirestoreWithDatabaseID(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.FirestoreWithDatabaseID(ctx, "other-db"); c == nil || err != nil {
+		t.Errorf("FirestoreWithDatabaseID() = (%v, %v); want (client, nil)", c, err)
+	}
+}
+
 func TestFirestoreWithProjectID(t *testing.T) {
 	verify := func(varName string) {
 		current := os.Getenv(varName)
@@ -335,6 +347,10 @@ func TestFirestoreWithNoProjectID(t *testing.T) {
 
 	if c, err := app.Firestore(ctx); c != nil || err == nil {
 		t.Errorf("Firestore() = (%v, %v); want (nil, error)", c, err)
+	}
+
+	if c, err := app.FirestoreWithDatabaseID(ctx, "other-db"); c != nil || err == nil {
+		t.Errorf("FirestoreWithDatabaseID() = (%v, %v); want (nil, error)", c, err)
 	}
 }
 

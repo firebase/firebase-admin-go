@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -424,6 +424,23 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 		if savedUser.TenantID != id {
 			t.Errorf("ImportUser() TenantID = %q; want = %q", savedUser.TenantID, id)
+		}
+	})
+
+	t.Run("QueryUsers()", func(t *testing.T) {
+		query := &auth.QueryUsersRequest{
+			Expression: []*auth.Expression{
+				{
+					Email: want.Email,
+				},
+			},
+		}
+		result, err := tenantClient.QueryUsers(context.Background(), query)
+		if err != nil {
+			t.Fatalf("QueryUsers() = %v", err)
+		}
+		if len(result.Users) != 1 || result.Users[0].UID != user.UID {
+			t.Errorf("QueryUsers(email=%s) = %v; want user %s", want.Email, result.Users, user.UID)
 		}
 	})
 
