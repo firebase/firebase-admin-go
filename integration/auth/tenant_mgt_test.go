@@ -427,6 +427,23 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 	})
 
+	t.Run("QueryUsers()", func(t *testing.T) {
+		query := &auth.QueryUsersRequest{
+			Expression: []*auth.Expression{
+				{
+					Email: want.Email,
+				},
+			},
+		}
+		result, err := tenantClient.QueryUsers(context.Background(), query)
+		if err != nil {
+			t.Fatalf("QueryUsers() = %v", err)
+		}
+		if len(result.Users) != 1 || result.Users[0].UID != user.UID {
+			t.Errorf("QueryUsers(email=%s) = %v; want user %s", want.Email, result.Users, user.UID)
+		}
+	})
+
 	t.Run("DeleteUser()", func(t *testing.T) {
 		if err := tenantClient.DeleteUser(context.Background(), user.UID); err != nil {
 			t.Fatalf("DeleteUser() = %v", err)
