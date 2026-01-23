@@ -1442,3 +1442,39 @@ func deletePhoneNumberUser(t *testing.T, phoneNumber string) {
 		t.Fatal(err)
 	}
 }
+func TestQueryUsers(t *testing.T) {
+	u1 := newUserWithParams(t)
+	defer deleteUser(u1.UID)
+	u2 := newUserWithParams(t)
+	defer deleteUser(u2.UID)
+
+	// Query by email
+	query := &auth.QueryUsersRequest{
+		Expression: []*auth.Expression{
+			{
+				Email: u1.Email,
+			},
+		},
+	}
+	result, err := client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+	if len(result.Users) != 1 || result.Users[0].UID != u1.UID {
+		t.Errorf("QueryUsers(uid=%s) = %v; want user %s", u1.UID, result.Users, u1.UID)
+	}
+
+	// Query with limit and sort
+	query = &auth.QueryUsersRequest{
+		Limit:  2,
+		SortBy: auth.CreatedAt,
+		Order:  auth.Desc,
+	}
+	result, err = client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+	if len(result.Users) < 2 {
+		t.Errorf("QueryUsers(limit=2) = %d users; want >= 2", len(result.Users))
+	}
+}
