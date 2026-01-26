@@ -33,6 +33,7 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"firebase.google.com/go/v4/remoteconfig"
 	"firebase.google.com/go/v4/storage"
+    "firebase.google.com/go/v4/fpnv"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
@@ -153,6 +154,14 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 		Version:   Version,
 	}
 	return remoteconfig.NewClient(ctx, conf)
+}
+
+// Fpnv returns an instance of fpnv.Client.
+func (a *App) Fpnv(ctx context.Context) (*fpnv.Client, error) {
+    conf := &internal.FpnvConfig{
+       ProjectID: a.projectID,
+    }
+    return fpnv.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
