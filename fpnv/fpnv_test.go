@@ -155,6 +155,20 @@ func TestVerifyToken(t *testing.T) {
 			wantErr: true,
 			// Error message depends on keyfunc implementation, but usually complains about missing key
 		},
+		{
+			name: "Valid Token with single string audience",
+			token: func() string {
+				return generateToken(t, privateKey, kid, jwt.MapClaims{
+					"iss": validIssuer,
+					"aud": validAudience,
+					"sub": validSub,
+					"iat": time.Now().Unix(),
+					"exp": time.Now().Add(time.Hour).Unix(),
+				})
+			},
+			wantErr:   false,
+			wantPhone: validSub,
+		},
 	}
 
 	for _, tt := range tests {

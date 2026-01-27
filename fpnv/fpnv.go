@@ -44,12 +44,18 @@ var (
 	ErrTokenType = errors.New("FPNV token has incorrect type")
 	// ErrTokenClaims is returned when the token claims cannot be decoded.
 	ErrTokenClaims = errors.New("FPNV token has incorrect claims")
+	// ErrTokenEmptyAudience is returned when the token audience nas no audience.
+	ErrTokenEmptyAudience = errors.New("FPNV token has no 'aud' claim")
 	// ErrTokenAudience is returned when the token audience does not match the current project.
 	ErrTokenAudience = errors.New("FPNV token has incorrect audience")
 	// ErrTokenIssuer is returned when the token issuer does not match FPNV service.
 	ErrTokenIssuer = errors.New("FPNV token has incorrect issuer")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
 	ErrTokenSubject = errors.New("FPNV token has empty or missing subject")
+	// ErrTokenExpiresAt is returned when the token has issue with expiresAt.
+	ErrTokenExpiresAt = errors.New("FPNV token has incorrect expiresAt")
+	// ErrTokenIssuedAt is returned when the token has issue with issuedAt.
+	ErrTokenIssuedAt = errors.New("FPNV token has incorrect issuedAt")
 )
 
 // DecodedFpnvToken represents a verified FPNV token.
@@ -142,13 +148,19 @@ func (c *Client) VerifyToken(token string) (*DecodedFpnvToken, error) {
 
 	_, okAud := claims["aud"]
 	if !okAud {
-		return nil, errors.New("claims 'aud' is required")
+		return nil, ErrTokenEmptyAudience
 	}
 
-	rawAud := claims["aud"].([]interface{})
 	var aud []string
-	for _, v := range rawAud {
-		aud = append(aud, v.(string))
+	switch v := claims["aud"].(type) {
+	case string:
+		aud = []string{v}
+	case []interface{}:
+		for _, s := range v {
+			if str, ok := s.(string); ok {
+				aud = append(aud, str)
+			}
+		}
 	}
 
 	if !slices.Contains(aud, fpnvIssuer+c.projectID) {
@@ -164,17 +176,31 @@ func (c *Client) VerifyToken(token string) (*DecodedFpnvToken, error) {
 		return nil, ErrTokenIssuer
 	}
 
-	if val, ok := claims["sub"].(string); !ok || val == "" {
+	// Prepare claims for DecodedFpnvToken
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
 		return nil, ErrTokenSubject
+	}
+	iss, ok := claims["iss"].(string)
+	if !ok || iss == "" {
+		return nil, ErrTokenIssuer
+	}
+	exp, ok := claims["exp"].(float64)
+	if !ok || exp == 0 {
+		return nil, ErrTokenExpiresAt
+	}
+	iat, ok := claims["iat"].(float64)
+	if !ok || iat == 0 {
+		return nil, ErrTokenIssuedAt
 	}
 
 	decodedFpnvToken := DecodedFpnvToken{
-		Issuer:      claims["iss"].(string),
-		Subject:     claims["sub"].(string),
+		Issuer:      iss,
+		Subject:     sub,
 		Audience:    aud,
-		ExpiresAt:   time.Unix(int64(claims["exp"].(float64)), 0),
-		IssuedAt:    time.Unix(int64(claims["iat"].(float64)), 0),
-		PhoneNumber: claims["sub"].(string),
+		ExpiresAt:   time.Unix(int64(exp), 0),
+		IssuedAt:    time.Unix(int64(iat), 0),
+		PhoneNumber: sub,
 	}
 
 	// Remove all the claims we've already parsed.
