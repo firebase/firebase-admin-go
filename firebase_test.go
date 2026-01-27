@@ -606,6 +606,18 @@ func TestAutoInit(t *testing.T) {
 	}
 }
 
+func TestFpnv(t *testing.T) {
+	ctx := context.Background()
+	app, err := NewApp(ctx, nil, option.WithCredentialsFile("testdata/service_account.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c, err := app.Fpnv(ctx); c == nil || err != nil {
+		t.Errorf("Fpnv() = (%v, %v); want (fpnv, nil)", c, err)
+	}
+}
+
 func TestAutoInitInvalidFiles(t *testing.T) {
 	tests := []struct {
 		name      string
