@@ -44,7 +44,7 @@ var (
 	ErrTokenType = errors.New("FPNV token has incorrect type")
 	// ErrTokenClaims is returned when the token claims cannot be decoded.
 	ErrTokenClaims = errors.New("FPNV token has incorrect claims")
-	// ErrTokenEmptyAudience is returned when the token audience nas no audience.
+	// ErrTokenEmptyAudience is returned when the token audience has no audience.
 	ErrTokenEmptyAudience = errors.New("FPNV token has no 'aud' claim")
 	// ErrTokenAudience is returned when the token audience does not match the current project.
 	ErrTokenAudience = errors.New("FPNV token has incorrect audience")
@@ -167,22 +167,18 @@ func (c *Client) VerifyToken(token string) (*DecodedFpnvToken, error) {
 		return nil, ErrTokenAudience
 	}
 
-	// We check the prefix to make sure this token was issued
-	// by the Firebase Phone Number Verification service, but we do not check the
-	// Project Number suffix because the Golang SDK only has project ID.
-	//
-	// This is consistent with the Firebase Admin Node SDK.
-	if !strings.HasPrefix(claims["iss"].(string), fpnvIssuer) {
-		return nil, ErrTokenIssuer
-	}
-
 	// Prepare claims for DecodedFpnvToken
 	sub, ok := claims["sub"].(string)
 	if !ok || sub == "" {
 		return nil, ErrTokenSubject
 	}
 	iss, ok := claims["iss"].(string)
-	if !ok || iss == "" {
+    // We check the prefix to make sure this token was issued
+    // by the Firebase Phone Number Verification service, but we do not check the
+    // Project Number suffix because the Golang SDK only has project ID.
+    //
+    // This is consistent with the Firebase Admin Node SDK.
+	if !ok || !strings.HasPrefix(iss, fpnvIssuer) {
 		return nil, ErrTokenIssuer
 	}
 	exp, ok := claims["exp"].(float64)
