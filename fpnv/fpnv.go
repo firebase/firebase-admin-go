@@ -173,11 +173,11 @@ func (c *Client) VerifyToken(token string) (*DecodedFpnvToken, error) {
 		return nil, ErrTokenSubject
 	}
 	iss, ok := claims["iss"].(string)
-    // We check the prefix to make sure this token was issued
-    // by the Firebase Phone Number Verification service, but we do not check the
-    // Project Number suffix because the Golang SDK only has project ID.
-    //
-    // This is consistent with the Firebase Admin Node SDK.
+	// We check the prefix to make sure this token was issued
+	// by the Firebase Phone Number Verification service, but we do not check the
+	// Project Number suffix because the Golang SDK only has project ID.
+	//
+	// This is consistent with the Firebase Admin Node SDK.
 	if !ok || !strings.HasPrefix(iss, fpnvIssuer) {
 		return nil, ErrTokenIssuer
 	}
