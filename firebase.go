@@ -158,10 +158,10 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 
 // Fpnv returns an instance of fpnv.Client.
 func (a *App) Fpnv(ctx context.Context) (*fpnv.Client, error) {
-    conf := &internal.FpnvConfig{
-       ProjectID: a.projectID,
-    }
-    return fpnv.NewClient(ctx, conf)
+	conf := &internal.FpnvConfig{
+		ProjectID: a.projectID,
+	}
+	return fpnv.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.
