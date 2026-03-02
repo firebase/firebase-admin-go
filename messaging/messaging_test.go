@@ -148,8 +148,10 @@ var validMessages = []struct {
 		name: "AndroidDataMessage",
 		req: &Message{
 			Android: &AndroidConfig{
-				DirectBootOK: true,
-				CollapseKey:  "ck",
+				DirectBootOK:           true,
+				BandwidthConstrainedOK: true,
+				RestrictedSatelliteOK:  true,
+				CollapseKey:            "ck",
 				Data: map[string]string{
 					"k1": "v1",
 					"k2": "v2",
@@ -161,8 +163,10 @@ var validMessages = []struct {
 		},
 		want: map[string]interface{}{
 			"android": map[string]interface{}{
-				"direct_boot_ok": true,
-				"collapse_key":   "ck",
+				"direct_boot_ok":           true,
+				"bandwidth_constrained_ok": true,
+				"restricted_satellite_ok":  true,
+				"collapse_key":             "ck",
 				"data": map[string]interface{}{
 					"k1": "v1",
 					"k2": "v2",
