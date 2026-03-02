@@ -145,7 +145,7 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "AndroidDataMessage",
+		name: "AndroidDataMessageWithBooleanOptions",
 		req: &Message{
 			Android: &AndroidConfig{
 				DirectBootOK:           true,
