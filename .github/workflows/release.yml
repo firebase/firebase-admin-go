@@ -15,10 +15,18 @@
 name: Release Candidate
 
 on:
-  # Only run the workflow when a PR is updated or when a developer explicitly requests
-  # a build by sending a 'firebase_build' event.
+  # Run the workflow when:
+  # 1. A PR is created or updated (staging checks).
+  # 2. A commit is pushed to dev (release publication).
+  # 3. A developer explicitly requests a build via 'firebase_build' event.
   pull_request:
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
+
+  push:
+    branches:
+      - dev
+    paths:
+      - 'firebase.go'
 
   repository_dispatch:
     types:
@@ -26,13 +34,13 @@ on:
 
 jobs:
   stage_release:
-    # To publish a release, merge the release PR with the label 'release:publish'.
+    # To publish a release, merge a PR with the title prefix '[chore] Release ' to dev
+    # and ensure the squashed commit message also has the prefix.
     # To stage a release without publishing it, send a 'firebase_build' event or apply
     # the 'release:stage' label to a PR.
     if: github.event.action == 'firebase_build' ||
       contains(github.event.pull_request.labels.*.name, 'release:stage') ||
-      (github.event.pull_request.merged &&
-        contains(github.event.pull_request.labels.*.name, 'release:publish'))
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[chore] Release '))
 
     runs-on: ubuntu-latest
 
@@ -61,40 +69,50 @@ jobs:
   publish_release:
     needs: stage_release
 
-    # Check whether the release should be published. We publish only when the trigger PR is
-    #   1. merged
+    # Check whether the release should be published. We publish only when the trigger is
+    #   1. a push (merge)
     #   2. to the dev branch
-    #   3. with the label 'release:publish', and
-    #   4. the title prefix '[chore] Release '.
-    if: github.event.pull_request.merged &&
-      github.base_ref == 'dev' &&
-      contains(github.event.pull_request.labels.*.name, 'release:publish') &&
-      startsWith(github.event.pull_request.title, '[chore] Release ')
+    #   3. and the commit message has the title prefix '[chore] Release '.
+    if: github.event_name == 'push' &&
+      github.ref == 'refs/heads/dev' &&
+      startsWith(github.event.head_commit.message, '[chore] Release ')
 
     runs-on: ubuntu-latest
+    environment: Release
     permissions:
-      pull-requests: write
+      contents: write
 
     steps:
     - name: Checkout source for publish
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
-        ref: dev
         persist-credentials: false
 
     - name: Publish preflight check
       id: preflight
       run: ./.github/scripts/publish_preflight_check.sh
 
-    # Create a PR to merge dev into master.
-    - name: Create Release PR
+    # We authorize this step with an access token that has write access to the master branch.
+    - name: Merge to master
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+      with:
+        github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
+        script: |
+            github.rest.repos.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: 'master',
+              head: 'dev'
+            })
+
+    # See: https://cli.github.com/manual/gh_release_create
+    - name: Create release tag
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_VER: ${{ steps.preflight.outputs.version }}
         RELEASE_BODY: ${{ steps.preflight.outputs.changelog }}
-        RELEASE_TITLE: "[chore] Release ${{ steps.preflight.outputs.version }}"
       run: |
-        gh pr create \
-          --base master \
-          --head dev \
-          --title "$RELEASE_TITLE" \
-          --body "$RELEASE_BODY"
+        gh release create "$RELEASE_VER" \
+          --title "Firebase Admin Go SDK $RELEASE_VER" \
+          --notes "$RELEASE_BODY" \
+          --target "master"
