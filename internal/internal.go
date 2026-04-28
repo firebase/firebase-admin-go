@@ -86,8 +86,8 @@ type AppCheckConfig struct {
 	ProjectID string
 }
 
-// FpnvConfig represents the configuration of Firebase Phone Number Verification service.
-type FpnvConfig struct {
+// PhoneNumberVerificationConfig represents the configuration of Firebase Phone Number Verification service.
+type PhoneNumberVerificationConfig struct {
 	ProjectID string
 }
 

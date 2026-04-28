@@ -28,10 +28,10 @@ import (
 	"firebase.google.com/go/v4/appcheck"
 	"firebase.google.com/go/v4/auth"
 	"firebase.google.com/go/v4/db"
-	"firebase.google.com/go/v4/fpnv"
 	"firebase.google.com/go/v4/iid"
 	"firebase.google.com/go/v4/internal"
 	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/phonenumberverification"
 	"firebase.google.com/go/v4/remoteconfig"
 	"firebase.google.com/go/v4/storage"
 	"google.golang.org/api/option"
@@ -156,12 +156,12 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 	return remoteconfig.NewClient(ctx, conf)
 }
 
-// Fpnv returns an instance of fpnv.Client.
-func (a *App) Fpnv(ctx context.Context) (*fpnv.Client, error) {
-	conf := &internal.FpnvConfig{
+// PhoneNumberVerification returns an instance of phonenumberverification.Client.
+func (a *App) PhoneNumberVerification(ctx context.Context) (*phonenumberverification.Client, error) {
+	conf := &internal.PhoneNumberVerificationConfig{
 		ProjectID: a.projectID,
 	}
-	return fpnv.NewClient(ctx, conf)
+	return phonenumberverification.NewClient(ctx, conf)
 }
 
 // NewApp creates a new App from the provided config and client options.

@@ -1,4 +1,4 @@
-package fpnv
+package phonenumberverification
 
 import (
 	"context"
@@ -20,14 +20,14 @@ func TestNewClient(t *testing.T) {
 	tests := []struct {
 		name       string
 		cont       context.Context
-		conf       *internal.FpnvConfig
+		conf       *internal.PhoneNumberVerificationConfig
 		wantErr    bool
 		wantErrMsg string
 	}{
 		{
 			name: "Valid Client",
 			cont: context.Background(),
-			conf: &internal.FpnvConfig{
+			conf: &internal.PhoneNumberVerificationConfig{
 				ProjectID: "project_id",
 			},
 			wantErr: false,
@@ -87,8 +87,8 @@ func TestVerifyToken(t *testing.T) {
 	}
 
 	// Common claims for valid tokens
-	validIssuer := fpnvIssuer + "some-issuer-suffix" // Needs to start with fpnvIssuer
-	validAudience := fpnvIssuer + projectID
+	validIssuer := issuerPrefix + "some-issuer-suffix" // Needs to start with issuerPrefix
+	validAudience := issuerPrefix + projectID
 	validSub := "+15555550100"
 
 	tests := []struct {
@@ -104,7 +104,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Valid Token",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -123,7 +123,7 @@ func TestVerifyToken(t *testing.T) {
 				projectID: "",
 				jwks:      jwks,
 			},
-			validAudience: fpnvIssuer + "",
+			validAudience: issuerPrefix + "",
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -134,22 +134,22 @@ func TestVerifyToken(t *testing.T) {
 				})
 			},
 			wantErr:    true,
-			wantErrMsg: "project ID is required to access Fpnv client",
+			wantErrMsg: ErrProjectIDRequired.Error(),
 		},
 		{
 			name:          "Empty token",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return ""
 			},
 			wantErr:    true,
-			wantErrMsg: "token must be not empty",
+			wantErrMsg: ErrEmptyToken.Error(),
 		},
 		{
 			name:          "Expired Token",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -165,7 +165,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Wrong Audience",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -181,7 +181,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Wrong Issuer (Prefix)",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": "https://wrong.googleapis.com/",
@@ -197,7 +197,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Missing Subject",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -212,7 +212,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Wrong Algorithm",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				// Sign with HS256 instead of ES256
 				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -232,7 +232,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Nil Key ID",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, nil, jwt.MapClaims{
 					"iss": validIssuer,
@@ -242,12 +242,13 @@ func TestVerifyToken(t *testing.T) {
 					"exp": time.Now().Add(time.Hour).Unix(),
 				})
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: ErrTokenHeaderKid.Error(),
 		},
 		{
 			name:          "Unknown Key ID",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, StringPtr("unknown-kid"), jwt.MapClaims{
 					"iss": validIssuer,
@@ -263,7 +264,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Wrong header type",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				// Sign with HS256 instead of ES256
 				token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
@@ -278,12 +279,13 @@ func TestVerifyToken(t *testing.T) {
 				s, _ := token.SignedString(privateKey)
 				return s
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: ErrTokenType.Error(),
 		},
 		{
 			name:          "Token claims error",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				// TODO: nil doesn't work
 				token := jwt.NewWithClaims(jwt.SigningMethodES256, nil)
@@ -296,7 +298,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Token expired at error",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -312,7 +314,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Token issued at error",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
@@ -328,7 +330,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			name:          "Valid Token with single string audience",
 			client:        client,
-			validAudience: fpnvIssuer + projectID,
+			validAudience: issuerPrefix + projectID,
 			token: func() string {
 				return generateToken(t, privateKey, &kid, jwt.MapClaims{
 					"iss": validIssuer,
