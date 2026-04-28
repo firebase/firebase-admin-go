@@ -160,7 +160,6 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 func (a *App) PhoneNumberVerification(ctx context.Context) (*phonenumberverification.Client, error) {
 	conf := &internal.PhoneNumberVerificationConfig{
 		ProjectID: a.projectID,
-		Opts:      a.opts,
 	}
 	return phonenumberverification.NewClient(ctx, conf)
 }

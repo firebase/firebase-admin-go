@@ -89,14 +89,9 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // FPNV service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.PhoneNumberVerificationConfig) (*Client, error) {
-	httpClient, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
-	if err != nil {
-		return nil, err
-	}
-
+	// TODO: Add support for overriding the HTTP client using the App one.
 	jwks, err := keyfunc.Get(jwksURL, keyfunc.Options{
 		Ctx:             ctx,
-		Client:          httpClient.ClientWithoutAuth(),
 		RefreshInterval: 10 * time.Minute,
 	})
 	if err != nil {
