@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
@@ -66,6 +67,21 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 	}
 
 	return WithDefaultRetryConfig(hc), endpoint, nil
+}
+
+// ClientWithoutAuth returns a copy of the underlying http.Client with the oauth2.Transport stripped.
+// This allows using the configured proxy/telemetry options without sending authentication headers.
+func (c *HTTPClient) ClientWithoutAuth() *http.Client {
+	baseClient := &http.Client{
+		Timeout: c.Client.Timeout,
+	}
+
+	var t http.RoundTripper = c.Client.Transport
+	if oauth2Transport, ok := t.(*oauth2.Transport); ok {
+		t = oauth2Transport.Base
+	}
+	baseClient.Transport = t
+	return baseClient
 }
 
 // WithDefaultRetryConfig creates a new HTTPClient using the provided client and the default
