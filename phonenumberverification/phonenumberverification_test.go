@@ -93,7 +93,7 @@ func TestVerifyToken(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		projectId     string
+		projectID     string
 		validAudience string
 		client        *Client
 		token         func() string
