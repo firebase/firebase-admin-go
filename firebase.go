@@ -23,6 +23,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"sync"
 
 	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/appcheck"
@@ -54,6 +55,8 @@ type App struct {
 	serviceAccountID string
 	storageBucket    string
 	opts             []option.ClientOption
+	fpnvClient       *phonenumberverification.Client
+	fpnvMutex        sync.Mutex
 }
 
 // Config represents the configuration used to initialize an App.
@@ -158,10 +161,27 @@ func (a *App) RemoteConfig(ctx context.Context) (*remoteconfig.Client, error) {
 
 // PhoneNumberVerification returns an instance of phonenumberverification.Client.
 func (a *App) PhoneNumberVerification(ctx context.Context) (*phonenumberverification.Client, error) {
+	a.fpnvMutex.Lock()
+	defer a.fpnvMutex.Unlock()
+
+	if a.fpnvClient != nil {
+		return a.fpnvClient, nil
+	}
+
+	if a.projectID == "" {
+		return nil, errors.New("project id is required to access phone number verification client")
+	}
+
 	conf := &internal.PhoneNumberVerificationConfig{
 		ProjectID: a.projectID,
 	}
-	return phonenumberverification.NewClient(ctx, conf)
+	client, err := phonenumberverification.NewClient(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+
+	a.fpnvClient = client
+	return client, nil
 }
 
 // NewApp creates a new App from the provided config and client options.

@@ -31,13 +31,7 @@ func TestNewClient(t *testing.T) {
 				ProjectID: "project_id",
 			},
 			wantErr: false,
-		}, /*
-			{
-				name:    "Invalid Client",
-				cont:    context.Background(),
-				conf:    nil,
-				wantErr: true,
-			},*/
+		},
 	}
 
 	for _, tt := range tests {
@@ -287,7 +281,6 @@ func TestVerifyToken(t *testing.T) {
 			client:        client,
 			validAudience: issuerPrefix + projectID,
 			token: func() string {
-				// TODO: nil doesn't work
 				token := jwt.NewWithClaims(jwt.SigningMethodES256, nil)
 				token.Header["kid"] = kid
 				s, _ := token.SignedString(privateKey)

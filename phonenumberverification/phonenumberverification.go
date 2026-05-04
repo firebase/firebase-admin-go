@@ -91,8 +91,9 @@ type Client struct {
 func NewClient(ctx context.Context, conf *internal.PhoneNumberVerificationConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
 	jwks, err := keyfunc.Get(jwksURL, keyfunc.Options{
-		Ctx:             ctx,
-		RefreshInterval: 10 * time.Minute,
+		Ctx:               ctx,
+		RefreshUnknownKID: true,
+		RefreshRateLimit:  5 * time.Minute, // Prevent network floods from malicious tokens
 	})
 	if err != nil {
 		return nil, err
