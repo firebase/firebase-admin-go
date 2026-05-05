@@ -725,6 +725,47 @@ func TestNewHTTPClientWithRetryConfigOptionNil(t *testing.T) {
 	}
 }
 
+func TestCloneHTTPClient(t *testing.T) {
+	delay := 5 * time.Second
+	original := &HTTPClient{
+		Client: &http.Client{},
+		RetryConfig: &RetryConfig{
+			MaxRetries:       3,
+			CheckForRetry:    retryNetworkAndHTTPErrors(http.StatusServiceUnavailable),
+			ExpBackoffFactor: 0.5,
+			MaxDelay:         &delay,
+		},
+		Opts: []HTTPOption{
+			WithHeader("X-Test", "value"),
+		},
+	}
+
+	cloned := CloneHTTPClient(original)
+	if cloned == original {
+		t.Fatalf("CloneHTTPClient() returned the original instance")
+	}
+	if len(cloned.Opts) != len(original.Opts) {
+		t.Fatalf("len(Opts) = %d; want = %d", len(cloned.Opts), len(original.Opts))
+	}
+	if cloned.RetryConfig == original.RetryConfig {
+		t.Errorf("RetryConfig pointer should be copied")
+	}
+	if cloned.RetryConfig.MaxDelay == original.RetryConfig.MaxDelay {
+		t.Errorf("RetryConfig.MaxDelay pointer should be copied")
+	}
+
+	cloned.Opts = append(cloned.Opts, WithHeader("X-Test-2", "value-2"))
+	if len(original.Opts) != 1 {
+		t.Errorf("len(original.Opts) = %d; want = 1", len(original.Opts))
+	}
+
+	newDelay := 10 * time.Second
+	cloned.RetryConfig.MaxDelay = &newDelay
+	if *original.RetryConfig.MaxDelay != delay {
+		t.Errorf("original RetryConfig.MaxDelay = %v; want = %v", *original.RetryConfig.MaxDelay, delay)
+	}
+}
+
 func TestNewHTTPClientRetryOnNetworkErrors(t *testing.T) {
 	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
 	if err != nil {

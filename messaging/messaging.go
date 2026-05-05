@@ -934,15 +934,15 @@ type fcmClient struct {
 }
 
 func newFCMClient(base *internal.HTTPClient, conf *internal.MessagingConfig, messagingEndpoint string, batchEndpoint string) *fcmClient {
-	client := cloneHTTPClient(base)
+	client := internal.CloneHTTPClient(base)
 	client.CreateErrFn = handleFCMError
 
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
-	client.Opts = []internal.HTTPOption{
+	client.Opts = append(client.Opts,
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
 		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
-	}
+	)
 
 	return &fcmClient{
 		fcmEndpoint:   messagingEndpoint,
@@ -951,11 +951,6 @@ func newFCMClient(base *internal.HTTPClient, conf *internal.MessagingConfig, mes
 		version:       version,
 		httpClient:    client,
 	}
-}
-
-func cloneHTTPClient(client *internal.HTTPClient) *internal.HTTPClient {
-	clone := *client
-	return &clone
 }
 
 // Send sends a Message to Firebase Cloud Messaging.

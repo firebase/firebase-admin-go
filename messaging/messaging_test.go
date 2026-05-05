@@ -1376,11 +1376,17 @@ func TestNewClientWithRetryConfigOption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if client.fcmClient.httpClient.RetryConfig != customRetry {
-		t.Errorf("fcm retry config = %p; want = %p", client.fcmClient.httpClient.RetryConfig, customRetry)
+	if client.fcmClient.httpClient.RetryConfig == nil {
+		t.Fatal("fcm retry config = nil; want non-nil")
 	}
-	if client.iidClient.httpClient.RetryConfig != customRetry {
-		t.Errorf("iid retry config = %p; want = %p", client.iidClient.httpClient.RetryConfig, customRetry)
+	if client.iidClient.httpClient.RetryConfig == nil {
+		t.Fatal("iid retry config = nil; want non-nil")
+	}
+	if !reflect.DeepEqual(client.fcmClient.httpClient.RetryConfig, customRetry) {
+		t.Errorf("fcm retry config = %#v; want = %#v", client.fcmClient.httpClient.RetryConfig, customRetry)
+	}
+	if !reflect.DeepEqual(client.iidClient.httpClient.RetryConfig, customRetry) {
+		t.Errorf("iid retry config = %#v; want = %#v", client.iidClient.httpClient.RetryConfig, customRetry)
 	}
 }
 
@@ -1400,6 +1406,34 @@ func TestNewClientWithNilRetryConfigOption(t *testing.T) {
 	}
 	if client.iidClient.httpClient.RetryConfig != nil {
 		t.Errorf("iid retry config = %v; want = nil", client.iidClient.httpClient.RetryConfig)
+	}
+}
+
+func TestMessagingClientPreservesBaseHTTPOptions(t *testing.T) {
+	base := &internal.HTTPClient{
+		Client: &http.Client{},
+		Opts: []internal.HTTPOption{
+			internal.WithHeader("X-Base-Header", "base"),
+		},
+	}
+
+	conf := &internal.MessagingConfig{
+		ProjectID: "test-project",
+		Version:   "test-version",
+	}
+
+	fcm := newFCMClient(base, conf, defaultMessagingEndpoint, defaultBatchEndpoint)
+	iid := newIIDClient(base, conf)
+
+	if len(base.Opts) != 1 {
+		t.Fatalf("len(base.Opts) = %d; want = 1", len(base.Opts))
+	}
+
+	if len(fcm.httpClient.Opts) != 4 {
+		t.Errorf("len(fcm.httpClient.Opts) = %d; want = 4", len(fcm.httpClient.Opts))
+	}
+	if len(iid.httpClient.Opts) != 3 {
+		t.Errorf("len(iid.httpClient.Opts) = %d; want = 3", len(iid.httpClient.Opts))
 	}
 }
 

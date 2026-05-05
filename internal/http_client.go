@@ -88,6 +88,30 @@ func WithDefaultRetryConfig(hc *http.Client) *HTTPClient {
 	}
 }
 
+// CloneHTTPClient returns a copy of the given HTTPClient.
+//
+// Slice and pointer fields are copied to avoid accidental cross-client mutations.
+func CloneHTTPClient(client *HTTPClient) *HTTPClient {
+	if client == nil {
+		return nil
+	}
+
+	clone := *client
+	if client.Opts != nil {
+		clone.Opts = append([]HTTPOption{}, client.Opts...)
+	}
+	if client.RetryConfig != nil {
+		retryConfig := *client.RetryConfig
+		if client.RetryConfig.MaxDelay != nil {
+			maxDelay := *client.RetryConfig.MaxDelay
+			retryConfig.MaxDelay = &maxDelay
+		}
+		clone.RetryConfig = &retryConfig
+	}
+
+	return &clone
+}
+
 // WithRetryConfig creates a ClientOption that can be used to configure HTTP retries.
 //
 // The option can be passed into NewApp() and is propagated to service clients.
