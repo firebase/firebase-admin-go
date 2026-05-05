@@ -1360,6 +1360,49 @@ func TestSendWithCustomEndpoint(t *testing.T) {
 	}
 }
 
+func TestNewClientWithRetryConfigOption(t *testing.T) {
+	ctx := context.Background()
+
+	customRetry := &internal.RetryConfig{
+		MaxRetries:       2,
+		ExpBackoffFactor: 0.25,
+	}
+
+	conf := *testMessagingConfig
+	conf.Opts = append(conf.Opts, internal.WithRetryConfig(customRetry))
+
+	client, err := NewClient(ctx, &conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if client.fcmClient.httpClient.RetryConfig != customRetry {
+		t.Errorf("fcm retry config = %p; want = %p", client.fcmClient.httpClient.RetryConfig, customRetry)
+	}
+	if client.iidClient.httpClient.RetryConfig != customRetry {
+		t.Errorf("iid retry config = %p; want = %p", client.iidClient.httpClient.RetryConfig, customRetry)
+	}
+}
+
+func TestNewClientWithNilRetryConfigOption(t *testing.T) {
+	ctx := context.Background()
+
+	conf := *testMessagingConfig
+	conf.Opts = append(conf.Opts, internal.WithRetryConfig(nil))
+
+	client, err := NewClient(ctx, &conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if client.fcmClient.httpClient.RetryConfig != nil {
+		t.Errorf("fcm retry config = %v; want = nil", client.fcmClient.httpClient.RetryConfig)
+	}
+	if client.iidClient.httpClient.RetryConfig != nil {
+		t.Errorf("iid retry config = %v; want = nil", client.iidClient.httpClient.RetryConfig)
+	}
+}
+
 func TestSendDryRun(t *testing.T) {
 	var tr *http.Request
 	var b []byte

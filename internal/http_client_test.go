@@ -693,6 +693,38 @@ func TestNewHTTPClient(t *testing.T) {
 	}
 }
 
+func TestNewHTTPClientWithRetryConfigOption(t *testing.T) {
+	wantRetry := &RetryConfig{
+		MaxRetries:       1,
+		ExpBackoffFactor: 1.25,
+	}
+	client, _, err := NewHTTPClient(
+		context.Background(),
+		tokenSourceOpt,
+		WithRetryConfig(wantRetry),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.RetryConfig != wantRetry {
+		t.Errorf("NewHTTPClient().RetryConfig = %p; want = %p", client.RetryConfig, wantRetry)
+	}
+}
+
+func TestNewHTTPClientWithRetryConfigOptionNil(t *testing.T) {
+	client, _, err := NewHTTPClient(
+		context.Background(),
+		tokenSourceOpt,
+		WithRetryConfig(nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.RetryConfig != nil {
+		t.Errorf("NewHTTPClient().RetryConfig = %v; want = nil", client.RetryConfig)
+	}
+}
+
 func TestNewHTTPClientRetryOnNetworkErrors(t *testing.T) {
 	client, _, err := NewHTTPClient(context.Background(), tokenSourceOpt)
 	if err != nil {

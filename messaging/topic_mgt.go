@@ -63,8 +63,8 @@ type iidClient struct {
 	httpClient  *internal.HTTPClient
 }
 
-func newIIDClient(hc *http.Client, conf *internal.MessagingConfig) *iidClient {
-	client := internal.WithDefaultRetryConfig(hc)
+func newIIDClient(base *internal.HTTPClient, conf *internal.MessagingConfig) *iidClient {
+	client := cloneHTTPClient(base)
 	client.CreateErrFn = handleIIDError
 	client.Opts = []internal.HTTPOption{
 		internal.WithHeader("access_token_auth", "true"),
