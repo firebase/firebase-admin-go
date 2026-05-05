@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"google.golang.org/api/option"
+	"google.golang.org/api/option/internaloption"
 	"google.golang.org/api/transport"
 )
 
@@ -65,7 +66,13 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 		return nil, "", err
 	}
 
-	return WithDefaultRetryConfig(hc), endpoint, nil
+	client := &HTTPClient{Client: hc}
+	if retryConfig, ok := retryConfigFromOptions(opts...); ok {
+		client.RetryConfig = retryConfig
+	} else {
+		client.RetryConfig = defaultRetryConfig()
+	}
+	return client, endpoint, nil
 }
 
 // WithDefaultRetryConfig creates a new HTTPClient using the provided client and the default
@@ -75,17 +82,44 @@ func NewHTTPClient(ctx context.Context, opts ...option.ClientOption) (*HTTPClien
 // ServiceUnavailable (503) error. Repeatedly failing requests are retried up to 4 times
 // with exponential backoff. Retry delay is never longer than 2 minutes.
 func WithDefaultRetryConfig(hc *http.Client) *HTTPClient {
-	twoMinutes := time.Duration(2) * time.Minute
 	return &HTTPClient{
-		Client: hc,
-		RetryConfig: &RetryConfig{
-			MaxRetries: 4,
-			CheckForRetry: retryNetworkAndHTTPErrors(
-				http.StatusServiceUnavailable,
-			),
-			ExpBackoffFactor: 0.5,
-			MaxDelay:         &twoMinutes,
-		},
+		Client:      hc,
+		RetryConfig: defaultRetryConfig(),
+	}
+}
+
+// CloneHTTPClient returns a copy of the given HTTPClient.
+//
+// Slice and pointer fields are copied to avoid accidental cross-client mutations.
+func CloneHTTPClient(client *HTTPClient) *HTTPClient {
+	if client == nil {
+		return nil
+	}
+
+	clone := *client
+	if client.Opts != nil {
+		clone.Opts = append([]HTTPOption{}, client.Opts...)
+	}
+	if client.RetryConfig != nil {
+		retryConfig := *client.RetryConfig
+		if client.RetryConfig.MaxDelay != nil {
+			maxDelay := *client.RetryConfig.MaxDelay
+			retryConfig.MaxDelay = &maxDelay
+		}
+		clone.RetryConfig = &retryConfig
+	}
+
+	return &clone
+}
+
+// WithRetryConfig creates a ClientOption that can be used to configure HTTP retries.
+//
+// The option can be passed into NewApp() and is propagated to service clients.
+// If this option is provided with a nil RetryConfig, retries are disabled.
+func WithRetryConfig(retryConfig *RetryConfig) option.ClientOption {
+	return &withRetryConfigOption{
+		EmbeddableAdapter: &internaloption.EmbeddableAdapter{},
+		retryConfig:       retryConfig,
 	}
 }
 
@@ -369,6 +403,41 @@ type RetryConfig struct {
 	CheckForRetry    RetryCondition
 	ExpBackoffFactor float64
 	MaxDelay         *time.Duration
+}
+
+type withRetryConfigOption struct {
+	*internaloption.EmbeddableAdapter
+	retryConfig *RetryConfig
+}
+
+func (w *withRetryConfigOption) getRetryConfig() (*RetryConfig, bool) {
+	return w.retryConfig, true
+}
+
+type retryConfigOption interface {
+	getRetryConfig() (*RetryConfig, bool)
+}
+
+func retryConfigFromOptions(opts ...option.ClientOption) (*RetryConfig, bool) {
+	for idx := len(opts) - 1; idx >= 0; idx-- {
+		if rcOpt, ok := opts[idx].(retryConfigOption); ok {
+			return rcOpt.getRetryConfig()
+		}
+	}
+
+	return nil, false
+}
+
+func defaultRetryConfig() *RetryConfig {
+	twoMinutes := time.Duration(2) * time.Minute
+	return &RetryConfig{
+		MaxRetries: 4,
+		CheckForRetry: retryNetworkAndHTTPErrors(
+			http.StatusServiceUnavailable,
+		),
+		ExpBackoffFactor: 0.5,
+		MaxDelay:         &twoMinutes,
+	}
 }
 
 // RetryCondition determines if an HTTP request should be retried depending on its last outcome.
