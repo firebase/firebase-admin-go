@@ -44,7 +44,7 @@ requests, code review feedback, and also pull requests.
 
 ## Supported Go Versions
 
-The Firebase Admin Go SDK is compatible with the two most-recent major Go releases, the same [policy](https://go.dev/doc/devel/release#policy) the Go programming language follows. This means the currently supported versions are:
+The Firebase Admin Go SDK is compatible with the two most-recent major Go releases, following the same [policy](https://go.dev/doc/devel/release#policy) as the Go programming language. This means the currently supported versions are:
 
 - Go 1.25
 - Go 1.26
