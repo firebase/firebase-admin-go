@@ -51,7 +51,7 @@ var (
 	// ErrTokenEmptyAudience is returned when the token audience has no audience.
 	ErrTokenEmptyAudience = errors.New("token has no 'aud' claim")
 	// ErrTokenAudience is returned when the token audience does not match the current project.
-	ErrTokenAudience = errors.New("token has incorrect audience")
+	ErrTokenAudience = errors.New("token audience must be the project name")
 	// ErrTokenIssuer is returned when the token issuer does not match phone number verification service.
 	ErrTokenIssuer = errors.New("token was not issued by the PNV service")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
