@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package phonenumberverification provides functionality for Firebase Phone Number Verification (FPNV) tokens.
+// Package phonenumberverification provides functionality for verifying Firebase Phone Number Verification (FPNV) tokens.
 package phonenumberverification
 
 import (
