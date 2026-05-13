@@ -53,7 +53,7 @@ var (
 	// ErrTokenAudience is returned when the token audience does not match the current project.
 	ErrTokenAudience = errors.New("token has incorrect audience")
 	// ErrTokenIssuer is returned when the token issuer does not match phone number verification service.
-	ErrTokenIssuer = errors.New("token has incorrect issuer")
+	ErrTokenIssuer = errors.New("token was not issued by the PNV service")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
 	ErrTokenSubject = errors.New("token has empty or missing subject")
 	// ErrTokenExpiresAt is returned when the token has an invalid expiresAt.
