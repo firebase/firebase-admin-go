@@ -48,7 +48,7 @@ var (
 	ErrTokenType = errors.New("token is not a JWT")
 	// ErrTokenClaims is returned when the token claims cannot be decoded.
 	ErrTokenClaims = errors.New("token has incorrect claims")
-	// ErrTokenEmptyAudience is returned when the token audience has no audience.
+	// ErrTokenEmptyAudience is returned when the token has no audience.
 	ErrTokenEmptyAudience = errors.New("token has no 'aud' claim")
 	// ErrTokenAudience is returned when the token audience does not match the current project.
 	ErrTokenAudience = errors.New("token audience must be the project name")
