@@ -56,10 +56,10 @@ var (
 	ErrTokenIssuer = errors.New("token has incorrect issuer")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
 	ErrTokenSubject = errors.New("token has empty or missing subject")
-	// ErrTokenExpiresAt is returned when the token has issue with expiresAt.
-	ErrTokenExpiresAt = errors.New("token has incorrect expiresAt")
-	// ErrTokenIssuedAt is returned when the token has issue with issuedAt.
-	ErrTokenIssuedAt = errors.New("token has incorrect issuedAt")
+	// ErrTokenExpiresAt is returned when the token has an invalid expiresAt.
+	ErrTokenExpiresAt = errors.New("token has an invalid expiresAt")
+	// ErrTokenIssuedAt is returned when the token has an invalid issuedAt.
+	ErrTokenIssuedAt = errors.New("token has an invalid issuedAt")
 )
 
 // DecodedVerificationToken represents a verified FPNV token.
