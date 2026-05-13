@@ -86,6 +86,11 @@ type AppCheckConfig struct {
 	ProjectID string
 }
 
+// PhoneNumberVerificationConfig represents the configuration of Firebase Phone Number Verification service.
+type PhoneNumberVerificationConfig struct {
+	ProjectID string
+}
+
 // MockTokenSource is a TokenSource implementation that can be used for testing.
 type MockTokenSource struct {
 	AccessToken string
