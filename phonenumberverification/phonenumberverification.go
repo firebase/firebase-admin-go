@@ -43,7 +43,7 @@ var (
 	// ErrTokenHeaderKid is returned when the token has no 'kid' claim.
 	ErrTokenHeaderKid = errors.New("token has no 'kid' claim")
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-ES256 algorithm.
-	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
+	ErrIncorrectAlgorithm = errors.New("token must be signed with ES256")
 	// ErrTokenType is returned when the token is not a JWT.
 	ErrTokenType = errors.New("token has incorrect type")
 	// ErrTokenClaims is returned when the token claims cannot be decoded.
