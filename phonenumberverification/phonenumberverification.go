@@ -45,7 +45,7 @@ var (
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-ES256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token must be signed with ES256")
 	// ErrTokenType is returned when the token is not a JWT.
-	ErrTokenType = errors.New("token has incorrect type")
+	ErrTokenType = errors.New("token is not a JWT")
 	// ErrTokenClaims is returned when the token claims cannot be decoded.
 	ErrTokenClaims = errors.New("token has incorrect claims")
 	// ErrTokenEmptyAudience is returned when the token audience has no audience.
