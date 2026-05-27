@@ -105,6 +105,13 @@ func TestSendInvalidToken(t *testing.T) {
 	}
 }
 
+func TestSendInvalidFid(t *testing.T) {
+	msg := &messaging.Message{Fid: "INVALID_FID"}
+	if _, err := client.Send(context.Background(), msg); err == nil || !messaging.IsUnregistered(err) {
+		t.Errorf("Send() = %v; want UnregisteredError", err)
+	}
+}
+
 func TestSendEach(t *testing.T) {
 	messages := []*messaging.Message{
 		{
