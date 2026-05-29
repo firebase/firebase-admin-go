@@ -1056,8 +1056,8 @@ func IsRegistrationTokenNotRegistered(err error) bool {
 	return IsUnregistered(err)
 }
 
-// IsUnregistered checks if the given error was due to a registration token that
-// became invalid.
+// IsUnregistered checks if the given error was due to a registration token or
+// installation ID (FID) that was unregistered or became invalid.
 func IsUnregistered(err error) bool {
 	return hasMessagingErrorCode(err, unregistered)
 }

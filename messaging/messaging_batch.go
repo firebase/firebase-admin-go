@@ -37,9 +37,11 @@ const multipartBoundary = "__END_OF_PART__"
 // MulticastMessage represents a message that can be sent to multiple devices via Firebase Cloud
 // Messaging (FCM).
 //
-// It contains payload information as well as the list of device registration tokens to which the
-// message should be sent. A single MulticastMessage may contain up to 500 registration tokens.
+// It contains payload information as well as the list of device registration tokens and/or
+// Firebase Installation IDs (FIDs) to which the message should be sent. A single
+// MulticastMessage may contain up to 500 registration tokens and FIDs combined.
 type MulticastMessage struct {
+	// Deprecated: use `Fids` instead.
 	Tokens       []string
 	Data         map[string]string
 	Notification *Notification
@@ -47,20 +49,34 @@ type MulticastMessage struct {
 	Webpush      *WebpushConfig
 	APNS         *APNSConfig
 	FCMOptions   *FCMOptions
+	Fids         []string
 }
 
 func (mm *MulticastMessage) toMessages() ([]*Message, error) {
-	if len(mm.Tokens) == 0 {
-		return nil, errors.New("tokens must not be nil or empty")
+	if len(mm.Tokens) == 0 && len(mm.Fids) == 0 {
+		return nil, errors.New("either tokens or fids must be specified")
 	}
-	if len(mm.Tokens) > maxMessages {
-		return nil, fmt.Errorf("tokens must not contain more than %d elements", maxMessages)
+	total := len(mm.Tokens) + len(mm.Fids)
+	if total > maxMessages {
+		return nil, fmt.Errorf("total tokens and fids must not exceed %d elements", maxMessages)
 	}
 
-	var messages []*Message
+	messages := make([]*Message, 0, total)
 	for _, token := range mm.Tokens {
 		temp := &Message{
 			Token:        token,
+			Data:         mm.Data,
+			Notification: mm.Notification,
+			Android:      mm.Android,
+			Webpush:      mm.Webpush,
+			APNS:         mm.APNS,
+			FCMOptions:   mm.FCMOptions,
+		}
+		messages = append(messages, temp)
+	}
+	for _, fid := range mm.Fids {
+		temp := &Message{
+			Fid:          fid,
 			Data:         mm.Data,
 			Notification: mm.Notification,
 			Android:      mm.Android,
