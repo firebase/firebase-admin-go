@@ -70,10 +70,10 @@ type Message struct {
 	APNS         *APNSConfig       `json:"apns,omitempty"`
 	FCMOptions   *FCMOptions       `json:"fcm_options,omitempty"`
 	// Deprecated: use `Fid` instead
-	Token        string            `json:"token,omitempty"`
-	Topic        string            `json:"-"`
-	Condition    string            `json:"condition,omitempty"`
-	Fid          string            `json:"fid,omitempty"`
+	Token     string `json:"token,omitempty"`
+	Topic     string `json:"-"`
+	Condition string `json:"condition,omitempty"`
+	Fid       string `json:"fid,omitempty"`
 }
 
 // MarshalJSON marshals a Message into JSON (for internal use only).
