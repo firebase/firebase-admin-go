@@ -675,7 +675,7 @@ func TestSendEachForMulticastEmptyArray(t *testing.T) {
 	}
 }
 
-func TestSendEachForMulticastTooManyTokens(t *testing.T) {
+func TestSendEachForMulticastTooManyTargets(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
@@ -1226,7 +1226,7 @@ func TestSendMulticastEmptyArray(t *testing.T) {
 	}
 }
 
-func TestSendMulticastTooManyTokens(t *testing.T) {
+func TestSendMulticastTooManyTargets(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
@@ -1255,7 +1255,6 @@ func TestSendMulticastTooManyTokens(t *testing.T) {
 		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
 	}
 
-	// Mixed limit over 500
 	mixedTokens := []string{}
 	mixedFids := []string{}
 	for i := 0; i < 250; i++ {
