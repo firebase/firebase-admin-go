@@ -133,12 +133,14 @@ func (c *fcmClient) SendEachDryRun(ctx context.Context, messages []*Message) (*B
 	return c.sendEachInBatch(ctx, messages, true)
 }
 
-// SendEachForMulticast sends the given multicast message to all the FCM registration tokens specified.
+// SendEachForMulticast sends the given multicast message to all the specified FCM registration
+// tokens and/or Firebase Installation IDs (FIDs).
 //
-// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticast uses the
-// SendEach() function to send the given message to all the target recipients. The
-// responses list obtained from the return value corresponds to the order of the input tokens. An error
-// from SendEachForMulticast or a BatchResponse with all failures indicates a total failure, meaning
+// The tokens and FIDs in MulticastMessage may contain up to 500 elements in total.
+// SendEachForMulticast uses the SendEach() function to send the given message. The responses list
+// obtained from the return value corresponds to the order of the input targets. If both tokens
+// and FIDs are provided, tokens are processed first, followed by FIDs. An error from
+// SendEachForMulticast or a BatchResponse with all failures indicates a total failure, meaning
 // that none of the messages in the list could be sent. Partial failures or no failures are only
 // indicated by a BatchResponse return value.
 func (c *fcmClient) SendEachForMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
@@ -151,16 +153,17 @@ func (c *fcmClient) SendEachForMulticast(ctx context.Context, message *Multicast
 }
 
 // SendEachForMulticastDryRun sends the given multicast message to all the specified FCM registration
-// tokens in the dry run (validation only) mode.
+// tokens and/or Firebase Installation IDs (FIDs) in the dry run (validation only) mode.
 //
 // This function does not actually deliver any messages to target devices. Instead, it performs all
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
-// The tokens array in MulticastMessage may contain up to 500 tokens. SendEachForMulticastDryRunn uses the
-// SendEachDryRun() function to send the given message. The responses list obtained from
-// the return value corresponds to the order of the input tokens. An error from SendEachForMulticastDryRun
-// or a BatchResponse with all failures indicates a total failure, meaning that of the messages in the
-// list could be sent. Partial failures or no failures are only
+// The tokens and FIDs in MulticastMessage may contain up to 500 elements in total.
+// SendEachForMulticastDryRun uses the SendEachDryRun() function to send the given message.
+// The responses list obtained from the return value corresponds to the order of the input targets.
+// If both tokens and FIDs are provided, tokens are processed first, followed by FIDs. An error from
+// SendEachForMulticastDryRun or a BatchResponse with all failures indicates a total failure, meaning
+// that none of the messages in the list could be sent. Partial failures or no failures are only
 // indicated by a BatchResponse return value.
 func (c *fcmClient) SendEachForMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
 	messages, err := toMessages(message)
@@ -291,13 +294,16 @@ func (c *fcmClient) SendAllDryRun(ctx context.Context, messages []*Message) (*Ba
 	return c.sendBatch(ctx, messages, true)
 }
 
-// SendMulticast sends the given multicast message to all the FCM registration tokens specified.
+// SendMulticast sends the given multicast message to all the specified FCM registration
+// tokens and/or Firebase Installation IDs (FIDs).
 //
-// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticast uses the
-// SendAll() function to send the given message to all the target recipients. The
-// responses list obtained from the return value corresponds to the order of the input tokens. An
-// error from SendMulticast indicates a total failure, meaning that the message could not be sent
-// to any of the recipients. Partial failures are indicated by a BatchResponse return value.
+// The tokens and FIDs in MulticastMessage may contain up to 500 elements in total.
+// SendMulticast uses the SendAll() function to send the given message to all the target
+// recipients. The responses list obtained from the return value corresponds to the order of
+// the input targets. If both tokens and FIDs are provided, tokens are processed first,
+// followed by FIDs. An error from SendMulticast indicates a total failure, meaning that the
+// message could not be sent to any of the recipients. Partial failures are indicated by a
+// BatchResponse return value.
 //
 // Deprecated: Use SendEachForMulticast instead.
 func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
@@ -310,16 +316,17 @@ func (c *fcmClient) SendMulticast(ctx context.Context, message *MulticastMessage
 }
 
 // SendMulticastDryRun sends the given multicast message to all the specified FCM registration
-// tokens in the dry run (validation only) mode.
+// tokens and/or Firebase Installation IDs (FIDs) in the dry run (validation only) mode.
 //
 // This function does not actually deliver any messages to target devices. Instead, it performs all
 // the SDK-level and backend validations on the messages, and emulates the send operation.
 //
-// The tokens array in MulticastMessage may contain up to 500 tokens. SendMulticastDryRun uses the
-// SendAllDryRun() function to send the given message. The responses list obtained from
-// the return value corresponds to the order of the input tokens. An error from SendMulticastDryRun
-// indicates a total failure, meaning that none of the messages were sent to FCM for validation.
-// Partial failures are indicated by a BatchResponse return value.
+// The tokens and FIDs in MulticastMessage may contain up to 500 elements in total.
+// SendMulticastDryRun uses the SendAllDryRun() function to send the given message.
+// The responses list obtained from the return value corresponds to the order of the input targets.
+// If both tokens and FIDs are provided, tokens are processed first, followed by FIDs. An error
+// from SendMulticastDryRun indicates a total failure, meaning that none of the messages
+// were sent to FCM for validation. Partial failures are indicated by a BatchResponse return value.
 //
 // Deprecated: Use SendEachForMulticastDryRun instead.
 func (c *fcmClient) SendMulticastDryRun(ctx context.Context, message *MulticastMessage) (*BatchResponse, error) {
