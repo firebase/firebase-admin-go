@@ -821,8 +821,8 @@ func TestSendEachForMulticastMixed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if br.SuccessCount != 2 {
-		t.Errorf("SuccessCount = %d; want = 2", br.SuccessCount)
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEachForMulticast() = %v", err)
 	}
 }
 

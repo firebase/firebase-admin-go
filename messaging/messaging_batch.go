@@ -41,7 +41,7 @@ const multipartBoundary = "__END_OF_PART__"
 // Firebase Installation IDs (FIDs) to which the message should be sent. A single
 // MulticastMessage may contain up to 500 registration tokens and FIDs combined.
 type MulticastMessage struct {
-	// Deprecated: use `Fids` instead.
+	// Deprecated: Use Fids instead.
 	Tokens       []string
 	Data         map[string]string
 	Notification *Notification

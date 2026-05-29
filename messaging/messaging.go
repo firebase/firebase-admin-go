@@ -69,7 +69,7 @@ type Message struct {
 	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
 	APNS         *APNSConfig       `json:"apns,omitempty"`
 	FCMOptions   *FCMOptions       `json:"fcm_options,omitempty"`
-	// Deprecated: use `Fid` instead
+	// Deprecated: Use Fid instead.
 	Token     string `json:"token,omitempty"`
 	Topic     string `json:"-"`
 	Condition string `json:"condition,omitempty"`
