@@ -242,6 +242,21 @@ func TestEmailActionLinkNoEmail(t *testing.T) {
 	if _, err := client.EmailSignInLink(context.Background(), "", testActionCodeSettings); err == nil {
 		t.Errorf("EmailSignInLink('') = nil; want error")
 	}
+
+	if _, err := client.VerifyAndChangeEmailLink(context.Background(), "", testNewEmail); err == nil {
+		t.Errorf("VerifyAndChangeEmailLink('') = nil; want error")
+	}
+}
+
+func TestVerifyAndChangeEmailLinkNoNewEmail(t *testing.T) {
+	client := &Client{
+		baseClient: &baseClient{},
+	}
+
+	want := "newEmail must not be empty"
+	if _, err := client.VerifyAndChangeEmailLink(context.Background(), testEmail, ""); err == nil || err.Error() != want {
+		t.Errorf("VerifyAndChangeEmailLink('') = %v; want = %q", err, want)
+	}
 }
 
 func TestEmailVerificationLinkInvalidSettings(t *testing.T) {
