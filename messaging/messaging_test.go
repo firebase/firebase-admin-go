@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -145,11 +145,13 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "AndroidDataMessage",
+		name: "AndroidDataMessageWithBooleanOptions",
 		req: &Message{
 			Android: &AndroidConfig{
-				DirectBootOK: true,
-				CollapseKey:  "ck",
+				DirectBootOK:           true,
+				BandwidthConstrainedOK: true,
+				RestrictedSatelliteOK:  true,
+				CollapseKey:            "ck",
 				Data: map[string]string{
 					"k1": "v1",
 					"k2": "v2",
@@ -161,8 +163,10 @@ var validMessages = []struct {
 		},
 		want: map[string]interface{}{
 			"android": map[string]interface{}{
-				"direct_boot_ok": true,
-				"collapse_key":   "ck",
+				"direct_boot_ok":           true,
+				"bandwidth_constrained_ok": true,
+				"restricted_satellite_ok":  true,
+				"collapse_key":             "ck",
 				"data": map[string]interface{}{
 					"k1": "v1",
 					"k2": "v2",

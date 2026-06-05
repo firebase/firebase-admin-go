@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,8 +74,20 @@ type MessagingConfig struct {
 	Version   string
 }
 
+// RemoteConfigClientConfig represents the configuration of Firebase Remote Config
+type RemoteConfigClientConfig struct {
+	Opts      []option.ClientOption
+	ProjectID string
+	Version   string
+}
+
 // AppCheckConfig represents the configuration of App Check service.
 type AppCheckConfig struct {
+	ProjectID string
+}
+
+// PhoneNumberVerificationConfig represents the configuration of Firebase Phone Number Verification service.
+type PhoneNumberVerificationConfig struct {
 	ProjectID string
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ var testActionLinkResponse = []byte(fmt.Sprintf(testActionLinkFormat, testAction
 var testActionCodeSettings = &ActionCodeSettings{
 	URL:                   "https://example.dynamic.link",
 	HandleCodeInApp:       true,
+	LinkDomain:            "hosted.page.link",
 	DynamicLinkDomain:     "custom.page.link",
 	IOSBundleID:           "com.example.ios",
 	AndroidPackageName:    "com.example.android",
@@ -45,6 +46,7 @@ var testActionCodeSettings = &ActionCodeSettings{
 var testActionCodeSettingsMap = map[string]interface{}{
 	"continueUrl":           "https://example.dynamic.link",
 	"canHandleCodeInApp":    true,
+	"linkDomain":            "hosted.page.link",
 	"dynamicLinkDomain":     "custom.page.link",
 	"iOSBundleId":           "com.example.ios",
 	"androidPackageName":    "com.example.android",
@@ -309,6 +311,7 @@ func TestEmailVerificationLinkError(t *testing.T) {
 	cases := map[string]func(error) bool{
 		"UNAUTHORIZED_DOMAIN":         IsUnauthorizedContinueURI,
 		"INVALID_DYNAMIC_LINK_DOMAIN": IsInvalidDynamicLinkDomain,
+		"INVALID_HOSTING_LINK_DOMAIN": IsInvalidHostingLinkDomain,
 	}
 	s := echoServer(testActionLinkResponse, t)
 	defer s.Close()

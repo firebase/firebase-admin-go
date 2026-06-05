@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,14 +114,16 @@ type Notification struct {
 
 // AndroidConfig contains messaging options specific to the Android platform.
 type AndroidConfig struct {
-	CollapseKey           string               `json:"collapse_key,omitempty"`
-	Priority              string               `json:"priority,omitempty"` // one of "normal" or "high"
-	TTL                   *time.Duration       `json:"-"`
-	RestrictedPackageName string               `json:"restricted_package_name,omitempty"`
-	Data                  map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
-	Notification          *AndroidNotification `json:"notification,omitempty"`
-	FCMOptions            *AndroidFCMOptions   `json:"fcm_options,omitempty"`
-	DirectBootOK          bool                 `json:"direct_boot_ok,omitempty"`
+	CollapseKey            string               `json:"collapse_key,omitempty"`
+	Priority               string               `json:"priority,omitempty"` // one of "normal" or "high"
+	TTL                    *time.Duration       `json:"-"`
+	RestrictedPackageName  string               `json:"restricted_package_name,omitempty"`
+	Data                   map[string]string    `json:"data,omitempty"` // if specified, overrides the Data field on Message type
+	Notification           *AndroidNotification `json:"notification,omitempty"`
+	FCMOptions             *AndroidFCMOptions   `json:"fcm_options,omitempty"`
+	DirectBootOK           bool                 `json:"direct_boot_ok,omitempty"`
+	BandwidthConstrainedOK bool                 `json:"bandwidth_constrained_ok,omitempty"`
+	RestrictedSatelliteOK  bool                 `json:"restricted_satellite_ok,omitempty"`
 }
 
 // MarshalJSON marshals an AndroidConfig into JSON (for internal use only).

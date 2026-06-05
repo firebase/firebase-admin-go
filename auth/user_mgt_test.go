@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1899,6 +1899,247 @@ func TestDeleteUsers(t *testing.T) {
 	})
 }
 
+func TestQueryUsers(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser",
+			"email": "testuser@example.com",
+			"phoneNumber": "+1234567890",
+			"emailVerified": true,
+			"displayName": "Test User",
+			"photoUrl": "http://www.example.com/testuser/photo.png",
+			"validSince": "1494364393",
+			"disabled": false,
+			"createdAt": "1234567890000",
+			"lastLoginAt": "1233211232000",
+			"customAttributes": "{\"admin\": true, \"package\": \"gold\"}",
+			"tenantId": "testTenant",
+			"providerUserInfo": [{
+				"providerId": "password",
+				"displayName": "Test User",
+				"photoUrl": "http://www.example.com/testuser/photo.png",
+				"email": "testuser@example.com",
+				"rawId": "testuid"
+			}, {
+				"providerId": "phone",
+				"phoneNumber": "+1234567890",
+				"rawId": "testuid"
+			}],
+			"mfaInfo": [{
+				"phoneInfo": "+1234567890",
+				"mfaEnrollmentId": "enrolledPhoneFactor",
+				"displayName": "My MFA Phone",
+				"enrolledAt": "2021-03-03T13:06:20.542896Z"
+			}, {
+				"totpInfo": {},
+				"mfaEnrollmentId": "enrolledTOTPFactor",
+				"displayName": "My MFA TOTP",
+				"enrolledAt": "2021-03-03T13:06:20.542896Z"
+			}]
+		}],
+		"recordsCount": "1"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	returnUserInfo := true
+	query := &QueryUsersRequest{
+		ReturnUserInfo: &returnUserInfo,
+		Limit:          1,
+		SortBy:         UserEmail,
+		Order:          Asc,
+		Expression: []*Expression{
+			{
+				Email: "testuser@example.com",
+			},
+		},
+	}
+
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+
+	if len(result.Users) != 1 {
+		t.Fatalf("QueryUsers() returned %d users; want 1", len(result.Users))
+	}
+
+	if result.Count != 1 {
+		t.Errorf("QueryUsers() returned count %d; want 1", result.Count)
+	}
+
+	if !reflect.DeepEqual(result.Users[0], testUser) {
+		t.Errorf("QueryUsers() = %#v; want = %#v", result.Users[0], testUser)
+	}
+
+	wantPath := "/projects/mock-project-id/accounts:query"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestQueryUsersError(t *testing.T) {
+	resp := `{
+		"error": {
+			"message": "INVALID_QUERY"
+		}
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	s.Status = http.StatusBadRequest
+
+	returnUserInfo := true
+	query := &QueryUsersRequest{
+		ReturnUserInfo: &returnUserInfo,
+		Limit:          1,
+		SortBy:         UserEmail,
+		Order:          Asc,
+		Expression: []*Expression{
+			{
+				Email: "testuser@example.com",
+			},
+		},
+	}
+
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersNilQuery(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+	result, err := s.Client.QueryUsers(context.Background(), nil)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers(nil) = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersMalformedCustomAttributes(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser",
+			"customAttributes": "invalid-json"
+		}]
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	query := &QueryUsersRequest{}
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersMalformedLastRefreshTimestamp(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser",
+			"lastRefreshAt": "invalid-timestamp"
+		}]
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+	query := &QueryUsersRequest{}
+	result, err := s.Client.QueryUsers(context.Background(), query)
+	if result != nil || err == nil {
+		t.Fatalf("QueryUsers() = (%v, %v); want = (nil, error)", result, err)
+	}
+}
+
+func TestQueryUsersDefaultReturnUserInfo(t *testing.T) {
+	resp := `{
+		"userInfo": [{
+			"localId": "testuser"
+		}],
+		"recordsCount": "1"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	// ReturnUserInfo is nil, should default to true in build()
+	query := &QueryUsersRequest{
+		Limit: 1,
+	}
+
+	_, err := s.Client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(s.Rbody, &got); err != nil {
+		t.Fatal(err)
+	}
+
+	if got["returnUserInfo"] != true {
+		t.Errorf("QueryUsers() request[\"returnUserInfo\"] = %v; want true", got["returnUserInfo"])
+	}
+}
+
+func TestQueryUsersValidation(t *testing.T) {
+	s := echoServer([]byte("{}"), t)
+	defer s.Close()
+
+	tests := []struct {
+		name  string
+		query *QueryUsersRequest
+	}{
+		{
+			name: "Invalid Limit Low",
+			query: &QueryUsersRequest{
+				Limit: -1,
+			},
+		},
+		{
+			name: "Invalid Limit High",
+			query: &QueryUsersRequest{
+				Limit: 501,
+			},
+		},
+		{
+			name: "Invalid Offset",
+			query: &QueryUsersRequest{
+				Offset: -1,
+			},
+		},
+		{
+			name: "Invalid Email in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{Email: "invalid-email"},
+				},
+			},
+		},
+		{
+			name: "Invalid Phone in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{PhoneNumber: "invalid-phone"},
+				},
+			},
+		},
+		{
+			name: "Invalid UID in Expression",
+			query: &QueryUsersRequest{
+				Expression: []*Expression{
+					{UID: string(make([]byte, 129))},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.Client.QueryUsers(context.Background(), tt.query)
+			if err == nil {
+				t.Errorf("QueryUsers() with %s; want error, got nil", tt.name)
+			}
+		})
+	}
+}
+
 func TestMakeExportedUser(t *testing.T) {
 	queryResponse := &userQueryResponse{
 		UID:                "testuser",
@@ -2151,6 +2392,11 @@ func TestHTTPErrorWithCode(t *testing.T) {
 			errorutils.IsInvalidArgument,
 			"the provided dynamic link domain is not configured or authorized for the current project",
 		},
+		"INVALID_HOSTING_LINK_DOMAIN": {
+			IsInvalidHostingLinkDomain,
+			errorutils.IsInvalidArgument,
+			"the provided hosting link domain is not configured in Firebase Hosting or is not owned by the current project",
+		},
 		"PHONE_NUMBER_EXISTS": {
 			IsPhoneNumberAlreadyExists,
 			errorutils.IsAlreadyExists,
@@ -2186,7 +2432,7 @@ func TestHTTPErrorWithCode(t *testing.T) {
 }
 
 func TestAuthErrorWithCodeAndDetails(t *testing.T) {
-	resp := []byte(`{"error":{"message":"USER_NOT_FOUND: extra details"}}`)
+	resp := []byte(`{"error":{"message":"USER_NOT_FOUND : extra details"}}`)
 	s := echoServer(resp, t)
 	defer s.Close()
 	s.Client.baseClient.httpClient.RetryConfig = nil
