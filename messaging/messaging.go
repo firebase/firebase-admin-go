@@ -960,7 +960,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndp
 
 // Send sends a Message to Firebase Cloud Messaging.
 //
-// The Message must specify exactly one of Fid, Token, Topic or Condition fields. FCM will
+// The Message must specify exactly one of FID, Token, Topic or Condition fields. FCM will
 // customize the message for each target platform based on the arguments specified in the
 // Message.
 func (c *fcmClient) Send(ctx context.Context, message *Message) (string, error) {
