@@ -58,7 +58,7 @@ var (
 // Message to be sent via Firebase Cloud Messaging.
 //
 // Message contains payload data, recipient information and platform-specific configuration
-// options. A Message must specify exactly one of Fid, Token, Topic or Condition fields. Apart from
+// options. A Message must specify exactly one of FID, Token, Topic or Condition fields. Apart from
 // that a Message may specify any combination of Data, Notification, Android, Webpush and APNS
 // fields. See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages for more
 // details on how the backend FCM servers handle different message parameters.
