@@ -61,6 +61,11 @@ var validMessages = []struct {
 		want: map[string]interface{}{"token": "test-token"},
 	},
 	{
+		name: "FidOnly",
+		req:  &Message{Fid: "test-fid"},
+		want: map[string]interface{}{"fid": "test-fid"},
+	},
+	{
 		name: "TopicOnly",
 		req:  &Message{Topic: "test-topic"},
 		want: map[string]interface{}{"topic": "test-topic"},
@@ -774,7 +779,7 @@ var invalidMessages = []struct {
 	{
 		name: "NoTargets",
 		req:  &Message{},
-		want: "exactly one of token, topic or condition must be specified",
+		want: "exactly one of fid, token, topic or condition must be specified",
 	},
 	{
 		name: "MultipleTargets",
@@ -782,7 +787,15 @@ var invalidMessages = []struct {
 			Token: "token",
 			Topic: "topic",
 		},
-		want: "exactly one of token, topic or condition must be specified",
+		want: "exactly one of fid, token, topic or condition must be specified",
+	},
+	{
+		name: "MultipleTargetsWithFid",
+		req: &Message{
+			Fid:   "fid",
+			Topic: "topic",
+		},
+		want: "exactly one of fid, token, topic or condition must be specified",
 	},
 	{
 		name: "InvalidPrefixedTopicName",
