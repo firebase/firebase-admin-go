@@ -16,6 +16,7 @@ package internal
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -97,8 +98,8 @@ func (fe *FirebaseError) Error() string {
 
 // HasPlatformErrorCode checks if the given error contains a specific error code.
 func HasPlatformErrorCode(err error, code ErrorCode) bool {
-	fe, ok := err.(*FirebaseError)
-	return ok && fe.ErrorCode == code
+	var fe *FirebaseError
+	return errors.As(err, &fe) && fe.ErrorCode == code
 }
 
 var httpStatusToErrorCodes = map[int]ErrorCode{
