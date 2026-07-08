@@ -58,7 +58,7 @@ var (
 // Message to be sent via Firebase Cloud Messaging.
 //
 // Message contains payload data, recipient information and platform-specific configuration
-// options. A Message must specify exactly one of Token, Topic or Condition fields. Apart from
+// options. A Message must specify exactly one of FID, Token, Topic or Condition fields. Apart from
 // that a Message may specify any combination of Data, Notification, Android, Webpush and APNS
 // fields. See https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages for more
 // details on how the backend FCM servers handle different message parameters.
@@ -69,9 +69,11 @@ type Message struct {
 	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
 	APNS         *APNSConfig       `json:"apns,omitempty"`
 	FCMOptions   *FCMOptions       `json:"fcm_options,omitempty"`
-	Token        string            `json:"token,omitempty"`
-	Topic        string            `json:"-"`
-	Condition    string            `json:"condition,omitempty"`
+	// Deprecated: Use Fid instead.
+	Token     string `json:"token,omitempty"`
+	Topic     string `json:"-"`
+	Condition string `json:"condition,omitempty"`
+	Fid       string `json:"fid,omitempty"`
 }
 
 // MarshalJSON marshals a Message into JSON (for internal use only).
@@ -958,7 +960,7 @@ func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndp
 
 // Send sends a Message to Firebase Cloud Messaging.
 //
-// The Message must specify exactly one of Token, Topic and Condition fields. FCM will
+// The Message must specify exactly one of FID, Token, Topic or Condition fields. FCM will
 // customize the message for each target platform based on the arguments specified in the
 // Message.
 func (c *fcmClient) Send(ctx context.Context, message *Message) (string, error) {
@@ -1054,8 +1056,8 @@ func IsRegistrationTokenNotRegistered(err error) bool {
 	return IsUnregistered(err)
 }
 
-// IsUnregistered checks if the given error was due to a registration token that
-// became invalid.
+// IsUnregistered checks if the given error was due to a registration token or
+// installation ID (FID) that was unregistered or became invalid.
 func IsUnregistered(err error) bool {
 	return hasMessagingErrorCode(err, unregistered)
 }
