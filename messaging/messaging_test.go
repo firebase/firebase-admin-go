@@ -1363,6 +1363,36 @@ func TestJSONUnmarshal(t *testing.T) {
 	}
 }
 
+func TestAndroidNotificationV2Unmarshal(t *testing.T) {
+	t.Run("ReusedStructReplacesTimings", func(t *testing.T) {
+		jsonStr := `{"vibrate_timings":["0.100000000s","0.200000000s"]}`
+		target := &AndroidNotificationV2{
+			VibrateTimingMillis: []int64{500, 600, 700},
+		}
+		if err := json.Unmarshal([]byte(jsonStr), target); err != nil {
+			t.Fatal(err)
+		}
+		want := []int64{100, 200}
+		if !reflect.DeepEqual(target.VibrateTimingMillis, want) {
+			t.Errorf("VibrateTimingMillis = %v; want = %v", target.VibrateTimingMillis, want)
+		}
+	})
+
+	t.Run("ReusedStructOmittedTimingsUnchanged", func(t *testing.T) {
+		jsonStr := `{"title":"test"}`
+		target := &AndroidNotificationV2{
+			VibrateTimingMillis: []int64{500, 600, 700},
+		}
+		if err := json.Unmarshal([]byte(jsonStr), target); err != nil {
+			t.Fatal(err)
+		}
+		want := []int64{500, 600, 700}
+		if !reflect.DeepEqual(target.VibrateTimingMillis, want) {
+			t.Errorf("VibrateTimingMillis = %v; want = %v", target.VibrateTimingMillis, want)
+		}
+	})
+}
+
 func TestInvalidJSONUnmarshal(t *testing.T) {
 	cases := []struct {
 		name   string
