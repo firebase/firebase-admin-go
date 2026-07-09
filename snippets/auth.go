@@ -809,6 +809,7 @@ func sessionLogoutHandlerWithRevocation(client *auth.Client) http.HandlerFunc {
 }
 
 func getIDTokenFromBody(r *http.Request) (string, error) {
+    // [START get_id_token_from_body]
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return "", err
@@ -818,6 +819,7 @@ func getIDTokenFromBody(r *http.Request) (string, error) {
 		IDToken string `json:"idToken"`
 	}
 	err = json.Unmarshal(b, &parsedBody)
+	// [END get_id_token_from_body]
 	return parsedBody.IDToken, err
 }
 
