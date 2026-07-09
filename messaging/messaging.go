@@ -546,12 +546,15 @@ func (a *AndroidNotificationV2) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	for _, s := range temp.VibrateTimings {
-		d, err := stringToDuration(s)
-		if err != nil {
-			return err
+	if temp.VibrateTimings != nil {
+		a.VibrateTimingMillis = make([]int64, 0, len(temp.VibrateTimings))
+		for _, s := range temp.VibrateTimings {
+			d, err := stringToDuration(s)
+			if err != nil {
+				return err
+			}
+			a.VibrateTimingMillis = append(a.VibrateTimingMillis, int64(d/time.Millisecond))
 		}
-		a.VibrateTimingMillis = append(a.VibrateTimingMillis, int64(d/time.Millisecond))
 	}
 
 	return nil
