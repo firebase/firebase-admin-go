@@ -20,9 +20,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -545,7 +546,7 @@ func TestGetNonExistingUser(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
-	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	testListUsersResponse, err := os.ReadFile("../testdata/list_users.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2542,7 +2543,7 @@ func echoServer(resp interface{}, t *testing.T) *mockAuthServer {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		reqBody, err := ioutil.ReadAll(r.Body)
+		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}

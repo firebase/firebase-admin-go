@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -466,7 +465,7 @@ func newSendResponse(part *multipart.Part) (*SendResponse, error) {
 		return nil, fmt.Errorf("error parsing multipart body: %v", err)
 	}
 
-	b, err := ioutil.ReadAll(hr.Body)
+	b, err := io.ReadAll(hr.Body)
 	if err != nil {
 		return nil, err
 	}

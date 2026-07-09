@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -688,7 +687,7 @@ func compareConfig(got *App, want *Config, t *testing.T) {
 // mockServiceAcct generates a service account configuration with the provided URL as the
 // token_url value.
 func mockServiceAcct(tokenURL string) ([]byte, error) {
-	b, err := ioutil.ReadFile("testdata/service_account.json")
+	b, err := os.ReadFile("testdata/service_account.json")
 	if err != nil {
 		return nil, err
 	}

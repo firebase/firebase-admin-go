@@ -18,7 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"testing"
@@ -115,7 +115,7 @@ func verifyBucket(bucket *gcs.BucketHandle) error {
 		return err
 	}
 	defer r.Close()
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

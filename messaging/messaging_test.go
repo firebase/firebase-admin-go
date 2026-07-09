@@ -17,7 +17,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -1316,7 +1316,7 @@ func TestSend(t *testing.T) {
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{ \"name\":\"" + testMessageID + "\" }"))
 	}))
@@ -1345,7 +1345,7 @@ func TestSendWithCustomEndpoint(t *testing.T) {
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{ \"name\":\"" + testMessageID + "\" }"))
 	}))
@@ -1382,7 +1382,7 @@ func TestSendDryRun(t *testing.T) {
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{ \"name\":\"" + testMessageID + "\" }"))
 	}))

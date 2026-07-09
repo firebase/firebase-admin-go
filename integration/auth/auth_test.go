@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -86,7 +86,7 @@ func TestCustomToken(t *testing.T) {
 func TestCustomTokenWithoutServiceAccount(t *testing.T) {
 	// Create a TokenSource from the service account. This makes the private key not accessible
 	// to the Firebase APIs.
-	b, err := ioutil.ReadFile(internal.Resource("integration_cert.json"))
+	b, err := os.ReadFile(internal.Resource("integration_cert.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,7 +382,7 @@ func postRequest(url string, req []byte) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 // deleteUser makes a best effort attempt to delete the given user.

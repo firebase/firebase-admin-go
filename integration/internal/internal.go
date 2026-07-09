@@ -18,8 +18,8 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -52,7 +52,7 @@ func NewTestApp(ctx context.Context, conf *firebase.Config) (*firebase.App, erro
 // APIKey reads the API key string from a file named integration_apikey.txt
 // in the testdata directory.
 func APIKey() (string, error) {
-	b, err := ioutil.ReadFile(Resource(apiKeyPath))
+	b, err := os.ReadFile(Resource(apiKeyPath))
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +61,7 @@ func APIKey() (string, error) {
 
 // ProjectID fetches a Google Cloud project ID for integration tests.
 func ProjectID() (string, error) {
-	b, err := ioutil.ReadFile(Resource(certPath))
+	b, err := os.ReadFile(Resource(certPath))
 	if err != nil {
 		return "", err
 	}
