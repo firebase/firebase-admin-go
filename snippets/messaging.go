@@ -312,6 +312,78 @@ func androidMessage() *messaging.Message {
 	return message
 }
 
+func androidV2RemoteNotificationMessage() *messaging.Message {
+	// [START android_v2_remote_notification_golang]
+	oneHour := time.Duration(1) * time.Hour
+	message := &messaging.Message{
+		AndroidV2: &messaging.AndroidConfigV2{
+			TTL: &oneHour,
+			RemoteNotification: &messaging.AndroidRemoteNotification{
+				MutableContent:     true,
+				UseAsV1DataMessage: true,
+				Notification: &messaging.AndroidNotificationV2{
+					Title:    "$GOOG up 1.43% on the day",
+					Body:     "$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day.",
+					Icon:     "stock_ticker_update",
+					Color:    "#f45342",
+					ImageURL: "https://my-server/image.png",
+				},
+			},
+		},
+		Topic: "industry-tech",
+	}
+	// [END android_v2_remote_notification_golang]
+	return message
+}
+
+func androidV2BackgroundSyncMessage() *messaging.Message {
+	// [START android_v2_background_sync_golang]
+	oneHour := time.Duration(1) * time.Hour
+	message := &messaging.Message{
+		AndroidV2: &messaging.AndroidConfigV2{
+			TTL:            &oneHour,
+			BackgroundSync: &messaging.AndroidBackgroundSyncMessage{},
+		},
+		Data: map[string]string{
+			"score": "341/5",
+		},
+		Topic: "industry-tech",
+	}
+	// [END android_v2_background_sync_golang]
+	return message
+}
+
+func allPlatformsV2Message() *messaging.Message {
+	// [START multi_platforms_v2_message_golang]
+	oneHour := time.Duration(1) * time.Hour
+	badge := 42
+	message := &messaging.Message{
+		Notification: &messaging.Notification{
+			Title: "$GOOG up 1.43% on the day",
+			Body:  "$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day.",
+		},
+		AndroidV2: &messaging.AndroidConfigV2{
+			TTL: &oneHour,
+			RemoteNotification: &messaging.AndroidRemoteNotification{
+				Notification: &messaging.AndroidNotificationV2{
+					Icon:  "stock_ticker_update",
+					Color: "#f45342",
+				},
+			},
+		},
+		APNS: &messaging.APNSConfig{
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					Badge: &badge,
+				},
+			},
+		},
+		Topic: "industry-tech",
+	}
+	// [END multi_platforms_v2_message_golang]
+	return message
+}
+
 func apnsMessage() *messaging.Message {
 	// [START apns_message_golang]
 	badge := 42
