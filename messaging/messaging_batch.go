@@ -45,11 +45,13 @@ type MulticastMessage struct {
 	Tokens       []string
 	Data         map[string]string
 	Notification *Notification
-	Android      *AndroidConfig
-	Webpush      *WebpushConfig
-	APNS         *APNSConfig
-	FCMOptions   *FCMOptions
-	Fids         []string
+	// Deprecated: Use AndroidV2 instead.
+	Android    *AndroidConfig
+	AndroidV2  *AndroidConfigV2
+	Webpush    *WebpushConfig
+	APNS       *APNSConfig
+	FCMOptions *FCMOptions
+	Fids       []string
 }
 
 func (mm *MulticastMessage) toMessages() ([]*Message, error) {
@@ -68,6 +70,7 @@ func (mm *MulticastMessage) toMessages() ([]*Message, error) {
 			Data:         mm.Data,
 			Notification: mm.Notification,
 			Android:      mm.Android,
+			AndroidV2:    mm.AndroidV2,
 			Webpush:      mm.Webpush,
 			APNS:         mm.APNS,
 			FCMOptions:   mm.FCMOptions,
@@ -80,6 +83,7 @@ func (mm *MulticastMessage) toMessages() ([]*Message, error) {
 			Data:         mm.Data,
 			Notification: mm.Notification,
 			Android:      mm.Android,
+			AndroidV2:    mm.AndroidV2,
 			Webpush:      mm.Webpush,
 			APNS:         mm.APNS,
 			FCMOptions:   mm.FCMOptions,

@@ -44,10 +44,12 @@ var (
 	ttl          = time.Duration(10) * time.Second
 	invalidTTL   = time.Duration(-10) * time.Second
 
-	badge           = 42
-	badgeZero       = 0
-	timestampMillis = int64(12345)
-	timestamp       = time.Unix(0, 1546304523123*1000000).UTC()
+	badge             = 42
+	badgeZero         = 0
+	timestampMillis   = int64(12345)
+	timestamp         = time.Unix(0, 1546304523123*1000000).UTC()
+	notificationCount = 67
+	notificationID    = 100
 )
 
 var validMessages = []struct {
@@ -764,6 +766,115 @@ var validMessages = []struct {
 			"topic": "test-topic",
 		},
 	},
+	{
+		name: "AndroidV2RemoteNotification",
+		req: &Message{
+			AndroidV2: &AndroidConfigV2{
+				RestrictedPackageName: "rpn",
+				RemoteNotification: &AndroidRemoteNotification{
+					MutableContent:     true,
+					UseAsV1DataMessage: true,
+					Notification: &AndroidNotificationV2{
+						Title:                 "t",
+						Body:                  "b",
+						Color:                 "#112233",
+						Sound:                 "s",
+						TitleLocKey:           "tlk",
+						TitleLocArgs:          []string{"t1", "t2"},
+						BodyLocKey:            "blk",
+						BodyLocArgs:           []string{"b1", "b2"},
+						ChannelID:             "channel",
+						ImageURL:              "http://image.jpg",
+						Ticker:                "tkr",
+						Sticky:                true,
+						EventTimestamp:        &timestamp,
+						LocalOnly:             true,
+						Priority:              PriorityMax,
+						VibrateTimingMillis:   []int64{100, 50, 100},
+						DefaultVibrateTimings: true,
+						DefaultSound:          true,
+						LightSettings: &LightSettings{
+							Color:                  "#33669966",
+							LightOnDurationMillis:  100,
+							LightOffDurationMillis: 50,
+						},
+						Visibility:           VisibilityPrivate,
+						DefaultLightSettings: true,
+						NotificationCount:    &notificationCount,
+						ID:                   &notificationID,
+					},
+				},
+				TTL: &ttlWithNanos,
+				FCMOptions: &AndroidFCMOptions{
+					AnalyticsLabel: "Analytics",
+				},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"androidV2": map[string]interface{}{
+				"restricted_package_name": "rpn",
+				"remote_notification": map[string]interface{}{
+					"mutable_content":        true,
+					"use_as_v1_data_message": true,
+					"notification": map[string]interface{}{
+						"title":                   "t",
+						"body":                    "b",
+						"color":                   "#112233",
+						"sound":                   "s",
+						"title_loc_key":           "tlk",
+						"title_loc_args":          []interface{}{"t1", "t2"},
+						"body_loc_key":            "blk",
+						"body_loc_args":           []interface{}{"b1", "b2"},
+						"channel_id":              "channel",
+						"image":                   "http://image.jpg",
+						"ticker":                  "tkr",
+						"sticky":                  true,
+						"event_time":              "2019-01-01T01:02:03.123000000Z",
+						"local_only":              true,
+						"notification_priority":   "PRIORITY_MAX",
+						"vibrate_timings":         []interface{}{"0.100000000s", "0.050000000s", "0.100000000s"},
+						"default_vibrate_timings": true,
+						"default_sound":           true,
+						"light_settings": map[string]interface{}{
+							"color": map[string]interface{}{
+								"red":   float64(0.2),
+								"green": float64(0.4),
+								"blue":  float64(0.6),
+								"alpha": float64(0.4),
+							},
+							"light_on_duration":  "0.100000000s",
+							"light_off_duration": "0.050000000s",
+						},
+						"visibility":             "PRIVATE",
+						"default_light_settings": true,
+						"notification_count":     float64(67),
+						"id":                     float64(100),
+					},
+				},
+				"ttl": "1.500000000s",
+				"fcm_options": map[string]interface{}{
+					"analytics_label": "Analytics",
+				},
+			},
+			"topic": "test-topic",
+		},
+	},
+	{
+		name: "AndroidV2BackgroundSync",
+		req: &Message{
+			AndroidV2: &AndroidConfigV2{
+				BackgroundSync: &AndroidBackgroundSyncMessage{},
+			},
+			Topic: "test-topic",
+		},
+		want: map[string]interface{}{
+			"androidV2": map[string]interface{}{
+				"background_sync": map[string]interface{}{},
+			},
+			"topic": "test-topic",
+		},
+	},
 }
 
 var invalidMessages = []struct {
@@ -830,6 +941,36 @@ var invalidMessages = []struct {
 			Topic: "topic",
 		},
 		want: "ttl duration must not be negative",
+	},
+	{
+		name: "AndroidAndAndroidV2MutuallyExclusive",
+		req: &Message{
+			Android:   &AndroidConfig{},
+			AndroidV2: &AndroidConfigV2{},
+			Topic:     "topic",
+		},
+		want: "at most one of android or androidV2 can be specified; use AndroidConfigV2",
+	},
+	{
+		name: "InvalidAndroidV2TTL",
+		req: &Message{
+			AndroidV2: &AndroidConfigV2{
+				TTL: &invalidTTL,
+			},
+			Topic: "topic",
+		},
+		want: "ttl duration must not be negative",
+	},
+	{
+		name: "AndroidV2RemoteAndBackgroundMutuallyExclusive",
+		req: &Message{
+			AndroidV2: &AndroidConfigV2{
+				RemoteNotification: &AndroidRemoteNotification{},
+				BackgroundSync:     &AndroidBackgroundSyncMessage{},
+			},
+			Topic: "topic",
+		},
+		want: "exactly one of remoteNotification or backgroundSync is required",
 	},
 	{
 		name: "InvalidAndroidPriority",

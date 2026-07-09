@@ -65,10 +65,12 @@ var (
 type Message struct {
 	Data         map[string]string `json:"data,omitempty"`
 	Notification *Notification     `json:"notification,omitempty"`
-	Android      *AndroidConfig    `json:"android,omitempty"`
-	Webpush      *WebpushConfig    `json:"webpush,omitempty"`
-	APNS         *APNSConfig       `json:"apns,omitempty"`
-	FCMOptions   *FCMOptions       `json:"fcm_options,omitempty"`
+	// Deprecated: Use AndroidV2 instead.
+	Android    *AndroidConfig   `json:"android,omitempty"`
+	AndroidV2  *AndroidConfigV2 `json:"androidV2,omitempty"`
+	Webpush    *WebpushConfig   `json:"webpush,omitempty"`
+	APNS       *APNSConfig      `json:"apns,omitempty"`
+	FCMOptions *FCMOptions      `json:"fcm_options,omitempty"`
 	// Deprecated: Use Fid instead.
 	Token     string `json:"token,omitempty"`
 	Topic     string `json:"-"`
@@ -115,6 +117,8 @@ type Notification struct {
 }
 
 // AndroidConfig contains messaging options specific to the Android platform.
+//
+// Deprecated: Use AndroidConfigV2 instead.
 type AndroidConfig struct {
 	CollapseKey            string               `json:"collapse_key,omitempty"`
 	Priority               string               `json:"priority,omitempty"` // one of "normal" or "high"
@@ -168,7 +172,74 @@ func (a *AndroidConfig) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// AndroidConfigV2 contains messaging options specific to the Android platform in the V2 format.
+type AndroidConfigV2 struct {
+	CollapseKey            string                        `json:"collapse_key,omitempty"`
+	TTL                    *time.Duration                `json:"-"`
+	RestrictedPackageName  string                        `json:"restricted_package_name,omitempty"`
+	Data                   map[string]string             `json:"data,omitempty"`
+	FCMOptions             *AndroidFCMOptions            `json:"fcm_options,omitempty"`
+	DirectBootOK           bool                          `json:"direct_boot_ok,omitempty"`
+	BandwidthConstrainedOK bool                          `json:"bandwidth_constrained_ok,omitempty"`
+	RestrictedSatelliteOK  bool                          `json:"restricted_satellite_ok,omitempty"`
+	RemoteNotification     *AndroidRemoteNotification    `json:"remote_notification,omitempty"`
+	BackgroundSync         *AndroidBackgroundSyncMessage `json:"background_sync,omitempty"`
+}
+
+// MarshalJSON marshals an AndroidConfigV2 into JSON (for internal use only).
+func (a *AndroidConfigV2) MarshalJSON() ([]byte, error) {
+	var ttl string
+	if a.TTL != nil {
+		ttl = durationToString(*a.TTL)
+	}
+
+	type androidInternal AndroidConfigV2
+	temp := &struct {
+		TTL string `json:"ttl,omitempty"`
+		*androidInternal
+	}{
+		TTL:             ttl,
+		androidInternal: (*androidInternal)(a),
+	}
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into an AndroidConfigV2 (for internal use only).
+func (a *AndroidConfigV2) UnmarshalJSON(b []byte) error {
+	type androidInternal AndroidConfigV2
+	temp := struct {
+		TTL string `json:"ttl,omitempty"`
+		*androidInternal
+	}{
+		androidInternal: (*androidInternal)(a),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+	if temp.TTL != "" {
+		ttl, err := stringToDuration(temp.TTL)
+		if err != nil {
+			return err
+		}
+		a.TTL = &ttl
+	}
+	return nil
+}
+
+// AndroidRemoteNotification is a remote notification configuration.
+type AndroidRemoteNotification struct {
+	MutableContent     bool                   `json:"mutable_content,omitempty"`
+	Notification       *AndroidNotificationV2 `json:"notification"`
+	UseAsV1DataMessage bool                   `json:"use_as_v1_data_message,omitempty"`
+}
+
+// AndroidBackgroundSyncMessage is a background sync message configuration.
+type AndroidBackgroundSyncMessage struct {
+}
+
 // AndroidNotification is a notification to send to Android devices.
+//
+// Deprecated: Use AndroidNotificationV2 instead.
 type AndroidNotification struct {
 	Title                 string                        `json:"title,omitempty"` // if specified, overrides the Title field of the Notification type
 	Body                  string                        `json:"body,omitempty"`  // if specified, overrides the Body field of the Notification type
@@ -342,6 +413,150 @@ func (a *AndroidNotification) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// AndroidNotificationV2 is a notification to send to Android devices in the V2 format.
+type AndroidNotificationV2 struct {
+	Title                 string                        `json:"title,omitempty"`
+	Body                  string                        `json:"body,omitempty"`
+	Icon                  string                        `json:"icon,omitempty"`
+	Color                 string                        `json:"color,omitempty"`
+	Sound                 string                        `json:"sound,omitempty"`
+	Tag                   string                        `json:"tag,omitempty"`
+	ClickAction           string                        `json:"click_action,omitempty"`
+	BodyLocKey            string                        `json:"body_loc_key,omitempty"`
+	BodyLocArgs           []string                      `json:"body_loc_args,omitempty"`
+	TitleLocKey           string                        `json:"title_loc_key,omitempty"`
+	TitleLocArgs          []string                      `json:"title_loc_args,omitempty"`
+	ChannelID             string                        `json:"channel_id,omitempty"`
+	ImageURL              string                        `json:"image,omitempty"`
+	Ticker                string                        `json:"ticker,omitempty"`
+	Sticky                bool                          `json:"sticky,omitempty"`
+	EventTimestamp        *time.Time                    `json:"-"`
+	LocalOnly             bool                          `json:"local_only,omitempty"`
+	Priority              AndroidNotificationPriority   `json:"-"`
+	VibrateTimingMillis   []int64                       `json:"-"`
+	DefaultVibrateTimings bool                          `json:"default_vibrate_timings,omitempty"`
+	DefaultSound          bool                          `json:"default_sound,omitempty"`
+	LightSettings         *LightSettings                `json:"light_settings,omitempty"`
+	DefaultLightSettings  bool                          `json:"default_light_settings,omitempty"`
+	Visibility            AndroidNotificationVisibility `json:"-"`
+	NotificationCount     *int                          `json:"notification_count,omitempty"`
+	ID                    *int                          `json:"id,omitempty"`
+}
+
+// MarshalJSON marshals an AndroidNotificationV2 into JSON (for internal use only).
+func (a *AndroidNotificationV2) MarshalJSON() ([]byte, error) {
+	var priority string
+	if a.Priority != priorityUnspecified {
+		priorities := map[AndroidNotificationPriority]string{
+			PriorityMin:     "PRIORITY_MIN",
+			PriorityLow:     "PRIORITY_LOW",
+			PriorityDefault: "PRIORITY_DEFAULT",
+			PriorityHigh:    "PRIORITY_HIGH",
+			PriorityMax:     "PRIORITY_MAX",
+		}
+		priority, _ = priorities[a.Priority]
+	}
+
+	var visibility string
+	if a.Visibility != visibilityUnspecified {
+		visibilities := map[AndroidNotificationVisibility]string{
+			VisibilityPrivate: "PRIVATE",
+			VisibilityPublic:  "PUBLIC",
+			VisibilitySecret:  "SECRET",
+		}
+		visibility, _ = visibilities[a.Visibility]
+	}
+
+	var timestamp string
+	if a.EventTimestamp != nil {
+		timestamp = a.EventTimestamp.UTC().Format(rfc3339Zulu)
+	}
+
+	var vibTimings []string
+	for _, t := range a.VibrateTimingMillis {
+		vibTimings = append(vibTimings, durationToString(time.Duration(t)*time.Millisecond))
+	}
+
+	type androidInternal AndroidNotificationV2
+	temp := &struct {
+		EventTimestamp string   `json:"event_time,omitempty"`
+		Priority       string   `json:"notification_priority,omitempty"`
+		Visibility     string   `json:"visibility,omitempty"`
+		VibrateTimings []string `json:"vibrate_timings,omitempty"`
+		*androidInternal
+	}{
+		EventTimestamp:  timestamp,
+		Priority:        priority,
+		Visibility:      visibility,
+		VibrateTimings:  vibTimings,
+		androidInternal: (*androidInternal)(a),
+	}
+	return json.Marshal(temp)
+}
+
+// UnmarshalJSON unmarshals a JSON string into an AndroidNotificationV2 (for internal use only).
+func (a *AndroidNotificationV2) UnmarshalJSON(b []byte) error {
+	type androidInternal AndroidNotificationV2
+	temp := struct {
+		EventTimestamp string   `json:"event_time,omitempty"`
+		Priority       string   `json:"notification_priority,omitempty"`
+		Visibility     string   `json:"visibility,omitempty"`
+		VibrateTimings []string `json:"vibrate_timings,omitempty"`
+		*androidInternal
+	}{
+		androidInternal: (*androidInternal)(a),
+	}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return err
+	}
+
+	if temp.EventTimestamp != "" {
+		parsedTime, err := time.Parse(rfc3339Zulu, temp.EventTimestamp)
+		if err != nil {
+			return err
+		}
+		a.EventTimestamp = &parsedTime
+	}
+
+	if temp.Priority != "" {
+		priorities := map[string]AndroidNotificationPriority{
+			"PRIORITY_MIN":     PriorityMin,
+			"PRIORITY_LOW":     PriorityLow,
+			"PRIORITY_DEFAULT": PriorityDefault,
+			"PRIORITY_HIGH":    PriorityHigh,
+			"PRIORITY_MAX":     PriorityMax,
+		}
+		if prio, ok := priorities[temp.Priority]; ok {
+			a.Priority = prio
+		} else {
+			return fmt.Errorf("unknown priority value: %q", temp.Priority)
+		}
+	}
+
+	if temp.Visibility != "" {
+		visibilities := map[string]AndroidNotificationVisibility{
+			"PRIVATE": VisibilityPrivate,
+			"PUBLIC":  VisibilityPublic,
+			"SECRET":  VisibilitySecret,
+		}
+		if vis, ok := visibilities[temp.Visibility]; ok {
+			a.Visibility = vis
+		} else {
+			return fmt.Errorf("unknown visibility value: %q", temp.Visibility)
+		}
+	}
+
+	for _, s := range temp.VibrateTimings {
+		d, err := stringToDuration(s)
+		if err != nil {
+			return err
+		}
+		a.VibrateTimingMillis = append(a.VibrateTimingMillis, int64(d/time.Millisecond))
+	}
+
+	return nil
+}
+
 // AndroidNotificationPriority represents the priority levels of a notification.
 type AndroidNotificationPriority int
 
@@ -388,8 +603,11 @@ const (
 )
 
 // AndroidNotificationProxy to control when a notification may be proxied.
+//
+// Deprecated: AndroidNotificationProxy is not supported in the V2 API. Use AndroidConfigV2 instead.
 type AndroidNotificationProxy int
 
+// Deprecated: AndroidNotificationProxy constants are not supported in the V2 API. Use AndroidConfigV2 instead.
 const (
 	proxyUnspecified AndroidNotificationProxy = iota
 
