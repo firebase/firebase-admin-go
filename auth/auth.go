@@ -267,9 +267,10 @@ type Token struct {
 //
 // This data is provided by the Firebase Auth service and is a reserved claim in the ID token.
 type FirebaseInfo struct {
-	SignInProvider string                 `json:"sign_in_provider"`
-	Tenant         string                 `json:"tenant"`
-	Identities     map[string]interface{} `json:"identities"`
+	SignInProvider   string                 `json:"sign_in_provider"`
+	SignInAttributes map[string]interface{} `json:"sign_in_attributes"`
+	Tenant           string                 `json:"tenant"`
+	Identities       map[string]interface{} `json:"identities"`
 }
 
 // baseClient exposes the APIs common to both auth.Client and auth.TenantClient.
