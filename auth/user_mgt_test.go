@@ -57,6 +57,10 @@ var testUser = &UserRecord{
 			ProviderID:  "phone",
 			PhoneNumber: "+1234567890",
 			UID:         "testuid",
+		}, {
+			ProviderID: "github",
+			ScreenName: "login",
+			UID:        "testuid",
 		},
 	},
 	TokensValidAfterMillis: 1494364393000,
@@ -2167,6 +2171,10 @@ func TestMakeExportedUser(t *testing.T) {
 				ProviderID:  "phone",
 				PhoneNumber: "+1234567890",
 				UID:         "testuid",
+			}, {
+				ProviderID: "github",
+				ScreenName: "login",
+				UID:        "testuid",
 			}},
 		MFAInfo: []*multiFactorInfoResponse{
 			{

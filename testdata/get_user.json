@@ -20,6 +20,11 @@
           "providerId": "phone",
           "phoneNumber": "+1234567890",
           "rawId": "testuid"
+        },
+        {
+          "providerId": "github",
+          "screenName": "login",
+          "rawId": "testuid"
         }
       ],
       "photoUrl": "http://www.example.com/testuser/photo.png",
