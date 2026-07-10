@@ -1,21 +1,134 @@
 package appcheck
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"firebase.google.com/go/v4/internal"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 )
+
+func TestVerifyOneTimeToken(t *testing.T) {
+
+	projectID := "project_id"
+
+	ts, err := setupFakeJWKS()
+	if err != nil {
+		t.Fatalf("error setting up fake JWKS server: %v", err)
+	}
+	defer ts.Close()
+
+	privateKey, err := loadPrivateKey()
+	if err != nil {
+		t.Fatalf("error loading private key: %v", err)
+	}
+
+	JWKSUrl = ts.URL
+	mockTime := time.Now()
+
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
+		Issuer:    appCheckIssuer,
+		Audience:  jwt.ClaimStrings([]string{"projects/12345678", "projects/" + projectID}),
+		Subject:   "1:12345678:android:abcdef",
+		ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(mockTime),
+		NotBefore: jwt.NewNumericDate(mockTime.Add(-1 * time.Hour)),
+	})
+
+	// kid matches the key ID in testdata/mock.jwks.json,
+	// which is the public key matching to the private key
+	// in testdata/appcheck_pk.pem.
+	jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+
+	token, err := jwtToken.SignedString(privateKey)
+
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	appCheckVerifyTestsTable := []struct {
+		label             string
+		expectedError     error
+		mockHTTPTransport mockHTTPTransport
+	}{
+		{
+			label:         "testWhenAlreadyConsumedResponseIsTrue",
+			expectedError: ErrTokenAlreadyConsumed,
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"alreadyConsumed": true}`)),
+				},
+				Err: nil,
+			},
+		},
+		{
+			label:         "testWhenAlreadyConsumedResponseIsFalse",
+			expectedError: nil,
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"alreadyConsumed": false}`)),
+				},
+				Err: nil,
+			},
+		},
+		{
+			label:         "testWhenTokenCheckResponseReturnsError",
+			expectedError: internal.NewFirebaseError(&internal.Response{Status: 500}),
+			mockHTTPTransport: mockHTTPTransport{
+				Response: http.Response{
+					StatusCode: 500,
+					Body:       http.NoBody,
+				},
+				Err: internal.NewFirebaseError(&internal.Response{Status: 500}),
+			},
+		},
+	}
+
+	for _, tt := range appCheckVerifyTestsTable {
+
+		t.Run(tt.label, func(t *testing.T) {
+
+			mockHTTPClient := &http.Client{
+				Transport: &tt.mockHTTPTransport,
+			}
+
+			conf := &internal.AppCheckConfig{
+				ProjectID: projectID,
+				Opts: []option.ClientOption{
+					option.WithHTTPClient(mockHTTPClient),
+				},
+			}
+
+			client, err := NewClient(context.Background(), conf)
+
+			if err != nil {
+				t.Fatalf("error creating new client: %v", err)
+			}
+
+			_, gotErr := client.VerifyOneTimeToken(context.Background(), token)
+
+			if gotErr != nil && !strings.HasSuffix(gotErr.Error(), tt.expectedError.Error()) {
+				t.Errorf("Expected error: %v, but got: %v", tt.expectedError, gotErr)
+			}
+		})
+
+	}
+}
 
 func TestVerifyTokenHasValidClaims(t *testing.T) {
 	ts, err := setupFakeJWKS()
@@ -32,6 +145,9 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -178,6 +294,9 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -211,6 +330,9 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts: []option.ClientOption{
+			option.WithHTTPClient(ts.Client()),
+		},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -286,4 +408,13 @@ func loadPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	return privateKey, nil
+}
+
+type mockHTTPTransport struct {
+	Response http.Response
+	Err      error
+}
+
+func (m *mockHTTPTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &m.Response, m.Err
 }

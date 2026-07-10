@@ -18,6 +18,7 @@ package appcheck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -32,6 +33,8 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
+var verifyTokenURL = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
+
 var (
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
@@ -45,6 +48,8 @@ var (
 	ErrTokenIssuer = errors.New("token has incorrect issuer")
 	// ErrTokenSubject is returned when the token subject is empty or missing.
 	ErrTokenSubject = errors.New("token has empty or missing subject")
+	// ErrTokenAlreadyConsumed is returned when the token is already consumed
+	ErrTokenAlreadyConsumed = errors.New("token already consumed")
 )
 
 // DecodedAppCheckToken represents a verified App Check token.
@@ -64,8 +69,9 @@ type DecodedAppCheckToken struct {
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
-	projectID string
-	jwks      *keyfunc.JWKS
+	projectID  string
+	jwks       *keyfunc.JWKS
+	httpClient *internal.HTTPClient
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -82,9 +88,15 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		return nil, err
 	}
 
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		projectID: conf.ProjectID,
-		jwks:      jwks,
+		projectID:  conf.ProjectID,
+		jwks:       jwks,
+		httpClient: hc,
 	}, nil
 }
 
@@ -164,6 +176,63 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	appCheckToken.Claims = claims
 
 	return &appCheckToken, nil
+}
+
+// VerifyOneTimeToken verifies the given App Check token and consumes it, so that it cannot be consumed again.
+//
+// VerifyOneTimeToken considers an App Check token string to be valid if all the following conditions are met:
+//   - The token string is a valid RS256 JWT.
+//   - The JWT contains valid issuer (iss) and audience (aud) claims that match the issuerPrefix
+//     and projectID of the tokenVerifier.
+//   - The JWT contains a valid subject (sub) claim.
+//   - The JWT is not expired, and it has been issued some time in the past.
+//   - The JWT is signed by a Firebase App Check backend server as determined by the keySource.
+//
+// If any of the above conditions are not met, an error is returned, regardless whether the token was
+// previously consumed or not.
+//
+// This method currently only supports App Check tokens exchanged from the following attestation
+// providers:
+//
+//   - Play Integrity API
+//   - Apple App Attest
+//   - Apple DeviceCheck (DCDevice tokens)
+//   - reCAPTCHA Enterprise
+//   - reCAPTCHA v3
+//   - Custom providers
+//
+// App Check tokens exchanged from debug secrets are also supported. Calling this method on an
+// otherwise valid App Check token with an unsupported provider will cause an error to be returned.
+//
+// If the token was already consumed prior to this call, an error is returned.
+func (c *Client) VerifyOneTimeToken(ctx context.Context, token string) (*DecodedAppCheckToken, error) {
+	decodedAppCheckToken, err := c.VerifyToken(token)
+
+	if err != nil {
+		return nil, err
+	}
+
+	req := &internal.Request{
+		Method: "POST",
+		URL:    fmt.Sprintf(verifyTokenURL, c.projectID),
+		Body: internal.NewJSONEntity(map[string]string{
+			"app_check_token": token,
+		}),
+	}
+
+	var resp struct {
+		AlreadyConsumed bool `json:"alreadyConsumed"`
+	}
+
+	if _, err := c.httpClient.DoAndUnmarshal(ctx, req, &resp); err != nil {
+		return nil, err
+	}
+
+	if resp.AlreadyConsumed {
+		return nil, ErrTokenAlreadyConsumed
+	}
+
+	return decodedAppCheckToken, nil
 }
 
 func contains(s []string, str string) bool {
