@@ -32,6 +32,9 @@ on:
     types:
       - firebase_build
 
+permissions:
+  contents: read
+
 jobs:
   stage_release:
     # To publish a release, merge a PR with the title prefix '[chore] Release ' to dev
@@ -47,6 +50,8 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      with:
+        persist-credentials: false
 
     - name: Set up Go
       uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -81,11 +86,13 @@ jobs:
     environment: Release
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
     - name: Checkout source for publish
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
+        ref: dev
         persist-credentials: false
 
     - name: Publish preflight check
