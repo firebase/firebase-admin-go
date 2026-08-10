@@ -323,6 +323,8 @@ func TestVerifyOneTimeToken(t *testing.T) {
 		t.Fatalf("Error signing token: %v", err)
 	}
 
+	boolPtr := func(b bool) *bool { return &b }
+
 	tests := []struct {
 		name                string
 		backendResponse     string
@@ -334,13 +336,13 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			name:                "success_not_consumed",
 			backendResponse:     `{"alreadyConsumed": false}`,
 			backendStatus:       http.StatusOK,
-			wantAlreadyConsumed: func() *bool { b := false; return &b }(),
+			wantAlreadyConsumed: boolPtr(false),
 		},
 		{
 			name:                "success_already_consumed",
 			backendResponse:     `{"alreadyConsumed": true}`,
 			backendStatus:       http.StatusOK,
-			wantAlreadyConsumed: func() *bool { b := true; return &b }(),
+			wantAlreadyConsumed: boolPtr(true),
 		},
 		{
 			name:            "backend_error",
