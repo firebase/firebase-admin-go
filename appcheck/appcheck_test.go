@@ -15,6 +15,7 @@ import (
 	"firebase.google.com/go/v4/internal"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 )
 
 type appCheckClaims struct {
@@ -37,6 +38,7 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -178,6 +180,7 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -211,6 +214,7 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -367,6 +371,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 
 			conf := &internal.AppCheckConfig{
 				ProjectID: "project_id",
+				Opts:      []option.ClientOption{option.WithoutAuthentication()},
 			}
 			client, err := NewClient(context.Background(), conf)
 			if err != nil {
