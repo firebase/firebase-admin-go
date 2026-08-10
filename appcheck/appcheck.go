@@ -34,6 +34,8 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
 var (
+	verifyURLFormat = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
+
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
 	// ErrTokenType is returned when the token is not a JWT.
@@ -187,7 +189,7 @@ func (c *Client) VerifyOneTimeToken(ctx context.Context, token string) (*Decoded
 		return nil, err
 	}
 
-	url := fmt.Sprintf("https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken", c.projectID)
+	url := fmt.Sprintf(verifyURLFormat, c.projectID)
 	req := &internal.Request{
 		Method: "POST",
 		URL:    url,
