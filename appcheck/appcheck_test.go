@@ -324,11 +324,11 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                 string
-		backendResponse      string
-		backendStatus        int
-		wantAlreadyConsumed  *bool
-		wantErr              bool
+		name                string
+		backendResponse     string
+		backendStatus       int
+		wantAlreadyConsumed *bool
+		wantErr             bool
 	}{
 		{
 			name:                "success_not_consumed",
@@ -343,10 +343,10 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			wantAlreadyConsumed: func() *bool { b := true; return &b }(),
 		},
 		{
-			name:                "backend_error",
-			backendResponse:     `{"error": {"message": "Internal Server Error"}}`,
-			backendStatus:       http.StatusInternalServerError,
-			wantErr:             true,
+			name:            "backend_error",
+			backendResponse: `{"error": {"message": "Internal Server Error"}}`,
+			backendStatus:   http.StatusInternalServerError,
+			wantErr:         true,
 		},
 	}
 
@@ -379,7 +379,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if decodedToken.AlreadyConsumed == nil || *decodedToken.AlreadyConsumed != *tc.wantAlreadyConsumed {
 				t.Errorf("VerifyOneTimeToken() AlreadyConsumed = %v; want = %v", decodedToken.AlreadyConsumed, tc.wantAlreadyConsumed)
 			}
