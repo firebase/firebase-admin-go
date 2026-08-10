@@ -84,6 +84,7 @@ type RemoteConfigClientConfig struct {
 // AppCheckConfig represents the configuration of App Check service.
 type AppCheckConfig struct {
 	ProjectID string
+	Opts      []option.ClientOption
 }
 
 // PhoneNumberVerificationConfig represents the configuration of Firebase Phone Number Verification service.
