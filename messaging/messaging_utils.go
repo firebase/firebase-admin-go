@@ -33,9 +33,9 @@ func validateMessage(message *Message) error {
 		return fmt.Errorf("message must not be nil")
 	}
 
-	targets := countNonEmpty(message.Token, message.Condition, message.Topic)
+	targets := countNonEmpty(message.Token, message.Condition, message.Topic, message.Fid)
 	if targets != 1 {
-		return fmt.Errorf("exactly one of token, topic or condition must be specified")
+		return fmt.Errorf("exactly one of fid, token, topic or condition must be specified")
 	}
 
 	// validate topic

@@ -372,6 +372,23 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 	})
 
+	t.Run("VerifyAndChangeEmailLink()", func(t *testing.T) {
+		newEmail := "new-" + want.Email
+		link, err := tenantClient.VerifyAndChangeEmailLink(context.Background(), want.Email, newEmail)
+		if err != nil {
+			t.Fatalf("VerifyAndChangeEmailLink() = %v", err)
+		}
+
+		tenant, err := extractTenantID(link)
+		if err != nil {
+			t.Fatalf("extractTenantID(%s) = %v", link, err)
+		}
+
+		if id != tenant {
+			t.Fatalf("VerifyAndChangeEmailLink() TenantID = %q; want = %q", tenant, id)
+		}
+	})
+
 	t.Run("RevokeRefreshTokens()", func(t *testing.T) {
 		validSinceMillis := time.Now().Unix() * 1000
 		time.Sleep(1 * time.Second)
@@ -424,6 +441,23 @@ func testTenantAwareUserManagement(t *testing.T, id string) {
 		}
 		if savedUser.TenantID != id {
 			t.Errorf("ImportUser() TenantID = %q; want = %q", savedUser.TenantID, id)
+		}
+	})
+
+	t.Run("QueryUsers()", func(t *testing.T) {
+		query := &auth.QueryUsersRequest{
+			Expression: []*auth.Expression{
+				{
+					Email: want.Email,
+				},
+			},
+		}
+		result, err := tenantClient.QueryUsers(context.Background(), query)
+		if err != nil {
+			t.Fatalf("QueryUsers() = %v", err)
+		}
+		if len(result.Users) != 1 || result.Users[0].UID != user.UID {
+			t.Errorf("QueryUsers(email=%s) = %v; want user %s", want.Email, result.Users, user.UID)
 		}
 	})
 

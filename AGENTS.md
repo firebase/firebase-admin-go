@@ -64,6 +64,7 @@ The Firebase Admin Go SDK enables server-side (backend) applications to interact
 
 -   **DO:** Use the centralized HTTP client in `internal/http_client.go` for all network calls.
 -   **DO:** Pass `context.Context` as the first argument to all functions that perform I/O or other blocking operations.
+-   **DO:** Run `go fmt` after implementing a change and fix any linting errors.
 -   **DON'T:** Expose types or functions from the `internal/` directory in the public API.
 -   **DON'T:** Introduce new third-party dependencies without a strong, documented justification and team consensus.
 
