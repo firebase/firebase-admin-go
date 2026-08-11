@@ -34,7 +34,7 @@ var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
 var (
-	verifyURLFormat = "https://firebaseappcheck.googleapis.com/v1beta/projects/%s:verifyAppCheckToken"
+	verifyURLFormat = "https://firebaseappcheck.googleapis.com/v1/projects/%s:verifyAppCheckToken"
 
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")

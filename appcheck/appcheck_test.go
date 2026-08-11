@@ -367,7 +367,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 
 			oldVerifyURLFormat := verifyURLFormat
 			defer func() { verifyURLFormat = oldVerifyURLFormat }()
-			verifyURLFormat = backend.URL + "/v1beta/projects/%s:verifyAppCheckToken"
+			verifyURLFormat = backend.URL + "/v1/projects/%s:verifyAppCheckToken"
 
 			conf := &internal.AppCheckConfig{
 				ProjectID: "project_id",
