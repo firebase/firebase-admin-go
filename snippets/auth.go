@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -631,8 +630,10 @@ func loginHandler(client *auth.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the ID token sent by the client
 		defer r.Body.Close()
-		idToken, err := getIDTokenFromBody(r)
-		if err != nil {
+		var requestBody struct {
+			IDToken string `json:"idToken"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -644,7 +645,7 @@ func loginHandler(client *auth.Client) http.HandlerFunc {
 		// The session cookie will have the same claims as the ID token.
 		// To only allow session cookie setting on recent sign-in, auth_time in ID token
 		// can be checked to ensure user was recently signed in before creating a session cookie.
-		cookie, err := client.SessionCookie(r.Context(), idToken, expiresIn)
+		cookie, err := client.SessionCookie(r.Context(), requestBody.IDToken, expiresIn)
 		if err != nil {
 			http.Error(w, "Failed to create a session cookie", http.StatusInternalServerError)
 			return
@@ -668,13 +669,15 @@ func loginWithAuthTimeCheckHandler(client *auth.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the ID token sent by the client
 		defer r.Body.Close()
-		idToken, err := getIDTokenFromBody(r)
-		if err != nil {
+		var requestBody struct {
+			IDToken string `json:"idToken"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		decoded, err := client.VerifyIDToken(r.Context(), idToken)
+		decoded, err := client.VerifyIDToken(r.Context(), requestBody.IDToken)
 		if err != nil {
 			http.Error(w, "Invalid ID token", http.StatusUnauthorized)
 			return
@@ -686,7 +689,7 @@ func loginWithAuthTimeCheckHandler(client *auth.Client) http.HandlerFunc {
 		}
 
 		expiresIn := time.Hour * 24 * 5
-		cookie, err := client.SessionCookie(r.Context(), idToken, expiresIn)
+		cookie, err := client.SessionCookie(r.Context(), requestBody.IDToken, expiresIn)
 		if err != nil {
 			http.Error(w, "Failed to create a session cookie", http.StatusInternalServerError)
 			return
@@ -806,19 +809,6 @@ func sessionLogoutHandlerWithRevocation(client *auth.Client) http.HandlerFunc {
 		http.Redirect(w, r, "/login", http.StatusFound)
 	}
 	// [END session_clear_and_revoke]
-}
-
-func getIDTokenFromBody(r *http.Request) (string, error) {
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var parsedBody struct {
-		IDToken string `json:"idToken"`
-	}
-	err = json.Unmarshal(b, &parsedBody)
-	return parsedBody.IDToken, err
 }
 
 func newActionCodeSettings() *auth.ActionCodeSettings {
