@@ -40,12 +40,12 @@ jobs:
     # via the 'ref' client parameter.
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         ref: ${{ github.event.client_payload.ref || github.ref }}
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
       with:
         go-version: '1.20'
 
@@ -79,7 +79,7 @@ jobs:
 
     steps:
     - name: Checkout source for publish
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         persist-credentials: false
 
@@ -89,7 +89,7 @@ jobs:
 
     # We authorize this step with an access token that has write access to the master branch.
     - name: Merge to master
-      uses: actions/github-script@v7
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
       with:
         github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
         script: |
