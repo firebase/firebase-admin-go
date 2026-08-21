@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -90,7 +91,7 @@ func TestEncodeInvalidPayload(t *testing.T) {
 }
 
 func TestServiceAccountSigner(t *testing.T) {
-	b, err := ioutil.ReadFile("../testdata/service_account.json")
+	b, err := os.ReadFile("../testdata/service_account.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +332,7 @@ func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 	wantPath := fmt.Sprintf("/v1/projects/-/serviceAccounts/%s:signBlob", serviceAcct)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		reqBody, err := ioutil.ReadAll(r.Body)
+		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}

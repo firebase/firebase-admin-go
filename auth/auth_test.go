@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -74,10 +73,10 @@ func TestMain(m *testing.M) {
 	testCookieVerifier, err = cookieVerifierForTests(context.Background())
 	logFatal(err)
 
-	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	testGetUserResponse, err = os.ReadFile("../testdata/get_user.json")
 	logFatal(err)
 
-	testGetDisabledUserResponse, err = ioutil.ReadFile("../testdata/get_disabled_user.json")
+	testGetDisabledUserResponse, err = os.ReadFile("../testdata/get_disabled_user.json")
 	logFatal(err)
 
 	testIDToken = getIDToken(nil)
@@ -1290,7 +1289,7 @@ type mockKeySource struct {
 }
 
 func newMockKeySource(filePath string) (*mockKeySource, error) {
-	certs, err := ioutil.ReadFile(filePath)
+	certs, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
