@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,6 +59,11 @@ var validMessages = []struct {
 		name: "TokenOnly",
 		req:  &Message{Token: "test-token"},
 		want: map[string]interface{}{"token": "test-token"},
+	},
+	{
+		name: "FidOnly",
+		req:  &Message{Fid: "test-fid"},
+		want: map[string]interface{}{"fid": "test-fid"},
 	},
 	{
 		name: "TopicOnly",
@@ -145,11 +150,13 @@ var validMessages = []struct {
 		},
 	},
 	{
-		name: "AndroidDataMessage",
+		name: "AndroidDataMessageWithBooleanOptions",
 		req: &Message{
 			Android: &AndroidConfig{
-				DirectBootOK: true,
-				CollapseKey:  "ck",
+				DirectBootOK:           true,
+				BandwidthConstrainedOK: true,
+				RestrictedSatelliteOK:  true,
+				CollapseKey:            "ck",
 				Data: map[string]string{
 					"k1": "v1",
 					"k2": "v2",
@@ -161,8 +168,10 @@ var validMessages = []struct {
 		},
 		want: map[string]interface{}{
 			"android": map[string]interface{}{
-				"direct_boot_ok": true,
-				"collapse_key":   "ck",
+				"direct_boot_ok":           true,
+				"bandwidth_constrained_ok": true,
+				"restricted_satellite_ok":  true,
+				"collapse_key":             "ck",
 				"data": map[string]interface{}{
 					"k1": "v1",
 					"k2": "v2",
@@ -770,7 +779,7 @@ var invalidMessages = []struct {
 	{
 		name: "NoTargets",
 		req:  &Message{},
-		want: "exactly one of token, topic or condition must be specified",
+		want: "exactly one of fid, token, topic or condition must be specified",
 	},
 	{
 		name: "MultipleTargets",
@@ -778,7 +787,15 @@ var invalidMessages = []struct {
 			Token: "token",
 			Topic: "topic",
 		},
-		want: "exactly one of token, topic or condition must be specified",
+		want: "exactly one of fid, token, topic or condition must be specified",
+	},
+	{
+		name: "MultipleTargetsWithFid",
+		req: &Message{
+			Fid:   "fid",
+			Topic: "topic",
+		},
+		want: "exactly one of fid, token, topic or condition must be specified",
 	},
 	{
 		name: "InvalidPrefixedTopicName",

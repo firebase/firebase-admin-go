@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -87,6 +87,35 @@ func TestTenantGetUser(t *testing.T) {
 	wantPath := "/projects/mock-project-id/tenants/tenantID/accounts:lookup"
 	if s.Req[0].RequestURI != wantPath {
 		t.Errorf("GetUser() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestTenantQueryUsers(t *testing.T) {
+	resp := `{
+		"usersInfo": [],
+		"recordsCount": "0"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	tenantClient, err := s.Client.TenantManager.AuthForTenant("test-tenant")
+	if err != nil {
+		t.Fatalf("Failed to create tenant client: %v", err)
+	}
+
+	returnUserInfo := true
+	query := &QueryUsersRequest{
+		ReturnUserInfo: &returnUserInfo,
+	}
+
+	_, err = tenantClient.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() with tenant client = %v", err)
+	}
+
+	wantPath := "/projects/mock-project-id/tenants/test-tenant/accounts:query"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -566,6 +595,34 @@ func TestTenantEmailSignInLink(t *testing.T) {
 	}
 	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
 		t.Fatalf("EmailSignInLink() %v", err)
+	}
+}
+
+func TestTenantVerifyAndChangeEmail(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.VerifyAndChangeEmailLink(context.Background(), testEmail, testNewEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("VerifyAndChangeEmailLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_AND_CHANGE_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+		"newEmail":      testNewEmail,
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("checkActionLinkRequestWithURL() = %v", err)
 	}
 }
 
