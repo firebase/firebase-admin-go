@@ -113,7 +113,7 @@ jobs:
     - name: Post to Twitter
       if: success() &&
         contains(github.event.pull_request.labels.*.name, 'release:tweet')
-      uses: firebase/firebase-admin-node/.github/actions/send-tweet@master
+      uses: firebase/firebase-admin-node/.github/actions/send-tweet@5a203f6737ffd96e44824a22a5a9004411d088e3 # main
       with:
         status: >
           ${{ steps.preflight.outputs.version }} of @Firebase Admin Go SDK is available.
