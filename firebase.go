@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -231,7 +230,7 @@ func getConfigDefaults() (*Config, error) {
 		dat = []byte(confFileName)
 	} else {
 		var err error
-		if dat, err = ioutil.ReadFile(confFileName); err != nil {
+		if dat, err = os.ReadFile(confFileName); err != nil {
 			return nil, err
 		}
 	}

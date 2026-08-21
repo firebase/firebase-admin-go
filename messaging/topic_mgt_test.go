@@ -17,7 +17,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -33,7 +33,7 @@ func TestSubscribe(t *testing.T) {
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
 	}))
@@ -76,7 +76,7 @@ func TestUnsubscribe(t *testing.T) {
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tr = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
 	}))
