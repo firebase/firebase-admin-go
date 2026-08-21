@@ -766,7 +766,7 @@ func TestSendEachForMulticast(t *testing.T) {
 
 func TestSendEachForMulticastFids(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, fid := range testFidMulticastMessage.Fids {
 			if strings.Contains(string(req), fid) {
@@ -794,7 +794,7 @@ func TestSendEachForMulticastFids(t *testing.T) {
 
 func TestSendEachForMulticastMixed(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMixedMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
