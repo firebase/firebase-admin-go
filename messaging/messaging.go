@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
-	"google.golang.org/api/transport"
 )
 
 const (
@@ -912,7 +911,7 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 		return nil, errors.New("project ID is required to access Firebase Cloud Messaging client")
 	}
 
-	hc, messagingEndpoint, err := transport.NewHTTPClient(ctx, c.Opts...)
+	baseHTTPClient, messagingEndpoint, err := internal.NewHTTPClient(ctx, c.Opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -925,8 +924,8 @@ func NewClient(ctx context.Context, c *internal.MessagingConfig) (*Client, error
 	}
 
 	return &Client{
-		fcmClient: newFCMClient(hc, c, messagingEndpoint, batchEndpoint),
-		iidClient: newIIDClient(hc, c),
+		fcmClient: newFCMClient(baseHTTPClient, c, messagingEndpoint, batchEndpoint),
+		iidClient: newIIDClient(baseHTTPClient, c),
 	}, nil
 }
 
@@ -938,16 +937,16 @@ type fcmClient struct {
 	httpClient    *internal.HTTPClient
 }
 
-func newFCMClient(hc *http.Client, conf *internal.MessagingConfig, messagingEndpoint string, batchEndpoint string) *fcmClient {
-	client := internal.WithDefaultRetryConfig(hc)
+func newFCMClient(base *internal.HTTPClient, conf *internal.MessagingConfig, messagingEndpoint string, batchEndpoint string) *fcmClient {
+	client := internal.CloneHTTPClient(base)
 	client.CreateErrFn = handleFCMError
 
 	version := fmt.Sprintf("fire-admin-go/%s", conf.Version)
-	client.Opts = []internal.HTTPOption{
+	client.Opts = append(client.Opts,
 		internal.WithHeader(apiFormatVersionHeader, apiFormatVersion),
 		internal.WithHeader(firebaseClientHeader, version),
 		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
-	}
+	)
 
 	return &fcmClient{
 		fcmEndpoint:   messagingEndpoint,
