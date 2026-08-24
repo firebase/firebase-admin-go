@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -147,7 +147,7 @@ func TestHTTPClient(t *testing.T) {
 				t.Errorf("[%d] Content-Type = %q; want = %q", idx, h, "application/json")
 			}
 			wb := []byte(want.body)
-			gb, err := ioutil.ReadAll(r.Body)
+			gb, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Fatal(err)
 			}

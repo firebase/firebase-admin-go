@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,7 +72,7 @@ func TestDoAndUnmarshalPost(t *testing.T) {
 	var b []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		resp := `{
 			"name": "test"
 		}`
