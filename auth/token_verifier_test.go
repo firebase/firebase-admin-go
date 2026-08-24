@@ -140,6 +140,13 @@ func TestFindMaxAge(t *testing.T) {
 		{"max-age=100", 100},
 		{"public, max-age=100", 100},
 		{"public,max-age=100", 100},
+		// Without a parseable max-age directive (e.g. "cache-control: private"),
+		// findMaxAge falls back to a one-hour expiry rather than failing.
+		{"", 3600},
+		{"private", 3600},
+		{"max-age 100", 3600},
+		{"max-age: 100", 3600},
+		{"max-age2=100", 3600},
 	}
 	for _, tc := range cases {
 		resp := &http.Response{
@@ -156,11 +163,8 @@ func TestFindMaxAge(t *testing.T) {
 
 func TestFindMaxAgeError(t *testing.T) {
 	cases := []string{
-		"",
-		"max-age 100",
-		"max-age: 100",
-		"max-age2=100",
 		"max-age=foo",
+		"max-age=",
 	}
 	for _, tc := range cases {
 		resp := &http.Response{

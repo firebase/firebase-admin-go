@@ -711,7 +711,7 @@ func TestTransactionError(t *testing.T) {
 			mock.Header = map[string]string{"ETag": "mock-etag2"}
 			mock.Resp = &person{"Peter Parker", 19}
 		} else if cnt == 1 {
-			return nil, fmt.Errorf(want)
+			return nil, fmt.Errorf("%s", want)
 		}
 		cnt++
 		var p person
