@@ -18,6 +18,7 @@ package appcheck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,11 +29,13 @@ import (
 )
 
 // JWKSUrl is the URL of the JWKS used to verify App Check tokens.
-var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1beta/jwks"
+var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1/jwks"
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
 var (
+	verifyURLFormat = "https://firebaseappcheck.googleapis.com/v1/projects/%s:verifyAppCheckToken"
+
 	// ErrIncorrectAlgorithm is returned when the token is signed with a non-RSA256 algorithm.
 	ErrIncorrectAlgorithm = errors.New("token has incorrect algorithm")
 	// ErrTokenType is returned when the token is not a JWT.
@@ -50,22 +53,25 @@ var (
 // DecodedAppCheckToken represents a verified App Check token.
 //
 // DecodedAppCheckToken provides typed accessors to the common JWT fields such as Audience (aud)
-// and ExpiresAt (exp). Additionally it provides an AppID field, which indicates the application ID to which this
-// token belongs. Any additional JWT claims can be accessed via the Claims map of DecodedAppCheckToken.
+// and ExpiresAt (exp). Additionally, it provides an AppID field, which indicates the application ID to which this
+// token belongs, and an AlreadyConsumed field, which is populated when verifying a one-time token.
+// Any additional JWT claims can be accessed via the Claims map of DecodedAppCheckToken.
 type DecodedAppCheckToken struct {
-	Issuer    string
-	Subject   string
-	Audience  []string
-	ExpiresAt time.Time
-	IssuedAt  time.Time
-	AppID     string
-	Claims    map[string]interface{}
+	Issuer          string
+	Subject         string
+	Audience        []string
+	ExpiresAt       time.Time
+	IssuedAt        time.Time
+	AppID           string
+	AlreadyConsumed *bool
+	Claims          map[string]interface{}
 }
 
 // Client is the interface for the Firebase App Check service.
 type Client struct {
 	projectID string
 	jwks      *keyfunc.JWKS
+	client    *internal.HTTPClient
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -82,9 +88,15 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		return nil, err
 	}
 
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
 		projectID: conf.ProjectID,
 		jwks:      jwks,
+		client:    hc,
 	}, nil
 }
 
@@ -164,6 +176,36 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 	appCheckToken.Claims = claims
 
 	return &appCheckToken, nil
+}
+
+// VerifyOneTimeToken verifies the given App Check token and consumes it.
+//
+// This method performs the same stateless verification as VerifyToken. In addition, it makes a
+// stateful network call to the Firebase App Check backend to ensure that the token has not been
+// consumed previously. If the token is valid, it is marked as consumed.
+func (c *Client) VerifyOneTimeToken(ctx context.Context, token string) (*DecodedAppCheckToken, error) {
+	decodedToken, err := c.VerifyToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf(verifyURLFormat, c.projectID)
+	req := &internal.Request{
+		Method: "POST",
+		URL:    url,
+		Body:   internal.NewJSONEntity(map[string]string{"app_check_token": token}),
+	}
+
+	var result struct {
+		AlreadyConsumed bool `json:"alreadyConsumed"`
+	}
+
+	if _, err := c.client.DoAndUnmarshal(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	decodedToken.AlreadyConsumed = &result.AlreadyConsumed
+	return decodedToken, nil
 }
 
 func contains(s []string, str string) bool {
