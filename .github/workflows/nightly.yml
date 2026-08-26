@@ -29,12 +29,12 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.event.client_payload.ref || github.ref }}
         
     - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: '1.25'
 
@@ -53,7 +53,7 @@ jobs:
 
     - name: Send email on failure
       if: failure()
-      uses: firebase/firebase-admin-node/.github/actions/send-email@2e2b36a84ba28679bcb7aecdacabfec0bded2d48 # Admin Node SDK v13.6.0
+      uses: firebase/firebase-admin-node/.github/actions/send-email@7343f166ec71c2efee5fe0554c2fb96203faf2a5 # Admin Node SDK v14.2.0
       with:
         api-key: ${{ secrets.OSS_BOT_MAILGUN_KEY }}
         domain: ${{ secrets.OSS_BOT_MAILGUN_DOMAIN }}
@@ -68,7 +68,7 @@ jobs:
 
     - name: Send email on cancelled
       if: cancelled()
-      uses: firebase/firebase-admin-node/.github/actions/send-email@2e2b36a84ba28679bcb7aecdacabfec0bded2d48 # Admin Node SDK v13.6.0
+      uses: firebase/firebase-admin-node/.github/actions/send-email@7343f166ec71c2efee5fe0554c2fb96203faf2a5 # Admin Node SDK v14.2.0
       with:
         api-key: ${{ secrets.OSS_BOT_MAILGUN_KEY }}
         domain: ${{ secrets.OSS_BOT_MAILGUN_DOMAIN }}
