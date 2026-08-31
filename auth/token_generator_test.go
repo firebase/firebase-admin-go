@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"firebase.google.com/go/v4/errorutils"
@@ -358,4 +360,42 @@ func iamServer(t *testing.T, serviceAcct, signature string) *httptest.Server {
 		w.Write(b)
 	})
 	return httptest.NewServer(handler)
+}
+
+func TestIAMSignerEmailConcurrent(t *testing.T) {
+	var hits int64
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		atomic.AddInt64(&hits, 1)
+		w.Header().Set("Content-Type", "application/text")
+		w.Write([]byte("discovered-service-account"))
+	})
+	metadata := httptest.NewServer(handler)
+	defer metadata.Close()
+
+	conf := &internal.AuthConfig{
+		Opts:    optsWithTokenSource,
+		Version: testVersion,
+	}
+	signer, err := newIAMSigner(context.Background(), conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer.metadataHost = metadata.URL
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := signer.Email(context.Background()); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt64(&hits); got != 1 {
+		t.Errorf("concurrent Email() made %d metadata requests; want = 1", got)
+	}
 }

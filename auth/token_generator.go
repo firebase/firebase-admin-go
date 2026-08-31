@@ -218,12 +218,12 @@ func (s *iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 }
 
 func (s *iamSigner) Email(ctx context.Context) (string, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	if s.serviceAcct != "" {
 		return s.serviceAcct, nil
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	result, err := s.callMetadataService(ctx)
 	if err != nil {
 		msg := "failed to determine service account: %v; initialize the SDK with service " +
