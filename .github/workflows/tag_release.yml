@@ -1,0 +1,49 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Tag Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'firebase.go'
+
+jobs:
+  tag_release:
+    if: startsWith(github.event.head_commit.message, '[chore] Release ')
+
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+    - name: Publish preflight check
+      id: preflight
+      run: ./.github/scripts/publish_preflight_check.sh
+
+    - name: Create release tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_VER: ${{ steps.preflight.outputs.version }}
+        RELEASE_NOTES: ${{ steps.preflight.outputs.changelog }}
+      run: gh release create "$RELEASE_VER" \
+            --title "Firebase Admin Go SDK $RELEASE_VER" \
+            --notes "$RELEASE_NOTES" \
+            --target "master"
