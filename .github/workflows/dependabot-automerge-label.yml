@@ -1,0 +1,26 @@
+name: Dependabot Auto-merge Label
+
+# Labels Dependabot's own bumps `automerge` + `dependabot-automerge` so
+# Kodiak can auto-approve and merge them. See derivita/shared-workflows's
+# dependabot-automerge-label.yml (the reusable workflow this calls) for the full
+# security rationale, and derivita/infrastructure#1716 for the reference rollout.
+#
+# ecosystems is go_modules only — the only versioned dependency surface
+# dependabot.yml opens PRs for besides github-actions, which is excluded
+# from auto-merge org-wide (Actions bumps run with elevated CI permissions
+# and always need human review — see this org's other
+# dependabot-automerge-label.yml callers).
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    uses: derivita/shared-workflows/.github/workflows/dependabot-automerge-label.yml@25a5b12a3d6192f3aa09e3ee56f35aaa365ea73e # v1
+    with:
+      ecosystems: go_modules
