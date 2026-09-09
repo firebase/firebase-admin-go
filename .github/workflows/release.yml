@@ -83,27 +83,34 @@ jobs:
       contents: write
 
     steps:
+    - name: Create GitHub App token
+      id: generate-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ secrets.FIREBASE_RELEASE_APP_CLIENT_ID }}
+        private-key: ${{ secrets.FIREBASE_RELEASE_APP_PRIVATE_KEY }}
+        permission-contents: write
+
     - name: Checkout source for publish
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        persist-credentials: false
+        token: ${{ steps.generate-token.outputs.token }}
+        fetch-depth: 0
 
     - name: Publish preflight check
       id: preflight
       run: ./.github/scripts/publish_preflight_check.sh
 
-    # We authorize this step with an access token that has write access to the master branch.
-    - name: Merge to master
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        github-token: ${{ secrets.FIREBASE_GITHUB_TOKEN }}
-        script: |
-            await github.rest.repos.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              base: 'master',
-              head: 'dev'
-            })
+    # We authorize this step with temporary GitHub App installation token that has
+    # write access to the master branch.
+    - name: Fast-forward master to dev
+      run: |
+        git checkout dev
+        git pull origin dev
+        git checkout master
+        git pull origin master
+        git merge dev --ff-only
+        git push origin master
 
     # See: https://cli.github.com/manual/gh_release_create
     - name: Create release tag
