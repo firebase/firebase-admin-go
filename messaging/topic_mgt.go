@@ -156,7 +156,7 @@ func handleIIDError(resp *internal.Response) error {
 	var ie iidErrorResponse
 	json.Unmarshal(resp.Body, &ie) // ignore any json parse errors at this level
 	if ie.Error != "" {
-		base.String = fmt.Sprintf("error while calling the iid service: %s", ie.Error)
+		base.Message = fmt.Sprintf("error while calling the iid service: %s", ie.Error)
 	}
 
 	return base
