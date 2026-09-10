@@ -15,7 +15,13 @@ import (
 	"firebase.google.com/go/v4/internal"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 )
+
+type appCheckClaims struct {
+	Aud []string `json:"aud"`
+	jwt.RegisteredClaims
+}
 
 func TestVerifyTokenHasValidClaims(t *testing.T) {
 	ts, err := setupFakeJWKS()
@@ -32,16 +38,12 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Errorf("Error creating NewClient: %v", err)
-	}
-
-	type appCheckClaims struct {
-		Aud []string `json:"aud"`
-		jwt.RegisteredClaims
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -178,6 +180,7 @@ func TestVerifyTokenMustExist(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -211,6 +214,7 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	JWKSUrl = ts.URL
 	conf := &internal.AppCheckConfig{
 		ProjectID: "project_id",
+		Opts:      []option.ClientOption{option.WithoutAuthentication()},
 	}
 
 	client, err := NewClient(context.Background(), conf)
@@ -286,4 +290,108 @@ func loadPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	return privateKey, nil
+}
+
+func TestVerifyOneTimeToken(t *testing.T) {
+	ts, err := setupFakeJWKS()
+	if err != nil {
+		t.Fatalf("Error setting up fake JWKS server: %v", err)
+	}
+	defer ts.Close()
+
+	JWKSUrl = ts.URL
+
+	privateKey, err := loadPrivateKey()
+	if err != nil {
+		t.Fatalf("Error loading private key: %v", err)
+	}
+
+	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	jwt.TimeFunc = func() time.Time {
+		return mockTime
+	}
+
+	claims := &appCheckClaims{
+		[]string{"projects/12345678", "projects/project_id"},
+		jwt.RegisteredClaims{
+			Issuer:    "https://firebaseappcheck.googleapis.com/12345678",
+			Subject:   "12345678:app:ID",
+			ExpiresAt: jwt.NewNumericDate(mockTime.Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(mockTime),
+		},
+	}
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	jwtToken.Header["kid"] = "FGQdnRlzAmKyKr6-Hg_kMQrBkj_H6i6ADnBQz4OI6BU"
+	tokenString, err := jwtToken.SignedString(privateKey)
+	if err != nil {
+		t.Fatalf("Error signing token: %v", err)
+	}
+
+	boolPtr := func(b bool) *bool { return &b }
+
+	tests := []struct {
+		name                string
+		backendResponse     string
+		backendStatus       int
+		wantAlreadyConsumed *bool
+		wantErr             bool
+	}{
+		{
+			name:                "success_not_consumed",
+			backendResponse:     `{"alreadyConsumed": false}`,
+			backendStatus:       http.StatusOK,
+			wantAlreadyConsumed: boolPtr(false),
+		},
+		{
+			name:                "success_already_consumed",
+			backendResponse:     `{"alreadyConsumed": true}`,
+			backendStatus:       http.StatusOK,
+			wantAlreadyConsumed: boolPtr(true),
+		},
+		{
+			name:            "backend_error",
+			backendResponse: `{"error": {"message": "Internal Server Error"}}`,
+			backendStatus:   http.StatusInternalServerError,
+			wantErr:         true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.backendStatus)
+				w.Write([]byte(tc.backendResponse))
+			}))
+			defer backend.Close()
+
+			oldVerifyURLFormat := verifyURLFormat
+			defer func() { verifyURLFormat = oldVerifyURLFormat }()
+			verifyURLFormat = backend.URL + "/v1/projects/%s:verifyAppCheckToken"
+
+			conf := &internal.AppCheckConfig{
+				ProjectID: "project_id",
+				Opts:      []option.ClientOption{option.WithoutAuthentication()},
+			}
+			client, err := NewClient(context.Background(), conf)
+			if err != nil {
+				t.Fatalf("Error creating NewClient: %v", err)
+			}
+
+			decodedToken, err := client.VerifyOneTimeToken(context.Background(), tokenString)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("Expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if decodedToken.AlreadyConsumed == nil || *decodedToken.AlreadyConsumed != *tc.wantAlreadyConsumed {
+				t.Errorf("VerifyOneTimeToken() AlreadyConsumed = %v; want = %v", decodedToken.AlreadyConsumed, tc.wantAlreadyConsumed)
+			}
+		})
+	}
 }
