@@ -18,7 +18,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"firebase.google.com/go/v4/internal"
@@ -76,10 +78,10 @@ func newIIDClient(hc *http.Client, conf *internal.MessagingConfig) *iidClient {
 	}
 }
 
-// SubscribeToTopic subscribes a list of registration tokens to a topic.
+// SubscribeToTopicLegacy subscribes a list of registration tokens to a topic using the legacy Instance ID API.
 //
-// The tokens list must not be empty, and have at most 1000 tokens.
-func (c *iidClient) SubscribeToTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
+// Deprecated: Use SubscribeToTopic instead.
+func (c *iidClient) SubscribeToTopicLegacy(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
 	req := &iidRequest{
 		Topic:  topic,
 		Tokens: tokens,
@@ -88,10 +90,10 @@ func (c *iidClient) SubscribeToTopic(ctx context.Context, tokens []string, topic
 	return c.makeTopicManagementRequest(ctx, req)
 }
 
-// UnsubscribeFromTopic unsubscribes a list of registration tokens from a topic.
+// UnsubscribeFromTopicLegacy unsubscribes a list of registration tokens from a topic using the legacy Instance ID API.
 //
-// The tokens list must not be empty, and have at most 1000 tokens.
-func (c *iidClient) UnsubscribeFromTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
+// Deprecated: Use UnsubscribeFromTopic instead.
+func (c *iidClient) UnsubscribeFromTopicLegacy(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
 	req := &iidRequest{
 		Topic:  topic,
 		Tokens: tokens,
@@ -160,4 +162,199 @@ func handleIIDError(resp *internal.Response) error {
 	}
 
 	return base
+}
+
+func validateTopicManagementArgs(tokens []string, topic string) (string, error) {
+	if len(tokens) == 0 {
+		return "", fmt.Errorf("no tokens specified")
+	}
+	if len(tokens) > 1000 {
+		return "", fmt.Errorf("tokens list must not contain more than 1000 items")
+	}
+	for _, token := range tokens {
+		if token == "" {
+			return "", fmt.Errorf("tokens list must not contain empty strings")
+		}
+	}
+
+	if topic == "" {
+		return "", fmt.Errorf("topic name not specified")
+	}
+	if !topicNamePattern.MatchString(topic) {
+		return "", fmt.Errorf("invalid topic name: %q", topic)
+	}
+
+	topicName := strings.TrimPrefix(topic, "/topics/")
+	return topicName, nil
+}
+
+type topicJob struct {
+	token string
+	index int
+}
+
+type topicResult struct {
+	index   int
+	success bool
+	reason  string
+}
+
+// SubscribeToTopic subscribes a list of registration tokens to a topic via the FCM v1 API.
+//
+// The tokens list must not be empty, and have at most 1000 tokens.
+func (c *fcmClient) SubscribeToTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
+	return c.makeTopicManagementRequestV1(ctx, tokens, topic, true)
+}
+
+// UnsubscribeFromTopic unsubscribes a list of registration tokens from a topic via the FCM v1 API.
+//
+// The tokens list must not be empty, and have at most 1000 tokens.
+func (c *fcmClient) UnsubscribeFromTopic(ctx context.Context, tokens []string, topic string) (*TopicManagementResponse, error) {
+	return c.makeTopicManagementRequestV1(ctx, tokens, topic, false)
+}
+
+func (c *fcmClient) makeTopicManagementRequestV1(ctx context.Context, tokens []string, topic string, isSubscribe bool) (*TopicManagementResponse, error) {
+	topicName, err := validateTopicManagementArgs(tokens, topic)
+	if err != nil {
+		return nil, err
+	}
+
+	numWorkers := len(tokens)
+	if numWorkers > 100 {
+		numWorkers = 100
+	}
+
+	jobs := make(chan topicJob, len(tokens))
+	results := make(chan topicResult, len(tokens))
+
+	for w := 0; w < numWorkers; w++ {
+		go func() {
+			for j := range jobs {
+				success, reason := c.makeTopicManagementSingleRequest(ctx, j.token, topicName, isSubscribe)
+				results <- topicResult{
+					index:   j.index,
+					success: success,
+					reason:  reason,
+				}
+			}
+		}()
+	}
+
+	for idx, token := range tokens {
+		jobs <- topicJob{token: token, index: idx}
+	}
+	close(jobs)
+
+	resps := make([]topicResult, len(tokens))
+	for i := 0; i < len(tokens); i++ {
+		res := <-results
+		resps[res.index] = res
+	}
+
+	tmr := &TopicManagementResponse{}
+	for _, res := range resps {
+		if res.success {
+			tmr.SuccessCount++
+		} else {
+			tmr.FailureCount++
+			tmr.Errors = append(tmr.Errors, &ErrorInfo{
+				Index:  res.index,
+				Reason: res.reason,
+			})
+		}
+	}
+
+	return tmr, nil
+}
+
+func (c *fcmClient) makeTopicManagementSingleRequest(ctx context.Context, token, topicName string, isSubscribe bool) (bool, string) {
+	encodedToken := url.PathEscape(token)
+	var request *internal.Request
+
+	if isSubscribe {
+		request = &internal.Request{
+			Method: http.MethodPost,
+			URL:    fmt.Sprintf("%s/projects/%s/registrations/%s/topicSubscriptions?topic_name=%s", c.fcmEndpoint, c.project, encodedToken, url.QueryEscape(topicName)),
+			Body:   internal.NewJSONEntity(map[string]interface{}{}),
+			SuccessFn: func(resp *internal.Response) bool {
+				return resp.Status == http.StatusOK || resp.Status == http.StatusConflict
+			},
+		}
+	} else {
+		request = &internal.Request{
+			Method: http.MethodDelete,
+			URL:    fmt.Sprintf("%s/projects/%s/registrations/%s/topicSubscriptions/%s?allow_missing=true", c.fcmEndpoint, c.project, encodedToken, url.PathEscape(topicName)),
+		}
+	}
+
+	resp, err := c.httpClient.Do(ctx, request)
+	if err == nil {
+		if resp != nil && isSubscribe && resp.Status == http.StatusConflict {
+			return true, ""
+		}
+		return true, ""
+	}
+
+	var respBody []byte
+	var status int
+	if fe, ok := err.(*internal.FirebaseError); ok && fe.Response != nil {
+		status = fe.Response.StatusCode
+		if fe.Response.Body != nil {
+			respBody, _ = io.ReadAll(fe.Response.Body)
+		}
+	}
+
+	if isSubscribe && status == http.StatusConflict {
+		return true, ""
+	}
+
+	var parsed struct {
+		Error struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+			Details []struct {
+				Type      string `json:"@type"`
+				ErrorCode string `json:"errorCode"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+
+	if len(respBody) > 0 {
+		_ = json.Unmarshal(respBody, &parsed)
+	}
+
+	if isSubscribe && parsed.Error.Status == "ALREADY_EXISTS" {
+		return true, ""
+	}
+
+	for _, d := range parsed.Error.Details {
+		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" && d.ErrorCode != "" {
+			return false, d.ErrorCode
+		}
+	}
+
+	if parsed.Error.Status != "" {
+		return false, parsed.Error.Status
+	}
+
+	if parsed.Error.Message != "" {
+		return false, parsed.Error.Message
+	}
+
+	switch status {
+	case http.StatusBadRequest:
+		return false, "INVALID_ARGUMENT"
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, "PERMISSION_DENIED"
+	case http.StatusNotFound:
+		return false, "NOT_FOUND"
+	case http.StatusTooManyRequests:
+		return false, "RESOURCE_EXHAUSTED"
+	case http.StatusInternalServerError:
+		return false, "INTERNAL"
+	case http.StatusServiceUnavailable:
+		return false, "DEADLINE_EXCEEDED"
+	default:
+		return false, "UNKNOWN_ERROR"
+	}
 }
