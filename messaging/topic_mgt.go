@@ -264,6 +264,10 @@ func (c *fcmClient) makeTopicManagementRequestV1(ctx context.Context, tokens []s
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	return tmr, nil
 }
 

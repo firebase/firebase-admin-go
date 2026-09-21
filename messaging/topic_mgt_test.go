@@ -30,10 +30,10 @@ import (
 
 func TestSubscribe(t *testing.T) {
 	var mu sync.Mutex
-	var requests []*http.Request
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		requests = append(requests, r)
+		requestCount++
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -59,8 +59,8 @@ func TestSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkTopicMgtResponse(t, resp, "INVALID_ARGUMENT")
-	if len(requests) != 2 {
-		t.Errorf("got %d requests, want 2", len(requests))
+	if requestCount != 2 {
+		t.Errorf("got %d requests, want 2", requestCount)
 	}
 }
 
@@ -90,10 +90,10 @@ func TestSubscribeAlreadyExists409(t *testing.T) {
 
 func TestUnsubscribe(t *testing.T) {
 	var mu sync.Mutex
-	var requests []*http.Request
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		requests = append(requests, r)
+		requestCount++
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -119,8 +119,8 @@ func TestUnsubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkTopicMgtResponse(t, resp, "INVALID_ARGUMENT")
-	if len(requests) != 2 {
-		t.Errorf("got %d requests, want 2", len(requests))
+	if requestCount != 2 {
+		t.Errorf("got %d requests, want 2", requestCount)
 	}
 }
 
@@ -238,6 +238,33 @@ func TestTopicManagementNonJsonError(t *testing.T) {
 	}
 	if len(resp.Errors) != 1 || resp.Errors[0].Reason != "INVALID_ARGUMENT" {
 		t.Errorf("Errors[0].Reason = %q, want INVALID_ARGUMENT", resp.Errors[0].Reason)
+	}
+}
+
+func TestTopicManagementContextCancelled(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	client, err := NewClient(context.Background(), testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != context.Canceled {
+		t.Errorf("SubscribeToTopic() = (%#v, %v); want = (nil, %v)", resp, err, context.Canceled)
+	}
+
+	resp, err = client.UnsubscribeFromTopic(ctx, []string{"id1"}, "test-topic")
+	if err != context.Canceled {
+		t.Errorf("UnsubscribeFromTopic() = (%#v, %v); want = (nil, %v)", resp, err, context.Canceled)
 	}
 }
 
