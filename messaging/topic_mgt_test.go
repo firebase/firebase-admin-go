@@ -88,6 +88,28 @@ func TestSubscribeAlreadyExists409(t *testing.T) {
 	}
 }
 
+func TestSubscribe204Success(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 1 || resp.FailureCount != 0 {
+		t.Errorf("resp = (%d, %d), want (1, 0)", resp.SuccessCount, resp.FailureCount)
+	}
+}
+
 func TestUnsubscribe(t *testing.T) {
 	var mu sync.Mutex
 	var requestCount int

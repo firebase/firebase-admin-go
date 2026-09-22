@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,9 +26,10 @@ import (
 )
 
 const (
-	iidEndpoint    = "https://iid.googleapis.com/iid/v1"
-	iidSubscribe   = "batchAdd"
-	iidUnsubscribe = "batchRemove"
+	iidEndpoint               = "https://iid.googleapis.com/iid/v1"
+	iidSubscribe              = "batchAdd"
+	iidUnsubscribe            = "batchRemove"
+	maxTopicManagementWorkers = 100
 )
 
 // TopicManagementResponse is the result produced by topic management operations.
@@ -220,8 +220,8 @@ func (c *fcmClient) makeTopicManagementRequestV1(ctx context.Context, tokens []s
 	}
 
 	numWorkers := len(tokens)
-	if numWorkers > 100 {
-		numWorkers = 100
+	if numWorkers > maxTopicManagementWorkers {
+		numWorkers = maxTopicManagementWorkers
 	}
 
 	jobs := make(chan topicJob, len(tokens))
@@ -281,7 +281,7 @@ func (c *fcmClient) makeTopicManagementSingleRequest(ctx context.Context, token,
 			URL:    fmt.Sprintf("%s/projects/%s/registrations/%s/topicSubscriptions?topic_name=%s", c.fcmEndpoint, c.project, encodedToken, url.QueryEscape(topicName)),
 			Body:   internal.NewJSONEntity(map[string]interface{}{}),
 			SuccessFn: func(resp *internal.Response) bool {
-				return resp.Status == http.StatusOK || resp.Status == http.StatusConflict
+				return internal.HasSuccessStatus(resp) || resp.Status == http.StatusConflict
 			},
 		}
 	} else {
@@ -291,74 +291,19 @@ func (c *fcmClient) makeTopicManagementSingleRequest(ctx context.Context, token,
 		}
 	}
 
-	resp, err := c.httpClient.Do(ctx, request)
+	_, err := c.httpClient.Do(ctx, request)
 	if err == nil {
-		if resp != nil && isSubscribe && resp.Status == http.StatusConflict {
-			return true, ""
-		}
 		return true, ""
 	}
 
-	var respBody []byte
-	var status int
-	if fe, ok := err.(*internal.FirebaseError); ok && fe.Response != nil {
-		status = fe.Response.StatusCode
-		if fe.Response.Body != nil {
-			respBody, _ = io.ReadAll(fe.Response.Body)
+	if fe, ok := err.(*internal.FirebaseError); ok {
+		if code, ok := fe.Ext["messagingErrorCode"].(string); ok && code != "" {
+			return false, code
+		}
+		if fe.ErrorCode != "" && fe.ErrorCode != internal.Unknown {
+			return false, string(fe.ErrorCode)
 		}
 	}
 
-	if isSubscribe && status == http.StatusConflict {
-		return true, ""
-	}
-
-	var parsed struct {
-		Error struct {
-			Status  string `json:"status"`
-			Message string `json:"message"`
-			Details []struct {
-				Type      string `json:"@type"`
-				ErrorCode string `json:"errorCode"`
-			} `json:"details"`
-		} `json:"error"`
-	}
-
-	if len(respBody) > 0 {
-		_ = json.Unmarshal(respBody, &parsed)
-	}
-
-	if isSubscribe && parsed.Error.Status == "ALREADY_EXISTS" {
-		return true, ""
-	}
-
-	for _, d := range parsed.Error.Details {
-		if d.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" && d.ErrorCode != "" {
-			return false, d.ErrorCode
-		}
-	}
-
-	if parsed.Error.Status != "" {
-		return false, parsed.Error.Status
-	}
-
-	if parsed.Error.Message != "" {
-		return false, parsed.Error.Message
-	}
-
-	switch status {
-	case http.StatusBadRequest:
-		return false, "INVALID_ARGUMENT"
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return false, "PERMISSION_DENIED"
-	case http.StatusNotFound:
-		return false, "NOT_FOUND"
-	case http.StatusTooManyRequests:
-		return false, "RESOURCE_EXHAUSTED"
-	case http.StatusInternalServerError:
-		return false, "INTERNAL"
-	case http.StatusServiceUnavailable:
-		return false, "DEADLINE_EXCEEDED"
-	default:
-		return false, "UNKNOWN_ERROR"
-	}
+	return false, "UNKNOWN_ERROR"
 }
