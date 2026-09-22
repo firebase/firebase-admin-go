@@ -186,7 +186,9 @@ func (u *UserToCreate) set(key string, value interface{}) *UserToCreate {
 func convertMultiFactorInfoToServerFormat(mfaInfo MultiFactorInfo) (multiFactorInfoResponse, error) {
 	authFactorInfo := multiFactorInfoResponse{DisplayName: mfaInfo.DisplayName}
 	if mfaInfo.EnrollmentTimestamp != 0 {
-		authFactorInfo.EnrolledAt = time.Unix(mfaInfo.EnrollmentTimestamp, 0).Format("2006-01-02T15:04:05Z07:00Z")
+		// EnrollmentTimestamp is milliseconds since epoch, same as the value
+		// parseMultiFactorInfo hands back when reading a user record.
+		authFactorInfo.EnrolledAt = time.UnixMilli(mfaInfo.EnrollmentTimestamp).UTC().Format(time.RFC3339)
 	}
 	if mfaInfo.UID != "" {
 		authFactorInfo.MFAEnrollmentID = mfaInfo.UID
