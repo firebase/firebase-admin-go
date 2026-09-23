@@ -174,10 +174,6 @@ func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 
 	environmentEmulatorURL := os.Getenv(emulatorDatabaseEnvVar)
 	if environmentEmulatorURL != "" {
-		parsedURL, err = url.ParseRequestURI(environmentEmulatorURL)
-		if err != nil {
-			return nil, false, fmt.Errorf("%s: %w", environmentEmulatorURL, errInvalidURL)
-		}
 		cfg, err := parseEmulatorHost(environmentEmulatorURL, parsedURL)
 		return cfg, true, err
 	}
@@ -192,23 +188,31 @@ func parseURLConfig(dbURL string) (*dbURLConfig, bool, error) {
 	}, false, nil
 }
 
-func parseEmulatorHost(rawEmulatorHostURL string, parsedEmulatorHost *url.URL) (*dbURLConfig, error) {
-	if strings.Contains(rawEmulatorHostURL, "//") {
+func parseEmulatorHost(rawEmulatorHostURL string, parsedDbURL *url.URL) (*dbURLConfig, error) {
+	parsedEmulatorURL, err := url.ParseRequestURI("http://" + rawEmulatorHostURL)
+	if err != nil {
 		return nil, fmt.Errorf(`invalid %s: "%s". It must follow format "host:port": %w`, emulatorDatabaseEnvVar, rawEmulatorHostURL, errInvalidURL)
 	}
-
-	baseURL := strings.Replace(rawEmulatorHostURL, fmt.Sprintf("?%s", parsedEmulatorHost.RawQuery), "", -1)
-	if parsedEmulatorHost.Scheme != "http" {
+	// FIREBASE_DATABASE_EMULATOR_HOST in doc https://firebase.google.com/docs/emulator-suite/connect_rtdb#admin_sdks
+	// Format should only be host:port, "127.0.0.1:9000"
+	baseURL := parsedEmulatorURL.Host
+	if parsedDbURL.Scheme != "http" {
 		baseURL = fmt.Sprintf("http://%s", baseURL)
 	}
 
-	namespace := parsedEmulatorHost.Query().Get(emulatorNamespaceParam)
+	namespace := parsedDbURL.Query().Get(emulatorNamespaceParam)
 	if namespace == "" {
-		if strings.Contains(rawEmulatorHostURL, ".") {
+		if strings.Contains(rawEmulatorHostURL, ".") && !strings.Contains(rawEmulatorHostURL, "127.0.0.1") {
 			namespace = strings.Split(rawEmulatorHostURL, ".")[0]
-		}
-		if namespace == "" {
-			return nil, fmt.Errorf(`invalid database URL: "%s". Database URL must be a valid URL to a Firebase Realtime Database instance (include ?ns=<db-name> query param)`, parsedEmulatorHost)
+			if namespace == "" {
+				return nil, fmt.Errorf(`invalid database URL: "%s". Database URL must be a valid URL to a Firebase Realtime Database instance (Emulator URL include ?ns=<db-name> query param, or Real DB URL in Firebase Console with https://<db-name>.firebaseio.com)`, parsedDbURL)
+			}
+
+		} else {
+			namespace = strings.Split(parsedDbURL.Host, ".")[0]
+			if namespace == "" {
+				return nil, fmt.Errorf(`invalid database URL: "%s". Database URL must be a valid URL to a Firebase Realtime Database instance (Emulator URL include ?ns=<db-name> query param, or Real DB URL in Firebase Console with https://<db-name>.firebaseio.com)`, parsedDbURL)
+			}
 		}
 	}
 
