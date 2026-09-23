@@ -22,13 +22,275 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
-	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/internal"
 )
 
 func TestSubscribe(t *testing.T) {
+	var mu sync.Mutex
+	var requestCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requestCount++
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "id2") {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": {"status": "INVALID_ARGUMENT", "message": "error_reason"}}`))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("{}"))
+		}
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1", "id2"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkTopicMgtResponse(t, resp, "INVALID_ARGUMENT")
+	if requestCount != 2 {
+		t.Errorf("got %d requests, want 2", requestCount)
+	}
+}
+
+func TestSubscribeAlreadyExists409(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"error": {"status": "ALREADY_EXISTS", "message": "Already exists"}}`))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 1 || resp.FailureCount != 0 {
+		t.Errorf("resp = (%d, %d), want (1, 0)", resp.SuccessCount, resp.FailureCount)
+	}
+}
+
+func TestSubscribe204Success(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 1 || resp.FailureCount != 0 {
+		t.Errorf("resp = (%d, %d), want (1, 0)", resp.SuccessCount, resp.FailureCount)
+	}
+}
+
+func TestUnsubscribe(t *testing.T) {
+	var mu sync.Mutex
+	var requestCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requestCount++
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "id2") {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": {"status": "INVALID_ARGUMENT", "message": "error_reason"}}`))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("{}"))
+		}
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1", "id2"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkTopicMgtResponse(t, resp, "INVALID_ARGUMENT")
+	if requestCount != 2 {
+		t.Errorf("got %d requests, want 2", requestCount)
+	}
+}
+
+func TestUnsubscribeNotFound404(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error": {"status": "NOT_FOUND", "message": "Not found"}}`))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 0 || resp.FailureCount != 1 {
+		t.Errorf("resp = (%d, %d), want (0, 1)", resp.SuccessCount, resp.FailureCount)
+	}
+	if len(resp.Errors) != 1 || resp.Errors[0].Reason != "NOT_FOUND" {
+		t.Errorf("Errors[0].Reason = %q, want NOT_FOUND", resp.Errors[0].Reason)
+	}
+}
+
+func TestTopicManagementFcmErrorDetails(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{
+			"error": {
+				"status": "NOT_FOUND",
+				"details": [
+					{
+						"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+						"errorCode": "UNREGISTERED"
+					}
+				]
+			}
+		}`))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 0 || resp.FailureCount != 1 {
+		t.Errorf("resp = (%d, %d), want (0, 1)", resp.SuccessCount, resp.FailureCount)
+	}
+	if len(resp.Errors) != 1 || resp.Errors[0].Reason != "UNREGISTERED" {
+		t.Errorf("Errors[0].Reason = %q, want UNREGISTERED", resp.Errors[0].Reason)
+	}
+}
+
+func TestTopicManagement500Error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": null}`))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 0 || resp.FailureCount != 1 {
+		t.Errorf("resp = (%d, %d), want (0, 1)", resp.SuccessCount, resp.FailureCount)
+	}
+	if len(resp.Errors) != 1 || resp.Errors[0].Reason != "INTERNAL" {
+		t.Errorf("Errors[0].Reason = %q, want INTERNAL", resp.Errors[0].Reason)
+	}
+}
+
+func TestTopicManagementNonJsonError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("not json"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SuccessCount != 0 || resp.FailureCount != 1 {
+		t.Errorf("resp = (%d, %d), want (0, 1)", resp.SuccessCount, resp.FailureCount)
+	}
+	if len(resp.Errors) != 1 || resp.Errors[0].Reason != "INVALID_ARGUMENT" {
+		t.Errorf("Errors[0].Reason = %q, want INVALID_ARGUMENT", resp.Errors[0].Reason)
+	}
+}
+
+func TestTopicManagementContextCancelled(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	client, err := NewClient(context.Background(), testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	resp, err := client.SubscribeToTopic(ctx, []string{"id1"}, "test-topic")
+	if err != context.Canceled {
+		t.Errorf("SubscribeToTopic() = (%#v, %v); want = (nil, %v)", resp, err, context.Canceled)
+	}
+
+	resp, err = client.UnsubscribeFromTopic(ctx, []string{"id1"}, "test-topic")
+	if err != context.Canceled {
+		t.Errorf("UnsubscribeFromTopic() = (%#v, %v); want = (nil, %v)", resp, err, context.Canceled)
+	}
+}
+
+func TestSubscribeLegacy(t *testing.T) {
 	var tr *http.Request
 	var b []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,12 +308,38 @@ func TestSubscribe(t *testing.T) {
 	}
 	client.iidEndpoint = ts.URL + "/v1"
 
-	resp, err := client.SubscribeToTopic(ctx, []string{"id1", "id2"}, "test-topic")
+	resp, err := client.SubscribeToTopicLegacy(ctx, []string{"id1", "id2"}, "test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
 	checkIIDRequest(t, b, tr, iidSubscribe)
-	checkTopicMgtResponse(t, resp)
+	checkTopicMgtResponse(t, resp, "error_reason")
+}
+
+func TestUnsubscribeLegacy(t *testing.T) {
+	var tr *http.Request
+	var b []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr = r
+		b, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
+	}))
+	defer ts.Close()
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.iidEndpoint = ts.URL + "/v1"
+
+	resp, err := client.UnsubscribeFromTopicLegacy(ctx, []string{"id1", "id2"}, "test-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkIIDRequest(t, b, tr, iidUnsubscribe)
+	checkTopicMgtResponse(t, resp, "error_reason")
 }
 
 func TestInvalidSubscribe(t *testing.T) {
@@ -71,32 +359,6 @@ func TestInvalidSubscribe(t *testing.T) {
 	}
 }
 
-func TestUnsubscribe(t *testing.T) {
-	var tr *http.Request
-	var b []byte
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tr = r
-		b, _ = io.ReadAll(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{\"results\": [{}, {\"error\": \"error_reason\"}]}"))
-	}))
-	defer ts.Close()
-
-	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.iidEndpoint = ts.URL + "/v1"
-
-	resp, err := client.UnsubscribeFromTopic(ctx, []string{"id1", "id2"}, "test-topic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	checkIIDRequest(t, b, tr, iidUnsubscribe)
-	checkTopicMgtResponse(t, resp)
-}
-
 func TestInvalidUnsubscribe(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
@@ -111,68 +373,6 @@ func TestInvalidUnsubscribe(t *testing.T) {
 					"UnsubscribeFromTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, resp, err, tc.want)
 			}
 		})
-	}
-}
-
-func TestTopicManagementError(t *testing.T) {
-	var resp string
-	var status int
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(status)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(resp))
-	}))
-	defer ts.Close()
-
-	ctx := context.Background()
-	client, err := NewClient(ctx, testMessagingConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.iidEndpoint = ts.URL + "/v1"
-	client.iidClient.httpClient.RetryConfig = nil
-
-	cases := []struct {
-		name, resp, want string
-		status           int
-		check            func(err error) bool
-	}{
-		{
-			name:   "EmptyResponse",
-			resp:   "{}",
-			want:   "unexpected http response with status: 500\n{}",
-			status: http.StatusInternalServerError,
-			check:  errorutils.IsInternal,
-		},
-		{
-			name:   "ErrorCode",
-			resp:   "{\"error\": \"INVALID_ARGUMENT\"}",
-			want:   "error while calling the iid service: INVALID_ARGUMENT",
-			status: http.StatusBadRequest,
-			check:  errorutils.IsInvalidArgument,
-		},
-		{
-			name:   "NotJson",
-			resp:   "not json",
-			want:   "unexpected http response with status: 500\nnot json",
-			status: http.StatusInternalServerError,
-			check:  errorutils.IsInternal,
-		},
-	}
-
-	for _, tc := range cases {
-		resp = tc.resp
-		status = tc.status
-
-		tmr, err := client.SubscribeToTopic(ctx, []string{"id1"}, "topic")
-		if err == nil || err.Error() != tc.want || !tc.check(err) {
-			t.Errorf("SubscribeToTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, tmr, err, tc.want)
-		}
-
-		tmr, err = client.UnsubscribeFromTopic(ctx, []string{"id1"}, "topic")
-		if err == nil || err.Error() != tc.want || !tc.check(err) {
-			t.Errorf("UnsubscribeFromTopic(%s) = (%#v, %v); want = (nil, %q)", tc.name, tmr, err, tc.want)
-		}
 	}
 }
 
@@ -205,7 +405,7 @@ func checkIIDRequest(t *testing.T, b []byte, tr *http.Request, op string) {
 	}
 }
 
-func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
+func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse, wantReason string) {
 	if resp.SuccessCount != 1 {
 		t.Errorf("SuccessCount = %d; want  = %d", resp.SuccessCount, 1)
 	}
@@ -219,8 +419,8 @@ func checkTopicMgtResponse(t *testing.T, resp *TopicManagementResponse) {
 	if e.Index != 1 {
 		t.Errorf("ErrorInfo.Index = %d; want = %d", e.Index, 1)
 	}
-	if e.Reason != "error_reason" {
-		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, "error_reason")
+	if e.Reason != wantReason {
+		t.Errorf("ErrorInfo.Reason = %s; want = %s", e.Reason, wantReason)
 	}
 }
 
