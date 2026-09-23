@@ -111,7 +111,7 @@ func handleRemoteConfigError(resp *internal.Response) error {
 	}
 	json.Unmarshal(resp.Body, &p)
 	if p.Error != "" {
-		err.String = fmt.Sprintf("http error status: %d; reason: %s", resp.Status, p.Error)
+		err.Message = fmt.Sprintf("http error status: %d; reason: %s", resp.Status, p.Error)
 	}
 
 	return err

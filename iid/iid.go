@@ -152,7 +152,7 @@ func createError(resp *internal.Response) error {
 	if msg, ok := errorMessages[resp.Status]; ok {
 		requestPath := resp.LowLevelResponse().Request.URL.Path
 		idx := strings.LastIndex(requestPath, "/")
-		err.String = fmt.Sprintf("instance id %q: %s", requestPath[idx+1:], msg)
+		err.Message = fmt.Sprintf("instance id %q: %s", requestPath[idx+1:], msg)
 	}
 
 	return err
