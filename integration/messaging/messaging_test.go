@@ -23,6 +23,7 @@ import (
 	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/v4/integration/internal"
 	"firebase.google.com/go/v4/messaging"
@@ -95,6 +96,164 @@ func TestSend(t *testing.T) {
 	}
 	if !messageIDPattern.MatchString(name) {
 		t.Errorf("Send() = %q; want = %q", name, messageIDPattern.String())
+	}
+}
+
+func fullAndroidNotificationV2() *messaging.AndroidNotificationV2 {
+	count := 1
+	id := 42
+	eventTimestamp := time.Now()
+	return &messaging.AndroidNotificationV2{
+		Title:                 "test.title",
+		Body:                  "test.body",
+		Icon:                  "test.icon",
+		Color:                 "#AABBCC",
+		Sound:                 "test.sound",
+		Tag:                   "test.tag",
+		ClickAction:           "test.click.action",
+		BodyLocKey:            "test.body.loc.key",
+		BodyLocArgs:           []string{"body.arg1", "body.arg2"},
+		TitleLocKey:           "test.title.loc.key",
+		TitleLocArgs:          []string{"title.arg1", "title.arg2"},
+		ChannelID:             "test.channel.id",
+		ImageURL:              "https://example.com/image.png",
+		Ticker:                "test.ticker",
+		Sticky:                true,
+		EventTimestamp:        &eventTimestamp,
+		LocalOnly:             true,
+		Priority:              messaging.PriorityHigh,
+		VibrateTimingMillis:   []int64{100, 50, 250},
+		DefaultVibrateTimings: true,
+		DefaultSound:          true,
+		LightSettings: &messaging.LightSettings{
+			Color:                  "#AABBCC",
+			LightOnDurationMillis:  200,
+			LightOffDurationMillis: 300,
+		},
+		DefaultLightSettings: true,
+		Visibility:           messaging.VisibilityPrivate,
+		NotificationCount:    &count,
+		ID:                   &id,
+	}
+}
+
+// fullAndroidConfigV2Base populates all shared AndroidConfigV2 fields.
+func fullAndroidConfigV2Base() *messaging.AndroidConfigV2 {
+	ttl := 5 * time.Second
+	return &messaging.AndroidConfigV2{
+		CollapseKey:            "test-key",
+		TTL:                    &ttl,
+		RestrictedPackageName:  "com.google.firebase.testing",
+		Data:                   map[string]string{"androidFoo": "androidBar"},
+		FCMOptions:             &messaging.AndroidFCMOptions{AnalyticsLabel: "test-analytics"},
+		DirectBootOK:           true,
+		BandwidthConstrainedOK: true,
+		RestrictedSatelliteOK:  true,
+	}
+}
+
+// androidV2RemoteNotificationMessage populates RemoteNotification and all shared AndroidConfigV2 fields.
+func androidV2RemoteNotificationMessage() *messaging.Message {
+	config := fullAndroidConfigV2Base()
+	config.RemoteNotification = &messaging.AndroidRemoteNotification{
+		MutableContent:     true,
+		UseAsV1DataMessage: true,
+		Notification:       fullAndroidNotificationV2(),
+	}
+	return &messaging.Message{
+		Topic: "foo-bar",
+		Notification: &messaging.Notification{
+			Title: "Title",
+			Body:  "Body",
+		},
+		AndroidV2: config,
+	}
+}
+
+// androidV2BackgroundSyncMessage populates BackgroundSync and all shared AndroidConfigV2 fields.
+func androidV2BackgroundSyncMessage() *messaging.Message {
+	config := fullAndroidConfigV2Base()
+	config.BackgroundSync = &messaging.AndroidBackgroundSyncMessage{}
+	return &messaging.Message{
+		Topic:     "foo-bar",
+		AndroidV2: config,
+	}
+}
+
+func androidV2MinimalRemoteNotificationMessage() *messaging.Message {
+	return &messaging.Message{
+		Topic: "foo-bar",
+		AndroidV2: &messaging.AndroidConfigV2{
+			RemoteNotification: &messaging.AndroidRemoteNotification{
+				Notification: &messaging.AndroidNotificationV2{
+					Title: "test.title",
+					Body:  "test.body",
+				},
+			},
+		},
+	}
+}
+
+func androidV2MinimalBackgroundSyncMessage() *messaging.Message {
+	return &messaging.Message{
+		Topic: "foo-bar",
+		AndroidV2: &messaging.AndroidConfigV2{
+			BackgroundSync: &messaging.AndroidBackgroundSyncMessage{},
+		},
+	}
+}
+
+func TestSendAndroidV2(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  *messaging.Message
+	}{
+		{"FullRemoteNotification", androidV2RemoteNotificationMessage()},
+		{"MinimalRemoteNotification", androidV2MinimalRemoteNotificationMessage()},
+		{"FullBackgroundSync", androidV2BackgroundSyncMessage()},
+		{"MinimalBackgroundSync", androidV2MinimalBackgroundSyncMessage()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			name, err := client.SendDryRun(context.Background(), tc.msg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !messageIDPattern.MatchString(name) {
+				t.Errorf("Send() = %q; want = %q", name, messageIDPattern.String())
+			}
+		})
+	}
+}
+
+func TestSendEachAndroidV2(t *testing.T) {
+	messages := []*messaging.Message{
+		androidV2RemoteNotificationMessage(),
+		androidV2MinimalRemoteNotificationMessage(),
+		androidV2BackgroundSyncMessage(),
+		androidV2MinimalBackgroundSyncMessage(),
+	}
+
+	br, err := client.SendEachDryRun(context.Background(), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != len(messages) {
+		t.Errorf("len(Responses) = %d; want = %d", len(br.Responses), len(messages))
+	}
+	if br.SuccessCount != len(messages) {
+		t.Errorf("SuccessCount = %d; want = %d", br.SuccessCount, len(messages))
+	}
+	if br.FailureCount != 0 {
+		t.Errorf("FailureCount = %d; want = 0", br.FailureCount)
+	}
+
+	for i, sr := range br.Responses {
+		if err := checkSuccessfulSendResponse(sr); err != nil {
+			t.Errorf("Responses[%d]: %v", i, err)
+		}
 	}
 }
 
