@@ -3,3 +3,4 @@ testdata/integration_*
 *~
 \#*\#
 .DS_Store
+.idea
