@@ -1084,7 +1084,7 @@ var updateUserCases = []struct {
 					},
 					DisplayName:         "Spouse's phone number",
 					FactorID:            "phone",
-					EnrollmentTimestamp: time.Now().Unix(),
+					EnrollmentTimestamp: 1614776780000,
 				}, {
 					UID: "enrolledSecondFactor2",
 					Phone: &PhoneMultiFactorInfo{
@@ -1108,7 +1108,7 @@ var updateUserCases = []struct {
 				MFAEnrollmentID: "enrolledSecondFactor1",
 				PhoneInfo:       "+11234567890",
 				DisplayName:     "Spouse's phone number",
-				EnrolledAt:      time.Now().Format("2006-01-02T15:04:05Z07:00Z"),
+				EnrolledAt:      "2021-03-03T13:06:20Z",
 			},
 			{
 				MFAEnrollmentID: "enrolledSecondFactor2",
