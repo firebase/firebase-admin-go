@@ -92,6 +92,9 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 	if err != nil {
 		return nil, err
 	}
+	hc.Opts = []internal.HTTPOption{
+		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
+	}
 
 	return &Client{
 		projectID: conf.ProjectID,
@@ -181,8 +184,20 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 // VerifyOneTimeToken verifies the given App Check token and consumes it.
 //
 // This method performs the same stateless verification as VerifyToken. In addition, it makes a
-// stateful network call to the Firebase App Check backend to ensure that the token has not been
-// consumed previously. If the token is valid, it is marked as consumed.
+// network call to the Firebase App Check backend to mark the token as consumed, enabling the
+// replay protection feature.
+//
+// VerifyOneTimeToken does not return an error for tokens that have already been consumed.
+// Instead, the AlreadyConsumed field of the returned DecodedAppCheckToken is set to true.
+//
+// Tokens are only considered to be consumed if they are sent to the App Check backend by calling
+// this method; other uses of the token, such as calling VerifyToken, do not consume it.
+//
+// This replay protection feature requires an additional network call to the App Check backend
+// and forces your clients to obtain a fresh attestation from your chosen attestation providers.
+// This can therefore negatively impact performance and can potentially deplete your attestation
+// providers' quotas faster. We recommend that you use this feature only for protecting
+// low volume, security critical, or expensive operations.
 func (c *Client) VerifyOneTimeToken(ctx context.Context, token string) (*DecodedAppCheckToken, error) {
 	decodedToken, err := c.VerifyToken(token)
 	if err != nil {

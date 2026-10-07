@@ -145,6 +145,7 @@ func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
 	conf := &internal.AppCheckConfig{
 		ProjectID: a.projectID,
 		Opts:      a.opts,
+		Version:   Version,
 	}
 	return appcheck.NewClient(ctx, conf)
 }

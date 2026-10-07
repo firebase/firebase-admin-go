@@ -359,6 +359,9 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if h, want := r.Header.Get("x-goog-api-client"), internal.GetMetricsHeader("test-version"); h != want {
+					t.Errorf("x-goog-api-client header = %q; want = %q", h, want)
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.backendStatus)
 				w.Write([]byte(tc.backendResponse))
@@ -372,6 +375,7 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			conf := &internal.AppCheckConfig{
 				ProjectID: "project_id",
 				Opts:      []option.ClientOption{option.WithoutAuthentication()},
+				Version:   "test-version",
 			}
 			client, err := NewClient(context.Background(), conf)
 			if err != nil {
