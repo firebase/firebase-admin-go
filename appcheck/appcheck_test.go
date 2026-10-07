@@ -23,6 +23,16 @@ type appCheckClaims struct {
 	jwt.RegisteredClaims
 }
 
+func TestNewClientWithoutProjectID(t *testing.T) {
+	conf := &internal.AppCheckConfig{
+		Opts: []option.ClientOption{option.WithoutAuthentication()},
+	}
+	client, err := NewClient(context.Background(), conf)
+	if client != nil || err == nil {
+		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", client, err)
+	}
+}
+
 func TestVerifyTokenHasValidClaims(t *testing.T) {
 	ts, err := setupFakeJWKS()
 	if err != nil {

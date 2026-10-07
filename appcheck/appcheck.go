@@ -80,6 +80,9 @@ type Client struct {
 // the App Check service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
 	// TODO: Add support for overriding the HTTP client using the App one.
+	if conf.ProjectID == "" {
+		return nil, errors.New("project ID is required to access Firebase App Check client")
+	}
 	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
 		Ctx:             ctx,
 		RefreshInterval: 6 * time.Hour,
