@@ -192,10 +192,12 @@ func (u *UserToImport) set(key string, value interface{}) *UserToImport {
 //
 // One or more user providers can be specified for each user when importing in bulk.
 // See UserToImport type.
+// More info at https://firebase.google.com/docs/reference/admin/node/firebase-admin.auth.userproviderrequest.md#properties
 type UserProvider struct {
 	UID         string `json:"rawId"`
 	ProviderID  string `json:"providerId"`
 	Email       string `json:"email,omitempty"`
+	PhoneNumber string `json:"phoneNumber,omitempty"`
 	DisplayName string `json:"displayName,omitempty"`
 	PhotoURL    string `json:"photoUrl,omitempty"`
 }
