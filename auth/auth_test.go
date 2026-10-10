@@ -525,7 +525,7 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
-				t.Fatalf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
+				t.Fatalf("VerifyIDToken(%q) = (%v, %v); want = (token, nil)", tc.name, ft, err)
 			}
 			if ft.Claims["admin"] != true {
 				t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
