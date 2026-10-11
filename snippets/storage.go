@@ -19,7 +19,6 @@ import (
 	"log"
 
 	firebase "firebase.google.com/go/v4"
-	"google.golang.org/api/option"
 )
 
 // ==================================================================
@@ -31,8 +30,7 @@ func cloudStorage() {
 	config := &firebase.Config{
 		StorageBucket: "<BUCKET_NAME>.appspot.com",
 	}
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-	app, err := firebase.NewApp(context.Background(), config, opt)
+	app, err := firebase.NewApp(context.Background(), config)
 	if err != nil {
 		log.Fatalln(err)
 	}
