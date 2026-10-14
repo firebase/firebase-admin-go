@@ -752,7 +752,7 @@ func TestGetOrderedWithLeafNode(t *testing.T) {
 		t.Fatalf("GetOrdered(chid) = %d; want = 1", len(result))
 	}
 	if result[0].Key() != "0" {
-		t.Errorf("GetOrdered(value).Key() = %v; want = %q", result[0].Key(), 0)
+		t.Errorf("GetOrdered(value).Key() = %v; want = %q", result[0].Key(), "0")
 	}
 
 	var v interface{}
