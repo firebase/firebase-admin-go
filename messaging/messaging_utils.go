@@ -52,7 +52,14 @@ func validateMessage(message *Message) error {
 	}
 
 	// validate AndroidConfig
+	if message.Android != nil && message.AndroidV2 != nil {
+		return fmt.Errorf("at most one of android or androidV2 can be specified; use AndroidConfigV2")
+	}
 	if err := validateAndroidConfig(message.Android); err != nil {
+		return err
+	}
+
+	if err := validateAndroidConfigV2(message.AndroidV2); err != nil {
 		return err
 	}
 
@@ -95,10 +102,59 @@ func validateAndroidConfig(config *AndroidConfig) error {
 	return validateAndroidNotification(config.Notification)
 }
 
+func validateAndroidConfigV2(config *AndroidConfigV2) error {
+	if config == nil {
+		return nil
+	}
+
+	if config.TTL != nil && config.TTL.Seconds() < 0 {
+		return fmt.Errorf("ttl duration must not be negative")
+	}
+
+	targets := countTrue(config.RemoteNotification != nil, config.BackgroundSync != nil)
+	if targets != 1 {
+		return fmt.Errorf("exactly one of remoteNotification or backgroundSync is required")
+	}
+
+	if config.RemoteNotification == nil {
+		return nil
+	}
+	return validateAndroidNotificationV2(config.RemoteNotification.Notification)
+}
+
 func validateAndroidNotification(notification *AndroidNotification) error {
 	if notification == nil {
 		return nil
 	}
+	if notification.Color != "" && !colorPattern.MatchString(notification.Color) {
+		return fmt.Errorf("color must be in the #RRGGBB form")
+	}
+	if len(notification.TitleLocArgs) > 0 && notification.TitleLocKey == "" {
+		return fmt.Errorf("titleLocKey is required when specifying titleLocArgs")
+	}
+	if len(notification.BodyLocArgs) > 0 && notification.BodyLocKey == "" {
+		return fmt.Errorf("bodyLocKey is required when specifying bodyLocArgs")
+	}
+	image := notification.ImageURL
+	if image != "" {
+		if _, err := url.ParseRequestURI(image); err != nil {
+			return fmt.Errorf("invalid image URL: %q", image)
+		}
+	}
+	for _, timing := range notification.VibrateTimingMillis {
+		if timing < 0 {
+			return fmt.Errorf("vibrateTimingMillis must not be negative")
+		}
+	}
+
+	return validateLightSettings(notification.LightSettings)
+}
+
+func validateAndroidNotificationV2(notification *AndroidNotificationV2) error {
+	if notification == nil {
+		return nil
+	}
+
 	if notification.Color != "" && !colorPattern.MatchString(notification.Color) {
 		return fmt.Errorf("color must be in the #RRGGBB form")
 	}
@@ -238,6 +294,16 @@ func countNonEmpty(strings ...string) int {
 	count := 0
 	for _, s := range strings {
 		if s != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func countTrue(bools ...bool) int {
+	count := 0
+	for _, b := range bools {
+		if b {
 			count++
 		}
 	}
