@@ -22,7 +22,6 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/db"
-	"google.golang.org/api/option"
 )
 
 // [END authenticate_db_imports]
@@ -33,11 +32,9 @@ func authenticateWithAdminPrivileges() {
 	conf := &firebase.Config{
 		DatabaseURL: "https://databaseName.firebaseio.com",
 	}
-	// Fetch the service account key JSON file contents
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
 
-	// Initialize the app with a service account, granting admin privileges
-	app, err := firebase.NewApp(ctx, conf, opt)
+	// Initialize the app with Application Default Credentials, granting admin privileges
+	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
@@ -67,10 +64,7 @@ func authenticateWithLimitedPrivileges() {
 		AuthOverride: &ao,
 	}
 
-	// Fetch the service account key JSON file contents
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-
-	app, err := firebase.NewApp(ctx, conf, opt)
+	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
@@ -100,10 +94,7 @@ func authenticateWithGuestPrivileges() {
 		AuthOverride: &nilMap,
 	}
 
-	// Fetch the service account key JSON file contents
-	opt := option.WithCredentialsFile("path/to/serviceAccountKey.json")
-
-	app, err := firebase.NewApp(ctx, conf, opt)
+	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		log.Fatalln("Error initializing app:", err)
 	}
