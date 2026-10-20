@@ -98,12 +98,22 @@ var invalidOIDCConfigIDs = []string{
 	"",
 	"invalid.id",
 	"saml.config",
+	"oidc.",
+	"oidc.config.",
+	"oidc.config/sub",
+	"oidc.config?param=1",
+	"oidc.config#frag",
 }
 
 var invalidSAMLConfigIDs = []string{
 	"",
 	"invalid.id",
 	"oidc.config",
+	"saml.",
+	"saml.config.",
+	"saml.config/sub",
+	"saml.config?param=1",
+	"saml.config#frag",
 }
 
 func TestOIDCProviderConfig(t *testing.T) {
