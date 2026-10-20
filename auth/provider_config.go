@@ -978,7 +978,7 @@ func isSafeURLSegment(segment string) bool {
 }
 
 func validateOIDCConfigID(id string) error {
-	if !strings.HasPrefix(id, "oidc.") || id == "oidc." || !isSafeURLSegment(id) {
+	if !strings.HasPrefix(id, "oidc.") || !isSafeURLSegment(id) {
 		return fmt.Errorf("invalid OIDC provider id: %q", id)
 	}
 
@@ -986,7 +986,7 @@ func validateOIDCConfigID(id string) error {
 }
 
 func validateSAMLConfigID(id string) error {
-	if !strings.HasPrefix(id, "saml.") || id == "saml." || !isSafeURLSegment(id) {
+	if !strings.HasPrefix(id, "saml.") || !isSafeURLSegment(id) {
 		return fmt.Errorf("invalid SAML provider id: %q", id)
 	}
 
