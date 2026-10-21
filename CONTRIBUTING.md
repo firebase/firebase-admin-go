@@ -47,7 +47,7 @@ Great, we love hearing how we can improve our products! Share you idea through o
 ## <a name="submit"></a>Want to submit a pull request?
 
 Sweet, we'd love to accept your contribution!
-[Open a new pull request](https://github.com/firebase/firebase-admin-go/pull/new/master) and fill
+[Open a new pull request](https://github.com/firebase/firebase-admin-go/compare/dev...) and fill
 out the provided template.
 
 Make sure to create all your pull requests against the `dev` branch. All development
@@ -98,7 +98,7 @@ to checkout the sources of Firebase Admin SDK, and its dependencies:
 
 ```bash
 $ cd $GOPATH
-$ git clone https://github.com/firebase/firebase-admin-go.git src/firebase.google.com/go
+$ git clone -b dev https://github.com/firebase/firebase-admin-go.git src/firebase.google.com/go
 $ go get -d -t firebase.google.com/go/... # Install dependencies
 ```
 

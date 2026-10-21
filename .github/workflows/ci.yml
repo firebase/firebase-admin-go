@@ -2,6 +2,19 @@ name: Continuous Integration
 on: pull_request
 jobs:
 
+  check_base_branch:
+    name: Check base branch
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify target branch is dev
+      env:
+        BASE_REF: ${{ github.base_ref }}
+      run: |
+        if [[ "${BASE_REF}" != "dev" ]]; then
+          echo "::error title=Invalid Base Branch::Pull requests must target the 'dev' branch (currently targeting '${BASE_REF}'). Please edit this PR to change the base branch to 'dev'."
+          exit 1
+        fi
+
   module:
     name: Module build
     runs-on: ubuntu-latest
