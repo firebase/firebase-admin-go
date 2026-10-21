@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Target Branch:** Please make sure the **base branch** dropdown above is set to **`dev`** (not `main`). All development work takes place on the `dev` branch.
+
 Hey there! So you want to contribute to a Firebase SDK? 
 Before you file this pull request, please read these guidelines:
 

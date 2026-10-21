@@ -102,15 +102,15 @@ jobs:
       run: ./.github/scripts/publish_preflight_check.sh
 
     # We authorize this step with temporary GitHub App installation token that has
-    # write access to the master branch.
-    - name: Fast-forward master to dev
+    # write access to the main branch.
+    - name: Fast-forward main to dev
       run: |
         git checkout dev
         git pull origin dev
-        git checkout master
-        git pull origin master
+        git checkout main
+        git pull origin main
         git merge dev --ff-only
-        git push origin master
+        git push origin main
 
     # See: https://cli.github.com/manual/gh_release_create
     - name: Create release tag
@@ -122,4 +122,4 @@ jobs:
         gh release create "$RELEASE_VER" \
           --title "Firebase Admin Go SDK $RELEASE_VER" \
           --notes "$RELEASE_BODY" \
-          --target "master"
+          --target "main"
