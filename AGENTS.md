@@ -69,7 +69,7 @@ The Firebase Admin Go SDK enables server-side (backend) applications to interact
 -   **DON'T:** Introduce new third-party dependencies without a strong, documented justification and team consensus.
 
 ## 9. Branch Creation
-- Always create new branches from the `dev` branch (never `master`).
+- Always create new branches from the `dev` branch (never `main`).
 - When creating a new branch use the format `agentName-short-description`.
     * Example: `jules-auth-token-parsing`
     * Example: `gemini-add-storage-file-signer`
@@ -78,7 +78,7 @@ The Firebase Admin Go SDK enables server-side (backend) applications to interact
 ## 10. Commit and Pull Request Generation
 
 After implementing and testing a change, you may create a commit and pull request which must follow the following these rules:
-- Always target the `dev` branch as the base branch when creating a pull request (e.g., `gh pr create --base dev`). Never target `master`.
+- Always target the `dev` branch as the base branch when creating a pull request (e.g., `gh pr create --base dev`). Never target `main`.
 
 ### Commit and Pull Request Title Format:
 Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification: `type(scope): subject`

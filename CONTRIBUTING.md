@@ -51,9 +51,9 @@ Sweet, we'd love to accept your contribution!
 out the provided template.
 
 Make sure to create all your pull requests against the `dev` branch. All development
-work takes place on this branch, while the `master` branch is dedicated for released
+work takes place on this branch, while the `main` branch is dedicated for released
 stable code. This enables us to review and merge routine code changes, without
-impacting downstream applications that are building against our `master`
+impacting downstream applications that are building against our `main`
 branch.
 
 **If you want to implement a new feature, please open an issue with a proposal first so that we can
