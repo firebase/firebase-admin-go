@@ -1,0 +1,54 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      google-minor-and-patch:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+          - "github.com/google/*"
+          - "github.com/googleapis/*"
+          - "github.com/GoogleCloudPlatform/*"
+        update-types:
+          - "minor"
+          - "patch"
+      golang-x-minor-and-patch:
+        patterns:
+          - "golang.org/x/*"
+        update-types:
+          - "minor"
+          - "patch"
+      other-minor-and-patch:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+          - "github.com/google/*"
+          - "github.com/googleapis/*"
+          - "github.com/GoogleCloudPlatform/*"
+          - "golang.org/x/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
