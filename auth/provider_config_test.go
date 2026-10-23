@@ -98,12 +98,22 @@ var invalidOIDCConfigIDs = []string{
 	"",
 	"invalid.id",
 	"saml.config",
+	"oidc.",
+	"oidc.config.",
+	"oidc.config/sub",
+	"oidc.config?param=1",
+	"oidc.config#frag",
 }
 
 var invalidSAMLConfigIDs = []string{
 	"",
 	"invalid.id",
 	"oidc.config",
+	"saml.",
+	"saml.config.",
+	"saml.config/sub",
+	"saml.config?param=1",
+	"saml.config#frag",
 }
 
 func TestOIDCProviderConfig(t *testing.T) {
@@ -483,12 +493,11 @@ func TestUpdateOIDCProviderConfigZeroValues(t *testing.T) {
 }
 
 func TestUpdateOIDCProviderConfigInvalidID(t *testing.T) {
-	cases := []string{"", "saml.config"}
 	client := &baseClient{}
 	options := (&OIDCProviderConfigToUpdate{}).
 		DisplayName("")
 	want := "invalid OIDC provider id: "
-	for _, tc := range cases {
+	for _, tc := range invalidOIDCConfigIDs {
 		_, err := client.UpdateOIDCProviderConfig(context.Background(), tc, options)
 		if err == nil || !strings.HasPrefix(err.Error(), want) {
 			t.Errorf("UpdateOIDCProviderConfig(%q) = %v; want = %q", tc, err, want)
@@ -1103,14 +1112,13 @@ func TestUpdateSAMLProviderConfigZeroValues(t *testing.T) {
 }
 
 func TestUpdateSAMLProviderConfigInvalidID(t *testing.T) {
-	cases := []string{"", "oidc.config"}
 	client := &baseClient{}
 	options := (&SAMLProviderConfigToUpdate{}).
 		DisplayName("").
 		Enabled(false).
 		RequestSigningEnabled(false)
 	want := "invalid SAML provider id: "
-	for _, tc := range cases {
+	for _, tc := range invalidSAMLConfigIDs {
 		_, err := client.UpdateSAMLProviderConfig(context.Background(), tc, options)
 		if err == nil || !strings.HasPrefix(err.Error(), want) {
 			t.Errorf("UpdateSAMLProviderConfig(%q) = %v; want = %q", tc, err, want)
