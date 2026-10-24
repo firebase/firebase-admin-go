@@ -1354,6 +1354,8 @@ func (c *baseClient) CreateUser(ctx context.Context, user *UserToCreate) (*UserR
 	return c.GetUser(ctx, uid)
 }
 
+
+
 func (c *baseClient) createUser(ctx context.Context, user *UserToCreate) (string, error) {
 	if user == nil {
 		user = &UserToCreate{}
