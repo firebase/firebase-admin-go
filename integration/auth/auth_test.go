@@ -135,6 +135,48 @@ func TestCustomTokenWithClaims(t *testing.T) {
 	}
 }
 
+func TestExchangeIdToken(t *testing.T) {
+	uid := "fetch_id_token_by_refresh_token"
+	ct, err := client.CustomToken(context.Background(), uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idt, err := signInWithCustomToken(ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteUser(uid)
+
+	vt, err := client.VerifyIDTokenAndCheckRevoked(context.Background(), idt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vt.UID != uid {
+		t.Errorf("UID = %q; want UID = %q", vt.UID, uid)
+	}
+
+	apiKey, err := internal.APIKey()
+	if err != nil {
+		t.Errorf("internal.APIKey() = %v; want = <nil>", err)
+	}
+
+	time.Sleep(time.Second)
+	newIdt, err := client.ExchangeIdToken(context.Background(), apiKey, "mock-refresh-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if idt == newIdt {
+		// The new ID token should be different from the old one.
+		t.Errorf("ID token = %q; want ID token != %q", newIdt, idt)
+	}
+
+	_, err = client.VerifyIDTokenAndCheckRevoked(context.Background(), newIdt)
+	if err != nil {
+		t.Errorf("VerifyIDTokenAndCheckRevoked(); err = %s; want err = <nil>", err)
+	}
+}
+
 func TestRevokeRefreshTokens(t *testing.T) {
 	uid := "user_revoked"
 	ct, err := client.CustomToken(context.Background(), uid)
