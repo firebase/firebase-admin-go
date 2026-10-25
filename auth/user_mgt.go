@@ -59,6 +59,9 @@ type UserInfo struct {
 	// In UserRecord.UserInfo it will return the constant string "firebase".
 	ProviderID string `json:"providerId,omitempty"`
 	UID        string `json:"rawId,omitempty"`
+	// ScreenName is the user's screen name at Twitter or login name at GitHub.
+	// Only populated in ProviderUserInfo[]
+	ScreenName string `json:"screenName,omitempty"`
 }
 
 // multiFactorInfoResponse describes the `mfaInfo` of the user record API response
