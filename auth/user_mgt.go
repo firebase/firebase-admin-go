@@ -803,7 +803,7 @@ func (c *baseClient) GetUserByProviderUID(ctx context.Context, providerID string
 	if len(getUsersResult.Users) == 0 {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.NotFound,
-			String:    fmt.Sprintf("cannot find user from providerID: { %s, %s }", providerID, providerUID),
+			Message:   fmt.Sprintf("cannot find user from providerID: { %s, %s }", providerID, providerUID),
 			Response:  nil,
 			Ext: map[string]interface{}{
 				authErrorCode: userNotFound,
@@ -848,7 +848,7 @@ func (c *baseClient) getUser(ctx context.Context, query *userQuery) (*UserRecord
 	if len(parsed.Users) == 0 {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.NotFound,
-			String:    fmt.Sprintf("no user exists with the %s", query.description()),
+			Message:   fmt.Sprintf("no user exists with the %s", query.description()),
 			Response:  resp.LowLevelResponse(),
 			Ext: map[string]interface{}{
 				authErrorCode: userNotFound,
@@ -1659,9 +1659,9 @@ func handleHTTPError(resp *internal.Response) error {
 		err.ErrorCode = authErr.code
 		err.Ext[authErrorCode] = authErr.authCode
 		if detail != "" {
-			err.String = fmt.Sprintf("%s: %s", authErr.message, detail)
+			err.Message = fmt.Sprintf("%s: %s", authErr.message, detail)
 		} else {
-			err.String = authErr.message
+			err.Message = authErr.message
 		}
 	}
 
