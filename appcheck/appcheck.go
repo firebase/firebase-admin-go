@@ -24,6 +24,9 @@ import (
 
 	"github.com/MicahParks/keyfunc"
 	"github.com/golang-jwt/jwt/v4"
+	"google.golang.org/api/option"
+	"google.golang.org/api/option/internaloption"
+	"google.golang.org/api/transport"
 
 	"firebase.google.com/go/v4/internal"
 )
@@ -79,12 +82,23 @@ type Client struct {
 // This function can only be invoked from within the SDK. Client applications should access the
 // the App Check service through firebase.App.
 func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, error) {
-	// TODO: Add support for overriding the HTTP client using the App one.
 	if conf.ProjectID == "" {
 		return nil, errors.New("project ID is required to access Firebase App Check client")
 	}
+
+	// Use the HTTP client configured on the App (option.WithHTTPClient), if any. The JWKS endpoint
+	// is public, so otherwise the keys are fetched without authentication, as before. Validation is
+	// skipped because App options carrying credentials conflict with WithoutAuthentication.
+	jwksOpts := append([]option.ClientOption{}, conf.Opts...)
+	jwksOpts = append(jwksOpts, option.WithoutAuthentication(), internaloption.SkipDialSettingsValidation())
+	jwksClient, _, err := transport.NewHTTPClient(ctx, jwksOpts...)
+	if err != nil {
+		return nil, err
+	}
+
 	jwks, err := keyfunc.Get(JWKSUrl, keyfunc.Options{
 		Ctx:             ctx,
+		Client:          jwksClient,
 		RefreshInterval: 6 * time.Hour,
 	})
 	if err != nil {

@@ -25,9 +25,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"firebase.google.com/go/v4/appcheck"
 	"firebase.google.com/go/v4/messaging"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -411,6 +413,83 @@ func TestMessagingSendWithCustomEndpoint(t *testing.T) {
 	if n != name || err != nil {
 		t.Errorf("Send() = (%q, %v); want (%q, nil)", n, err, name)
 	}
+}
+
+func TestAppCheckWithCustomHTTPClient(t *testing.T) {
+	ts := newMockJWKSServer(t)
+	defer ts.Close()
+
+	ctx := context.Background()
+	rt := &countingTransport{base: http.DefaultTransport}
+	app, err := NewApp(
+		ctx,
+		&Config{ProjectID: "test-project-id"},
+		option.WithHTTPClient(&http.Client{Transport: rt}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := app.AppCheck(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&rt.calls) == 0 {
+		t.Error("AppCheck() did not use the HTTP client provided via option.WithHTTPClient")
+	}
+}
+
+func TestAppCheckWithCredentialsAndCustomHTTPClient(t *testing.T) {
+	ts := newMockJWKSServer(t)
+	defer ts.Close()
+
+	ctx := context.Background()
+	creds := option.WithCredentialsFile("testdata/service_account.json")
+	app, err := NewApp(ctx, nil, creds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.AppCheck(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	rt := &countingTransport{base: http.DefaultTransport}
+	app, err = NewApp(ctx, nil, creds, option.WithHTTPClient(&http.Client{Transport: rt}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.AppCheck(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&rt.calls) == 0 {
+		t.Error("AppCheck() did not use the HTTP client provided via option.WithHTTPClient")
+	}
+}
+
+// newMockJWKSServer starts a server that serves the mock App Check JWKS, and points
+// appcheck.JWKSUrl at it for the duration of the test.
+func newMockJWKSServer(t *testing.T) *httptest.Server {
+	jwks, err := os.ReadFile("testdata/mock.jwks.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jwks)
+	}))
+	orig := appcheck.JWKSUrl
+	appcheck.JWKSUrl = ts.URL
+	t.Cleanup(func() { appcheck.JWKSUrl = orig })
+	return ts
+}
+
+type countingTransport struct {
+	base  http.RoundTripper
+	calls int32
+}
+
+func (c *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	atomic.AddInt32(&c.calls, 1)
+	return c.base.RoundTrip(r)
 }
 
 func TestCustomTokenSource(t *testing.T) {
