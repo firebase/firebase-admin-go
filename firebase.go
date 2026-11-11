@@ -141,6 +141,8 @@ func (a *App) Messaging(ctx context.Context) (*messaging.Client, error) {
 }
 
 // AppCheck returns an instance of appcheck.Client.
+// It validates the App's client options before fetching public verification keys. App credentials
+// are not added to key requests; a custom HTTP client's authentication behavior is unchanged.
 func (a *App) AppCheck(ctx context.Context) (*appcheck.Client, error) {
 	conf := &internal.AppCheckConfig{
 		ProjectID: a.projectID,

@@ -465,6 +465,25 @@ func TestAppCheckWithCredentialsAndCustomHTTPClient(t *testing.T) {
 	}
 }
 
+func TestAppCheckWithTokenSourceDoesNotAuthenticateJWKS(t *testing.T) {
+	ts := newMockJWKSServer(t)
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app, err := NewApp(
+		ctx,
+		&Config{ProjectID: "test-project-id"},
+		option.WithTokenSource(&testTokenSource{AccessToken: "private-access-token"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.AppCheck(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // newMockJWKSServer starts a server that serves the mock App Check JWKS, and points
 // appcheck.JWKSUrl at it for the duration of the test.
 func newMockJWKSServer(t *testing.T) *httptest.Server {
@@ -473,6 +492,9 @@ func newMockJWKSServer(t *testing.T) *httptest.Server {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			t.Errorf("JWKS request Authorization = %q; want empty", authorization)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(jwks)
 	}))

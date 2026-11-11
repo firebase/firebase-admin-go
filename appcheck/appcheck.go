@@ -86,6 +86,11 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		return nil, errors.New("project ID is required to access Firebase App Check client")
 	}
 
+	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	// Use the HTTP client configured on the App (option.WithHTTPClient), if any. The JWKS endpoint
 	// is public, so otherwise the keys are fetched without authentication, as before. Validation is
 	// skipped because App options carrying credentials conflict with WithoutAuthentication.
@@ -105,10 +110,6 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		return nil, err
 	}
 
-	hc, _, err := internal.NewHTTPClient(ctx, conf.Opts...)
-	if err != nil {
-		return nil, err
-	}
 	hc.Opts = []internal.HTTPOption{
 		internal.WithHeader("x-goog-api-client", internal.GetMetricsHeader(conf.Version)),
 	}
