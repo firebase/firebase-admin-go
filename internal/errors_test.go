@@ -335,3 +335,59 @@ func TestErrorHTTPResponse(t *testing.T) {
 		t.Errorf("Unmarshal(Response.Body) = %v; want = {key: value}", m)
 	}
 }
+
+func TestHasPlatformErrorCode(t *testing.T) {
+	type args struct {
+		err  error
+		code ErrorCode
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "nil",
+			args: args{
+				err:  nil,
+				code: Aborted,
+			},
+			want: false,
+		},
+		{
+			name: "not internal",
+			args: args{
+				err:  fmt.Errorf("something happened"),
+				code: Aborted,
+			},
+			want: false,
+		},
+		{
+			name: "simple",
+			args: args{
+				err: &FirebaseError{
+					ErrorCode: Aborted,
+				},
+				code: Aborted,
+			},
+			want: true,
+		},
+		{
+			name: "wrapped",
+			args: args{
+				err: fmt.Errorf("[prefix] %w", &FirebaseError{
+					ErrorCode: Aborted,
+				}),
+				code: Aborted,
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HasPlatformErrorCode(tt.args.err, tt.args.code); got != tt.want {
+				t.Errorf("HasPlatformErrorCode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
