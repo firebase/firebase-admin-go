@@ -188,11 +188,11 @@ func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner,
 	}, nil
 }
 
-func (s iamSigner) Algorithm() string {
+func (s *iamSigner) Algorithm() string {
 	return algorithmRS256
 }
 
-func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
+func (s *iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	account, err := s.Email(ctx)
 	if err != nil {
 		return nil, err
@@ -217,13 +217,13 @@ func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(signResponse.Signature)
 }
 
-func (s iamSigner) Email(ctx context.Context) (string, error) {
+func (s *iamSigner) Email(ctx context.Context) (string, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	if s.serviceAcct != "" {
 		return s.serviceAcct, nil
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	result, err := s.callMetadataService(ctx)
 	if err != nil {
 		msg := "failed to determine service account: %v; initialize the SDK with service " +
@@ -237,7 +237,7 @@ func (s iamSigner) Email(ctx context.Context) (string, error) {
 	return result, nil
 }
 
-func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
+func (s *iamSigner) callMetadataService(ctx context.Context) (string, error) {
 	// Use the built-in default client without request authorization or retries for this call.
 	noAuthClient := &internal.HTTPClient{
 		Client: http.DefaultClient,
