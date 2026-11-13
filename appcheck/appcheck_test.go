@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,6 +31,37 @@ func TestNewClientWithoutProjectID(t *testing.T) {
 	client, err := NewClient(context.Background(), conf)
 	if client != nil || err == nil {
 		t.Errorf("NewClient() = (%v, %v); want = (nil, error)", client, err)
+	}
+}
+
+func TestNewClientWithInvalidCredentialsSkipsJWKS(t *testing.T) {
+	jwks, err := os.ReadFile("../testdata/mock.jwks.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requests int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jwks)
+	}))
+	defer ts.Close()
+	orig := JWKSUrl
+	JWKSUrl = ts.URL
+	defer func() { JWKSUrl = orig }()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conf := &internal.AppCheckConfig{
+		ProjectID: "test-project-id",
+		Opts:      []option.ClientOption{option.WithCredentialsJSON([]byte("invalid credentials"))},
+	}
+
+	client, err := NewClient(ctx, conf)
+	if client != nil || err == nil {
+		t.Fatalf("NewClient() = (%v, %v); want = (nil, error)", client, err)
+	}
+	if got := atomic.LoadInt32(&requests); got != 0 {
+		t.Errorf("JWKS requests = %d; want = 0 for invalid credentials", got)
 	}
 }
 
