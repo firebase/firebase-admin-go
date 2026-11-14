@@ -129,7 +129,7 @@ func sendAll(ctx context.Context, client *messaging.Client) {
 		},
 	}
 
-	br, err := client.SendAll(context.Background(), messages)
+	br, err := client.SendEach(context.Background(), messages)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -191,7 +191,7 @@ func sendMulticast(ctx context.Context, client *messaging.Client) {
 		Tokens: registrationTokens,
 	}
 
-	br, err := client.SendMulticast(context.Background(), message)
+	br, err := client.SendEachForMulticast(context.Background(), message)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -219,7 +219,7 @@ func sendMulticastAndHandleErrors(ctx context.Context, client *messaging.Client)
 		Tokens: registrationTokens,
 	}
 
-	br, err := client.SendMulticast(context.Background(), message)
+	br, err := client.SendEachForMulticast(context.Background(), message)
 	if err != nil {
 		log.Fatalln(err)
 	}
