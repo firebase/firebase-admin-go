@@ -479,7 +479,13 @@ func stringToDuration(s string) (time.Duration, error) {
 
 	ttl := time.Duration(seconds) * time.Second
 	if len(segments) == 2 {
-		nanos, err := strconv.ParseInt(strings.TrimLeft(segments[1], "0"), 10, 64)
+		// The fractional part has up to nine digits (e.g. "3.5s" is 3.5 seconds). Right-pad it to
+		// nine digits so that it can be parsed as a number of nanoseconds.
+		fraction := segments[1]
+		if len(fraction) == 0 || len(fraction) > 9 {
+			return 0, fmt.Errorf("failed to parse %s: fractional part must have 1 to 9 digits", s)
+		}
+		nanos, err := strconv.ParseUint(fraction+strings.Repeat("0", 9-len(fraction)), 10, 64)
 		if err != nil {
 			return 0, fmt.Errorf("failed to parse %s: %v", s, err)
 		}

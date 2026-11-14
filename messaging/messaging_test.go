@@ -1222,6 +1222,35 @@ func TestJSONUnmarshal(t *testing.T) {
 	}
 }
 
+func TestJSONUnmarshalFractionalDuration(t *testing.T) {
+	cases := []struct {
+		ttl  string
+		want time.Duration
+	}{
+		{"3s", 3 * time.Second},
+		{"3.5s", 3500 * time.Millisecond},
+		{"1.500s", 1500 * time.Millisecond},
+		{"1.000s", time.Second},
+		{"0.000001s", time.Microsecond},
+		{"3.000000001s", 3*time.Second + time.Nanosecond},
+		{"3.500000000s", 3500 * time.Millisecond},
+	}
+	for _, tc := range cases {
+		b, err := json.Marshal(map[string]interface{}{"ttl": tc.ttl})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var target AndroidConfig
+		if err := json.Unmarshal(b, &target); err != nil {
+			t.Errorf("Unmarshal(%s) = %v; want = nil", tc.ttl, err)
+			continue
+		}
+		if target.TTL == nil || *target.TTL != tc.want {
+			t.Errorf("Unmarshal(%s).TTL = %v; want = %v", tc.ttl, target.TTL, tc.want)
+		}
+	}
+}
+
 func TestInvalidJSONUnmarshal(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -1246,6 +1275,13 @@ func TestInvalidJSONUnmarshal(t *testing.T) {
 			name: "IncorrectTTLNanoseconds",
 			req: map[string]interface{}{
 				"ttl": "10.abcs",
+			},
+			target: &AndroidConfig{},
+		},
+		{
+			name: "TooManyTTLFractionalDigits",
+			req: map[string]interface{}{
+				"ttl": "1.1234567891s",
 			},
 			target: &AndroidConfig{},
 		},
