@@ -187,7 +187,7 @@ func (tv *tokenVerifier) verifyContent(token string, isEmulator bool) (*Token, e
 	if token == "" {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			String:    fmt.Sprintf("%s must be a non-empty string", tv.shortName),
+			Message:    fmt.Sprintf("%s must be a non-empty string", tv.shortName),
 			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
 		}
 	}
@@ -196,7 +196,7 @@ func (tv *tokenVerifier) verifyContent(token string, isEmulator bool) (*Token, e
 	if err != nil {
 		return nil, &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			String: fmt.Sprintf(
+			Message: fmt.Sprintf(
 				"%s; see %s for details on how to retrieve a valid %s",
 				err.Error(), tv.docURL, tv.shortName),
 			Ext: map[string]interface{}{authErrorCode: tv.invalidTokenCode},
@@ -210,7 +210,7 @@ func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
 	if (payload.IssuedAt - clockSkewSeconds) > tv.clock.Now().Unix() {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			String:    fmt.Sprintf("%s issued at future timestamp: %d", tv.shortName, payload.IssuedAt),
+			Message:    fmt.Sprintf("%s issued at future timestamp: %d", tv.shortName, payload.IssuedAt),
 			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
 		}
 	}
@@ -218,7 +218,7 @@ func (tv *tokenVerifier) verifyTimestamps(payload *Token) error {
 	if (payload.Expires + clockSkewSeconds) < tv.clock.Now().Unix() {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			String:    fmt.Sprintf("%s has expired at: %d", tv.shortName, payload.Expires),
+			Message:    fmt.Sprintf("%s has expired at: %d", tv.shortName, payload.Expires),
 			Ext:       map[string]interface{}{authErrorCode: tv.expiredTokenCode},
 		}
 	}
@@ -231,7 +231,7 @@ func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) erro
 	if err != nil {
 		return &internal.FirebaseError{
 			ErrorCode: internal.Unknown,
-			String:    err.Error(),
+			Message:    err.Error(),
 			Ext:       map[string]interface{}{authErrorCode: certificateFetchFailed},
 		}
 	}
@@ -239,7 +239,7 @@ func (tv *tokenVerifier) verifySignature(ctx context.Context, token string) erro
 	if !tv.verifySignatureWithKeys(ctx, token, keys) {
 		return &internal.FirebaseError{
 			ErrorCode: internal.InvalidArgument,
-			String:    "failed to verify token signature",
+			Message:    "failed to verify token signature",
 			Ext:       map[string]interface{}{authErrorCode: tv.invalidTokenCode},
 		}
 	}
