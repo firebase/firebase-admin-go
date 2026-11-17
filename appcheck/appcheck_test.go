@@ -57,7 +57,7 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	timeFunc = func() time.Time {
+	client.timeFunc = func() time.Time {
 		return mockTime
 	}
 
@@ -233,7 +233,7 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	timeFunc = func() time.Time {
+	client.timeFunc = func() time.Time {
 		return mockTime
 	}
 
@@ -317,9 +317,6 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	timeFunc = func() time.Time {
-		return mockTime
-	}
 
 	claims := &appCheckClaims{
 		[]string{"projects/12345678", "projects/project_id"},
@@ -390,6 +387,9 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			client, err := NewClient(context.Background(), conf)
 			if err != nil {
 				t.Fatalf("Error creating NewClient: %v", err)
+			}
+			client.timeFunc = func() time.Time {
+				return mockTime
 			}
 
 			decodedToken, err := client.VerifyOneTimeToken(context.Background(), tokenString)

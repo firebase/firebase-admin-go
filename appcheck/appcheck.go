@@ -31,8 +31,6 @@ import (
 // JWKSUrl is the URL of the JWKS used to verify App Check tokens.
 var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1/jwks"
 
-var timeFunc = time.Now
-
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
 var (
@@ -74,6 +72,7 @@ type Client struct {
 	projectID string
 	jwks      *keyfunc.JWKS
 	client    *internal.HTTPClient
+	timeFunc  func() time.Time
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -105,6 +104,7 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		projectID: conf.ProjectID,
 		jwks:      jwks,
 		client:    hc,
+		timeFunc:  time.Now,
 	}, nil
 }
 
@@ -135,7 +135,7 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 			return nil, ErrTokenType
 		}
 		return c.jwks.Keyfunc(t)
-	}, jwt.WithTimeFunc(timeFunc))
+	}, jwt.WithTimeFunc(c.timeFunc))
 	if err != nil {
 		return nil, err
 	}
