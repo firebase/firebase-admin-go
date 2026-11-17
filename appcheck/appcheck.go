@@ -22,14 +22,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MicahParks/keyfunc"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/golang-jwt/jwt/v5"
 
 	"firebase.google.com/go/v4/internal"
 )
 
 // JWKSUrl is the URL of the JWKS used to verify App Check tokens.
 var JWKSUrl = "https://firebaseappcheck.googleapis.com/v1/jwks"
+
+var timeFunc = time.Now
 
 const appCheckIssuer = "https://firebaseappcheck.googleapis.com/"
 
@@ -133,7 +135,7 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 			return nil, ErrTokenType
 		}
 		return c.jwks.Keyfunc(t)
-	})
+	}, jwt.WithTimeFunc(timeFunc))
 	if err != nil {
 		return nil, err
 	}
