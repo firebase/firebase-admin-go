@@ -94,8 +94,8 @@ func newTenantManager(client *internal.HTTPClient, conf *internal.AuthConfig, ba
 
 // AuthForTenant creates a new TenantClient scoped to a given tenantID.
 func (tm *TenantManager) AuthForTenant(tenantID string) (*TenantClient, error) {
-	if tenantID == "" {
-		return nil, errors.New("tenantID must not be empty")
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
 	}
 
 	return &TenantClient{
@@ -105,8 +105,8 @@ func (tm *TenantManager) AuthForTenant(tenantID string) (*TenantClient, error) {
 
 // Tenant returns the tenant with the given ID.
 func (tm *TenantManager) Tenant(ctx context.Context, tenantID string) (*Tenant, error) {
-	if tenantID == "" {
-		return nil, errors.New("tenantID must not be empty")
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
 	}
 
 	req := &internal.Request{
@@ -146,8 +146,8 @@ func (tm *TenantManager) CreateTenant(ctx context.Context, tenant *TenantToCreat
 
 // UpdateTenant updates an existing tenant with the given options.
 func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tenant *TenantToUpdate) (*Tenant, error) {
-	if tenantID == "" {
-		return nil, errors.New("tenantID must not be empty")
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
 	}
 	if tenant == nil {
 		return nil, errors.New("tenant must not be nil")
@@ -179,8 +179,8 @@ func (tm *TenantManager) UpdateTenant(ctx context.Context, tenantID string, tena
 
 // DeleteTenant deletes the tenant with the given ID.
 func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
-	if tenantID == "" {
-		return errors.New("tenantID must not be empty")
+	if err := validateTenantID(tenantID); err != nil {
+		return err
 	}
 
 	req := &internal.Request{
@@ -189,6 +189,16 @@ func (tm *TenantManager) DeleteTenant(ctx context.Context, tenantID string) erro
 	}
 	_, err := tm.makeRequest(ctx, req, nil)
 	return err
+}
+
+func validateTenantID(tenantID string) error {
+	if tenantID == "" {
+		return errors.New("tenantID must not be empty")
+	}
+	if !isSafeURLSegment(tenantID) {
+		return fmt.Errorf("invalid tenantID: %q", tenantID)
+	}
+	return nil
 }
 
 // Tenants returns an iterator over tenants in the project.

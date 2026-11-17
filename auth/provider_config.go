@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -967,8 +968,17 @@ func (dao *samlProviderConfigDAO) toSAMLProviderConfig() *SAMLProviderConfig {
 	}
 }
 
+var safeURLSegmentPattern = regexp.MustCompile(`^[a-zA-Z0-9\-_.~]+$`)
+
+func isSafeURLSegment(segment string) bool {
+	if segment == "" || strings.HasSuffix(segment, ".") {
+		return false
+	}
+	return safeURLSegmentPattern.MatchString(segment)
+}
+
 func validateOIDCConfigID(id string) error {
-	if !strings.HasPrefix(id, "oidc.") {
+	if !strings.HasPrefix(id, "oidc.") || !isSafeURLSegment(id) {
 		return fmt.Errorf("invalid OIDC provider id: %q", id)
 	}
 
@@ -976,7 +986,7 @@ func validateOIDCConfigID(id string) error {
 }
 
 func validateSAMLConfigID(id string) error {
-	if !strings.HasPrefix(id, "saml.") {
+	if !strings.HasPrefix(id, "saml.") || !isSafeURLSegment(id) {
 		return fmt.Errorf("invalid SAML provider id: %q", id)
 	}
 

@@ -41,6 +41,28 @@ func TestAuthForTenantEmptyTenantID(t *testing.T) {
 	}
 }
 
+var invalidTenantIDs = []string{
+	".",
+	"..",
+	"tenant.",
+	"tenant/sub",
+	"tenant?param=1",
+	"tenant#frag",
+}
+
+func TestAuthForTenantInvalidTenantID(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		client, err := s.Client.TenantManager.AuthForTenant(id)
+		if client != nil || err == nil || err.Error() != wantErr {
+			t.Errorf("AuthForTenant(%q) = (%v, %v); want = (nil, %q)", id, client, err, wantErr)
+		}
+	}
+}
+
 func TestTenantID(t *testing.T) {
 	s := echoServer(testGetUserResponse, t)
 	defer s.Close()
@@ -1250,6 +1272,17 @@ func TestTenantEmptyID(t *testing.T) {
 	}
 }
 
+func TestTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		tenant, err := tm.Tenant(context.Background(), id)
+		if tenant != nil || err == nil || err.Error() != wantErr {
+			t.Errorf("Tenant(%q) = (%v, %v); want = (nil, %q)", id, tenant, err, wantErr)
+		}
+	}
+}
+
 func TestTenantError(t *testing.T) {
 	s := echoServer([]byte(tenantNotFoundResponse), t)
 	defer s.Close()
@@ -1502,6 +1535,17 @@ func TestUpdateTenantEmptyID(t *testing.T) {
 	}
 }
 
+func TestUpdateTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	options := (&TenantToUpdate{}).DisplayName("")
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		if _, err := tm.UpdateTenant(context.Background(), id, options); err == nil || err.Error() != wantErr {
+			t.Errorf("UpdateTenant(%q) = %v, want = %q", id, err, wantErr)
+		}
+	}
+}
+
 func TestUpdateTenantNilOptions(t *testing.T) {
 	tm := &TenantManager{}
 	want := "tenant must not be nil"
@@ -1545,6 +1589,17 @@ func TestDeleteTenantEmptyID(t *testing.T) {
 	err := tm.DeleteTenant(context.Background(), "")
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("DeleteTenant('') = %v; want = (nil, %q)", err, wantErr)
+	}
+}
+
+func TestDeleteTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		err := tm.DeleteTenant(context.Background(), id)
+		if err == nil || err.Error() != wantErr {
+			t.Errorf("DeleteTenant(%q) = %v; want = %q", id, err, wantErr)
+		}
 	}
 }
 
