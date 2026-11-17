@@ -1,5 +1,6 @@
 testdata/integration_*
 .vscode/*
+.idea/
 *~
 \#*\#
 .DS_Store

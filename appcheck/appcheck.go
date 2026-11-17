@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MicahParks/keyfunc"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/golang-jwt/jwt/v5"
 
 	"firebase.google.com/go/v4/internal"
 )
@@ -72,6 +72,7 @@ type Client struct {
 	projectID string
 	jwks      *keyfunc.JWKS
 	client    *internal.HTTPClient
+	timeFunc  func() time.Time
 }
 
 // NewClient creates a new instance of the Firebase App Check Client.
@@ -103,6 +104,7 @@ func NewClient(ctx context.Context, conf *internal.AppCheckConfig) (*Client, err
 		projectID: conf.ProjectID,
 		jwks:      jwks,
 		client:    hc,
+		timeFunc:  time.Now,
 	}, nil
 }
 
@@ -133,7 +135,7 @@ func (c *Client) VerifyToken(token string) (*DecodedAppCheckToken, error) {
 			return nil, ErrTokenType
 		}
 		return c.jwks.Keyfunc(t)
-	})
+	}, jwt.WithTimeFunc(c.timeFunc))
 	if err != nil {
 		return nil, err
 	}

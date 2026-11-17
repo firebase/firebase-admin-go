@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
-	"github.com/MicahParks/keyfunc"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestNewClient(t *testing.T) {
@@ -168,7 +168,7 @@ func TestVerifyToken(t *testing.T) {
 				})
 			},
 			wantErr:    true,
-			wantErrMsg: "Token is expired",
+			wantErrMsg: jwt.ErrTokenExpired.Error(),
 		},
 		{
 			name:          "Wrong Audience",

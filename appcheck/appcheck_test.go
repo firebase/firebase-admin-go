@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/option"
 )
@@ -57,7 +57,7 @@ func TestVerifyTokenHasValidClaims(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	jwt.TimeFunc = func() time.Time {
+	client.timeFunc = func() time.Time {
 		return mockTime
 	}
 
@@ -233,7 +233,7 @@ func TestVerifyTokenNotExpired(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	jwt.TimeFunc = func() time.Time {
+	client.timeFunc = func() time.Time {
 		return mockTime
 	}
 
@@ -317,9 +317,6 @@ func TestVerifyOneTimeToken(t *testing.T) {
 	}
 
 	mockTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
-	jwt.TimeFunc = func() time.Time {
-		return mockTime
-	}
 
 	claims := &appCheckClaims{
 		[]string{"projects/12345678", "projects/project_id"},
@@ -390,6 +387,9 @@ func TestVerifyOneTimeToken(t *testing.T) {
 			client, err := NewClient(context.Background(), conf)
 			if err != nil {
 				t.Fatalf("Error creating NewClient: %v", err)
+			}
+			client.timeFunc = func() time.Time {
+				return mockTime
 			}
 
 			decodedToken, err := client.VerifyOneTimeToken(context.Background(), tokenString)
