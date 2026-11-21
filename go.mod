@@ -9,8 +9,8 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-cmp v0.7.0
 	golang.org/x/oauth2 v0.38.0
-	google.golang.org/api v0.311.0
-	google.golang.org/appengine/v2 v2.0.6
+	google.golang.org/api v0.315.0
+	google.golang.org/appengine/v2 v2.1.0
 )
 
 require (
