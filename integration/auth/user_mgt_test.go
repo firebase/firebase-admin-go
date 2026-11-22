@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import (
 
 const (
 	continueURL        = "http://localhost/?a=1&b=2#c=3"
+	invalidContinueURL = "http://www.localhost/?a=1&b=2#c=3"
 	continueURLKey     = "continueUrl"
 	oobCodeKey         = "oobCode"
 	modeKey            = "mode"
@@ -1297,6 +1298,19 @@ func TestEmailSignInLink(t *testing.T) {
 	}
 }
 
+func TestAuthErrorParse(t *testing.T) {
+	user := newUserWithParams(t)
+	defer deleteUser(user.UID)
+	_, err := client.EmailSignInLink(context.Background(), user.Email, &auth.ActionCodeSettings{
+		URL:             invalidContinueURL,
+		HandleCodeInApp: false,
+	})
+	want := "domain of the continue url is not whitelisted: "
+	if err == nil || !auth.IsUnauthorizedContinueURI(err) || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("EmailSignInLink() expected error, got: %s, want: %s", err, want)
+	}
+}
+
 func resetPassword(email, oldPassword, newPassword, oobCode string) error {
 	req := map[string]interface{}{
 		"email":       email,
@@ -1426,5 +1440,41 @@ func deletePhoneNumberUser(t *testing.T, phoneNumber string) {
 
 	if err = client.DeleteUser(context.Background(), userRecord.UID); err != nil {
 		t.Fatal(err)
+	}
+}
+func TestQueryUsers(t *testing.T) {
+	u1 := newUserWithParams(t)
+	defer deleteUser(u1.UID)
+	u2 := newUserWithParams(t)
+	defer deleteUser(u2.UID)
+
+	// Query by email
+	query := &auth.QueryUsersRequest{
+		Expression: []*auth.Expression{
+			{
+				Email: u1.Email,
+			},
+		},
+	}
+	result, err := client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+	if len(result.Users) != 1 || result.Users[0].UID != u1.UID {
+		t.Errorf("QueryUsers(uid=%s) = %v; want user %s", u1.UID, result.Users, u1.UID)
+	}
+
+	// Query with limit and sort
+	query = &auth.QueryUsersRequest{
+		Limit:  2,
+		SortBy: auth.CreatedAt,
+		Order:  auth.Desc,
+	}
+	result, err = client.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() = %v", err)
+	}
+	if len(result.Users) < 2 {
+		t.Errorf("QueryUsers(limit=2) = %d users; want >= 2", len(result.Users))
 	}
 }

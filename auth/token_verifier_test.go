@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -51,7 +51,7 @@ func TestNewIDTokenVerifier(t *testing.T) {
 }
 
 func TestHTTPKeySource(t *testing.T) {
-	data, err := ioutil.ReadFile("../testdata/public_certs.json")
+	data, err := os.ReadFile("../testdata/public_certs.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestHTTPKeySource(t *testing.T) {
 }
 
 func TestHTTPKeySourceWithClient(t *testing.T) {
-	data, err := ioutil.ReadFile("../testdata/public_certs.json")
+	data, err := os.ReadFile("../testdata/public_certs.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestFindMaxAge(t *testing.T) {
 }
 
 func TestParsePublicKeys(t *testing.T) {
-	b, err := ioutil.ReadFile("../testdata/public_certs.json")
+	b, err := os.ReadFile("../testdata/public_certs.json")
 	if err != nil {
 		t.Fatal(err)
 	}

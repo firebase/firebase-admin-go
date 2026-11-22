@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -74,10 +73,10 @@ func TestMain(m *testing.M) {
 	testCookieVerifier, err = cookieVerifierForTests(context.Background())
 	logFatal(err)
 
-	testGetUserResponse, err = ioutil.ReadFile("../testdata/get_user.json")
+	testGetUserResponse, err = os.ReadFile("../testdata/get_user.json")
 	logFatal(err)
 
-	testGetDisabledUserResponse, err = ioutil.ReadFile("../testdata/get_disabled_user.json")
+	testGetDisabledUserResponse, err = os.ReadFile("../testdata/get_disabled_user.json")
 	logFatal(err)
 
 	testIDToken = getIDToken(nil)
@@ -526,7 +525,7 @@ func TestVerifyIDTokenClockSkew(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ft, err := client.VerifyIDToken(context.Background(), tc.token)
 			if err != nil {
-				t.Fatalf("VerifyIDToken(%q) = (%q, %v); want = (token, nil)", tc.name, ft, err)
+				t.Fatalf("VerifyIDToken(%q) = (%v, %v); want = (token, nil)", tc.name, ft, err)
 			}
 			if ft.Claims["admin"] != true {
 				t.Errorf("Claims['admin'] = %v; want = true", ft.Claims["admin"])
@@ -1290,7 +1289,7 @@ type mockKeySource struct {
 }
 
 func newMockKeySource(filePath string) (*mockKeySource, error) {
-	certs, err := ioutil.ReadFile(filePath)
+	certs, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}

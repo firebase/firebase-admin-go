@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -38,6 +38,28 @@ func TestAuthForTenantEmptyTenantID(t *testing.T) {
 	client, err := s.Client.TenantManager.AuthForTenant("")
 	if client != nil || err == nil {
 		t.Errorf("AuthForTenant() = (%v, %v); want = (nil, error)", client, err)
+	}
+}
+
+var invalidTenantIDs = []string{
+	".",
+	"..",
+	"tenant.",
+	"tenant/sub",
+	"tenant?param=1",
+	"tenant#frag",
+}
+
+func TestAuthForTenantInvalidTenantID(t *testing.T) {
+	s := echoServer(testGetUserResponse, t)
+	defer s.Close()
+
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		client, err := s.Client.TenantManager.AuthForTenant(id)
+		if client != nil || err == nil || err.Error() != wantErr {
+			t.Errorf("AuthForTenant(%q) = (%v, %v); want = (nil, %q)", id, client, err, wantErr)
+		}
 	}
 }
 
@@ -87,6 +109,35 @@ func TestTenantGetUser(t *testing.T) {
 	wantPath := "/projects/mock-project-id/tenants/tenantID/accounts:lookup"
 	if s.Req[0].RequestURI != wantPath {
 		t.Errorf("GetUser() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
+	}
+}
+
+func TestTenantQueryUsers(t *testing.T) {
+	resp := `{
+		"usersInfo": [],
+		"recordsCount": "0"
+	}`
+	s := echoServer([]byte(resp), t)
+	defer s.Close()
+
+	tenantClient, err := s.Client.TenantManager.AuthForTenant("test-tenant")
+	if err != nil {
+		t.Fatalf("Failed to create tenant client: %v", err)
+	}
+
+	returnUserInfo := true
+	query := &QueryUsersRequest{
+		ReturnUserInfo: &returnUserInfo,
+	}
+
+	_, err = tenantClient.QueryUsers(context.Background(), query)
+	if err != nil {
+		t.Fatalf("QueryUsers() with tenant client = %v", err)
+	}
+
+	wantPath := "/projects/mock-project-id/tenants/test-tenant/accounts:query"
+	if s.Req[0].RequestURI != wantPath {
+		t.Errorf("QueryUsers() URL = %q; want = %q", s.Req[0].RequestURI, wantPath)
 	}
 }
 
@@ -149,7 +200,7 @@ func TestTenantGetUserByPhoneNumber(t *testing.T) {
 }
 
 func TestTenantListUsers(t *testing.T) {
-	testListUsersResponse, err := ioutil.ReadFile("../testdata/list_users.json")
+	testListUsersResponse, err := os.ReadFile("../testdata/list_users.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,6 +617,34 @@ func TestTenantEmailSignInLink(t *testing.T) {
 	}
 	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
 		t.Fatalf("EmailSignInLink() %v", err)
+	}
+}
+
+func TestTenantVerifyAndChangeEmail(t *testing.T) {
+	s := echoServer(testActionLinkResponse, t)
+	defer s.Close()
+
+	client, err := s.Client.TenantManager.AuthForTenant("tenantID")
+	if err != nil {
+		t.Fatalf("AuthForTenant() = %v", err)
+	}
+
+	link, err := client.VerifyAndChangeEmailLink(context.Background(), testEmail, testNewEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != testActionLink {
+		t.Errorf("VerifyAndChangeEmailLink() = %q; want = %q", link, testActionLink)
+	}
+
+	want := map[string]interface{}{
+		"requestType":   "VERIFY_AND_CHANGE_EMAIL",
+		"email":         testEmail,
+		"returnOobLink": true,
+		"newEmail":      testNewEmail,
+	}
+	if err := checkActionLinkRequestWithURL(want, wantEmailActionURL, s); err != nil {
+		t.Fatalf("checkActionLinkRequestWithURL() = %v", err)
 	}
 }
 
@@ -1193,6 +1272,17 @@ func TestTenantEmptyID(t *testing.T) {
 	}
 }
 
+func TestTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		tenant, err := tm.Tenant(context.Background(), id)
+		if tenant != nil || err == nil || err.Error() != wantErr {
+			t.Errorf("Tenant(%q) = (%v, %v); want = (nil, %q)", id, tenant, err, wantErr)
+		}
+	}
+}
+
 func TestTenantError(t *testing.T) {
 	s := echoServer([]byte(tenantNotFoundResponse), t)
 	defer s.Close()
@@ -1445,6 +1535,17 @@ func TestUpdateTenantEmptyID(t *testing.T) {
 	}
 }
 
+func TestUpdateTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	options := (&TenantToUpdate{}).DisplayName("")
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		if _, err := tm.UpdateTenant(context.Background(), id, options); err == nil || err.Error() != wantErr {
+			t.Errorf("UpdateTenant(%q) = %v, want = %q", id, err, wantErr)
+		}
+	}
+}
+
 func TestUpdateTenantNilOptions(t *testing.T) {
 	tm := &TenantManager{}
 	want := "tenant must not be nil"
@@ -1488,6 +1589,17 @@ func TestDeleteTenantEmptyID(t *testing.T) {
 	err := tm.DeleteTenant(context.Background(), "")
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("DeleteTenant('') = %v; want = (nil, %q)", err, wantErr)
+	}
+}
+
+func TestDeleteTenantInvalidID(t *testing.T) {
+	tm := &TenantManager{}
+	for _, id := range invalidTenantIDs {
+		wantErr := fmt.Sprintf("invalid tenantID: %q", id)
+		err := tm.DeleteTenant(context.Background(), id)
+		if err == nil || err.Error() != wantErr {
+			t.Errorf("DeleteTenant(%q) = %v; want = %q", id, err, wantErr)
+		}
 	}
 }
 

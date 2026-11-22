@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -102,6 +102,13 @@ func TestSendInvalidToken(t *testing.T) {
 	msg := &messaging.Message{Token: "INVALID_TOKEN"}
 	if _, err := client.Send(context.Background(), msg); err == nil || !messaging.IsInvalidArgument(err) {
 		t.Errorf("Send() = %v; want InvalidArgumentError", err)
+	}
+}
+
+func TestSendInvalidFid(t *testing.T) {
+	msg := &messaging.Message{Fid: "INVALID_FID"}
+	if _, err := client.Send(context.Background(), msg); err == nil || !messaging.IsUnregistered(err) {
+		t.Errorf("Send() = %v; want UnregisteredError", err)
 	}
 }
 
@@ -225,6 +232,44 @@ func TestSendEachForMulticast(t *testing.T) {
 		sr := br.Responses[i]
 		if err := checkErrorSendResponse(sr); err != nil {
 			t.Errorf("Responses[%d]: %v", i, err)
+		}
+	}
+}
+
+func TestSendEachForMulticastFids(t *testing.T) {
+	message := &messaging.MulticastMessage{
+		Notification: &messaging.Notification{
+			Title: "title",
+			Body:  "body",
+		},
+		Fids: []string{"INVALID_FID", "ANOTHER_INVALID_FID"},
+	}
+
+	br, err := client.SendEachForMulticastDryRun(context.Background(), message)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(br.Responses) != 2 {
+		t.Errorf("len(Responses) = %d; want = 2", len(br.Responses))
+	}
+	if br.SuccessCount != 0 {
+		t.Errorf("SuccessCount = %d; want = 0", br.SuccessCount)
+	}
+	if br.FailureCount != 2 {
+		t.Errorf("FailureCount = %d; want = 2", br.FailureCount)
+	}
+
+	for i := 0; i < 2; i++ {
+		sr := br.Responses[i]
+		if sr.Success {
+			t.Errorf("Responses[%d]: Success = true; want = false", i)
+		}
+		if sr.MessageID != "" {
+			t.Errorf("Responses[%d]: MessageID = %q; want = %q", i, sr.MessageID, "")
+		}
+		if sr.Error == nil || !messaging.IsUnregistered(sr.Error) {
+			t.Errorf("Responses[%d]: Error = %v; want = UnregisteredError", i, sr.Error)
 		}
 	}
 }

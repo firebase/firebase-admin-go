@@ -1,4 +1,4 @@
-// Copyright 2020 Google Inc. All Rights Reserved.
+// Copyright 2020 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -321,7 +321,7 @@ func TestErrorHTTPResponse(t *testing.T) {
 		t.Errorf("Do() Response.StatusCode = %d; want = %d", hr.StatusCode, http.StatusInternalServerError)
 	}
 
-	b, err := ioutil.ReadAll(hr.Body)
+	b, err := io.ReadAll(hr.Body)
 	if err != nil {
 		t.Fatalf("ReadAll(Response.Body) = %v", err)
 	}

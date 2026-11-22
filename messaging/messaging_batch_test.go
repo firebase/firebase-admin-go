@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +35,13 @@ import (
 var testMessages = []*Message{{Topic: "topic1"}, {Topic: "topic2"}}
 var testMulticastMessage = &MulticastMessage{
 	Tokens: []string{"token1", "token2"},
+}
+var testFidMulticastMessage = &MulticastMessage{
+	Fids: []string{"fid1", "fid2"},
+}
+var testMixedMulticastMessage = &MulticastMessage{
+	Tokens: []string{"token1"},
+	Fids:   []string{"fid2"},
 }
 var testSuccessResponse = []fcmResponse{
 	{Name: "projects/test-project/messages/1"},
@@ -467,7 +473,7 @@ func TestSendEachInvalidMessage(t *testing.T) {
 
 func TestSendEach(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, testMessage := range testMessages {
 			if strings.Contains(string(req), testMessage.Topic) {
@@ -495,7 +501,7 @@ func TestSendEach(t *testing.T) {
 
 func TestSendEachDryRun(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, testMessage := range testMessages {
 			if strings.Contains(string(req), testMessage.Topic) {
@@ -541,7 +547,7 @@ func TestSendEachPartialFailure(t *testing.T) {
 			mu.Lock()
 			serverHitCount++
 			mu.Unlock()
-			reqBody, _ := ioutil.ReadAll(r.Body)
+			reqBody, _ := io.ReadAll(r.Body)
 			var msgIn fcmRequest
 			json.Unmarshal(reqBody, &msgIn)
 
@@ -642,7 +648,7 @@ func TestSendEachForMulticastEmptyArray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "tokens must not be nil or empty"
+	want := "either tokens or fids must be specified"
 	mm := &MulticastMessage{}
 	br, err := client.SendEachForMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
@@ -657,9 +663,18 @@ func TestSendEachForMulticastEmptyArray(t *testing.T) {
 	if err == nil || err.Error() != want {
 		t.Errorf("SendEachForMulticast(Tokens: []) = (%v, %v); want = (nil, %q)", br, err, want)
 	}
+
+	var fids []string
+	mm = &MulticastMessage{
+		Fids: fids,
+	}
+	br, err = client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast(Fids: []) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
 }
 
-func TestSendEachForMulticastTooManyTokens(t *testing.T) {
+func TestSendEachForMulticastTooManyTargets(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
@@ -671,9 +686,33 @@ func TestSendEachForMulticastTooManyTokens(t *testing.T) {
 		tokens = append(tokens, fmt.Sprintf("token%d", i))
 	}
 
-	want := "tokens must not contain more than 500 elements"
+	want := "total tokens and fids must not exceed 500 elements"
 	mm := &MulticastMessage{Tokens: tokens}
 	br, err := client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	var fids []string
+	for i := 0; i < 501; i++ {
+		fids = append(fids, fmt.Sprintf("fid%d", i))
+	}
+	mm = &MulticastMessage{Fids: fids}
+	br, err = client.SendEachForMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendEachForMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	mixedTokens := []string{}
+	mixedFids := []string{}
+	for i := 0; i < 250; i++ {
+		mixedTokens = append(mixedTokens, fmt.Sprintf("token%d", i))
+	}
+	for i := 0; i < 251; i++ {
+		mixedFids = append(mixedFids, fmt.Sprintf("fid%d", i))
+	}
+	mm = &MulticastMessage{Tokens: mixedTokens, Fids: mixedFids}
+	br, err = client.SendEachForMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
 		t.Errorf("SendEachForMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
 	}
@@ -699,7 +738,7 @@ func TestSendEachForMulticastInvalidMessage(t *testing.T) {
 
 func TestSendEachForMulticast(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -725,9 +764,70 @@ func TestSendEachForMulticast(t *testing.T) {
 	}
 }
 
+func TestSendEachForMulticastFids(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, fid := range testFidMulticastMessage.Fids {
+			if strings.Contains(string(req), fid) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEachForMulticast(ctx, testFidMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEachForMulticast() = %v", err)
+	}
+}
+
+func TestSendEachForMulticastMixed(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		for idx, token := range testMixedMulticastMessage.Tokens {
+			if strings.Contains(string(req), token) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx].Name + "\" }"))
+			}
+		}
+		for idx, fid := range testMixedMulticastMessage.Fids {
+			if strings.Contains(string(req), fid) {
+				w.Write([]byte("{ \"name\":\"" + testSuccessResponse[idx+1].Name + "\" }"))
+			}
+		}
+	}))
+	defer ts.Close()
+	ctx := context.Background()
+	client, err := NewClient(ctx, testMessagingConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.fcmEndpoint = ts.URL
+
+	br, err := client.SendEachForMulticast(ctx, testMixedMulticastMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkSuccessfulBatchResponseForSendEach(br, false); err != nil {
+		t.Errorf("SendEachForMulticast() = %v", err)
+	}
+}
+
 func TestSendEachForMulticastWithCustomEndpoint(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -760,7 +860,7 @@ func TestSendEachForMulticastWithCustomEndpoint(t *testing.T) {
 
 func TestSendEachForMulticastDryRun(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -793,7 +893,7 @@ func TestSendEachForMulticastPartialFailure(t *testing.T) {
 
 	var failures []string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := ioutil.ReadAll(r.Body)
+		req, _ := io.ReadAll(r.Body)
 
 		for idx, token := range testMulticastMessage.Tokens {
 			if strings.Contains(string(req), token) {
@@ -891,7 +991,7 @@ func TestSendAll(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -922,7 +1022,7 @@ func TestSendAllDryRun(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -952,7 +1052,7 @@ func TestSendAllPartialFailure(t *testing.T) {
 
 	var req, resp []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1099,7 +1199,7 @@ func TestSendMulticastEmptyArray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "tokens must not be nil or empty"
+	want := "either tokens or fids must be specified"
 	mm := &MulticastMessage{}
 	br, err := client.SendMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
@@ -1114,9 +1214,18 @@ func TestSendMulticastEmptyArray(t *testing.T) {
 	if err == nil || err.Error() != want {
 		t.Errorf("SendMulticast(Tokens: []) = (%v, %v); want = (nil, %q)", br, err, want)
 	}
+
+	var fids []string
+	mm = &MulticastMessage{
+		Fids: fids,
+	}
+	br, err = client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast(Fids: []) = (%v, %v); want = (nil, %q)", br, err, want)
+	}
 }
 
-func TestSendMulticastTooManyTokens(t *testing.T) {
+func TestSendMulticastTooManyTargets(t *testing.T) {
 	ctx := context.Background()
 	client, err := NewClient(ctx, testMessagingConfig)
 	if err != nil {
@@ -1128,9 +1237,33 @@ func TestSendMulticastTooManyTokens(t *testing.T) {
 		tokens = append(tokens, fmt.Sprintf("token%d", i))
 	}
 
-	want := "tokens must not contain more than 500 elements"
+	want := "total tokens and fids must not exceed 500 elements"
 	mm := &MulticastMessage{Tokens: tokens}
 	br, err := client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	var fids []string
+	for i := 0; i < 501; i++ {
+		fids = append(fids, fmt.Sprintf("fid%d", i))
+	}
+	mm = &MulticastMessage{Fids: fids}
+	br, err = client.SendMulticast(ctx, mm)
+	if err == nil || err.Error() != want {
+		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
+	}
+
+	mixedTokens := []string{}
+	mixedFids := []string{}
+	for i := 0; i < 250; i++ {
+		mixedTokens = append(mixedTokens, fmt.Sprintf("token%d", i))
+	}
+	for i := 0; i < 251; i++ {
+		mixedFids = append(mixedFids, fmt.Sprintf("fid%d", i))
+	}
+	mm = &MulticastMessage{Tokens: mixedTokens, Fids: mixedFids}
+	br, err = client.SendMulticast(ctx, mm)
 	if err == nil || err.Error() != want {
 		t.Errorf("SendMulticast() = (%v, %v); want = (nil, %q)", br, err, want)
 	}
@@ -1162,7 +1295,7 @@ func TestSendMulticast(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1193,7 +1326,7 @@ func TestSendMulticastWithCustomEndpoint(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1233,7 +1366,7 @@ func TestSendMulticastDryRun(t *testing.T) {
 
 	var req []byte
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ = ioutil.ReadAll(r.Body)
+		req, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", wantMime)
 		w.Write(resp)
 	}))
@@ -1453,7 +1586,7 @@ func checkRequestPart(part *multipart.Part, dryRun bool) error {
 		return fmt.Errorf("X-FIREBASE-CLIENT = %q; want = %q", h, clientVersion)
 	}
 
-	b, _ := ioutil.ReadAll(r.Body)
+	b, _ := io.ReadAll(r.Body)
 	var parsed map[string]interface{}
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		return err

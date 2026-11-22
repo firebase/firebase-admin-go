@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -137,7 +137,7 @@ func initGuestClient(pid string) (*db.Client, error) {
 }
 
 func initRules() {
-	b, err := ioutil.ReadFile(internal.Resource("dinosaurs_index.json"))
+	b, err := os.ReadFile(internal.Resource("dinosaurs_index.json"))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -162,7 +162,7 @@ func initRules() {
 	}
 	defer resp.Body.Close()
 
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err = io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	} else if resp.StatusCode != http.StatusOK {
@@ -171,7 +171,7 @@ func initRules() {
 }
 
 func initData() {
-	b, err := ioutil.ReadFile(internal.Resource("dinosaurs.json"))
+	b, err := os.ReadFile(internal.Resource("dinosaurs.json"))
 	if err != nil {
 		log.Fatalln(err)
 	}

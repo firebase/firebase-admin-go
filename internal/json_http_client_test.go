@@ -1,4 +1,4 @@
-// Copyright 2019 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,7 +72,7 @@ func TestDoAndUnmarshalPost(t *testing.T) {
 	var b []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req = r
-		b, _ = ioutil.ReadAll(r.Body)
+		b, _ = io.ReadAll(r.Body)
 		resp := `{
 			"name": "test"
 		}`

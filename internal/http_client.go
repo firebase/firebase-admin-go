@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"runtime"
@@ -121,7 +120,7 @@ func (r *Response) LowLevelResponse() *http.Response {
 	}
 
 	resp := *r.resp
-	resp.Body = ioutil.NopCloser(bytes.NewBuffer(r.Body))
+	resp.Body = io.NopCloser(bytes.NewBuffer(r.Body))
 	return &resp
 }
 
@@ -305,7 +304,7 @@ func (e *jsonEntity) Mime() string {
 
 func newResponse(resp *http.Response) (*Response, error) {
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
